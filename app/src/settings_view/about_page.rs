@@ -128,6 +128,13 @@ impl SettingsWidget for AboutPageWidget {
                         .with_margin_top(16.)
                         .finish(),
                 )
+                .with_child(
+                    ui_builder
+                        .span(crate::brand::ABOUT_SOURCE)
+                        .build()
+                        .with_margin_top(6.)
+                        .finish(),
+                )
                 .finish(),
         )
         .finish()
