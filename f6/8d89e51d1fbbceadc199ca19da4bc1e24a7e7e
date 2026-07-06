@@ -1,0 +1,44 @@
+app/src/server/cloud_objects/update_manager.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 2952-2977
+app/src/settings_view/ai_page.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 3026-3033,3078-3085,3807-3808,4146-4154,7588-7590,7694-7696,7698-7712,7714-7725,7752
+app/src/workspace/view/left_panel.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 195
+app/src/workspace/action.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 863-864,1203
+app/src/workspace/view.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 107,3274-3277,3290-3298,10588-10591,10593-10624,10658-10671,14452-14460,21188-21194,21199-21200,23458-23465,24022-24023
+  s_3e4cc0ba3e0ede::t_46a79765b15d51 24024
+crates/warp_server_auth/src/auth_state.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 421-429
+app/src/drive/index.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 1064-1074,4408-4416,4807-4821,4823
+  s_3e4cc0ba3e0ede::t_4b5507bcc4768b 4822,4824-4825
+app/src/auth/auth_manager.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 651-659,670-676
+app/src/workspace/view/config_panel.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 98,146-156
+  s_3e4cc0ba3e0ede::t_82d0b3fd0f2c79 157-158
+app/src/gist_sync.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 18,26-34,42-63,83,87,186-192,194-195,200,207-209,260-265,269-270,273-287
+app/src/server/cloud_objects/listener.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 236-244
+app/src/terminal/cli_agent.rs
+  s_3e4cc0ba3e0ede::t_0ddfb9c2e6d99c 7,615-616,619-650,654-655,659-660,672-675,692-719
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f68d89e51d1fbbceadc199ca19da4bc1e24a7e7e",
+  "prompts": {},
+  "sessions": {
+    "s_3e4cc0ba3e0ede": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e772dcd-0cc7-45ef-b232-59d0e8d0d1c9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.pro@gmail.com>"
+    }
+  }
+}
