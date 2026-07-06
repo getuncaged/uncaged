@@ -2949,9 +2949,34 @@ impl UpdateManager {
             return self.trash_object(object_id, ctx);
         }
 
+        let uid = object_id.uid();
+
+        // Uncaged (Oss): the Drive is fully local. Reparent in-memory and persist
+        // the new folder_id straight to SQLite. There is no server to confirm the
+        // move, so we bypass move_object_to_folder and the sync queue entirely —
+        // this is what makes drag-to-folder (and "Move to…") actually work for
+        // local (ClientId) objects, which have no server id.
+        if matches!(
+            warp_core::channel::ChannelState::channel(),
+            warp_core::channel::Channel::Oss
+        ) {
+            let new_folder_id = match new_location {
+                // Moving to a space root clears the folder parent.
+                CloudObjectLocation::Space(_) => None,
+                // Moving into a folder (local ClientId or synced ServerId).
+                CloudObjectLocation::Folder(folder_id) => Some(folder_id),
+                CloudObjectLocation::Trash => return,
+            };
+            CloudModel::handle(ctx).update(ctx, |model, ctx| {
+                model.update_object_location(&uid, None, new_folder_id, ctx);
+            });
+            self.save_in_memory_object_to_sqlite(CloudModel::as_ref(ctx), &uid);
+            ctx.notify();
+            return;
+        }
+
         // A move operation does not make sense offline,
         // so early return if we don't have a server ID for whatever reason.
-        let uid = object_id.uid();
         let Some(server_id) = object_id.server_id() else {
             return;
         };

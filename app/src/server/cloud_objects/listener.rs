@@ -233,6 +233,15 @@ impl Listener {
     }
 
     fn start_listener(&mut self, ctx: &mut ModelContext<Self>) {
+        // Uncaged (Oss): the Drive is 100% local — there is no cloud to subscribe
+        // to. Skip the RTC websocket subscription entirely so we never open (or
+        // retry) a connection and never emit connection-failure log noise.
+        if matches!(
+            warp_core::channel::ChannelState::channel(),
+            warp_core::channel::Channel::Oss
+        ) {
+            return;
+        }
         if !self.should_subscribe_to_updates {
             self.should_subscribe_to_updates = true;
             self.get_warp_drive_updates(ctx);

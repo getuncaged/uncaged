@@ -418,6 +418,15 @@ impl AuthState {
 
     /// Returns whether or not the user is a feature gated anonymous user.
     pub fn is_anonymous_user_feature_gated(&self) -> Option<bool> {
+        // Uncaged (Oss) has no accounts and no feature gating: the local user is
+        // never a gated anonymous user. This removes the Drive object-count cap,
+        // the "sign up for more storage" banner, and the AI-credit gate at once.
+        if matches!(
+            warp_core::channel::ChannelState::channel(),
+            warp_core::channel::Channel::Oss
+        ) {
+            return Some(false);
+        }
         self.user.read().as_ref().map(|user| {
             if !self.is_user_anonymous().unwrap_or_default() {
                 return false;

@@ -95,7 +95,7 @@ fn action_row(
 pub fn render_config_content(
     entries: &[ConfigEntry],
     row_states: &[MouseStateHandle],
-    action_states: &[MouseStateHandle; 4],
+    action_states: &[MouseStateHandle; 5],
     scroll_state: &ClippedScrollStateHandle,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
@@ -141,6 +141,19 @@ pub fn render_config_content(
         "Restore from gist…",
         WorkspaceAction::PullConfigFromGist,
         action_states[3].clone(),
+        appearance,
+    ));
+    // Toggle for automated (no-confirmation) gist sync. Off by default.
+    let auto_label = if crate::gist_sync::auto_sync_enabled() {
+        "Auto-sync to gist: On"
+    } else {
+        "Auto-sync to gist: Off"
+    };
+    column.add_child(action_row(
+        Icon::Refresh,
+        auto_label,
+        WorkspaceAction::ToggleGistAutoSync,
+        action_states[4].clone(),
         appearance,
     ));
 

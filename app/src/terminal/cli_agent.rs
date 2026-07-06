@@ -4,7 +4,7 @@
 //! like Claude Code, Gemini CLI, Codex, Amp, and Droid.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use ai::skills::SkillProvider;
 use enum_iterator::Sequence;
@@ -612,16 +612,52 @@ impl From<CLIAgent> for CLIAgentType {
 
 use std::path::PathBuf;
 
-/// Emitted when the background installed-agent scan finishes.
+/// Emitted when the background installed-agent scan finishes, or when the user
+/// shows/hides an agent's launcher button.
 pub enum CLIAgentInstallEvent {
     ScanComplete,
+    VisibilityChanged,
+}
+
+/// File under the data dir that records which agents the user has hidden from
+/// the coding-agent launcher toolbar. Deliberately local-only, tiny, no secrets.
+const HIDDEN_CLI_AGENTS_FILE: &str = "cli_agents.json";
+
+#[derive(Serialize, Deserialize, Default)]
+struct HiddenCliAgentsFile {
+    /// Agents whose launcher button the user has turned off.
+    hidden: Vec<CLIAgent>,
+}
+
+fn hidden_cli_agents_path() -> PathBuf {
+    warp_core::paths::data_dir().join(HIDDEN_CLI_AGENTS_FILE)
+}
+
+fn load_hidden_cli_agents() -> HashSet<CLIAgent> {
+    std::fs::read_to_string(hidden_cli_agents_path())
+        .ok()
+        .and_then(|s| serde_json::from_str::<HiddenCliAgentsFile>(&s).ok())
+        .map(|f| f.hidden.into_iter().collect())
+        .unwrap_or_default()
+}
+
+fn save_hidden_cli_agents(hidden: &HashSet<CLIAgent>) {
+    let file = HiddenCliAgentsFile {
+        hidden: hidden.iter().copied().collect(),
+    };
+    if let Ok(json) = serde_json::to_string_pretty(&file) {
+        let _ = std::fs::write(hidden_cli_agents_path(), json);
+    }
 }
 
 /// Singleton that scans for installed CLI-agent binaries once at startup and
-/// caches the result. Read it with [`CLIAgentInstallModel::as_ref`].
+/// caches the result, plus the user's per-agent launcher visibility choices.
+/// Read it with [`CLIAgentInstallModel::as_ref`].
 pub struct CLIAgentInstallModel {
     /// `None` until the first scan completes.
     installed: Option<HashMap<CLIAgent, bool>>,
+    /// Agents the user has hidden from the launcher toolbar (persisted locally).
+    hidden: HashSet<CLIAgent>,
 }
 
 impl CLIAgentInstallModel {
@@ -633,7 +669,10 @@ impl CLIAgentInstallModel {
                 ctx.emit(CLIAgentInstallEvent::ScanComplete);
             },
         );
-        Self { installed: None }
+        Self {
+            installed: None,
+            hidden: load_hidden_cli_agents(),
+        }
     }
 
     /// Whether the given agent's binary was found on the user's PATH. Returns
@@ -649,6 +688,34 @@ impl CLIAgentInstallModel {
     /// state until this is true.
     pub fn is_scan_complete(&self) -> bool {
         self.installed.is_some()
+    }
+
+    /// Whether the user has hidden this agent's launcher button.
+    pub fn is_hidden(&self, agent: CLIAgent) -> bool {
+        self.hidden.contains(&agent)
+    }
+
+    /// Whether this agent's launcher button should appear in the toolbar
+    /// (installed AND not hidden by the user).
+    pub fn is_launcher_visible(&self, agent: CLIAgent) -> bool {
+        self.is_installed(agent) && !self.is_hidden(agent)
+    }
+
+    /// Show or hide an agent's launcher button and persist the choice.
+    pub fn set_agent_hidden(
+        &mut self,
+        agent: CLIAgent,
+        hidden: bool,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if hidden {
+            self.hidden.insert(agent);
+        } else {
+            self.hidden.remove(&agent);
+        }
+        save_hidden_cli_agents(&self.hidden);
+        ctx.emit(CLIAgentInstallEvent::VisibilityChanged);
+        ctx.notify();
     }
 }
 
