@@ -1,0 +1,7 @@
+<svg width="24" height="24" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- Uncaged in-terminal AI mark: the ❯ prompt caret. Shown beside an AI reply
+     when no provider logo is available — "the AI answering at the prompt", the
+     same caret that lives in the app mark. Single-colour recolour sentinel
+     (#FF0000); tinted by the icon pipeline. Design system: ai/ai-caret-mono.svg. -->
+<polyline points="44,34 78,60 44,86" fill="none" stroke="#FF0000" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

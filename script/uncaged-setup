@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+#
+# uncaged-setup — configure the Uncaged local agent engine in a few prompts.
+#
+# Writes ~/.uncaged/engine.json (or $UNCAGED_CONFIG), which the running
+# app reads live. Re-run any time to switch backends. This is the build-free
+# path to "plug in any model"; the same options are also exposed in the app's
+# Settings → Uncaged Engine section.
+#
+# Part of the Uncaged fork of the open-source Warp client. AGPL-3.0-only.
+
+set -euo pipefail
+
+CONFIG_PATH="${UNCAGED_CONFIG:-$HOME/.uncaged/engine.json}"
+CONFIG_DIR="$(dirname "$CONFIG_PATH")"
+
+bold() { printf '\033[1m%s\033[0m\n' "$1"; }
+dim()  { printf '\033[2m%s\033[0m\n' "$1"; }
+
+prompt() {
+  # prompt <var> <message> [default]
+  local __var="$1" __msg="$2" __default="${3:-}" __input
+  if [[ -n "$__default" ]]; then
+    read -r -p "$__msg [$__default]: " __input || true
+    __input="${__input:-$__default}"
+  else
+    read -r -p "$__msg: " __input || true
+  fi
+  printf -v "$__var" '%s' "$__input"
+}
+
+prompt_secret() {
+  local __var="$1" __msg="$2" __input
+  read -r -s -p "$__msg: " __input || true
+  echo
+  printf -v "$__var" '%s' "$__input"
+}
+
+write_config() {
+  mkdir -p "$CONFIG_DIR"
+  printf '%s\n' "$1" > "$CONFIG_PATH"
+  echo
+  bold "Saved → $CONFIG_PATH"
+  dim "The app picks this up on the next Agent Mode turn (no restart needed)."
+}
+
+# ----- local runtime detection (so local setups are a couple keystrokes) -----
+
+list_ollama_models() {
+  if command -v ollama >/dev/null 2>&1; then
+    ollama list 2>/dev/null | awk 'NR>1 {print "    - "$1}' || true
+  fi
+}
+
+list_openai_compatible_models() {
+  # list_openai_compatible_models <base_url>
+  local base="$1"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS "${base%/}/models" 2>/dev/null \
+      | grep -o '"id"[[:space:]]*:[[:space:]]*"[^"]*"' \
+      | sed 's/.*"\([^"]*\)"$/    - \1/' || true
+  fi
+}
+
+main() {
+  bold "Uncaged Engine setup"
+  dim  "Power Warp's Agent Mode with your own model — API, local, or a CLI you pay for."
+  echo
+  echo "Choose a backend:"
+  echo "  1) Anthropic API            (Claude — your own API key)"
+  echo "  2) OpenAI API               (GPT — your own API key)"
+  echo "  3) OpenRouter               (any model via one key)"
+  echo "  4) Ollama          (local)  (http://localhost:11434)"
+  echo "  5) LM Studio       (local)  (http://localhost:1234)"
+  echo "  6) Custom OpenAI-compatible (llama.cpp, vLLM, a proxy, ...)"
+  echo "  7) Local agent CLI          (Claude Code / Gemini / Codex — your login)"
+  echo "  8) Disable Uncaged          (fall back to Warp's hosted agent)"
+  echo
+  prompt CHOICE "Selection" "1"
+  echo
+
+  case "$CHOICE" in
+    1)
+      prompt_secret KEY "Anthropic API key (sk-ant-...)"
+      prompt MODEL "Model" "claude-sonnet-4-5"
+      write_config "$(cat <<JSON
+{
+  "enabled": true,
+  "provider": {
+    "kind": "anthropic",
+    "api_key": "$KEY",
+    "model": "$MODEL",
+    "base_url": "https://api.anthropic.com",
+    "max_tokens": 8192
+  }
+}
+JSON
+)"
+      ;;
+    2)
+      prompt_secret KEY "OpenAI API key (sk-...)"
+      prompt MODEL "Model" "gpt-4o"
+      write_config "$(openai_compatible_json "https://api.openai.com/v1" "$KEY" "$MODEL" "openai")"
+      ;;
+    3)
+      prompt_secret KEY "OpenRouter API key (sk-or-...)"
+      prompt MODEL "Model" "anthropic/claude-sonnet-4.5"
+      write_config "$(openai_compatible_json "https://openrouter.ai/api/v1" "$KEY" "$MODEL" "openrouter")"
+      ;;
+    4)
+      bold "Detected Ollama models:"; list_ollama_models; echo
+      prompt MODEL "Model" "llama3.1:8b"
+      write_config "$(openai_compatible_json "http://localhost:11434/v1" "" "$MODEL" "ollama")"
+      ;;
+    5)
+      bold "Detected LM Studio models:"; list_openai_compatible_models "http://localhost:1234/v1"; echo
+      prompt MODEL "Model (LM Studio model id)" "local-model"
+      write_config "$(openai_compatible_json "http://localhost:1234/v1" "" "$MODEL" "lmstudio")"
+      ;;
+    6)
+      prompt BASE "Base URL (include /v1)" "http://localhost:8000/v1"
+      bold "Models advertised by $BASE:"; list_openai_compatible_models "$BASE"; echo
+      prompt_secret KEY "API key (leave blank if none)"
+      prompt MODEL "Model"
+      write_config "$(openai_compatible_json "$BASE" "$KEY" "$MODEL" "custom")"
+      ;;
+    7)
+      dim "Drives a CLI you already sign in to — no API key. It runs its own tool"
+      dim "loop over ACP, so Warp's native tools/permission UI are bypassed."
+      echo
+      echo "  a) Claude Code   (needs 'claude-code-acp' on PATH — npm i -g @zed-industries/claude-code-acp)"
+      echo "  b) Gemini CLI    (gemini --experimental-acp)"
+      echo "  c) Codex CLI     (codex acp)"
+      echo "  d) Custom ACP command"
+      echo
+      prompt AGENT "Agent" "a"
+      case "$AGENT" in
+        a|A) CMD="claude-code-acp" ;;
+        b|B) CMD="gemini --experimental-acp" ;;
+        c|C) CMD="codex acp" ;;
+        *)   prompt CMD "ACP command (argv, space-separated)" "claude-code-acp" ;;
+      esac
+      # Build a JSON array from the space-separated argv.
+      local args_json="" first=1 tok
+      for tok in $CMD; do
+        if [[ $first -eq 1 ]]; then args_json="\"$tok\""; first=0; else args_json="$args_json, \"$tok\""; fi
+      done
+      write_config "$(cat <<JSON
+{
+  "enabled": true,
+  "provider": { "kind": "acp", "command": [ $args_json ] }
+}
+JSON
+)"
+      ;;
+    8)
+      write_config "$(cat <<JSON
+{
+  "enabled": false,
+  "provider": { "kind": "openai_compatible", "base_url": "http://localhost:11434/v1", "model": "llama3.1:8b" }
+}
+JSON
+)"
+      bold "Uncaged disabled — Warp's hosted agent will be used."
+      ;;
+    *)
+      echo "Unknown selection: $CHOICE" >&2; exit 1 ;;
+  esac
+}
+
+openai_compatible_json() {
+  # openai_compatible_json <base_url> <api_key> <model> <label>
+  local base="$1" key="$2" model="$3" label="$4" key_line=""
+  if [[ -n "$key" ]]; then
+    key_line="\n    \"api_key\": \"$key\","
+  fi
+  printf '{
+  "enabled": true,
+  "provider": {
+    "kind": "openai_compatible",
+    "base_url": "%s",%b
+    "model": "%s",
+    "max_tokens": 8192,
+    "label": "%s"
+  }
+}\n' "$base" "$key_line" "$model" "$label"
+}
+
+main "$@"

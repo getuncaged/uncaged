@@ -1,0 +1,34 @@
+Uncaged
+====
+
+Uncaged is a fork of Warp, the terminal by Denver Technologies, Inc.
+(https://www.warp.dev / https://github.com/warpdotdev/warp).
+
+Copyright (C) 2020-2026 Denver Technologies, Inc. and Warp contributors.
+Modifications for Uncaged Copyright (C) 2026 the Uncaged contributors.
+
+Licensing
+---------
+The application and most crates are licensed under the GNU Affero General
+Public License v3.0 (see LICENSE-AGPL). The UI framework crates `warpui` and
+`warpui_core` are licensed under the MIT License (see LICENSE-MIT). Uncaged is
+distributed under these same licenses.
+
+Trademarks
+----------
+"Warp" and the Warp logo are trademarks of Denver Technologies, Inc. The AGPL
+grants copyright permissions only and does NOT grant any trademark rights.
+Uncaged is an independent fork: it has been renamed and re-marked, and is not
+affiliated with, sponsored by, or endorsed by Denver Technologies, Inc. The
+name "Uncaged" and the Uncaged mark are used by this project; Warp's word mark and
+logo have been removed from user-facing surfaces.
+
+Third-party marks referenced in the UI (e.g. Anthropic/Claude, OpenAI, Google
+Gemini) belong to their respective owners and are used only to identify those
+services; their appearance does not imply endorsement.
+
+Source
+------
+As required by AGPL-3.0 §13, anyone who interacts with a modified version of
+this program remotely (over a network) must be offered the complete
+corresponding source of that modified version.

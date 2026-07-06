@@ -1,0 +1,32 @@
+<svg width="700" height="500" viewBox="0 0 700 500" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="bg" x1="350" y1="0" x2="350" y2="500" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#241C13"/><stop offset="1" stop-color="#0A0806"/>
+  </linearGradient>
+  <radialGradient id="glow" cx="150" cy="80" r="520" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#FF7A18" stop-opacity="0.15"/><stop offset="1" stop-color="#FF7A18" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="ember" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#FFD866"/><stop offset=".5" stop-color="#FF8A2E"/><stop offset="1" stop-color="#FF4438"/>
+  </linearGradient>
+</defs>
+<rect width="700" height="500" fill="url(#bg)"/>
+<rect width="700" height="500" fill="url(#glow)"/>
+
+<!-- Wordmark: the [ >_ ] mark, brackets bright ink, caret + underscore in ember -->
+<g transform="translate(316 30) scale(0.60)">
+  <path d="M20 14 H13.5 Q9.5 14 9.5 18 V46 Q9.5 50 13.5 50 H20 V44 H14 V20 H20 Z" fill="#F9F4EA"/>
+  <path d="M44 14 H50.5 Q54.5 14 54.5 18 V46 Q54.5 50 50.5 50 H44 V44 H50 V20 H44 Z" fill="#F9F4EA"/>
+  <path d="M23.5 22 L32.5 31.5 L23.5 41 L19.7 37.2 L25 31.5 L19.7 25.8 Z" fill="url(#ember)"/>
+  <rect x="34" y="36.4" width="11" height="4.2" rx="2.1" fill="url(#ember)"/>
+</g>
+<text x="350" y="112" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="36" font-weight="700" letter-spacing="7" fill="#F9F4EA">UNCAGED</text>
+<text x="350" y="140" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" letter-spacing="3" fill="#C9B79E">BRING YOUR OWN MODEL  ·  NO ACCOUNT</text>
+
+<!-- Arrow from the app (left, x=150) toward Applications (right, x=550), at icon row y=250 -->
+<rect x="250" y="246" width="150" height="7" rx="3.5" fill="url(#ember)" opacity="0.92"/>
+<path d="M398 232 L426 250 L398 268 Z" fill="url(#ember)"/>
+
+<!-- Bottom hint -->
+<text x="350" y="452" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" letter-spacing="0.3" fill="#8A7F72">Drag Uncaged into your Applications folder</text>
+</svg>

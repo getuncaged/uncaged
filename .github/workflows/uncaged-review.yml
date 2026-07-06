@@ -1,0 +1,54 @@
+# Uncaged code review — Claude reviews PR diffs for bugs/quality.
+# REQUIRES repo secret: ANTHROPIC_API_KEY  (Settings -> Secrets -> Actions).
+# Uses Anthropic's official GitHub Action: anthropics/claude-code-action@v1.
+#
+# Triggers:
+#   - Automatically on every opened / updated PR (posts a review).
+#   - On demand when someone comments "@claude ..." on a PR or issue.
+
+name: Uncaged Claude Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+# Least-privilege token: read the code, write PR review comments.
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  claude-review:
+    name: Claude PR review
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Run the automatic review on PR events; for comment events only run when
+    # the "@claude" trigger phrase is present, so ordinary chatter is ignored.
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude'))
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude Code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          # You MUST add this repo secret for the action to work.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Default GITHUB_TOKEN is sufficient to post review comments given the
+          # permissions block above.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # On pull_request events, drive an automatic review; on @claude
+          # comments the action detects intent from the comment itself, so we
+          # only pass a prompt for the automatic (non-comment) path.
+          prompt: ${{ github.event_name == 'pull_request' && 'Review this pull request diff for correctness bugs, security issues, and code-quality problems. Focus on real defects over style. Post concise inline comments anchored to the offending lines, and a short summary. This is a large Rust workspace (the Uncaged terminal, a Warp fork); the primary build target is `cargo build --bin warp-oss`.' || '' }}
