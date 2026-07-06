@@ -648,6 +648,15 @@ impl AuthManager {
         auth_view_variant: AuthViewVariant,
         ctx: &mut ModelContext<Self>,
     ) {
+        // Uncaged (Oss): no accounts — never emit the login-gated event, so the
+        // "Sign up for Warp" modal can never open. Cloud-only gated features
+        // (sharing, teams) are simply inert locally rather than prompting a login.
+        if matches!(
+            warp_core::channel::ChannelState::channel(),
+            warp_core::channel::Channel::Oss
+        ) {
+            return;
+        }
         if self.auth_state.is_anonymous_or_logged_out() {
             send_telemetry_from_ctx!(
                 TelemetryEvent::AnonymousUserAttemptLoginGatedFeature { feature },
@@ -658,6 +667,13 @@ impl AuthManager {
     }
 
     pub fn anonymous_user_hit_drive_object_limit(&self, ctx: &mut ModelContext<Self>) {
+        // Uncaged (Oss): there is no Drive object limit, so never emit the gate.
+        if matches!(
+            warp_core::channel::ChannelState::channel(),
+            warp_core::channel::Channel::Oss
+        ) {
+            return;
+        }
         if self.auth_state.is_anonymous_or_logged_out() {
             send_telemetry_from_ctx!(TelemetryEvent::AnonymousUserHitCloudObjectLimit, ctx);
             ctx.emit(AuthManagerEvent::AttemptedLoginGatedFeature {

@@ -860,6 +860,8 @@ pub enum WorkspaceAction {
     /// Pulls the portable config + Drive bundle from the stored private gist and
     /// imports it (validates + snapshots + extracts).
     PullConfigFromGist,
+    /// Toggles automated (no-confirmation) gist sync on/off.
+    ToggleGistAutoSync,
     /// Opens a new terminal tab and connects to an `~/.ssh/config` host via `ssh`.
     ConnectSsh { host: String },
     /// Opens `~/.ssh/config` in a code editor tab (creating it if missing) so
@@ -1198,6 +1200,7 @@ impl WorkspaceAction {
             | RestoreSettings
             | PushConfigToGist
             | PullConfigFromGist
+            | ToggleGistAutoSync
             | ConnectSsh { .. }
             | OpenSshConfig
             | LaunchCliAgent { .. }

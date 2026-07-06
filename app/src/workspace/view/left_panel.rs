@@ -192,7 +192,7 @@ pub struct LeftPanelView {
     skills_scroll_state: ClippedScrollStateHandle,
     config_entries: Vec<config_panel::ConfigEntry>,
     config_row_states: Vec<MouseStateHandle>,
-    config_action_states: [MouseStateHandle; 4],
+    config_action_states: [MouseStateHandle; 5],
     config_scroll_state: ClippedScrollStateHandle,
     active_view: active_view_state::ActiveViewState,
     toolbelt_buttons: Vec<ToolbeltButtonConfig>,

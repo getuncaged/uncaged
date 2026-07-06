@@ -1061,6 +1061,17 @@ impl DriveIndex {
         app: &AppContext,
     ) -> bool {
         if let Some(object) = CloudModel::as_ref(app).get_by_uid(&cloud_object_type_and_id.uid()) {
+            // Uncaged (Oss): the Drive is fully local, so move / trash / rename
+            // apply to local (ClientId) objects too — there is no server to be
+            // online with and no server id to require. This is the master gate
+            // behind draggability, the move menu, Trash and folder actions, so
+            // relaxing it here is what makes organizing a local Drive work.
+            if matches!(
+                warp_core::channel::ChannelState::channel(),
+                warp_core::channel::Channel::Oss
+            ) {
+                return !object.metadata().has_pending_online_only_change();
+            }
             return self.is_online(app)
                 && cloud_object_type_and_id.has_server_id()
                 && !object.metadata().has_pending_online_only_change();
@@ -4394,7 +4405,15 @@ impl DriveIndex {
         let object = CloudModel::as_ref(app).get_by_uid(&cloud_object_type_and_id.uid());
 
         if let CloudObjectTypeAndId::Folder(folder_id) = cloud_object_type_and_id {
-            if let SyncId::ServerId(_) = folder_id {
+            // Uncaged (Oss): local folders use ClientId (never a ServerId), so
+            // without this they'd get no context menu at all. Allow the full
+            // folder menu (create sub-items, rename, import, collapse) locally —
+            // every one of those actions persists to SQLite offline.
+            let folder_actions_allowed = matches!(
+                warp_core::channel::ChannelState::channel(),
+                warp_core::channel::Channel::Oss
+            ) || matches!(folder_id, SyncId::ServerId(_));
+            if folder_actions_allowed {
                 if self.is_online(app) {
                     if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
                         menu_items.push(
@@ -4781,6 +4800,25 @@ impl DriveIndex {
                             .with_icon(Icon::Minus)
                             .into_item(),
                     )
+                }
+            }
+        }
+
+        // "Move out of folder" — a discoverable alternative to dragging onto the
+        // space header. Clears the folder parent, sending the item to the top
+        // level of its space, reusing the (offline-capable) MoveObject path.
+        if can_move_or_trash {
+            if let Some(object) = object {
+                if object.metadata().folder_id.is_some() {
+                    menu_items.push(
+                        MenuItemFields::new("Move out of folder")
+                            .with_on_select_action(DriveIndexAction::MoveObject {
+                                cloud_object_type_and_id: *cloud_object_type_and_id,
+                                new_space: *space,
+                            })
+                            .with_icon(Icon::Move)
+                            .into_item(),
+                    );
                 }
             }
         }

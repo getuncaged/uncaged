@@ -3023,7 +3023,14 @@ impl AISettingsPageView {
                 widgets.push(Box::new(AwsBedrockWidget::new(ctx)));
                 widgets.push(Box::new(AgentAttributionWidget::default()));
                 widgets.push(Box::new(OtherAIWidget::default()));
-                if FeatureFlag::AgentModeComputerUse.is_enabled() {
+                // Uncaged (Oss) has no cloud agents, so the experimental
+                // "Computer use in Cloud Agents" toggle doesn't apply — hide it.
+                if FeatureFlag::AgentModeComputerUse.is_enabled()
+                    && !matches!(
+                        warp_core::channel::ChannelState::channel(),
+                        warp_core::channel::Channel::Oss
+                    )
+                {
                     widgets.push(Box::new(CloudAgentComputerUseWidget::default()));
                 }
             }
@@ -3068,7 +3075,14 @@ impl AISettingsPageView {
                 }
                 widgets.push(Box::new(AgentAttributionWidget::default()));
                 widgets.push(Box::new(OtherAIWidget::default()));
-                if FeatureFlag::AgentModeComputerUse.is_enabled() {
+                // Uncaged (Oss) has no cloud agents, so the experimental
+                // "Computer use in Cloud Agents" toggle doesn't apply — hide it.
+                if FeatureFlag::AgentModeComputerUse.is_enabled()
+                    && !matches!(
+                        warp_core::channel::ChannelState::channel(),
+                        warp_core::channel::Channel::Oss
+                    )
+                {
                     widgets.push(Box::new(CloudAgentComputerUseWidget::default()));
                 }
             }
@@ -3790,6 +3804,8 @@ pub enum AISettingsPageAction {
     ToggleAIInputAutoDetection,
     ToggleNLDInTerminal,
     ToggleCLIAgentToolbar,
+    /// Show/hide a specific CLI agent's launcher button in the coding-agent toolbar.
+    ToggleCliAgentLauncherVisibility(crate::terminal::cli_agent::CLIAgent),
     ToggleUseAgentToolbar,
     ToggleVoiceInput,
     ToggleCanUseWarpCreditsForFallback,
@@ -4125,6 +4141,15 @@ impl TypedActionView for AISettingsPageView {
                         log::warn!("Failed to set value for CLI Agent Footer setting: {e:?}");
                     }
                 }
+                ctx.notify();
+            }
+            AISettingsPageAction::ToggleCliAgentLauncherVisibility(agent) => {
+                use crate::terminal::cli_agent::CLIAgentInstallModel;
+                let agent = *agent;
+                CLIAgentInstallModel::handle(ctx).update(ctx, |model, ctx| {
+                    let now_hidden = !model.is_hidden(agent);
+                    model.set_agent_hidden(agent, now_hidden, ctx);
+                });
                 ctx.notify();
             }
             AISettingsPageAction::ToggleAutoToggleRichInput => {
@@ -7560,6 +7585,9 @@ pub(crate) fn cli_agent_settings_widget_id() -> &'static str {
 #[derive(Default)]
 struct CLIAgentWidget {
     cli_agent_footer_toggle: SwitchStateHandle,
+    /// One show/hide switch state per known CLI agent (all `CLIAgent` variants
+    /// except `Unknown`, in declaration order). Sized to the current agent count.
+    agent_launcher_toggles: [SwitchStateHandle; 14],
     auto_toggle_rich_input_toggle: SwitchStateHandle,
     auto_toggle_rich_input_info_tooltip: MouseStateHandle,
     auto_open_rich_input_on_cli_agent_start_toggle: SwitchStateHandle,
@@ -7663,28 +7691,39 @@ impl SettingsWidget for CLIAgentWidget {
                 .finish(),
             );
 
-            for agent in
-                enum_iterator::all::<CLIAgent>().filter(|a| !matches!(a, CLIAgent::Unknown))
+            for (i, agent) in enum_iterator::all::<CLIAgent>()
+                .filter(|a| !matches!(a, CLIAgent::Unknown))
+                .enumerate()
             {
-                let (pill_text, pill_color) = if !scanned {
-                    ("Checking…", theme.nonactive_ui_text_color())
-                } else if install.is_installed(agent) {
-                    ("Installed", ThemeFill::Solid(theme.ansi_fg_green()))
+                // For an installed agent, the right-hand control is a show/hide
+                // switch that toggles its launcher button (disabled while the
+                // master "Show coding agent toolbar" toggle is off). For a
+                // not-installed / still-scanning agent it's a status pill.
+                let right_element: Box<dyn Element> = if scanned && install.is_installed(agent) {
+                    render_ai_feature_switch(
+                        self.agent_launcher_toggles
+                            .get(i)
+                            .cloned()
+                            .unwrap_or_default(),
+                        !install.is_hidden(agent),
+                        is_footer_enabled,
+                        AISettingsPageAction::ToggleCliAgentLauncherVisibility(agent),
+                        app,
+                    )
                 } else {
-                    ("Not installed", theme.nonactive_ui_text_color())
+                    let pill_text = if !scanned { "Checking…" } else { "Not installed" };
+                    Container::new(
+                        Text::new(pill_text.to_string(), appearance.ui_font_family(), 10.)
+                            .with_color(theme.nonactive_ui_text_color().into())
+                            .with_style(Properties::default().weight(Weight::Semibold))
+                            .finish(),
+                    )
+                    .with_horizontal_padding(7.)
+                    .with_vertical_padding(3.)
+                    .with_background(internal_colors::fg_overlay_2(theme))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(5.)))
+                    .finish()
                 };
-
-                let pill = Container::new(
-                    Text::new(pill_text.to_string(), appearance.ui_font_family(), 10.)
-                        .with_color(pill_color.into())
-                        .with_style(Properties::default().weight(Weight::Semibold))
-                        .finish(),
-                )
-                .with_horizontal_padding(7.)
-                .with_vertical_padding(3.)
-                .with_background(internal_colors::fg_overlay_2(theme))
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(5.)))
-                .finish();
 
                 let name = Text::new(
                     agent.display_name().to_string(),
@@ -7710,7 +7749,7 @@ impl SettingsWidget for CLIAgentWidget {
                 }
                 row = row
                     .with_child(Shrinkable::new(1., name).finish())
-                    .with_child(pill);
+                    .with_child(right_element);
 
                 detected.add_child(
                     Container::new(row.finish())

@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, bail, Context, Result};
+use base64::Engine as _;
 use serde::{Deserialize, Serialize};
 
 use crate::settings_backup;
@@ -22,7 +23,15 @@ use crate::settings_backup;
 /// Stable name for the archive inside the gist. Using a fixed name means
 /// `gh gist edit` replaces the file in place on every push (rather than
 /// accumulating timestamped copies), and `pull` always finds the same file.
-const GIST_ARCHIVE_NAME: &str = "uncaged-config-backup.tgz";
+///
+/// GitHub gists only accept **text** files — uploading a raw `.tgz` fails with
+/// "binary file not supported". So we base64-encode the archive into this
+/// `.base64` text file for the gist and decode it back to a `.tgz` on pull.
+const GIST_ARCHIVE_NAME: &str = "uncaged-config-backup.tgz.base64";
+
+/// Legacy suffix for the pre-base64 raw archive, so a `pull` can still read a
+/// gist that predates the base64 change (should be rare — those uploads failed).
+const LEGACY_ARCHIVE_SUFFIX: &str = ".tgz";
 
 /// The small, non-secret record of which gist we sync to. Stored at
 /// `data_dir()/gist_sync.json`. NOT part of the backup whitelist.
@@ -30,6 +39,28 @@ const GIST_ARCHIVE_NAME: &str = "uncaged-config-backup.tgz";
 struct GistSyncState {
     gist_id: String,
     updated_at: u64,
+    /// When true, "Sync to gist" pushes without the confirmation prompt. Opt-in;
+    /// defaults to false so an outbound upload always asks first.
+    #[serde(default)]
+    auto_sync: bool,
+}
+
+/// Whether automated (no-confirmation) gist sync is turned on.
+pub fn auto_sync_enabled() -> bool {
+    read_state().map(|s| s.auto_sync).unwrap_or(false)
+}
+
+/// Turns automated gist sync on/off, preserving any existing gist id.
+pub fn set_auto_sync(enabled: bool) {
+    let mut state = read_state().unwrap_or(GistSyncState {
+        gist_id: String::new(),
+        updated_at: now_secs(),
+        auto_sync: false,
+    });
+    state.auto_sync = enabled;
+    if let Ok(json) = serde_json::to_string_pretty(&state) {
+        let _ = std::fs::write(state_path(), json);
+    }
 }
 
 fn state_path() -> PathBuf {
@@ -49,9 +80,11 @@ fn read_state() -> Option<GistSyncState> {
 }
 
 fn write_state(gist_id: &str) -> Result<()> {
+    let auto_sync = read_state().map(|s| s.auto_sync).unwrap_or(false);
     let state = GistSyncState {
         gist_id: gist_id.to_string(),
         updated_at: now_secs(),
+        auto_sync,
     };
     let json = serde_json::to_string_pretty(&state).context("failed to serialize gist_sync state")?;
     std::fs::write(state_path(), json).context("failed to write gist_sync.json")?;
@@ -150,30 +183,34 @@ pub async fn push(path_env: Option<&str>) -> Result<String> {
 
     let exported = settings_backup::export_to_dir(&std::env::temp_dir())
         .context("failed to build the config backup bundle")?;
-    // Rename to a stable filename so `gh gist edit` overwrites in place instead
-    // of appending a new timestamped file to the gist each push.
+    // GitHub gists reject binary files, so base64-encode the `.tgz` into a text
+    // file with a stable name (so `gh gist edit` overwrites in place instead of
+    // accumulating copies, and `pull` always finds the same file).
+    let tgz_bytes =
+        std::fs::read(&exported).context("failed to read the config backup bundle")?;
+    let _ = std::fs::remove_file(&exported);
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&tgz_bytes);
     let archive = std::env::temp_dir().join(GIST_ARCHIVE_NAME);
-    if archive != exported {
-        std::fs::rename(&exported, &archive)
-            .context("failed to stage the config backup bundle")?;
-    }
+    std::fs::write(&archive, encoded)
+        .context("failed to stage the encoded config backup bundle")?;
     let archive_str = archive
         .to_str()
         .ok_or_else(|| anyhow!("backup archive path is not valid UTF-8"))?;
 
-    let result = if let Some(state) = read_state() {
+    let result = if let Some(state) = read_state().filter(|s| !s.gist_id.is_empty()) {
         // Update the existing gist in place.
         gh(&["gist", "edit", &state.gist_id, archive_str], path_env).await?;
         // Refresh the persisted timestamp; id is unchanged.
         let _ = write_state(&state.gist_id);
         Ok(gist_url_from_id(&state.gist_id))
     } else {
-        // Create a new secret gist.
+        // Create a new gist. `gh gist create` makes a SECRET gist by default
+        // (there is no `--secret` flag — `--public` would opt into a public one),
+        // so we simply omit it to keep the backup private/unlisted.
         let stdout = gh(
             &[
                 "gist",
                 "create",
-                "--secret",
                 "--desc",
                 "Uncaged config + drive backup",
                 archive_str,
@@ -220,16 +257,34 @@ pub async fn pull(path_env: Option<&str>) -> Result<()> {
     let file_name = file_names
         .iter()
         .find(|name| **name == GIST_ARCHIVE_NAME)
-        .or_else(|| file_names.iter().find(|name| name.ends_with(".tgz")))
+        .or_else(|| file_names.iter().find(|name| name.ends_with(".base64")))
+        .or_else(|| {
+            file_names
+                .iter()
+                .find(|name| name.ends_with(LEGACY_ARCHIVE_SUFFIX))
+        })
         .ok_or_else(|| anyhow!("The gist doesn't contain a config backup archive."))?
         .to_string();
 
-    // Fetch the raw archive contents. `gh gist view <id> -f <name>` prints the
-    // file's raw bytes to stdout; we redirect them into a temp file.
+    // Fetch the archive contents. `gh gist view <id> -f <name>` prints the
+    // file's bytes to stdout.
     let contents = gist_view_file_bytes(&state.gist_id, &file_name, path_env).await?;
 
-    let dest: PathBuf = std::env::temp_dir().join(&file_name);
-    std::fs::write(&dest, &contents).context("failed to write downloaded gist archive")?;
+    // Base64 text files (`.base64`) hold the encoded `.tgz`; decode them back to
+    // bytes. A legacy raw `.tgz` file is used as-is.
+    let tgz_bytes = if file_name.ends_with(".base64") {
+        let text = String::from_utf8(contents)
+            .context("downloaded gist file was not valid UTF-8")?;
+        let cleaned: String = text.split_whitespace().collect();
+        base64::engine::general_purpose::STANDARD
+            .decode(cleaned.as_bytes())
+            .context("failed to base64-decode the downloaded backup")?
+    } else {
+        contents
+    };
+
+    let dest: PathBuf = std::env::temp_dir().join("uncaged-config-backup.tgz");
+    std::fs::write(&dest, &tgz_bytes).context("failed to write downloaded gist archive")?;
 
     let result = settings_backup::import_from(&dest)
         .context("failed to import the downloaded config bundle");

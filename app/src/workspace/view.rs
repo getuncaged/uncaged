@@ -104,7 +104,7 @@ use warpui::elements::{
 use warpui::fonts::{Properties, Weight};
 use warpui::geometry::vector::{vec2f, Vector2F};
 use warpui::keymap::Context;
-use warpui::modals::{AlertDialogWithCallbacks, AppModalCallback};
+use warpui::modals::{AlertDialogWithCallbacks, AppModalCallback, ModalButton};
 use warpui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
 use warpui::platform::{
     Cursor, FilePickerConfiguration, FullscreenState, SystemTheme, TerminationMode,
@@ -3271,7 +3271,10 @@ impl Workspace {
             }
             AISettingsChangedEvent::IsActiveAIEnabled { .. }
             | AISettingsChangedEvent::ThinkingDisplayMode { .. }
-            | AISettingsChangedEvent::PromptSubmissionMode { .. } => {
+            | AISettingsChangedEvent::PromptSubmissionMode { .. }
+            // Re-render the titlebar so the CLI-agent launcher buttons show/hide
+            // with the "Show coding agent toolbar" toggle.
+            | AISettingsChangedEvent::ShouldRenderCLIAgentToolbar { .. } => {
                 ctx.notify();
             }
             AISettingsChangedEvent::ShowAgentNotifications { .. } => {
@@ -3283,6 +3286,15 @@ impl Workspace {
             }
             _ => (),
         });
+
+        // Re-render the titlebar when the installed-agent scan finishes or the
+        // user shows/hides a CLI-agent launcher button in Settings.
+        ctx.subscribe_to_model(
+            &crate::terminal::cli_agent::CLIAgentInstallModel::handle(ctx),
+            |_me, _model, _event, ctx| {
+                ctx.notify();
+            },
+        );
 
         ctx.subscribe_to_model(&OneTimeModalModel::handle(ctx), |me, model, event, ctx| {
             let OneTimeModalEvent::VisibilityChanged { is_open } = event;
@@ -10573,7 +10585,43 @@ impl Workspace {
     /// Captures the shell's interactive PATH so a GUI-launched app finds a
     /// Homebrew `gh`. Shows a toast with the gist URL on success, or an
     /// actionable error message on failure.
+    /// Entry point for "Sync to gist". Any outbound upload asks for confirmation
+    /// first — spelling out what's uploaded and where — unless the user has
+    /// turned on automated sync (via the modal's "Don't ask again" or the Config
+    /// panel toggle).
     fn push_config_to_gist(&mut self, ctx: &mut ViewContext<Self>) {
+        if crate::gist_sync::auto_sync_enabled() {
+            self.do_push_config_to_gist(ctx);
+            return;
+        }
+        if cfg!(all(not(target_family = "wasm"), target_os = "macos")) {
+            let dialog = AlertDialogWithCallbacks::for_view(
+                "Sync your config to a private gist?",
+                "This uploads your config and Drive — settings, keybindings, themes, \
+                 workflows, notebooks — to a private (secret) GitHub gist under your own \
+                 account. No API keys or secrets are ever included, and only you can see \
+                 it. \u{201c}Don\u{2019}t ask again\u{201d} turns on automatic sync; you \
+                 can turn it back off from the Config panel.",
+                vec![
+                    ModalButton::for_view("Sync", |view: &mut Self, ctx| {
+                        view.do_push_config_to_gist(ctx);
+                    }),
+                    ModalButton::for_view("Cancel", |_view: &mut Self, _ctx| {}),
+                ],
+                |_view: &mut Self, _ctx| {
+                    // "Don't ask again" → opt into automatic (no-confirm) sync.
+                    crate::gist_sync::set_auto_sync(true);
+                },
+            );
+            ctx.show_native_platform_modal(dialog);
+        } else {
+            // No native modal on this platform; push directly.
+            self.do_push_config_to_gist(ctx);
+        }
+    }
+
+    /// Actually uploads the config + Drive bundle to the user's private gist.
+    fn do_push_config_to_gist(&mut self, ctx: &mut ViewContext<Self>) {
         #[cfg(feature = "local_tty")]
         let path_future = crate::terminal::local_shell::LocalShellState::handle(ctx)
             .update(ctx, |shell_state, ctx| {
@@ -10605,6 +10653,20 @@ impl Workspace {
                 });
             },
         );
+    }
+
+    /// Flips automated gist sync on/off (Config panel toggle) and confirms via toast.
+    fn toggle_gist_auto_sync(&mut self, ctx: &mut ViewContext<Self>) {
+        let enabled = !crate::gist_sync::auto_sync_enabled();
+        crate::gist_sync::set_auto_sync(enabled);
+        let msg = if enabled {
+            "Automatic gist sync is ON — \u{201c}Sync to gist\u{201d} will upload without asking."
+        } else {
+            "Automatic gist sync is OFF — you'll be asked before each upload."
+        };
+        self.toast_stack.update(ctx, |toast_stack, ctx| {
+            toast_stack.add_persistent_toast(DismissibleToast::success(msg.to_string()), ctx);
+        });
     }
 
     /// Pull the portable config + Drive bundle from the stored private gist and
@@ -14387,6 +14449,15 @@ impl Workspace {
     }
 
     fn open_require_login_modal(&mut self, variant: AuthViewVariant, ctx: &mut ViewContext<Self>) {
+        // Uncaged (Oss): the app has no accounts, so the "Sign up for Warp" modal
+        // must never appear. This is the single display-layer backstop — even if
+        // some upstream path tries to open it, it is a no-op locally.
+        if matches!(
+            warp_core::channel::ChannelState::channel(),
+            warp_core::channel::Channel::Oss
+        ) {
+            return;
+        }
         self.require_login_modal.update(ctx, |modal, ctx| {
             modal.set_variant(ctx, variant);
         });
@@ -21114,11 +21185,19 @@ impl Workspace {
     ) {
         use crate::terminal::cli_agent::{CLIAgent, CLIAgentInstallModel};
 
+        // The "Show coding agent toolbar" master toggle hides these launcher
+        // buttons too (not just the in-terminal footer), so the toggle has a
+        // visible effect.
+        if !*AISettings::as_ref(ctx).should_render_cli_agent_footer {
+            return;
+        }
+
         let install = CLIAgentInstallModel::as_ref(ctx);
         for (agent, state) in
             enum_iterator::all::<CLIAgent>().zip(self.cli_agent_launcher_states.iter())
         {
-            if matches!(agent, CLIAgent::Unknown) || !install.is_installed(agent) {
+            // Skip agents that aren't installed or the user has hidden.
+            if matches!(agent, CLIAgent::Unknown) || !install.is_launcher_visible(agent) {
                 continue;
             }
             let icon = agent.icon().unwrap_or(icons::Icon::Terminal);
@@ -23376,6 +23455,14 @@ impl Workspace {
         entrypoint: AnonymousUserSignupEntrypoint,
         ctx: &mut ViewContext<Self>,
     ) {
+        // Uncaged (Oss): no accounts — never open a Warp sign-up page or the
+        // login modal. Any stray "Sign up" entrypoint is inert locally.
+        if matches!(
+            warp_core::channel::ChannelState::channel(),
+            warp_core::channel::Channel::Oss
+        ) {
+            return;
+        }
         if self.auth_state.is_user_anonymous().unwrap_or_default() {
             // User has a Firebase anonymous account — use the linking flow.
             AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
@@ -23931,6 +24018,9 @@ impl TypedActionView for Workspace {
             }
             PullConfigFromGist => {
                 self.pull_config_from_gist(ctx);
+            }
+            ToggleGistAutoSync => {
+                self.toggle_gist_auto_sync(ctx);
             }
             ConnectSsh { host } => {
                 // Open a fresh terminal tab and run `ssh <host>`. The new tab's
