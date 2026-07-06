@@ -1,0 +1,25 @@
+app/src/brand.rs
+  s_3e4cc0ba3e0ede::t_68e917c6897471 79-84
+app/src/settings_view/about_page.rs
+  s_3e4cc0ba3e0ede::t_783b03268afb97 131-137
+docs/syncing-with-warp.md
+  s_3e4cc0ba3e0ede::t_099d621d67bda2 1-108
+script/sync-upstream.sh
+  s_3e4cc0ba3e0ede::t_9ea3a0b00bdd56 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "b4fdf8fe813cc35b39fd90745efc42613553f945",
+  "prompts": {},
+  "sessions": {
+    "s_3e4cc0ba3e0ede": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e772dcd-0cc7-45ef-b232-59d0e8d0d1c9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.pro@gmail.com>"
+    }
+  }
+}
