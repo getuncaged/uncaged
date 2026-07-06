@@ -1,0 +1,11 @@
+<svg width="24" height="24" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- Uncaged mark: a terminal cage with its right wall broken open, holding the
+     ❯_ prompt. Terminal + cage + broken = uncaged, drawn. Single-colour
+     recolour sentinel (#FF0000); the app's icon pipeline tints it to the
+     requested colour. Canonical in-app mark — see app/src/brand.rs and the
+     Uncaged design system master logo/glyph.svg. -->
+<defs><clipPath id="uncaged-gap"><path clip-rule="evenodd" d="M0 0 H120 V120 H0 Z M78 49 H108 V71 H78 Z"/></clipPath></defs>
+<path clip-path="url(#uncaged-gap)" d="M31 22 H86 C97 22 101 28 96 38 L86 60 L96 82 C101 92 97 98 86 98 H31 Q19 98 19 86 V34 Q19 22 31 22 Z" fill="none" stroke="#FF0000" stroke-width="7" stroke-linejoin="round"/>
+<polyline points="36,49 52,60 36,71" fill="none" stroke="#FF0000" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="53" y1="71" x2="69" y2="71" stroke="#FF0000" stroke-width="5" stroke-linecap="round"/>
+</svg>

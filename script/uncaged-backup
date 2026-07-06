@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+#
+# uncaged-backup — back up & restore your Uncaged config and "Drive" content
+# (reusable workflows, notebooks, themes, keybindings, settings) as one archive.
+#
+# Local-first, optional cloud, your choice per backup:
+#   * `export`         writes a plain .tgz to your disk.
+#   * `export --gist`  additionally ENCRYPTS it (your passphrase) and pushes a
+#                      SECRET gist under your own `gh` login — carry it to another
+#                      machine or keep an off-device backup. Your GitHub, your gist.
+#   * `import`         restores from a local file OR one of your gists.
+#
+# SECRETS ARE NEVER INCLUDED. Only a whitelist of portable, non-secret items is
+# archived — your API keys (connections.json / engine.json) and MCP config are
+# deliberately left out. A whitelist (not a blacklist) means a new secret file
+# can never be swept up by accident.
+#
+# Part of the Uncaged fork of the open-source Warp client. AGPL-3.0-only.
+
+set -euo pipefail
+
+CONFIG_DIR="${UNCAGED_CONFIG_DIR:-$HOME/.uncaged}"
+
+# Portable, non-secret items (files or dirs). Only those that exist are archived.
+WHITELIST=(
+  settings.toml
+  keybindings.yaml
+  keybindings.yml
+  themes
+  workflows
+  notebooks
+  launch_configurations
+  snippets
+)
+
+bold() { printf '\033[1m%s\033[0m\n' "$*"; }
+dim()  { printf '\033[2m%s\033[0m\n' "$*" >&2; }
+err()  { printf '\033[31m%s\033[0m\n' "$*" >&2; }
+
+usage() {
+  cat >&2 <<EOF
+$(bold "uncaged-backup") — back up & restore Uncaged config + Drive content
+
+  uncaged-backup export [--out FILE] [--gist]
+      Archive your portable config + workflows/notebooks/themes.
+      Default FILE: ./uncaged-backup-<timestamp>.tgz
+      --gist  also encrypt it and push a SECRET gist via your gh login.
+
+  uncaged-backup import <FILE | gist-id | gist-url>
+      Restore from a local archive or one of your gists. Your current config is
+      copied to <dir>.bak-<timestamp> first.
+
+  Config dir: $CONFIG_DIR
+  Never included: API keys (connections.json, engine.json), MCP tokens.
+EOF
+}
+
+# Populate the global `ITEMS` array with whitelisted entries that exist.
+collect_items() {
+  ITEMS=()
+  local it
+  for it in "${WHITELIST[@]}"; do
+    [[ -e "$CONFIG_DIR/$it" ]] && ITEMS+=("$it")
+  done
+  return 0
+}
+
+cmd_export() {
+  local out="" gist=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --out)  out="${2:?--out needs a path}"; shift 2 ;;
+      --gist) gist=true; shift ;;
+      -h|--help) usage; return 0 ;;
+      *) err "unknown option: $1"; return 1 ;;
+    esac
+  done
+
+  [[ -d "$CONFIG_DIR" ]] || { err "no config dir at $CONFIG_DIR"; return 1; }
+  collect_items
+  if [[ ${#ITEMS[@]} -eq 0 ]]; then
+    err "nothing portable to back up in $CONFIG_DIR yet (no settings/themes/workflows)."
+    return 1
+  fi
+
+  local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
+  out="${out:-uncaged-backup-$stamp.tgz}"
+
+  bold "Backing up from $CONFIG_DIR:"
+  printf '  * %s\n' "${ITEMS[@]}" >&2
+  dim "(secrets excluded: connections.json, engine.json, MCP)"
+  tar -czf "$out" -C "$CONFIG_DIR" "${ITEMS[@]}"
+  bold "-> $out ($(du -h "$out" | cut -f1 | tr -d ' '))"
+
+  if $gist; then
+    command -v openssl >/dev/null || { err "openssl not found (needed to encrypt for gist)."; return 1; }
+    command -v gh >/dev/null || { err "gh not found — install the GitHub CLI to push a gist."; return 1; }
+    gh auth status >/dev/null 2>&1 || { err "gh is not logged in — run: gh auth login"; return 1; }
+
+    local enc="$out.enc"
+    bold "Encrypting for the gist — choose a passphrase (it's the ONLY way to restore):"
+    openssl enc -aes-256-cbc -pbkdf2 -salt -in "$out" -out "$enc"
+
+    bold "Creating a SECRET gist on your GitHub account…"
+    local url
+    url="$(gh gist create --secret --desc "Uncaged backup $stamp (encrypted)" "$enc")"
+    rm -f "$enc"
+    bold "-> secret gist: $url"
+    dim "Restore elsewhere with:  uncaged-backup import $url"
+  fi
+}
+
+cmd_import() {
+  local src="${1:-}"
+  [[ -n "$src" ]] || { err "usage: uncaged-backup import <file|gist-id|gist-url>"; return 1; }
+
+  local tmp; tmp="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '$tmp'" RETURN
+  local archive=""
+
+  if [[ -f "$src" ]]; then
+    archive="$src"
+  else
+    command -v gh >/dev/null || { err "gh not found — needed to fetch a gist."; return 1; }
+    local id="${src##*/}"
+    bold "Fetching gist $id…"
+    local fname
+    fname="$(gh gist view "$id" --files | head -1)"
+    [[ -n "$fname" ]] || { err "could not read files from gist $id"; return 1; }
+    gh gist view "$id" -f "$fname" > "$tmp/$fname"
+    archive="$tmp/$fname"
+  fi
+
+  # Decrypt if it looks like an openssl-encrypted blob.
+  if [[ "$archive" == *.enc ]] || head -c 8 "$archive" 2>/dev/null | LC_ALL=C grep -q "Salted__"; then
+    bold "This backup is encrypted — enter its passphrase:"
+    local dec="$tmp/restore.tgz"
+    openssl enc -d -aes-256-cbc -pbkdf2 -in "$archive" -out "$dec" \
+      || { err "decryption failed (wrong passphrase?)."; return 1; }
+    archive="$dec"
+  fi
+
+  tar -tzf "$archive" >/dev/null 2>&1 || { err "not a valid Uncaged backup archive."; return 1; }
+
+  if [[ -d "$CONFIG_DIR" ]]; then
+    local bak="$CONFIG_DIR.bak-$(date +%Y%m%d-%H%M%S)"
+    cp -R "$CONFIG_DIR" "$bak"
+    dim "current config saved to $bak"
+  else
+    mkdir -p "$CONFIG_DIR"
+  fi
+
+  bold "Restoring into $CONFIG_DIR:"
+  tar -tzf "$archive" | sed 's/^/  * /' >&2
+  tar -xzf "$archive" -C "$CONFIG_DIR"
+  bold "Done — restart Uncaged to pick up restored settings/themes."
+}
+
+main() {
+  local cmd="${1:-}"; shift || true
+  case "$cmd" in
+    export) cmd_export "$@" ;;
+    import) cmd_import "$@" ;;
+    -h|--help|help|"") usage ;;
+    *) err "unknown command: $cmd"; usage; return 1 ;;
+  esac
+}
+
+main "$@"

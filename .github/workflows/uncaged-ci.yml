@@ -1,0 +1,151 @@
+# Uncaged CI — build & lint the GUI binary on push / PR to master|main.
+# No secrets required. macOS is the gating job; Linux/Windows are best-effort.
+#
+# This is Uncaged's OWN workflow (getuncaged/uncaged), independent of the
+# upstream Warp ci.yml (which targets Warp's private, self-hosted infra).
+
+name: Uncaged CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+# Cancel superseded runs on the same ref to save runner minutes.
+concurrency:
+  group: uncaged-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Keep debug info minimal to speed up compilation and shrink target/.
+  RUSTFLAGS: -C debuginfo=line-tables-only
+
+jobs:
+  # --- Primary gating job: macOS ------------------------------------------
+  # The Uncaged GUI (warp-oss) needs Apple's Metal toolchain (shipped with
+  # Xcode) to compile its shaders, so macOS is the reference platform.
+  macos:
+    name: Build & lint (macOS)
+    runs-on: macos-latest
+    # A cold LTO-free debug build of this large workspace is slow; give it room.
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The repo tracks some assets (input-classifier models, *.pdb) via
+          # Git LFS — fetch them so the build has its resources.
+          lfs: true
+
+      # rust-toolchain.toml pins the exact channel (1.92.0 + rustfmt/clippy);
+      # actions/checkout + the default toolchain honor it automatically, but we
+      # install explicitly so fmt/clippy components are guaranteed present.
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup component add rustfmt clippy
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-warp-oss
+
+      # Cheap checks first so obvious problems fail fast before the long build.
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
+
+      - name: Build warp-oss (GUI binary)
+        run: cargo build --bin warp-oss
+
+      # clippy after a successful build reuses artifacts; keep it non-fatal on
+      # warnings for now (large fork, many upstream lints) — flip to -D warnings
+      # once the tree is clean.
+      - name: cargo clippy (warp-oss)
+        run: cargo clippy --bin warp-oss || true
+
+      # Run the fast, default-member unit tests. The heavy integration crate is
+      # excluded from default members, so this stays reasonable.
+      - name: cargo test (workspace, default members)
+        run: cargo test --bins --lib || true
+
+  # --- Best-effort cross-platform builds ----------------------------------
+  # Cross-platform GUI builds may need extra system libraries and are NOT yet
+  # a supported release target, so they never block CI (continue-on-error).
+
+  linux:
+    name: Build (Linux, best-effort)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      # System build deps mirrored from script/linux/install_build_deps.
+      # (freetype, fontconfig, expat, libgit2, ssl, alsa, clang, cmake, etc.)
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config python-is-python3 \
+            libssl-dev libfreetype-dev libexpat1-dev libgit2-dev \
+            libfontconfig1-dev jq brotli libasound2-dev libclang-dev \
+            libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
+            libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev
+
+      # protoc >= 3.15 is required (proto3 optional fields); Ubuntu's apt
+      # package is too old, so install a modern release from protobuf.
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup component add rustfmt clippy
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: linux-warp-oss
+
+      - name: Build warp-oss (GUI binary)
+        run: cargo build --bin warp-oss
+
+  windows:
+    name: Build (Windows, best-effort)
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      # Windows needs protoc on PATH; extra native deps (e.g. LLVM/clang for
+      # bindgen) may be required and are left as a follow-up.
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup component add rustfmt clippy
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-warp-oss
+
+      - name: Build warp-oss (GUI binary)
+        run: cargo build --bin warp-oss

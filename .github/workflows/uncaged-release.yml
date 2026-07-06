@@ -1,0 +1,188 @@
+# Uncaged release — on a pushed tag `v*`, build per-OS packages and attach
+# them to a GitHub Release. No secrets required for the default ad-hoc-signed
+# macOS build. Optional Apple signing/notarization is guarded and documented.
+#
+# The published assets land at:
+#   https://github.com/getuncaged/uncaged/releases/tag/<tag>
+# and the "latest" release (what the website's Download button points at):
+#   https://github.com/getuncaged/uncaged/releases/latest
+#
+# Assets are named  Uncaged-<os>-<arch>.<ext>  e.g. Uncaged-macos-aarch64.dmg.
+
+name: Uncaged Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+# Needed to create the Release and upload assets with softprops/action-gh-release.
+permissions:
+  contents: write
+
+concurrency:
+  group: uncaged-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # --- macOS: the real, supported release artifact -------------------------
+  # Produces the ad-hoc-signed Uncaged.app + Uncaged.dmg exactly as described
+  # in RELEASING.md (channel oss, --selfsign falls back to ad-hoc signing).
+  macos:
+    name: Build macOS DMG (aarch64)
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add aarch64-apple-darwin
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-release-warp-oss
+
+      # script/macos/bundle builds the DMG via create-dmg.
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      # The Metal shader compiler ships with Xcode; select the full Xcode so
+      # actool / metal are on PATH (macos-latest images include Xcode).
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer || true
+
+      # OPTIONAL Apple Developer ID signing + notarization.
+      # By default we ship an AD-HOC signed build (no Apple account needed),
+      # which is what --selfsign produces. To notarize instead, add these repo
+      # secrets and switch the bundle flags to the CODESIGN/notarize path in
+      # script/macos/bundle:
+      #   APPLE_CERT_P12_BASE64, APPLE_CERT_PASSWORD, APPLE_TEAM_ID,
+      #   APPLE_NOTARIZE_APPLE_ID, APPLE_NOTARIZE_PASSWORD
+      # Until then the guarded block below is a no-op and the build stays local.
+      - name: Build Uncaged.app + Uncaged.dmg (ad-hoc signed)
+        run: |
+          ./script/bundle --channel oss --selfsign --arch aarch64
+
+      - name: Stage macOS assets
+        run: |
+          set -euo pipefail
+          OUT="target/aarch64-apple-darwin/release-lto/bundle/osx"
+          mkdir -p dist
+          cp "$OUT/Uncaged.dmg" "dist/Uncaged-macos-aarch64.dmg"
+          # Also ship a zip of the .app for users who prefer it.
+          ditto -c -k --keepParent "$OUT/Uncaged.app" "dist/Uncaged-macos-aarch64.zip"
+
+      - name: Upload macOS assets to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Uncaged-macos-aarch64.dmg
+            dist/Uncaged-macos-aarch64.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+  # --- Linux: best-effort tarball -----------------------------------------
+  # Not a first-class supported package yet: ships a .tar.gz of the built
+  # binary. .deb / AppImage (via script/linux/*) are a follow-up.
+  linux:
+    name: Build Linux tarball (x86_64, best-effort)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config python-is-python3 \
+            libssl-dev libfreetype-dev libexpat1-dev libgit2-dev \
+            libfontconfig1-dev jq brotli libasound2-dev libclang-dev \
+            libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
+            libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: linux-release-warp-oss
+
+      - name: Build warp-oss (release)
+        run: cargo build --release --bin warp-oss
+
+      - name: Stage Linux tarball
+        run: |
+          set -euo pipefail
+          mkdir -p dist stage/Uncaged-linux-x86_64
+          cp target/release/warp-oss stage/Uncaged-linux-x86_64/uncaged
+          [ -f README.md ] && cp README.md stage/Uncaged-linux-x86_64/ || true
+          [ -f LICENSE ] && cp LICENSE stage/Uncaged-linux-x86_64/ || true
+          tar -C stage -czf dist/Uncaged-linux-x86_64.tar.gz Uncaged-linux-x86_64
+
+      - name: Upload Linux asset to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Uncaged-linux-x86_64.tar.gz
+          fail_on_unmatched_files: false
+
+  # --- Windows: best-effort zip -------------------------------------------
+  windows:
+    name: Build Windows zip (x86_64, best-effort)
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 150
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-release-warp-oss
+
+      - name: Build warp-oss (release)
+        run: cargo build --release --bin warp-oss
+
+      - name: Stage Windows zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist, stage/Uncaged-windows-x86_64 | Out-Null
+          Copy-Item target/release/warp-oss.exe stage/Uncaged-windows-x86_64/uncaged.exe
+          if (Test-Path README.md) { Copy-Item README.md stage/Uncaged-windows-x86_64/ }
+          if (Test-Path LICENSE)   { Copy-Item LICENSE   stage/Uncaged-windows-x86_64/ }
+          Compress-Archive -Path stage/Uncaged-windows-x86_64 -DestinationPath dist/Uncaged-windows-x86_64.zip -Force
+
+      - name: Upload Windows asset to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Uncaged-windows-x86_64.zip
+          fail_on_unmatched_files: false
