@@ -76,6 +76,12 @@ pub const ICON_SVG: &str = "bundled/svg/brand/uncaged-icon.svg";
 /// One-line About-screen description. Factual reference to upstream is on-mission.
 pub const ABOUT_DESCRIPTION: &str = "Uncaged — an open source fork of Warp";
 
+/// About-screen source + license line. AGPL-3.0 §13 asks that users of a
+/// modified version be offered its complete source; surfacing the source repo
+/// and license right in the running app is the belt-and-suspenders way to do
+/// that (the repo NOTICE/README carry the full attribution).
+pub const ABOUT_SOURCE: &str = "Source: github.com/getuncaged/uncaged · AGPL-3.0";
+
 /// Label for the community/discussions link (app menu, resource center).
 pub const COMMUNITY_LABEL: &str = "Community";
 
