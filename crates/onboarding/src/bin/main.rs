@@ -149,7 +149,7 @@ impl OnboardingMainView {
                     appearance.set_theme(theme, ctx);
                 });
             }
-            AgentOnboardingEvent::OnboardingCompleted(selected_settings) => {
+            AgentOnboardingEvent::OnboardingCompleted(selected_settings, _) => {
                 let finished_view = ctx.add_typed_action_view(|_| {
                     FinishedOnboardingView::new(Some(selected_settings.clone()))
                 });

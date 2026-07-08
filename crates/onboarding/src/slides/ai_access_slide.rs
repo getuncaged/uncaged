@@ -5,12 +5,10 @@ use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::theme::Fill;
 use warpui_core::elements::{
     Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    Flex, FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
-    ParentElement, Radius, Stack,
+    Empty, Flex, FormattedTextElement, MainAxisSize, ParentElement, Radius, Shrinkable,
 };
 use warpui_core::fonts::Weight;
 use warpui_core::keymap::Keystroke;
-use warpui_core::platform::Cursor;
 use warpui_core::prelude::Align;
 use warpui_core::text_layout::TextAlignment;
 use warpui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
@@ -20,56 +18,141 @@ use warpui_core::{
 };
 
 use super::OnboardingSlide;
-use crate::model::{AiAccessChoice, OnboardingAuthState, OnboardingStateModel};
+use crate::model::{AiAccessChoice, OnboardingStateModel};
 use crate::slides::{bottom_nav, layout, slide_content};
+
+// ── Connect-gallery data (plain-data mirror of the app-crate uncaged views) ──
+//
+// The onboarding crate cannot reference the app crate, so `app/src/root_view.rs`
+// converts `crate::uncaged::{catalog_sections, connections, engine_active}` into
+// these structs and pushes them into the slide via
+// `AgentOnboardingView::set_connect_gallery`. The per-preset / per-connection
+// vendor `icon` is stamped by root_view from `crate::uncaged::preset_icon`, so
+// the branding stays in its one home.
+
+/// One connectable platform tile in a gallery section.
+#[derive(Clone, Debug)]
+pub struct ConnectPresetView {
+    pub id: String,
+    pub label: String,
+    pub blurb: String,
+    pub local: bool,
+    pub needs_key: bool,
+    /// "anthropic" | "openai_compatible" | "cli".
+    pub wire: String,
+    pub icon: Icon,
+}
+
+/// A gallery section grouping presets that connect the same way.
+#[derive(Clone, Debug)]
+pub struct ConnectSectionView {
+    pub title: String,
+    pub subtitle: String,
+    pub presets: Vec<ConnectPresetView>,
+}
+
+/// A saved connection as the gallery's "Connected" roster sees it.
+#[derive(Clone, Debug)]
+pub struct ConnectConnectionView {
+    pub id: String,
+    pub preset: String,
+    pub label: String,
+    pub endpoint: String,
+    pub model: String,
+    /// "Ready" | "Needs key" | "Incomplete".
+    pub status: String,
+    pub local: bool,
+    pub usable: bool,
+    pub is_active: bool,
+    pub icon: Icon,
+}
+
+/// The full connect gallery snapshot: catalog + roster + engine availability.
+#[derive(Clone, Debug, Default)]
+pub struct ConnectGalleryData {
+    pub sections: Vec<ConnectSectionView>,
+    pub connections: Vec<ConnectConnectionView>,
+    pub engine_available: bool,
+}
+
+impl ConnectGalleryData {
+    /// The number of preset tiles across all sections (the size the connect
+    /// button pool must cover, in flattened section order).
+    fn preset_count(&self) -> usize {
+        self.sections.iter().map(|s| s.presets.len()).sum()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum AiAccessSlideAction {
-    SelectSubscription,
-    SelectSetUpLater,
-    CopyUpgradeUrlClicked,
-    PasteAuthTokenFromClipboardClicked,
+    /// Connect a catalog preset by id (a gallery tile's "Connect" button).
+    ConnectPreset(String),
+    /// Make an already-saved but inactive connection active (a roster "Use").
+    UseConnection(String),
     BackClicked,
     NextClicked,
+    SetUpLaterClicked,
 }
 
-/// Emitted to the parent onboarding view so the (app-crate) upgrade fallback
-/// actions can be handled at the root level — the onboarding crate can't
-/// reference them directly.
+/// Emitted to the parent onboarding view so the (app-crate) connect actions can
+/// be handled at the root level — the onboarding crate can't reference the
+/// uncaged bridge directly.
 #[derive(Debug, Clone)]
 pub enum AiAccessSlideEvent {
-    CopyUpgradeUrlRequested,
-    PasteAuthTokenFromClipboardRequested,
+    /// The user asked to connect a catalog preset (root_view calls
+    /// `uncaged::connect` + activates no-key local/CLI presets).
+    ConnectPresetRequested(String),
+    /// The user asked to activate an existing connection by id.
+    ActivateConnectionRequested(String),
 }
 
-/// The "Connect your model" slide (built-in agent path). Forks between
-/// connecting your own model now — free, via an API key or a local runtime —
-/// and a "Set up later" option that finishes onboarding without a model.
+/// The "Connect your model" slide (built-in agent path). Renders the real
+/// connect gallery — a "Connected" roster plus catalog sections of one-click
+/// connectable platforms (local runtimes, CLI agents, API-key providers) — and
+/// a "Set up later" link that finishes onboarding without a model.
 pub struct AiAccessSlide {
     onboarding_state: ModelHandle<OnboardingStateModel>,
-    subscription_mouse_state: MouseStateHandle,
-    set_up_later_mouse_state: MouseStateHandle,
     back_button: button::Button,
     next_button: button::Button,
+    set_up_later_button: button::Button,
     scroll_state: ClippedScrollStateHandle,
-    show_auth_prompt_bar: bool,
-    copy_url_mouse_state: MouseStateHandle,
-    paste_token_mouse_state: MouseStateHandle,
+    /// The catalog + roster snapshot, pushed by root_view via the parent view.
+    gallery: ConnectGalleryData,
+    /// One button per preset tile, in flattened section order. Kept in lockstep
+    /// with `gallery.preset_count()` so `render` can index straight into it.
+    connect_buttons: Vec<button::Button>,
+    /// One "Use" button per roster connection, indexed by connection position.
+    use_buttons: Vec<button::Button>,
 }
 
 impl AiAccessSlide {
     pub(crate) fn new(onboarding_state: ModelHandle<OnboardingStateModel>) -> Self {
         Self {
             onboarding_state,
-            subscription_mouse_state: MouseStateHandle::default(),
-            set_up_later_mouse_state: MouseStateHandle::default(),
             back_button: button::Button::default(),
             next_button: button::Button::default(),
+            set_up_later_button: button::Button::default(),
             scroll_state: ClippedScrollStateHandle::new(),
-            show_auth_prompt_bar: false,
-            copy_url_mouse_state: MouseStateHandle::default(),
-            paste_token_mouse_state: MouseStateHandle::default(),
+            gallery: ConnectGalleryData::default(),
+            connect_buttons: Vec::new(),
+            use_buttons: Vec::new(),
         }
+    }
+
+    /// Replace the connect-gallery snapshot and resize the button pools to match.
+    /// Called by the parent onboarding view whenever root_view rebuilds the data
+    /// (initial load and after every connect/activate).
+    pub(crate) fn set_connect_gallery(
+        &mut self,
+        data: ConnectGalleryData,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.connect_buttons
+            .resize_with(data.preset_count(), button::Button::default);
+        self.use_buttons
+            .resize_with(data.connections.len(), button::Button::default);
+        self.gallery = data;
+        ctx.notify();
     }
 
     // The final DES-816 visual exports have not landed yet, so the right panel
@@ -77,22 +160,16 @@ impl AiAccessSlide {
     pub(crate) const VISUAL_IMAGE_PATHS: &'static [&'static str] =
         &["async/png/onboarding/welcome_agent.png"];
 
-    fn choice(&self, app: &AppContext) -> AiAccessChoice {
-        self.onboarding_state.as_ref(app).ai_access_choice()
-    }
-
-    fn render_content(
-        &self,
-        appearance: &Appearance,
-        choice: AiAccessChoice,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
+    fn render_content(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
         let bottom_nav = Align::new(self.render_bottom_nav(appearance, app)).finish();
 
         slide_content::onboarding_slide_content(
             vec![
                 Align::new(self.render_header(appearance)).left().finish(),
-                Align::new(self.render_options(appearance, choice)).finish(),
+                Align::new(self.render_gallery(appearance)).left().finish(),
+                Align::new(self.render_set_up_later(appearance))
+                    .left()
+                    .finish(),
             ],
             bottom_nav,
             self.scroll_state.clone(),
@@ -136,204 +213,320 @@ impl AiAccessSlide {
             .finish()
     }
 
-    fn render_options(&self, appearance: &Appearance, choice: AiAccessChoice) -> Box<dyn Element> {
-        let subscription_card = self
-            .render_subscription_card(appearance, matches!(choice, AiAccessChoice::Subscription));
+    // ── gallery primitives (mirror ai_page.rs ConnectModelWidget) ───────────
+    const GALLERY_ICON_SIZE: f32 = 20.;
 
-        let set_up_later_card =
-            self.render_set_up_later_card(appearance, matches!(choice, AiAccessChoice::SetUpLater));
+    /// Row / tile title (14px semibold).
+    fn tile_title(text: &str, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        appearance
+            .ui_builder()
+            .paragraph(text.to_string())
+            .with_style(UiComponentStyles {
+                font_size: Some(14.),
+                font_weight: Some(Weight::Semibold),
+                font_color: Some(internal_colors::text_main(
+                    theme,
+                    theme.background().into_solid(),
+                )),
+                ..Default::default()
+            })
+            .build()
+            .finish()
+    }
 
-        Container::new(
-            Flex::column()
-                .with_main_axis_size(MainAxisSize::Min)
-                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-                .with_child(
-                    Container::new(subscription_card)
-                        .with_margin_bottom(12.)
-                        .finish(),
-                )
-                .with_child(set_up_later_card)
-                .finish(),
-        )
-        .with_margin_top(38.)
+    /// Muted supporting text (section subtitle / tile blurb).
+    fn tile_muted(text: &str, size: f32, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        FormattedTextElement::from_str(text.to_string(), appearance.ui_font_family(), size)
+            .with_color(internal_colors::text_sub(theme, theme.background().into_solid()))
+            .with_weight(Weight::Normal)
+            .with_alignment(TextAlignment::Left)
+            .with_line_height_ratio(1.2)
+            .finish()
+    }
+
+    /// A pill-shaped status/state badge (10px semibold colored text on a subtle
+    /// fill).
+    fn pill(text: &str, text_color: Fill, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let label = appearance
+            .ui_builder()
+            .paragraph(text.to_string())
+            .with_style(UiComponentStyles {
+                font_size: Some(10.),
+                font_weight: Some(Weight::Semibold),
+                font_color: Some(text_color.into_solid()),
+                ..Default::default()
+            })
+            .build()
+            .finish();
+        Container::new(label)
+            .with_horizontal_padding(7.)
+            .with_vertical_padding(3.)
+            .with_background(internal_colors::fg_overlay_2(theme))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(5.)))
+            .finish()
+    }
+
+    /// A fixed-size leading vendor icon. Icons have no intrinsic size, so they
+    /// must be boxed in a ConstrainedBox (else the debug infinite-Y panic).
+    fn leading_icon(icon: Icon, appearance: &Appearance) -> Box<dyn Element> {
+        ConstrainedBox::new(Box::new(
+            icon.to_warpui_icon(appearance.theme().active_ui_text_color()),
+        ))
+        .with_width(Self::GALLERY_ICON_SIZE)
+        .with_height(Self::GALLERY_ICON_SIZE)
         .finish()
     }
 
-    /// Shared chrome for an option card: selected/unselected background + border,
-    /// hover/click to select.
-    fn render_card_chrome(
-        appearance: &Appearance,
-        is_selected: bool,
-        mouse_state: MouseStateHandle,
-        select_action: AiAccessSlideAction,
-        content: Box<dyn Element>,
-    ) -> Box<dyn Element> {
-        const RADIUS: f32 = 8.;
-
+    /// A card wrapper for a roster row / gallery tile. The active connection
+    /// gets an accent border.
+    fn card(child: Box<dyn Element>, accent: bool, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();
-        let background = if is_selected {
-            Some(internal_colors::accent_overlay_1(theme))
-        } else {
-            None
-        };
-        let border_color = if is_selected {
+        let border = if accent {
             theme.accent()
         } else {
             Fill::Solid(internal_colors::neutral_4(theme))
         };
-
-        Hoverable::new(mouse_state, move |_| {
-            let mut container = Container::new(content)
-                .with_uniform_padding(24.)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(RADIUS)))
-                .with_border(Border::all(1.).with_border_fill(border_color));
-            if let Some(bg) = background {
-                container = container.with_background(bg);
-            }
-            container.finish()
-        })
-        .with_cursor(Cursor::PointingHand)
-        .on_click(move |ctx, _, _| {
-            ctx.dispatch_typed_action(select_action.clone());
-        })
-        .finish()
+        Container::new(child)
+            .with_uniform_padding(12.)
+            .with_background(internal_colors::fg_overlay_1(theme))
+            .with_border(Border::all(1.).with_border_fill(border))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))
+            .finish()
     }
 
-    fn render_subscription_card(
+    /// One "Connected" roster row: vendor icon + label/subtitle + status pill
+    /// and, when inactive-but-usable, a "Use" button that activates it.
+    fn render_connection_row(
         &self,
         appearance: &Appearance,
-        is_selected: bool,
+        index: usize,
+        conn: &ConnectConnectionView,
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
-        let bg_solid = theme.background().into_solid();
-        let label_color = if is_selected {
-            internal_colors::text_main(theme, bg_solid)
-        } else {
-            internal_colors::text_sub(theme, bg_solid)
-        };
-        let description_color = internal_colors::text_sub(theme, bg_solid);
 
-        let label = appearance
-            .ui_builder()
-            .paragraph("Use your own model")
-            .with_style(UiComponentStyles {
-                font_size: Some(16.),
-                font_weight: Some(Weight::Semibold),
-                font_color: Some(label_color),
-                ..Default::default()
-            })
-            .build()
-            .finish();
-
-        let badge = {
-            let green = theme.ansi_fg_green();
-            let badge_text = appearance
-                .ui_builder()
-                .paragraph("Free")
-                .with_style(UiComponentStyles {
-                    font_size: Some(12.),
-                    font_weight: Some(Weight::Normal),
-                    font_color: Some(green),
-                    ..Default::default()
-                })
-                .build()
-                .finish();
-            Container::new(badge_text)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(11.)))
-                .with_border(Border::all(1.).with_border_fill(Fill::Solid(green)))
-                .with_horizontal_padding(8.)
-                .with_vertical_padding(3.)
-                .finish()
-        };
-
-        let header_row = Flex::row()
-            .with_main_axis_size(MainAxisSize::Max)
-            .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
+        let mut name_row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(label)
-            .with_child(badge)
+            .with_spacing(6.)
+            .with_child(Self::tile_title(&conn.label, appearance));
+        if conn.is_active {
+            name_row = name_row.with_child(Self::pill("Active", theme.accent(), appearance));
+        }
+        if conn.local {
+            name_row = name_row.with_child(Self::pill(
+                "Local",
+                theme.nonactive_ui_text_color(),
+                appearance,
+            ));
+        }
+
+        let subtitle_text = if conn.model.trim().is_empty() {
+            conn.endpoint.clone()
+        } else {
+            format!("{} · {}", conn.model, conn.endpoint)
+        };
+
+        let left = Flex::column()
+            .with_spacing(3.)
+            .with_child(name_row.finish())
+            .with_child(Self::tile_muted(&subtitle_text, 11., appearance))
             .finish();
 
-        let description = FormattedTextElement::from_str(
-            "Connect an API key from Anthropic, OpenAI, and others, or point Uncaged at a local \
-             runtime like LM Studio or Ollama. No account required.",
-            appearance.ui_font_family(),
-            14.,
-        )
-        .with_color(description_color)
-        .with_weight(Weight::Normal)
-        .with_alignment(TextAlignment::Left)
-        .with_line_height_ratio(1.2)
-        .finish();
+        let status_color = Fill::Solid(if conn.status == "Ready" {
+            theme.ansi_fg_green()
+        } else {
+            theme.ui_warning_color()
+        });
+        let mut right = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(8.)
+            .with_child(Self::pill(&conn.status, status_color, appearance));
+        if !conn.is_active && conn.usable {
+            if let Some(button) = self.use_buttons.get(index) {
+                let id = conn.id.clone();
+                right = right.with_child(button.render(
+                    appearance,
+                    button::Params {
+                        content: button::Content::Label("Use".into()),
+                        theme: &button::themes::Secondary,
+                        options: button::Options {
+                            size: button::Size::Small,
+                            on_click: Some(Box::new(move |ctx, _app, _pos| {
+                                ctx.dispatch_typed_action(AiAccessSlideAction::UseConnection(
+                                    id.clone(),
+                                ));
+                            })),
+                            ..button::Options::default(appearance)
+                        },
+                    },
+                ));
+            }
+        }
 
-        let content = Flex::column()
-            .with_main_axis_size(MainAxisSize::Min)
-            .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(header_row)
-            .with_child(Container::new(description).with_margin_top(12.).finish())
+        // Flat row: icon + shrinkable text + fixed right controls, all direct
+        // children of a MainAxisSize::Max row. The Shrinkable must NOT be nested
+        // in an intermediate sub-row (that sub-row measures with an infinite
+        // width constraint and the flex panics).
+        let row = Flex::row()
+            .with_main_axis_size(MainAxisSize::Max)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(11.)
+            .with_child(Self::leading_icon(conn.icon, appearance))
+            .with_child(Shrinkable::new(1., left).finish())
+            .with_child(right.finish())
             .finish();
 
-        Self::render_card_chrome(
-            appearance,
-            is_selected,
-            self.subscription_mouse_state.clone(),
-            AiAccessSlideAction::SelectSubscription,
-            content,
-        )
+        Self::card(row, conn.is_active, appearance)
     }
 
-    fn render_set_up_later_card(
+    /// One catalog preset tile: vendor icon + label/blurb + a right slot that is
+    /// a state pill when connected, else a "Connect" button.
+    #[allow(clippy::too_many_arguments)]
+    fn render_preset_tile(
         &self,
         appearance: &Appearance,
-        is_selected: bool,
+        button_index: usize,
+        preset: &ConnectPresetView,
+        is_active: bool,
+        is_connected: bool,
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
-        let bg_solid = theme.background().into_solid();
-        let label_color = if is_selected {
-            internal_colors::text_main(theme, bg_solid)
+
+        let left = Flex::column()
+            .with_spacing(3.)
+            .with_child(Self::tile_title(&preset.label, appearance))
+            .with_child(Self::tile_muted(&preset.blurb, 11., appearance))
+            .finish();
+
+        let right: Box<dyn Element> = if is_active {
+            Self::pill("In use", theme.accent(), appearance)
+        } else if is_connected {
+            Self::pill("Connected", Fill::Solid(theme.ansi_fg_green()), appearance)
+        } else if let Some(button) = self.connect_buttons.get(button_index) {
+            let id = preset.id.clone();
+            button.render(
+                appearance,
+                button::Params {
+                    content: button::Content::IconAndLabel(Icon::Plus, "Connect".into()),
+                    theme: &button::themes::Secondary,
+                    options: button::Options {
+                        size: button::Size::Small,
+                        on_click: Some(Box::new(move |ctx, _app, _pos| {
+                            ctx.dispatch_typed_action(AiAccessSlideAction::ConnectPreset(
+                                id.clone(),
+                            ));
+                        })),
+                        ..button::Options::default(appearance)
+                    },
+                },
+            )
         } else {
-            internal_colors::text_sub(theme, bg_solid)
+            Empty::new().finish()
         };
-        let description_color = internal_colors::text_sub(theme, bg_solid);
 
-        let label = appearance
-            .ui_builder()
-            .paragraph("Set up later")
-            .with_style(UiComponentStyles {
-                font_size: Some(16.),
-                font_weight: Some(Weight::Semibold),
-                font_color: Some(label_color),
-                ..Default::default()
-            })
-            .build()
+        let row = Flex::row()
+            .with_main_axis_size(MainAxisSize::Max)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(11.)
+            .with_child(Self::leading_icon(preset.icon, appearance))
+            .with_child(Shrinkable::new(1., left).finish())
+            .with_child(right)
             .finish();
 
-        let description = FormattedTextElement::from_str(
-            "Skip for now and explore the terminal. You can connect your model anytime from \
-             Settings.",
-            appearance.ui_font_family(),
-            14.,
-        )
-        .with_color(description_color)
-        .with_weight(Weight::Normal)
-        .with_alignment(TextAlignment::Left)
-        .with_line_height_ratio(1.2)
-        .finish();
+        Self::card(row, is_active, appearance)
+    }
 
-        let content = Flex::column()
+    /// The full connect gallery: a "Connected" roster (when non-empty) followed
+    /// by each catalog section of connectable preset tiles.
+    fn render_gallery(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let data = &self.gallery;
+
+        // Presets already connected (so we don't re-offer "Connect"), and the
+        // active preset (so its tile reads "In use").
+        let connected: std::collections::HashSet<&str> =
+            data.connections.iter().map(|c| c.preset.as_str()).collect();
+        let active_preset: Option<&str> = data
+            .connections
+            .iter()
+            .find(|c| c.is_active)
+            .map(|c| c.preset.as_str());
+
+        let mut column = Flex::column()
             .with_main_axis_size(MainAxisSize::Min)
-            .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(label)
-            .with_child(Container::new(description).with_margin_top(12.).finish())
-            .finish();
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_spacing(8.);
 
-        Self::render_card_chrome(
+        // "Connected" roster.
+        if !data.connections.is_empty() {
+            column = column.with_child(
+                Container::new(Self::tile_title("Connected", appearance))
+                    .with_margin_bottom(2.)
+                    .finish(),
+            );
+            for (index, conn) in data.connections.iter().enumerate() {
+                column = column.with_child(self.render_connection_row(appearance, index, conn));
+            }
+        }
+
+        // Catalog sections. `button_index` walks the flattened preset order in
+        // lockstep with the connect-button pool, advanced unconditionally so the
+        // positional pool never desyncs.
+        let mut button_index = 0usize;
+        for section in &data.sections {
+            column = column.with_child(
+                Container::new(
+                    Flex::column()
+                        .with_main_axis_size(MainAxisSize::Min)
+                        .with_cross_axis_alignment(CrossAxisAlignment::Start)
+                        .with_spacing(2.)
+                        .with_child(Self::tile_title(&section.title, appearance))
+                        .with_child(Self::tile_muted(&section.subtitle, 12., appearance))
+                        .finish(),
+                )
+                .with_margin_top(8.)
+                .with_margin_bottom(2.)
+                .finish(),
+            );
+
+            for preset in &section.presets {
+                let idx = button_index;
+                button_index += 1;
+                let is_active = active_preset == Some(preset.id.as_str());
+                let is_connected = connected.contains(preset.id.as_str());
+                column = column.with_child(self.render_preset_tile(
+                    appearance,
+                    idx,
+                    preset,
+                    is_active,
+                    is_connected,
+                ));
+            }
+        }
+
+        Container::new(column.finish())
+            .with_margin_top(32.)
+            .finish()
+    }
+
+    /// A muted "Set up later" link below the gallery that finishes onboarding
+    /// without a model.
+    fn render_set_up_later(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let button = self.set_up_later_button.render(
             appearance,
-            is_selected,
-            self.set_up_later_mouse_state.clone(),
-            AiAccessSlideAction::SelectSetUpLater,
-            content,
-        )
+            button::Params {
+                content: button::Content::Label("Set up later".into()),
+                theme: &button::themes::Naked,
+                options: button::Options {
+                    on_click: Some(Box::new(|ctx, _app, _pos| {
+                        ctx.dispatch_typed_action(AiAccessSlideAction::SetUpLaterClicked);
+                    })),
+                    ..button::Options::default(appearance)
+                },
+            },
+        );
+        Container::new(button).with_margin_top(16.).finish()
     }
 
     fn render_bottom_nav(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
@@ -384,115 +577,6 @@ impl AiAccessSlide {
         )
     }
 
-    /// Full-width bar pinned below the slide's two-column layout. Shown after
-    /// the user chooses to connect their own model and clicks "Next", pointing
-    /// them at where to finish setting up an API key or a local runtime.
-    fn render_auth_prompt_bar(&self, appearance: &Appearance) -> Box<dyn Element> {
-        const BAR_HEIGHT: f32 = 40.;
-        const ICON_SIZE: f32 = 14.;
-        const FONT_SIZE: f32 = 12.;
-
-        let theme = appearance.theme();
-        let bar_bg = theme.surface_1();
-        let bar_bg_solid = bar_bg.into_solid();
-        let text_color = internal_colors::text_sub(theme, bar_bg_solid);
-        let ui_builder = appearance.ui_builder();
-
-        let text_styles = UiComponentStyles {
-            font_color: Some(text_color),
-            font_size: Some(FONT_SIZE),
-            ..Default::default()
-        };
-        let link_styles = UiComponentStyles {
-            font_size: Some(FONT_SIZE),
-            ..Default::default()
-        };
-
-        let icon = ConstrainedBox::new(Box::new(
-            Icon::AlertCircle.to_warpui_icon(Fill::Solid(text_color)),
-        ))
-        .with_width(ICON_SIZE)
-        .with_height(ICON_SIZE)
-        .finish();
-
-        let open_settings_link = ui_builder
-            .link(
-                "open Settings".into(),
-                None,
-                Some(Box::new(|ctx| {
-                    ctx.dispatch_typed_action(AiAccessSlideAction::CopyUpgradeUrlClicked);
-                })),
-                self.copy_url_mouse_state.clone(),
-            )
-            .soft_wrap(false)
-            .with_style(link_styles)
-            .build()
-            .finish();
-
-        let local_runtime_link = ui_builder
-            .link(
-                "connect a local runtime".into(),
-                None,
-                Some(Box::new(|ctx| {
-                    ctx.dispatch_typed_action(
-                        AiAccessSlideAction::PasteAuthTokenFromClipboardClicked,
-                    );
-                })),
-                self.paste_token_mouse_state.clone(),
-            )
-            .soft_wrap(false)
-            .with_style(link_styles)
-            .build()
-            .finish();
-
-        let text_row = Flex::row()
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(icon)
-            .with_child(
-                Container::new(
-                    ui_builder
-                        .span("Your model isn't connected yet. You can ")
-                        .with_style(text_styles)
-                        .build()
-                        .finish(),
-                )
-                .with_margin_left(8.)
-                .finish(),
-            )
-            .with_child(open_settings_link)
-            .with_child(
-                ui_builder
-                    .span(" to add an API key, or ")
-                    .with_style(text_styles)
-                    .build()
-                    .finish(),
-            )
-            .with_child(local_runtime_link)
-            .with_child(
-                ui_builder
-                    .span(" like LM Studio or Ollama.")
-                    .with_style(text_styles)
-                    .build()
-                    .finish(),
-            )
-            .finish();
-
-        let row = Flex::row()
-            .with_main_axis_size(MainAxisSize::Max)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(text_row)
-            .finish();
-
-        ConstrainedBox::new(
-            Container::new(row)
-                .with_background(bar_bg)
-                .with_border(Border::top(1.).with_border_color(internal_colors::neutral_4(theme)))
-                .with_horizontal_padding(16.)
-                .finish(),
-        )
-        .with_min_height(BAR_HEIGHT)
-        .finish()
-    }
 }
 
 impl Entity for AiAccessSlide {
@@ -506,70 +590,24 @@ impl View for AiAccessSlide {
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
-        let choice = self.choice(app);
-
-        let slide = layout::static_left(
-            || self.render_content(appearance, choice, app),
+        layout::static_left(
+            || self.render_content(appearance, app),
             || self.render_visual(),
-        );
-
-        // Overlay the fallback bar at the bottom (rather than adding it to the
-        // column) so the slide layout stays stable whether or not it's shown.
-        let show_bar = self.show_auth_prompt_bar
-            && !matches!(
-                self.onboarding_state.as_ref(app).auth_state(),
-                OnboardingAuthState::PayingUser,
-            );
-        if !show_bar {
-            return slide;
-        }
-
-        let mut stack = Stack::new();
-        stack.add_child(slide);
-        stack.add_child(
-            Align::new(self.render_auth_prompt_bar(appearance))
-                .bottom_center()
-                .finish(),
-        );
-        stack.finish()
+        )
     }
 }
 
 impl AiAccessSlide {
-    fn select_choice(&mut self, choice: AiAccessChoice, ctx: &mut ViewContext<Self>) {
-        self.onboarding_state.update(ctx, |model, ctx| {
-            model.set_ai_access_choice(choice, ctx);
-        });
-        ctx.notify();
-    }
-
     fn next(&mut self, ctx: &mut ViewContext<Self>) {
         self.onboarding_state.update(ctx, |model, ctx| {
             model.next(ctx);
         });
     }
-
-    /// Primary "Next" action. Uncaged has no accounts, subscriptions, or
-    /// checkout — both cards ("Use your own model" and "Set up later") are free,
-    /// so this always advances and never launches a billing/upgrade URL.
-    fn advance_or_upgrade(&mut self, ctx: &mut ViewContext<Self>) {
-        match self.choice(ctx) {
-            AiAccessChoice::Subscription | AiAccessChoice::SetUpLater => self.next(ctx),
-        }
-    }
 }
 
 impl OnboardingSlide for AiAccessSlide {
-    fn on_up(&mut self, ctx: &mut ViewContext<Self>) {
-        self.select_choice(AiAccessChoice::Subscription, ctx);
-    }
-
-    fn on_down(&mut self, ctx: &mut ViewContext<Self>) {
-        self.select_choice(AiAccessChoice::SetUpLater, ctx);
-    }
-
     fn on_enter(&mut self, ctx: &mut ViewContext<Self>) {
-        self.advance_or_upgrade(ctx);
+        self.next(ctx);
     }
 }
 
@@ -578,17 +616,11 @@ impl TypedActionView for AiAccessSlide {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            AiAccessSlideAction::SelectSubscription => {
-                self.select_choice(AiAccessChoice::Subscription, ctx);
+            AiAccessSlideAction::ConnectPreset(preset_id) => {
+                ctx.emit(AiAccessSlideEvent::ConnectPresetRequested(preset_id.clone()));
             }
-            AiAccessSlideAction::SelectSetUpLater => {
-                self.select_choice(AiAccessChoice::SetUpLater, ctx);
-            }
-            AiAccessSlideAction::CopyUpgradeUrlClicked => {
-                ctx.emit(AiAccessSlideEvent::CopyUpgradeUrlRequested);
-            }
-            AiAccessSlideAction::PasteAuthTokenFromClipboardClicked => {
-                ctx.emit(AiAccessSlideEvent::PasteAuthTokenFromClipboardRequested);
+            AiAccessSlideAction::UseConnection(id) => {
+                ctx.emit(AiAccessSlideEvent::ActivateConnectionRequested(id.clone()));
             }
             AiAccessSlideAction::BackClicked => {
                 self.onboarding_state.update(ctx, |model, ctx| {
@@ -596,7 +628,15 @@ impl TypedActionView for AiAccessSlide {
                 });
             }
             AiAccessSlideAction::NextClicked => {
-                self.advance_or_upgrade(ctx);
+                self.next(ctx);
+            }
+            AiAccessSlideAction::SetUpLaterClicked => {
+                // Record that the user opted to finish without connecting (so the
+                // post-onboarding Settings redirect is skipped), then advance.
+                self.onboarding_state.update(ctx, |model, ctx| {
+                    model.set_ai_access_choice(AiAccessChoice::SetUpLater, ctx);
+                    model.next(ctx);
+                });
             }
         }
     }

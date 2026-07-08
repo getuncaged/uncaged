@@ -1,0 +1,31 @@
+# winget installer manifest for Uncaged.
+#
+# Points at the Inno Setup installer produced by uncaged-release.yml. The
+# `PackageVersion`, `InstallerUrl`, and `InstallerSha256` fields are
+# PLACEHOLDERS replaced by the release process:
+#   - PackageVersion  -> the tag without the leading "v" (e.g. 0.1.0)
+#   - InstallerUrl    -> the versioned release asset URL for that tag
+#   - InstallerSha256 -> uppercase SHA-256 of the installer .exe
+#
+# Uncaged's installer is Inno Setup (see script/windows/windows-installer.iss),
+# which supports the standard silent-install switches winget uses.
+PackageIdentifier: Uncaged.Uncaged
+PackageVersion: 0.0.0
+InstallerType: inno
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+UpgradeBehavior: install
+# AppUserModelID matches the Rust runtime identity and the installer shortcut.
+ProductCode: "{{ProductCode}}"
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/getuncaged/uncaged/releases/download/v0.0.0/Uncaged-windows-x86_64-setup.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+  - Architecture: arm64
+    InstallerUrl: https://github.com/getuncaged/uncaged/releases/download/v0.0.0/Uncaged-windows-aarch64-setup.exe
+    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+ManifestType: installer
+ManifestVersion: 1.6.0

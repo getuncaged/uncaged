@@ -1,4 +1,5 @@
 mod agent_visual;
+mod customize_visual;
 mod intention_terminal_visual;
 mod intention_visual;
 mod onboarding_visual;
@@ -6,6 +7,7 @@ mod project_visual;
 mod theme_picker_mock_visual;
 
 pub(crate) use agent_visual::agent_visual;
+pub(crate) use customize_visual::customize_visual;
 pub(crate) use intention_terminal_visual::intention_terminal_visual;
 pub(crate) use intention_visual::intention_visual;
 pub(crate) use project_visual::project_visual;

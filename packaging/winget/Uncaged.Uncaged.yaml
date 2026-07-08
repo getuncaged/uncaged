@@ -1,0 +1,18 @@
+# winget version manifest for Uncaged.
+#
+# This is the "version" file of the three-file winget manifest form. It ties
+# together the installer manifest and the default-locale manifest for a given
+# PackageVersion. All three files live under a path like:
+#
+#   manifests/u/Uncaged/Uncaged/<version>/
+#
+# in a fork of https://github.com/microsoft/winget-pkgs, and are submitted via
+# pull request (see packaging/winget/README notes in RELEASING.md).
+#
+# PackageVersion is a PLACEHOLDER (0.0.0); the release process replaces it with
+# the tag (without the leading "v") in all three files.
+PackageIdentifier: Uncaged.Uncaged
+PackageVersion: 0.0.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

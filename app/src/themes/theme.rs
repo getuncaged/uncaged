@@ -47,6 +47,8 @@ pub enum ThemeKind {
     ReceivedReferralReward,
     #[schemars(description = "Uncaged")]
     Uncaged,
+    #[schemars(description = "Midnight")]
+    Midnight,
     #[schemars(description = "Adeberry")]
     Adeberry,
     #[schemars(description = "Phenomenon")]
@@ -133,6 +135,7 @@ impl std::fmt::Display for ThemeKind {
             ThemeKind::Phenomenon => "Phenomenon",
             ThemeKind::SolarFlare => "Solar Flare",
             ThemeKind::Uncaged => "Uncaged",
+            ThemeKind::Midnight => "Midnight",
             ThemeKind::Adeberry => "Adeberry",
             ThemeKind::SentReferralReward => "Uncaged Referral",
             ThemeKind::ReceivedReferralReward => "Referred to Uncaged",
@@ -496,6 +499,7 @@ impl WarpThemeConfig {
             (ThemeKind::SolarFlare, solar_flare()),
             (ThemeKind::Adeberry, adeberry()),
             (ThemeKind::Uncaged, uncaged()),
+            (ThemeKind::Midnight, midnight()),
         ]);
         WarpThemeConfig { theme_map }
     }

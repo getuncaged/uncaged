@@ -47,6 +47,34 @@ pub fn static_left(
     left: impl Fn() -> Box<dyn Element>,
     right: impl FnOnce() -> Box<dyn Element>,
 ) -> Box<dyn Element> {
+    // Uncaged (Oss): some bundled right-column previews are upstream Warp product
+    // screenshots (they show `~/warp-internal` paths). Slides whose right panel is
+    // still a screenshot use this single-column fallback so no Warp imagery
+    // appears. Slides that render an on-brand drawn mock call
+    // `static_left_two_column` directly to keep their preview.
+    if matches!(
+        warp_core::channel::ChannelState::channel(),
+        warp_core::channel::Channel::Oss
+    ) {
+        return Align::new(
+            ConstrainedBox::new(left())
+                .with_max_width(LEFT_COLUMN_CONTENT_MAX_WIDTH)
+                .finish(),
+        )
+        .finish();
+    }
+
+    static_left_two_column(left, right)
+}
+
+/// The two-column layout (fixed-width left + flexible right), collapsing to a
+/// centered single column only when the window is too narrow. Unlike
+/// [`static_left`], this always shows the right panel — use it only when the
+/// `right` builder renders an on-brand drawn mock, never an upstream screenshot.
+pub fn static_left_two_column(
+    left: impl Fn() -> Box<dyn Element>,
+    right: impl FnOnce() -> Box<dyn Element>,
+) -> Box<dyn Element> {
     let max_width_for_two_columns = LEFT_COLUMN_WIDTH + MIN_RIGHT_COLUMN_WIDTH;
 
     let left_constrained = || {
@@ -56,13 +84,9 @@ pub fn static_left(
     };
 
     // Narrow layout: show only the left section, centered.
-    // Use Align instead of a max-sized Flex so we can safely center even when the incoming
-    // height constraint is unbounded.
     let left_only = Align::new(left_constrained()).finish();
 
     // Default layout: fixed-width left + flexible right.
-    // Use Align instead of a max-sized Flex so we can safely center even when the incoming
-    // height constraint is unbounded.
     let left_centered = Align::new(left_constrained()).finish();
 
     let left_fixed_width = Container::new(

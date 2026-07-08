@@ -78,8 +78,9 @@ impl IntroSlide {
 }
 
 impl OnboardingSlide for IntroSlide {
-    fn on_enter(&mut self, ctx: &mut ViewContext<Self>) {
-        self.get_started_clicked(ctx);
+    fn on_enter(&mut self, _ctx: &mut ViewContext<Self>) {
+        // Uncaged: Welcome is a real first slide — wait for the user to click
+        // "Get started" instead of auto-advancing straight past it.
     }
 }
 
@@ -87,13 +88,17 @@ impl IntroSlide {
     fn render_centered_content(&self, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();
 
-        let logo_fill = internal_colors::fg_overlay_4(theme);
+        // The Uncaged mark, in the ember brand accent (was a 20%-opacity ghost).
+        let logo_fill = internal_colors::accent(theme);
         let logo = ConstrainedBox::new(Icon::Oz.to_warpui_icon(logo_fill).finish())
             .with_width(64.)
             .with_height(64.)
             .finish();
 
-        let base_color: ColorU = internal_colors::fg_overlay_4(theme).into();
+        // Start the shimmer from a readable secondary tone (was a 20%-opacity
+        // ghost) so the title is legible at rest, then sweeps to full ink.
+        let base_color: ColorU =
+            internal_colors::text_sub(theme, theme.background().into_solid()).into();
         let shimmer_color: ColorU = theme.foreground().into();
         let title = ShimmeringTextElement::new(
             "Welcome to Uncaged",

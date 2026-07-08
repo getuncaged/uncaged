@@ -16,6 +16,13 @@
 #ifndef ReleaseChannel
   #define ReleaseChannel "dev"
 #endif
+; The application/AppUserModelID bundle id. For first-party channels this is
+; dev.warp.<AppName>; the oss (Uncaged) channel passes dev.uncaged.WarpOss so the
+; taskbar/start-menu shortcut links to the running app, whose AppUserModelID is
+; hardcoded in Rust as dev.uncaged.WarpOss.
+#ifndef BundleId
+  #define BundleId "dev.warp." + MyAppName
+#endif
 #ifndef TargetProfileDir
   #define TargetProfileDir "target\release-lto-debug_assertions"
 #endif
@@ -140,8 +147,8 @@ Type: filesandordirs; Name: "{localappdata}\warp\{#MyAppName}"
 Type: filesandordirs; Name: "{app}\bin"
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; AppUserModelID: "dev.warp.{#MyAppName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; AppUserModelID: "dev.warp.{#MyAppName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; AppUserModelID: "{#BundleId}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; AppUserModelID: "{#BundleId}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: postinstall runhidden nowait

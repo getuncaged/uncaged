@@ -154,8 +154,11 @@ mkdir -p "$OUT_DIR"
 
 # Update parameters based on the target release channel.
 #
-# APP_NAME here must match the value used in Rust as the
-# application name; see app/src/channel.rs.
+# For the first-party channels, APP_NAME must match the value used in Rust as
+# the application name (see app/src/channel.rs) and BUNDLE_ID is derived as
+# dev.warp.$APP_NAME. The oss (Uncaged) channel is special: its runtime
+# identity is hardcoded in Rust as dev.uncaged.WarpOss and BUNDLE_ID is
+# overridden below to match, so APP_NAME only affects the AppImage filename.
 #
 # WARP_BIN is the name of the binary produced by cargo;
 # BINARY_NAME is the desired name of the binary in the final package.
@@ -187,7 +190,14 @@ elif [[ $RELEASE_CHANNEL = "stable" ]]; then
 elif [[ $RELEASE_CHANNEL = "oss" ]]; then
   WARP_BIN="warp-oss"
   BINARY_NAME="warp-oss"
-  APP_NAME="WarpOss"
+  # Uncaged: the oss channel ships as the app "Uncaged". APP_NAME here only
+  # feeds the AppImage filename and (by default) the BUNDLE_ID derivation; the
+  # runtime channel identity (WM_CLASS / Wayland app_id / data domain) is
+  # hardcoded in Rust as dev.uncaged.WarpOss (see
+  # crates/warp_core/src/channel/state.rs), independent of this value. We
+  # override BUNDLE_ID below so it matches that Rust identity and the shipped
+  # desktop file app/channels/oss/dev.uncaged.WarpOss.desktop.
+  APP_NAME="Uncaged"
   # The OSS channel does not ship Sentry, so drop the crash_reporting feature
   # (which would otherwise pull in the Sentry SDK as a dependency).
   FEATURES="release_bundle"
@@ -221,6 +231,14 @@ if [[ -n "$EXTRA_FEATURES" ]]; then
 fi
 
 BUNDLE_ID="dev.warp.$APP_NAME"
+# Uncaged: the oss channel's user-visible bundle id is dev.uncaged.WarpOss, not
+# the dev.warp.* namespace used by the first-party channels. It MUST match both
+# the Rust runtime app_id (crates/warp_core/src/channel/state.rs) and the shipped
+# desktop file (app/channels/oss/dev.uncaged.WarpOss.desktop) that bundle_install
+# looks up by "$BUNDLE_ID.desktop".
+if [[ $RELEASE_CHANNEL = "oss" ]]; then
+  BUNDLE_ID="dev.uncaged.WarpOss"
+fi
 EXECUTABLE_PATH="$CARGO_TARGET_OUTPUT_DIR/$WARP_BIN"
 DEBUG_EXECUTABLE_PATH="$EXECUTABLE_PATH.debug"
 

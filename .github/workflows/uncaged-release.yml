@@ -1,6 +1,7 @@
-# Uncaged release — on a pushed tag `v*`, build per-OS packages and attach
-# them to a GitHub Release. No secrets required for the default ad-hoc-signed
-# macOS build. Optional Apple signing/notarization is guarded and documented.
+# Uncaged release — on a pushed tag `v*`, build the full set of per-OS packages
+# and attach them to a GitHub Release. No secrets required for the default
+# ad-hoc-signed macOS build. Optional Apple signing/notarization is guarded and
+# documented.
 #
 # The published assets land at:
 #   https://github.com/getuncaged/uncaged/releases/tag/<tag>
@@ -8,6 +9,21 @@
 #   https://github.com/getuncaged/uncaged/releases/latest
 #
 # Assets are named  Uncaged-<os>-<arch>.<ext>  e.g. Uncaged-macos-aarch64.dmg.
+# The exact asset names are the contract in DOWNLOADS.md — do not rename here
+# without updating that file (and the website consuming it).
+#
+# Job layout:
+#   * macos   — FIRST-CLASS. aarch64 + x86_64 + universal DMGs (ad-hoc signed)
+#               plus the aarch64 .app zip. Failing here fails the release.
+#   * linux   — best-effort (continue-on-error). .deb/.rpm/.pkg.tar.zst/.AppImage
+#               for x86_64, plus the existing tarball. aarch64 is wired but
+#               genuinely best-effort on a hosted x86_64 runner.
+#   * windows — best-effort (continue-on-error). Inno Setup installer for x86_64
+#               (and best-effort aarch64), plus the existing zip.
+#
+# Every non-macOS job is continue-on-error so a release still publishes whatever
+# succeeds. No new required secrets: Apple notarization stays the optional,
+# guarded path documented in .github/workflows/README-uncaged.md.
 
 name: Uncaged Release
 
@@ -25,13 +41,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # --- macOS: the real, supported release artifact -------------------------
-  # Produces the ad-hoc-signed Uncaged.app + Uncaged.dmg exactly as described
-  # in RELEASING.md (channel oss, --selfsign falls back to ad-hoc signing).
+  # --- macOS: the real, supported release artifacts ------------------------
+  # Produces the ad-hoc-signed Uncaged.app + Uncaged.dmg exactly as described in
+  # RELEASING.md (channel oss, --selfsign falls back to ad-hoc signing), for
+  # aarch64, x86_64, and a universal (lipo) DMG.
   macos:
-    name: Build macOS DMG (aarch64)
+    name: Build macOS DMGs (aarch64 + x86_64 + universal)
     runs-on: macos-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +58,7 @@ jobs:
       - name: Install pinned Rust toolchain
         run: |
           rustup show active-toolchain || rustup toolchain install
-          rustup target add aarch64-apple-darwin
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
@@ -64,37 +81,57 @@ jobs:
       # script/macos/bundle:
       #   APPLE_CERT_P12_BASE64, APPLE_CERT_PASSWORD, APPLE_TEAM_ID,
       #   APPLE_NOTARIZE_APPLE_ID, APPLE_NOTARIZE_PASSWORD
-      # Until then the guarded block below is a no-op and the build stays local.
-      - name: Build Uncaged.app + Uncaged.dmg (ad-hoc signed)
-        run: |
-          ./script/bundle --channel oss --selfsign --arch aarch64
+      # Until then the ad-hoc build below stays entirely local — no secrets.
 
-      - name: Stage macOS assets
+      # Each build writes target/release-lto/bundle/osx/Uncaged.dmg, so we stage
+      # (rename) each artifact immediately before kicking off the next build.
+      - name: Build + stage aarch64 DMG (ad-hoc signed)
         run: |
           set -euo pipefail
-          OUT="target/aarch64-apple-darwin/release-lto/bundle/osx"
+          ./script/bundle --channel oss --selfsign --arch aarch64
+          OUT="target/release-lto/bundle/osx"
           mkdir -p dist
           cp "$OUT/Uncaged.dmg" "dist/Uncaged-macos-aarch64.dmg"
           # Also ship a zip of the .app for users who prefer it.
           ditto -c -k --keepParent "$OUT/Uncaged.app" "dist/Uncaged-macos-aarch64.zip"
+
+      - name: Build + stage x86_64 DMG (ad-hoc signed)
+        run: |
+          set -euo pipefail
+          ./script/bundle --channel oss --selfsign --arch x86_64
+          OUT="target/release-lto/bundle/osx"
+          cp "$OUT/Uncaged.dmg" "dist/Uncaged-macos-x86_64.dmg"
+
+      - name: Build + stage universal DMG (ad-hoc signed)
+        run: |
+          set -euo pipefail
+          # Omitting --arch triggers the universal (lipo arm64 + x86_64) path in
+          # script/macos/bundle.
+          ./script/bundle --channel oss --selfsign
+          OUT="target/release-lto/bundle/osx"
+          cp "$OUT/Uncaged.dmg" "dist/Uncaged-macos-universal.dmg"
 
       - name: Upload macOS assets to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/Uncaged-macos-aarch64.dmg
+            dist/Uncaged-macos-x86_64.dmg
+            dist/Uncaged-macos-universal.dmg
             dist/Uncaged-macos-aarch64.zip
           fail_on_unmatched_files: true
           generate_release_notes: true
 
-  # --- Linux: best-effort tarball -----------------------------------------
-  # Not a first-class supported package yet: ships a .tar.gz of the built
-  # binary. .deb / AppImage (via script/linux/*) are a follow-up.
+  # --- Linux: full package set (best-effort) -------------------------------
+  # Uses the real script/linux/bundle* scripts to produce .deb, .rpm,
+  # .pkg.tar.zst (Arch) and .AppImage. The Warp-only bits (PGP signing, the
+  # releases.warp.dev apt/rpm repos) are stripped for the oss channel inside the
+  # bundle scripts. x86_64 is the primary target; aarch64 is wired best-effort.
   linux:
-    name: Build Linux tarball (x86_64, best-effort)
+    name: Build Linux packages (x86_64, best-effort)
     runs-on: ubuntu-latest
     continue-on-error: true
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -104,18 +141,33 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
+          # Build/runtime deps for warp-oss, plus the packaging tooling:
+          #   dpkg-dev + fakeroot -> .deb (dpkg-deb)
+          #   rpm                 -> .rpm (rpmbuild)
+          #   libfuse2 + wget     -> AppImage (linuxdeploy needs FUSE)
+          #   zstd, tar, bsdtar   -> Arch .pkg.tar.zst (makepkg, if available)
           sudo apt-get install -y \
             build-essential cmake pkg-config python-is-python3 \
             libssl-dev libfreetype-dev libexpat1-dev libgit2-dev \
             libfontconfig1-dev jq brotli libasound2-dev libclang-dev \
             libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
-            libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev
+            libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev \
+            dpkg-dev fakeroot rpm libfuse2 wget zstd libarchive-tools
 
       - name: Install protoc
         uses: arduino/setup-protoc@v3
         with:
           version: "25.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install linuxdeploy (for AppImage)
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          wget -q -O "$HOME/.local/bin/linuxdeploy" \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x "$HOME/.local/bin/linuxdeploy"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install pinned Rust toolchain
         run: rustup show active-toolchain || rustup toolchain install
@@ -125,30 +177,158 @@ jobs:
         with:
           key: linux-release-warp-oss
 
-      - name: Build warp-oss (release)
-        run: cargo build --release --bin warp-oss
-
-      - name: Stage Linux tarball
+      # Build the native binary once (the bundle script re-uses it) and produce
+      # the four native packages for x86_64. The bundle script builds via cargo,
+      # so we let it drive the build to keep feature flags/profile consistent
+      # with the packaged binary. Arch (.pkg.tar.zst) needs makepkg, which is not
+      # present on ubuntu-latest; we skip it gracefully if makepkg is missing.
+      - name: Build Linux packages (deb, rpm, AppImage) — x86_64
         run: |
-          set -euo pipefail
-          mkdir -p dist stage/Uncaged-linux-x86_64
-          cp target/release/warp-oss stage/Uncaged-linux-x86_64/uncaged
+          set -euxo pipefail
+          PKGS="deb,rpm,appimage"
+          if command -v makepkg >/dev/null 2>&1; then
+            PKGS="$PKGS,arch"
+          else
+            echo "makepkg not available on this runner; skipping the Arch .pkg.tar.zst build."
+          fi
+          ./script/linux/bundle \
+            --channel oss \
+            --arch x86_64 \
+            --release-tag "${GITHUB_REF_NAME}" \
+            --packages "$PKGS"
+
+      - name: Stage Linux assets (x86_64)
+        run: |
+          set -euxo pipefail
+          OUT="target/release-lto/bundle/linux"
+          mkdir -p dist
+
+          # .deb — dpkg-deb names it warp-terminal-oss_<version>_amd64.deb
+          DEB="$(ls "$OUT"/*amd64.deb 2>/dev/null | head -1 || true)"
+          [ -n "$DEB" ] && cp "$DEB" dist/Uncaged-linux-x86_64.deb || echo "no .deb produced"
+
+          # .rpm — warp-terminal-oss-<version>-1.x86_64.rpm
+          RPM="$(ls "$OUT"/*x86_64.rpm 2>/dev/null | head -1 || true)"
+          [ -n "$RPM" ] && cp "$RPM" dist/Uncaged-linux-x86_64.rpm || echo "no .rpm produced"
+
+          # .pkg.tar.zst (Arch) — warp-terminal-oss-<version>-1-x86_64.pkg.tar.zst
+          ARCHPKG="$(ls "$OUT"/*x86_64.pkg.tar.zst 2>/dev/null | head -1 || true)"
+          [ -n "$ARCHPKG" ] && cp "$ARCHPKG" dist/Uncaged-linux-x86_64.pkg.tar.zst || echo "no Arch pkg produced"
+
+          # .AppImage — Uncaged-x86_64.AppImage (from APPIMAGE_NAME)
+          APPIMG="$(ls "$OUT"/*x86_64.AppImage 2>/dev/null | head -1 || true)"
+          [ -n "$APPIMG" ] && cp "$APPIMG" dist/Uncaged-linux-x86_64.AppImage || echo "no AppImage produced"
+
+          # Keep shipping the plain tarball of the built binary as well.
+          mkdir -p stage/Uncaged-linux-x86_64
+          cp target/release-lto/warp-oss stage/Uncaged-linux-x86_64/uncaged 2>/dev/null \
+            || cp target/release/warp-oss stage/Uncaged-linux-x86_64/uncaged
           [ -f README.md ] && cp README.md stage/Uncaged-linux-x86_64/ || true
           [ -f LICENSE ] && cp LICENSE stage/Uncaged-linux-x86_64/ || true
           tar -C stage -czf dist/Uncaged-linux-x86_64.tar.gz Uncaged-linux-x86_64
 
-      - name: Upload Linux asset to Release
+          echo "Staged Linux assets:"
+          ls -la dist/
+
+      - name: Upload Linux assets to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Uncaged-linux-x86_64.tar.gz
+          # Only whichever files were actually produced get uploaded.
+          files: |
+            dist/Uncaged-linux-x86_64.deb
+            dist/Uncaged-linux-x86_64.rpm
+            dist/Uncaged-linux-x86_64.pkg.tar.zst
+            dist/Uncaged-linux-x86_64.AppImage
+            dist/Uncaged-linux-x86_64.tar.gz
           fail_on_unmatched_files: false
 
-  # --- Windows: best-effort zip -------------------------------------------
+  # --- Linux aarch64: wired, but genuinely best-effort ---------------------
+  # Cross-compiling the full GPU/Metal-less Linux app to aarch64 on a hosted
+  # x86_64 runner is not reliably supported yet (needs a cross sysroot for the
+  # X11/Wayland/EGL/fontconfig dev libs). This job is wired so the matrix is
+  # complete and easy to finish, but is expected to be flaky/skipped until an
+  # arm64 runner (or a solid cross toolchain) is available. It never blocks a
+  # release. See RELEASING.md for the follow-up.
+  linux-aarch64:
+    name: Build Linux packages (aarch64, best-effort)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up QEMU (for arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build aarch64 Linux packages (best-effort, emulated)
+        run: |
+          set -euxo pipefail
+          # Run the native Ubuntu arm64 toolchain under QEMU emulation inside an
+          # arm64 container. This is slow but avoids maintaining a cross sysroot.
+          # If it fails (it may: heavy GPU/graphics deps, long build), the job is
+          # continue-on-error and the release proceeds without arm64 Linux.
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD:/src" -w /src \
+            -e GITHUB_ACTIONS=true \
+            ubuntu:24.04 bash -euxo pipefail -c '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y \
+                build-essential cmake pkg-config python-is-python3 curl ca-certificates \
+                libssl-dev libfreetype-dev libexpat1-dev libgit2-dev \
+                libfontconfig1-dev jq brotli libasound2-dev libclang-dev \
+                libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
+                libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev \
+                protobuf-compiler dpkg-dev fakeroot rpm zstd libarchive-tools
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+              . "$HOME/.cargo/env"
+              rustup show active-toolchain || rustup toolchain install
+              ./script/linux/bundle \
+                --channel oss \
+                --arch aarch64 \
+                --release-tag "'"${GITHUB_REF_NAME}"'" \
+                --packages deb,rpm
+            '
+
+      - name: Stage aarch64 Linux assets
+        run: |
+          set -uxo pipefail
+          OUT="target/release-lto/bundle/linux"
+          mkdir -p dist
+          DEB="$(ls "$OUT"/*arm64.deb 2>/dev/null | head -1 || true)"
+          [ -n "$DEB" ] && cp "$DEB" dist/Uncaged-linux-aarch64.deb || echo "no arm64 .deb produced"
+          RPM="$(ls "$OUT"/*aarch64.rpm 2>/dev/null | head -1 || true)"
+          [ -n "$RPM" ] && cp "$RPM" dist/Uncaged-linux-aarch64.rpm || echo "no aarch64 .rpm produced"
+          ARCHPKG="$(ls "$OUT"/*aarch64.pkg.tar.zst 2>/dev/null | head -1 || true)"
+          [ -n "$ARCHPKG" ] && cp "$ARCHPKG" dist/Uncaged-linux-aarch64.pkg.tar.zst || echo "no aarch64 Arch pkg produced"
+          APPIMG="$(ls "$OUT"/*aarch64.AppImage 2>/dev/null | head -1 || true)"
+          [ -n "$APPIMG" ] && cp "$APPIMG" dist/Uncaged-linux-aarch64.AppImage || echo "no aarch64 AppImage produced"
+          ls -la dist/ || true
+
+      - name: Upload aarch64 Linux assets to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Uncaged-linux-aarch64.deb
+            dist/Uncaged-linux-aarch64.rpm
+            dist/Uncaged-linux-aarch64.pkg.tar.zst
+            dist/Uncaged-linux-aarch64.AppImage
+          fail_on_unmatched_files: false
+
+  # --- Windows: Inno Setup installer (best-effort) -------------------------
+  # Builds the Inno Setup installer via script/windows/bundle.ps1 for x86_64,
+  # plus the existing zip. aarch64 is wired best-effort (cross-compiles the arm64
+  # binary; the installer is arch-tagged).
   windows:
-    name: Build Windows zip (x86_64, best-effort)
+    name: Build Windows installer (x86_64, best-effort)
     runs-on: windows-latest
     continue-on-error: true
-    timeout-minutes: 150
+    timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -161,28 +341,121 @@ jobs:
           version: "25.x"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
       - name: Install pinned Rust toolchain
-        run: rustup show active-toolchain || rustup toolchain install
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add x86_64-pc-windows-msvc aarch64-pc-windows-msvc
 
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
           key: windows-release-warp-oss
 
-      - name: Build warp-oss (release)
-        run: cargo build --release --bin warp-oss
-
-      - name: Stage Windows zip
+      # bundle.ps1 builds the binary + Inno Setup installer for the given arch.
+      # $env:GIT_RELEASE_TAG is read for the installer version.
+      - name: Build Windows installer (x86_64)
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist, stage/Uncaged-windows-x86_64 | Out-Null
-          Copy-Item target/release/warp-oss.exe stage/Uncaged-windows-x86_64/uncaged.exe
-          if (Test-Path README.md) { Copy-Item README.md stage/Uncaged-windows-x86_64/ }
-          if (Test-Path LICENSE)   { Copy-Item LICENSE   stage/Uncaged-windows-x86_64/ }
-          Compress-Archive -Path stage/Uncaged-windows-x86_64 -DestinationPath dist/Uncaged-windows-x86_64.zip -Force
+          $ErrorActionPreference = 'Stop'
+          $env:GIT_RELEASE_TAG = $env:GITHUB_REF_NAME
+          & .\script\windows\bundle.ps1 -Channel oss -Arch x64 -RELEASE_TAG $env:GITHUB_REF_NAME
 
-      - name: Upload Windows asset to Release
+      - name: Stage Windows assets (x86_64)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path dist, stage/Uncaged-windows-x86_64 | Out-Null
+
+          # Inno Setup writes UncagedSetup.exe into script/windows/Output/.
+          $setup = Get-ChildItem -Path script/windows/Output -Filter '*.exe' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notlike '*arm64*' } | Select-Object -First 1
+          if ($setup) {
+            Copy-Item $setup.FullName dist/Uncaged-windows-x86_64-setup.exe
+          } else {
+            Write-Output 'no x86_64 installer produced'
+          }
+
+          # Also keep shipping the plain zip of the built binary.
+          $bin = 'target/x86_64-pc-windows-msvc/rlto/warp-oss.exe'
+          if (Test-Path $bin) {
+            Copy-Item $bin stage/Uncaged-windows-x86_64/uncaged.exe
+            if (Test-Path README.md) { Copy-Item README.md stage/Uncaged-windows-x86_64/ }
+            if (Test-Path LICENSE)   { Copy-Item LICENSE   stage/Uncaged-windows-x86_64/ }
+            Compress-Archive -Path stage/Uncaged-windows-x86_64 -DestinationPath dist/Uncaged-windows-x86_64.zip -Force
+          } else {
+            Write-Output "binary not found at $bin; skipping zip"
+          }
+          Get-ChildItem dist
+
+      - name: Upload Windows x86_64 assets to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/Uncaged-windows-x86_64.zip
+          files: |
+            dist/Uncaged-windows-x86_64-setup.exe
+            dist/Uncaged-windows-x86_64.zip
+          fail_on_unmatched_files: false
+
+  # --- Windows aarch64: wired best-effort ----------------------------------
+  # Cross-compiles the arm64 binary on the x86_64 windows-latest runner and
+  # builds the arm64 Inno Setup installer. The binary cross-compiles fine; the
+  # installer just repackages it, so this is expected to work but is kept
+  # best-effort until it has been through a real release run on ARM hardware.
+  windows-aarch64:
+    name: Build Windows installer (aarch64, best-effort)
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add aarch64-pc-windows-msvc
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-release-warp-oss-arm64
+
+      - name: Build Windows installer (aarch64)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:GIT_RELEASE_TAG = $env:GITHUB_REF_NAME
+          & .\script\windows\bundle.ps1 -Channel oss -Arch arm64 -RELEASE_TAG $env:GITHUB_REF_NAME
+
+      - name: Stage Windows assets (aarch64)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $setup = Get-ChildItem -Path script/windows/Output -Filter '*arm64*.exe' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if ($setup) {
+            Copy-Item $setup.FullName dist/Uncaged-windows-aarch64-setup.exe
+          } else {
+            Write-Output 'no aarch64 installer produced'
+          }
+          Get-ChildItem dist
+
+      - name: Upload Windows aarch64 asset to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Uncaged-windows-aarch64-setup.exe
           fail_on_unmatched_files: false

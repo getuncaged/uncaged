@@ -1,0 +1,29 @@
+# winget default-locale manifest for Uncaged (en-US).
+#
+# PackageVersion is a PLACEHOLDER (0.0.0) replaced by the release process with
+# the tag (without the leading "v").
+PackageIdentifier: Uncaged.Uncaged
+PackageVersion: 0.0.0
+PackageLocale: en-US
+Publisher: Uncaged
+PublisherUrl: https://getuncaged.dev/
+PublisherSupportUrl: https://github.com/getuncaged/uncaged/issues
+PackageName: Uncaged
+PackageUrl: https://getuncaged.dev/
+License: AGPL-3.0-or-later
+LicenseUrl: https://github.com/getuncaged/uncaged/blob/master/LICENSE
+Copyright: Uncaged contributors
+ShortDescription: Account-free, bring-your-own-model fork of the Warp terminal.
+Description: |-
+  Uncaged is an account-free, bring-your-own-model fork of the open-source Warp
+  terminal. It ships with no telemetry, autoupdate, crash reporting, or login,
+  and connects only to the model endpoint you configure.
+Moniker: uncaged
+Tags:
+  - terminal
+  - shell
+  - developer-tools
+  - ai
+  - warp
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

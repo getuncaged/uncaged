@@ -53,11 +53,34 @@ secrets exist.
 
 ## Release assets
 
-Assets are named `Uncaged-<os>-<arch>.<ext>`:
+`uncaged-release.yml` builds the **full download matrix** on standard
+GitHub-hosted runners and attaches it to the GitHub Release. Assets are named
+`Uncaged-<os>-<arch>.<ext>` — the exact names are the contract in
+[`../../DOWNLOADS.md`](../../DOWNLOADS.md), so don't rename them in the workflow.
 
-- `Uncaged-macos-aarch64.dmg` and `Uncaged-macos-aarch64.zip`
-- `Uncaged-linux-x86_64.tar.gz` (best-effort; `.deb` / AppImage are a follow-up)
-- `Uncaged-windows-x86_64.zip` (best-effort)
+| Platform | Runner | Assets | Job status |
+|---|---|---|---|
+| macOS | `macos-latest` | `Uncaged-macos-aarch64.dmg`, `Uncaged-macos-x86_64.dmg`, `Uncaged-macos-universal.dmg`, `Uncaged-macos-aarch64.zip` | **first-class** (blocks the release) |
+| Linux x86_64 | `ubuntu-latest` | `Uncaged-linux-x86_64.{deb,rpm,pkg.tar.zst,AppImage,tar.gz}` | `continue-on-error` |
+| Linux aarch64 | `ubuntu-latest` (QEMU) | `Uncaged-linux-aarch64.{deb,rpm}` (best-effort) | `continue-on-error` |
+| Windows x86_64 | `windows-latest` | `Uncaged-windows-x86_64-setup.exe`, `Uncaged-windows-x86_64.zip` | `continue-on-error` |
+| Windows aarch64 | `windows-latest` | `Uncaged-windows-aarch64-setup.exe` | `continue-on-error` |
+
+Every non-macOS job is `continue-on-error: true`, so a release still publishes
+whatever succeeds. The three macOS DMGs are ad-hoc signed
+(`./script/bundle --channel oss --selfsign`); the universal DMG omits `--arch`.
+
+The Linux packages come from the real `script/linux/bundle*` scripts with the
+Warp-only bits stripped for the `oss` channel (no `releases.warp.dev` apt/rpm
+repo, no PGP signing); the Windows installer comes from
+`script/windows/bundle.ps1 -Channel oss` (Inno Setup, installed on the runner
+via `choco install innosetup`). See [`../../RELEASING.md`](../../RELEASING.md)
+for the details, plus the Homebrew-cask and winget update steps.
+
+Genuinely uncertain on hosted runners (best-effort, expect to shake out on a
+real release run): the Arch `.pkg.tar.zst` (needs `makepkg`, absent on
+`ubuntu-latest`), and both **aarch64** paths (Linux via QEMU emulation, Windows
+via cross-compile).
 
 They are published to the tag's release page, and the "latest" release — what the
 website's Download button should link to — lives at:
