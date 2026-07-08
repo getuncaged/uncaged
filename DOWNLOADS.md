@@ -14,7 +14,7 @@ https://github.com/getuncaged/uncaged/releases/latest/download/<asset-name>
 ```
 
 Asset naming is uniform: `Uncaged-<os>-<arch>.<ext>`
-(`os` ∈ macos·linux·windows, `arch` ∈ aarch64·x86_64·universal).
+(`os` ∈ macos·linux·windows, `arch` ∈ aarch64·x86_64).
 
 ## Status legend
 - **live** — produced by the release workflow today.
@@ -30,9 +30,9 @@ Asset naming is uniform: `Uncaged-<os>-<arch>.<ext>`
 | Format | Arch | Asset | Status |
 |---|---|---|---|
 | Disk image | Apple Silicon | `Uncaged-macos-aarch64.dmg` | live |
-| Disk image | Intel | `Uncaged-macos-x86_64.dmg` | wired |
-| Disk image | Universal | `Uncaged-macos-universal.dmg` | wired |
+| Disk image | Intel | `Uncaged-macos-x86_64.dmg` | live |
 | App zip | Apple Silicon | `Uncaged-macos-aarch64.zip` | live |
+| App zip | Intel | `Uncaged-macos-x86_64.zip` | live |
 
 Homebrew (planned — needs the `getuncaged/homebrew-tap` tap, formula in
 [`packaging/homebrew/uncaged.rb`](packaging/homebrew/uncaged.rb)):
@@ -93,8 +93,7 @@ winget install Uncaged.Uncaged
   "platforms": {
     "macos": [
       { "label": "Apple Silicon (.dmg)", "arch": "aarch64", "asset": "Uncaged-macos-aarch64.dmg", "status": "live" },
-      { "label": "Intel (.dmg)", "arch": "x86_64", "asset": "Uncaged-macos-x86_64.dmg", "status": "wired" },
-      { "label": "Universal (.dmg)", "arch": "universal", "asset": "Uncaged-macos-universal.dmg", "status": "wired" }
+      { "label": "Intel (.dmg)", "arch": "x86_64", "asset": "Uncaged-macos-x86_64.dmg", "status": "live" }
     ],
     "linux": [
       { "label": ".deb (Debian, Ubuntu)", "arch": "x86_64", "asset": "Uncaged-linux-x86_64.deb", "status": "wired" },
