@@ -6,28 +6,33 @@
 #
 #     brew install --cask getuncaged/tap/uncaged
 #
-# The `version` and `sha256` fields below are PLACEHOLDERS. On each release the
-# tap is updated (see "Updating the cask" at the bottom) to point `version` at
-# the new tag and `sha256` at the checksum of the universal DMG for that tag.
+# The `version` and the two per-arch `sha256` fields are PLACEHOLDERS. On each
+# release the tap is updated (see "Updating the cask" at the bottom) to point
+# `version` at the new tag and each `sha256` at the checksum of the matching
+# per-arch DMG for that tag.
 #
 # Uncaged is AD-HOC signed (no Apple Developer ID / notarization). The
-# `quarantine` note and the `caveats` below tell users how to clear Gatekeeper's
-# quarantine on first launch; a notarized build would let us drop that step.
+# `quarantine` caveats below tell users how to clear Gatekeeper's quarantine on
+# first launch; a notarized build would let us drop that step.
 
 cask "uncaged" do
   # Bumped by the release process to the git tag without the leading "v"
-  # (e.g. tag v0.1.0 -> version "0.1.0").
+  # (e.g. tag v0.2.3 -> version "0.2.3").
   version "0.0.0"
 
-  # sha256 of Uncaged-macos-universal.dmg for the release named by `version`.
-  # Replaced by the release process; use `sha256 :no_check` only for local testing.
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-
-  # The universal DMG runs on both Apple Silicon and Intel, so one cask covers
-  # every Mac. The download URL points at a versioned release asset (not
-  # /latest/) so Homebrew can verify the checksum deterministically.
-  url "https://github.com/getuncaged/uncaged/releases/download/v#{version}/Uncaged-macos-universal.dmg",
-      verified: "github.com/getuncaged/uncaged/"
+  # Per-arch DMGs (there is no universal DMG). Homebrew picks the block matching
+  # the host. The download URL points at a versioned release asset (not /latest/)
+  # so Homebrew can verify the checksum deterministically.
+  on_arm do
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    url "https://github.com/getuncaged/uncaged/releases/download/v#{version}/Uncaged-macos-aarch64.dmg",
+        verified: "github.com/getuncaged/uncaged/"
+  end
+  on_intel do
+    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    url "https://github.com/getuncaged/uncaged/releases/download/v#{version}/Uncaged-macos-x86_64.dmg",
+        verified: "github.com/getuncaged/uncaged/"
+  end
 
   name "Uncaged"
   desc "Account-free, bring-your-own-model fork of the Warp terminal"

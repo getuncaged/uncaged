@@ -45,10 +45,18 @@ jobs:
   # Produces the ad-hoc-signed Uncaged.app + Uncaged.dmg exactly as described in
   # RELEASING.md (channel oss, --selfsign falls back to ad-hoc signing), for
   # aarch64, x86_64, and a universal (lipo) DMG.
+  # macOS builds are a full release-LTO compile (~1h each). Build the two
+  # arches IN PARALLEL (matrix) and upload each dmg independently, so Apple
+  # Silicon ships as soon as it's done regardless of Intel. No universal dmg —
+  # the per-arch dmgs cover every Mac and avoid a third (double) rebuild.
   macos:
-    name: Build macOS DMGs (aarch64 + x86_64 + universal)
+    name: Build macOS DMG (${{ matrix.arch }})
     runs-on: macos-latest
-    timeout-minutes: 180
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, x86_64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,15 +66,15 @@ jobs:
       - name: Install pinned Rust toolchain
         run: |
           rustup show active-toolchain || rustup toolchain install
-          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          rustup target add ${{ matrix.arch }}-apple-darwin
 
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
-          key: macos-release-warp-oss
+          key: macos-release-${{ matrix.arch }}
 
-      # script/macos/bundle builds the DMG via create-dmg, and the cargo build
-      # (warp-proto-apis build script) needs protoc.
+      # create-dmg builds the DMG; protobuf (protoc) is needed by the cargo build
+      # (warp-proto-apis build script).
       - name: Install create-dmg + protobuf
         run: brew install create-dmg protobuf
 
@@ -83,51 +91,25 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer || true
 
-      # OPTIONAL Apple Developer ID signing + notarization.
-      # By default we ship an AD-HOC signed build (no Apple account needed),
-      # which is what --selfsign produces. To notarize instead, add these repo
-      # secrets and switch the bundle flags to the CODESIGN/notarize path in
-      # script/macos/bundle:
-      #   APPLE_CERT_P12_BASE64, APPLE_CERT_PASSWORD, APPLE_TEAM_ID,
-      #   APPLE_NOTARIZE_APPLE_ID, APPLE_NOTARIZE_PASSWORD
-      # Until then the ad-hoc build below stays entirely local — no secrets.
-
-      # Each build writes target/release-lto/bundle/osx/Uncaged.dmg, so we stage
-      # (rename) each artifact immediately before kicking off the next build.
-      - name: Build + stage aarch64 DMG (ad-hoc signed)
+      # AD-HOC signed (no Apple account needed) via --selfsign. To notarize,
+      # add the APPLE_* repo secrets and switch to the CODESIGN/notarize path in
+      # script/macos/bundle.
+      - name: Build + stage ${{ matrix.arch }} DMG (ad-hoc signed)
         run: |
           set -euo pipefail
-          ./script/bundle --channel oss --selfsign --arch aarch64
+          ./script/bundle --channel oss --selfsign --arch ${{ matrix.arch }}
           OUT="target/release-lto/bundle/osx"
           mkdir -p dist
-          cp "$OUT/Uncaged.dmg" "dist/Uncaged-macos-aarch64.dmg"
+          cp "$OUT/Uncaged.dmg" "dist/Uncaged-macos-${{ matrix.arch }}.dmg"
           # Also ship a zip of the .app for users who prefer it.
-          ditto -c -k --keepParent "$OUT/Uncaged.app" "dist/Uncaged-macos-aarch64.zip"
+          ditto -c -k --keepParent "$OUT/Uncaged.app" "dist/Uncaged-macos-${{ matrix.arch }}.zip"
 
-      - name: Build + stage x86_64 DMG (ad-hoc signed)
-        run: |
-          set -euo pipefail
-          ./script/bundle --channel oss --selfsign --arch x86_64
-          OUT="target/release-lto/bundle/osx"
-          cp "$OUT/Uncaged.dmg" "dist/Uncaged-macos-x86_64.dmg"
-
-      - name: Build + stage universal DMG (ad-hoc signed)
-        run: |
-          set -euo pipefail
-          # Omitting --arch triggers the universal (lipo arm64 + x86_64) path in
-          # script/macos/bundle.
-          ./script/bundle --channel oss --selfsign
-          OUT="target/release-lto/bundle/osx"
-          cp "$OUT/Uncaged.dmg" "dist/Uncaged-macos-universal.dmg"
-
-      - name: Upload macOS assets to Release
+      - name: Upload macOS ${{ matrix.arch }} assets to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Uncaged-macos-aarch64.dmg
-            dist/Uncaged-macos-x86_64.dmg
-            dist/Uncaged-macos-universal.dmg
-            dist/Uncaged-macos-aarch64.zip
+            dist/Uncaged-macos-${{ matrix.arch }}.dmg
+            dist/Uncaged-macos-${{ matrix.arch }}.zip
           fail_on_unmatched_files: true
           generate_release_notes: true
 
