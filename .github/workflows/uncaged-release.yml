@@ -69,6 +69,14 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
+      # script/macos/bundle runs `cargo bundle` (the .app) and, via
+      # script/prepare_bundled_resources, `cargo about` (third-party license
+      # file). Neither ships with the runner, so install both up front.
+      - name: Install cargo-bundle + cargo-about
+        run: |
+          cargo install cargo-bundle --git https://github.com/burtonageo/cargo-bundle --rev ae4c76e92c08774bf54ff077b1c52e3d1cd6c16d
+          cargo install --locked cargo-about@0.8.4
+
       # The Metal shader compiler ships with Xcode; select the full Xcode so
       # actool / metal are on PATH (macos-latest images include Xcode).
       - name: Select Xcode
@@ -176,6 +184,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: linux-release-warp-oss
+
+      # The bundle scripts generate the third-party license file via
+      # script/prepare_bundled_resources -> `cargo about`, which isn't on the runner.
+      - name: Install cargo-about
+        run: cargo install --locked cargo-about@0.8.4
 
       # Build the native binary once (the bundle script re-uses it) and produce
       # the four native packages for x86_64. The bundle script builds via cargo,
@@ -356,6 +369,9 @@ jobs:
 
       # bundle.ps1 builds the binary + Inno Setup installer for the given arch.
       # $env:GIT_RELEASE_TAG is read for the installer version.
+      - name: Install cargo-about
+        run: cargo install --locked cargo-about@0.8.4
+
       - name: Build Windows installer (x86_64)
         shell: pwsh
         run: |
@@ -432,6 +448,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: windows-release-warp-oss-arm64
+
+      - name: Install cargo-about
+        run: cargo install --locked cargo-about@0.8.4
 
       - name: Build Windows installer (aarch64)
         shell: pwsh
