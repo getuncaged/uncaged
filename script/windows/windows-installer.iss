@@ -16,10 +16,10 @@
 #ifndef ReleaseChannel
   #define ReleaseChannel "dev"
 #endif
-; The application/AppUserModelID bundle id. For first-party channels this is
-; dev.warp.<AppName>; the oss (Uncaged) channel passes dev.uncaged.WarpOss so the
-; taskbar/start-menu shortcut links to the running app, whose AppUserModelID is
-; hardcoded in Rust as dev.uncaged.WarpOss.
+// The application/AppUserModelID bundle id. For first-party channels this is
+// dev.warp.<AppName>; the oss (Uncaged) channel passes dev.uncaged.WarpOss so the
+// taskbar/start-menu shortcut links to the running app, whose AppUserModelID is
+// hardcoded in Rust as dev.uncaged.WarpOss.
 #ifndef BundleId
   #define BundleId "dev.warp." + MyAppName
 #endif

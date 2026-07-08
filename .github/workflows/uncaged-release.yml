@@ -65,9 +65,10 @@ jobs:
         with:
           key: macos-release-warp-oss
 
-      # script/macos/bundle builds the DMG via create-dmg.
-      - name: Install create-dmg
-        run: brew install create-dmg
+      # script/macos/bundle builds the DMG via create-dmg, and the cargo build
+      # (warp-proto-apis build script) needs protoc.
+      - name: Install create-dmg + protobuf
+        run: brew install create-dmg protobuf
 
       # script/macos/bundle runs `cargo bundle` (the .app) and, via
       # script/prepare_bundled_resources, `cargo about` (third-party license
