@@ -1,0 +1,21 @@
+.github/workflows/uncaged-release.yml
+  s_3e4cc0ba3e0ede::t_e7c60d93c909a1 68-71
+script/windows/windows-installer.iss
+  s_3e4cc0ba3e0ede::t_a2272e74199219 19-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d37b0f00dd1b43e6a6065772f155a5f05f3a7ce0",
+  "prompts": {},
+  "sessions": {
+    "s_3e4cc0ba3e0ede": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e772dcd-0cc7-45ef-b232-59d0e8d0d1c9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.pro@gmail.com>"
+    }
+  }
+}
