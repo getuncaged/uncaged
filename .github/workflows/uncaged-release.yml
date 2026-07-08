@@ -59,7 +59,7 @@ jobs:
         arch: [aarch64, x86_64]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
 
@@ -125,7 +125,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
 
@@ -252,7 +252,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
 
@@ -327,7 +327,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
 
@@ -409,7 +409,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: true
 
