@@ -660,6 +660,52 @@ pub(super) fn uncaged() -> WarpTheme {
     )
 }
 
+// ── Midnight ─────────────────────────────────────────────────────────────
+// The cold companion to Uncaged: a disciplined blue-black night where the only
+// warmth is the same ember. Mirrors getuncaged.dev's "Midnight" web system —
+// cool bases, porcelain text, gold→ember reserved for action and the mark.
+const MIDNIGHT_NORMAL_COLORS: AnsiColors = AnsiColors::new(
+    AnsiColor::from_u32(0x363E4FFF), // black   — cool slate
+    AnsiColor::from_u32(0xF06A78FF), // red     — cool coral
+    AnsiColor::from_u32(0x7BD88FFF), // green   — mint (diff-added)
+    AnsiColor::from_u32(0xFFB23AFF), // yellow  — gold (the one warm pop)
+    AnsiColor::from_u32(0x6AA8FFFF), // blue    — steel
+    AnsiColor::from_u32(0xC8A9F0FF), // magenta — cool lavender
+    AnsiColor::from_u32(0x5FC7D6FF), // cyan    — cool cyan
+    AnsiColor::from_u32(0xC7CCD6FF), // white   — cool light gray
+);
+const MIDNIGHT_BRIGHT_COLORS: AnsiColors = AnsiColors::new(
+    AnsiColor::from_u32(0x5D6577FF), // bright black   — muted slate
+    AnsiColor::from_u32(0xFF8089FF), // bright red     — soft coral (diff-removed)
+    AnsiColor::from_u32(0xA5E4B4FF), // bright green
+    AnsiColor::from_u32(0xFFC96BFF), // bright yellow
+    AnsiColor::from_u32(0x8FC1FFFF), // bright blue
+    AnsiColor::from_u32(0xDCC2FFFF), // bright magenta
+    AnsiColor::from_u32(0x86DCE8FF), // bright cyan
+    AnsiColor::from_u32(0xE8EBF2FF), // bright white   — porcelain (the ceiling)
+);
+pub(super) fn midnight_colors() -> TerminalColors {
+    TerminalColors::new(MIDNIGHT_NORMAL_COLORS, MIDNIGHT_BRIGHT_COLORS)
+}
+
+pub(super) fn midnight() -> WarpTheme {
+    WarpTheme::new(
+        // Cool blue-black ground with a faint slate lift from the top.
+        Fill::VerticalGradient(VerticalGradient::new(
+            ColorU::from_u32(0x12151DFF),
+            ColorU::from_u32(0x0B0D12FF),
+        )),
+        ColorU::from_u32(0xE8EBF2FF), // porcelain ink foreground
+        Fill::Solid(ColorU::from_u32(0xFF7A18FF)), // ember accent — the only warmth
+        // Gold caret — the same grad-prompt head that lights the [ ❯_ ] mark.
+        Some(Fill::Solid(ColorU::from_u32(0xFFB23AFF))),
+        Some(Details::Darker),
+        midnight_colors(),
+        None,
+        Some("Midnight".to_string()),
+    )
+}
+
 pub(super) fn received_referral_reward() -> WarpTheme {
     WarpTheme::new(
         Fill::Solid(ColorU::from_u32(0xFFFFFFFF)),

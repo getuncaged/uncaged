@@ -83,8 +83,12 @@ $BUNDLE_ID = "dev.warp.$app_name"
 
 # Update parameters based on the target release channel.
 #
-# APP_NAME here must match the value used in Rust as the
-# application name; see app/src/channel.rs.
+# For the first-party channels, APP_NAME must match the value used in Rust as
+# the application name (see app/src/channel.rs) and BUNDLE_ID is derived as
+# dev.warp.$APP_NAME. The oss (Uncaged) channel is special: its runtime identity
+# (AppUserModelID) is hardcoded in Rust as dev.uncaged.WarpOss (see
+# crates/warp_core/src/channel/state.rs), and BUNDLE_ID is overridden below to
+# match. APP_NAME still drives the app's display name and installer filename.
 #
 # WARP_BIN is the name of the binary produced by cargo;
 # BINARY_NAME is the desired name of the binary in the final package.
@@ -109,7 +113,7 @@ if ("$CHANNEL" -eq 'local') {
 } elseif ("$CHANNEL" -eq 'oss') {
     $WARP_BIN = 'warp-oss'
     $BINARY_NAME = 'warp-oss.exe'
-    $APP_NAME = 'WarpOss'
+    $APP_NAME = 'Uncaged'
     # The OSS channel does not ship Sentry, so drop the crash_reporting feature
     # (which would otherwise pull in the Sentry SDK as a dependency).
     $FEATURES = 'release_bundle,gui'
@@ -120,6 +124,12 @@ $FEATURES = "$FEATURES,nld_classifier_v3,nld_heuristic_v2"
 
 $BINARY_PATH = "$CARGO_TARGET_OUTPUT_DIR\$BINARY_NAME"
 $BUNDLE_ID = "dev.warp.$APP_NAME"
+# Uncaged: the oss channel's user-visible bundle id / AppUserModelID is
+# dev.uncaged.WarpOss, matching the Rust runtime identity
+# (crates/warp_core/src/channel/state.rs) rather than the dev.warp.* namespace.
+if ("$CHANNEL" -eq 'oss') {
+    $BUNDLE_ID = 'dev.uncaged.WarpOss'
+}
 $INSTALLER_OUTPUT_DIR = "$WINDOWS_INSTALLER_DIR\Output"
 $INSTALLER_NAME = "$($APP_NAME)$($FILE_ENDING)"
 $INSTALLER_PATH = "$($INSTALLER_OUTPUT_DIR)\$($INSTALLER_NAME).exe"
@@ -195,7 +205,8 @@ $ISCC_ARGS = @(
     "/DMyAppName=$APP_NAME",
     "/DMyAppVersion=$env:GIT_RELEASE_TAG",
     "/DArch=$ARCH",
-    "/DOutputName=$INSTALLER_NAME"
+    "/DOutputName=$INSTALLER_NAME",
+    "/DBundleId=$BUNDLE_ID"
 )
 # Also accept the sign tool command via env var
 if (-not $SIGN_TOOL_CMD -and $env:SIGN_TOOL_CMD) {

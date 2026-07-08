@@ -66,8 +66,17 @@ rm -rf "$RPMBUILD_DIR"
 mkdir -p "$RPMBUILD_DIR"/{SPEC,RPMS}
 
 # Move the RPM-specific package metadata into the package directory.
+#
+# Uncaged: the oss channel is distributed only via GitHub Releases, so it uses a
+# dedicated spec template whose %post does NOT install Warp's GPG key or wire the
+# package to the releases.warp.dev yum/zypper repositories.
 VERSION="$GIT_RELEASE_TAG"
 RELEASE="1"
+if [ "$RELEASE_CHANNEL" = "oss" ] && [ -f "$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/warp-oss.spec.template" ]; then
+  SPEC_TEMPLATE="$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/warp-oss.spec.template"
+else
+  SPEC_TEMPLATE="$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/warp.spec.template"
+fi
 sed \
     "s#@@CHANNEL_SUFFIX@@#$CHANNEL_SUFFIX#g; \
      s#@@BINARY_NAME@@#$BINARY_NAME#g; \
@@ -78,7 +87,7 @@ sed \
      s#@@BUNDLEID@@#$BUNDLE_ID#g; \
      s#@@REPO_NAME@@#$REPO_NAME#g; \
      s#@@RELEASE_CHANNEL@@#$RELEASE_CHANNEL#g" \
-    < "$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/warp.spec.template" \
+    < "$SPEC_TEMPLATE" \
     > "$RPMBUILD_DIR/SPEC/warp.spec"
 
 # Build the actual package.
@@ -88,9 +97,14 @@ fakeroot rpmbuild -v -bb "$RPMBUILD_DIR/SPEC/warp.spec" --target="$ARCH" --defin
 RPM_NAME="$PACKAGE_NAME-$VERSION-$RELEASE.$ARCH.rpm"
 cp "$RPMBUILD_DIR/RPMS/$ARCH/$RPM_NAME" "$OUT_DIR"
 
+# Uncaged: the oss channel does not have (and does not need) Warp's private PGP
+# signing key. Its packages are distributed unsigned via GitHub Releases, so skip
+# the signing step entirely for oss (which also avoids importing the Warp key
+# from releases.warp.dev).
+#
 # If we're running on GitHub, sign the package using our signing key that
 # should have already been added to the gpg-agent with a preset passphrase.
-if [ "${GITHUB_ACTIONS}" == "true" ]; then
+if [ "$RELEASE_CHANNEL" != "oss" ] && [ "${GITHUB_ACTIONS}" == "true" ]; then
   # Import our signing key's public key into rpm so the signature can be
   # verified.
   sudo rpm --import https://releases.warp.dev/linux/keys/warp.asc

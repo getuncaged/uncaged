@@ -280,6 +280,11 @@ pub enum TerminalAction {
     AskAIAssistant {
         block_index: BlockIndex,
     },
+    /// Uncaged: attach this (usually failed) block as context and immediately ask
+    /// the local agent to diagnose/fix it — the one-click "Ask Uncaged AI to fix".
+    FixBlockWithAI {
+        block_index: BlockIndex,
+    },
     /// Starts a subshell in the active session.
     TriggerSubshellBootstrap,
     /// If the user says "no" to Warpification, possibly requesting not to be asked again
@@ -614,6 +619,7 @@ impl fmt::Debug for TerminalAction {
             }
             OpenBlockListContextMenu => f.write_str("OpenBlockListContextMenu"),
             AskAIAssistant { block_index } => write!(f, "AskAIAssistant({block_index:?})"),
+            FixBlockWithAI { block_index } => write!(f, "FixBlockWithAI({block_index:?})"),
             TriggerSubshellBootstrap => f.write_str("TriggerSubshellBootstrap"),
             DismissWarpifyBanner(remember) => write!(f, "DismissWarpifyBanner({remember:?})"),
             ShowSubshellBanner(_) => f.write_str("ShowSubshellBanner"),

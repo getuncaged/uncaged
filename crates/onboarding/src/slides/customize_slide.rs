@@ -20,7 +20,7 @@ use super::toggle_card::{render_toggle_card, ChipSpec, ToggleCardSpec};
 use super::OnboardingSlide;
 use crate::model::{OnboardingStateEvent, OnboardingStateModel, UICustomizationSettings};
 use crate::slides::{bottom_nav, layout, slide_content};
-use crate::visuals::{intention_terminal_visual, intention_visual};
+use crate::visuals::{customize_visual, intention_terminal_visual, intention_visual};
 use crate::OnboardingIntention;
 
 /// Which setting card is currently selected (expanded).
@@ -588,14 +588,17 @@ impl CustomizeUISlide {
         let theme = appearance.theme();
 
         if FeatureFlag::OpenWarpNewSettingsModes.is_enabled() {
-            let path =
-                Self::visual_image_path(self.selected_setting, self.hovered_chip, intention, ui);
-            let fg_layout = match self.selected_setting {
-                None => layout::FOREGROUND_LAYOUT_DEFAULT,
-                Some(SettingCard::CodeReview) => layout::FOREGROUND_LAYOUT_CODE_REVIEW,
-                _ => layout::FOREGROUND_LAYOUT_WIDE,
-            };
-            layout::onboarding_right_panel_with_bg(path, fg_layout)
+            // Uncaged: a live, drawn mock (no Warp screenshots) that re-renders as
+            // the user toggles, so they can see what each setting actually does —
+            // tab placement, the tools panel, and the code-review diff.
+            Container::new(customize_visual(
+                appearance,
+                ui.use_vertical_tabs,
+                ui.tools_panel_enabled(&intention),
+                ui.show_code_review_button,
+            ))
+            .with_background_color(internal_colors::neutral_1(theme))
+            .finish()
         } else {
             let panel_background = internal_colors::neutral_2(theme);
             let neutral = internal_colors::neutral_4(theme);
@@ -637,7 +640,9 @@ impl View for CustomizeUISlide {
         let intention = self.model_intention(app);
         let ui = self.model_ui_customization(app);
 
-        layout::static_left(
+        // The right panel is now an on-brand drawn mock (not a Warp screenshot),
+        // so keep the two-column layout on Oss to show the live preview.
+        layout::static_left_two_column(
             || self.render_content(appearance, intention, &ui, app),
             || self.render_visual(appearance, intention, &ui),
         )

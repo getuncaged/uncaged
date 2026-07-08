@@ -472,6 +472,13 @@ pub const SET_INPUT_MODE_UNLOCKED_TERMINAL_ACTION_NAME: &str = "input:set_mode_u
 const START_NEW_CONVERSATION_KEYBINDING_NAME: &str = "input:start_new_agent_conversation";
 const FIX_WITH_AI_KEYBINDING_NAME: &str = "input:fix_last_command_with_ai";
 
+/// Message shown when the user asks Uncaged AI to fix a terminal block (via the
+/// block toolbar button or the fix-with-AI keybinding). This is what the user
+/// sees in the conversation, so keep it short and human — the actual "how to
+/// respond" guidance lives in the engine's system prompt, not here. The failed
+/// command block is attached as hidden context alongside it.
+const FIX_WITH_AI_PROMPT: &str = "Help me fix this.";
+
 /// The position ID used to identify the start of the replacement span for completions.
 const COMPLETIONS_START_OF_REPLACEMENT_SPAN_POSITION_ID: &str =
     "start_of_completions_replacement_span";
@@ -5906,19 +5913,26 @@ impl Input {
                 .last_non_hidden_block()
                 .map(|block| block.id().clone())
         };
-        let Some(block_id) = last_block_id else {
-            return;
-        };
+        if let Some(block_id) = last_block_id {
+            self.fix_block_id_with_ai(block_id, ctx);
+        }
+    }
+
+    /// On-demand "Fix with AI" for a specific block — e.g. the block whose
+    /// "Ask Uncaged AI to fix" toolbar button was clicked. Unlike
+    /// [`Self::fix_last_command_with_ai`] this targets the given block, so fixing
+    /// an older failed command from its own block works too.
+    pub(crate) fn fix_block_id_with_ai(&mut self, block_id: BlockId, ctx: &mut ViewContext<Self>) {
         self.ai_context_model.update(ctx, |context_model, ctx| {
             context_model.set_pending_context_block_ids(vec![block_id], true, ctx);
         });
-        self.submit_user_query_now(
-            "Look at the attached terminal block. If the command failed or produced an error, \
-             explain what went wrong and give me the exact corrected command to run. Otherwise, \
-             briefly explain what the output means."
-                .to_string(),
-            ctx,
-        );
+        // Submit the fix prompt exactly like the user typing it and pressing Enter
+        // in AI mode: this opens the agent view and streams the answer with the
+        // block attached, instead of running the conversation headlessly (which
+        // lets the agent's own commands leak into the raw terminal).
+        self.replace_buffer_content(FIX_WITH_AI_PROMPT, ctx);
+        self.focus_input_box(ctx);
+        self.submit_ai_query(None, ctx);
     }
 
     pub fn clear_attached_context(&mut self, ctx: &mut ViewContext<Self>) {

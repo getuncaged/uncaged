@@ -18513,7 +18513,7 @@ impl Workspace {
         self.show_settings_with_section(None, ctx);
     }
 
-    fn show_settings_with_section(
+    pub(crate) fn show_settings_with_section(
         &mut self,
         section: Option<SettingsSection>,
         ctx: &mut ViewContext<Self>,

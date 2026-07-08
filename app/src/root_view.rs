@@ -8,7 +8,8 @@ use cfg_if::cfg_if;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use onboarding::{
-    AgentOnboardingEvent, AgentOnboardingView, OnboardingIntention, SelectedSettings,
+    AgentOnboardingEvent, AgentOnboardingView, ConnectConnectionView, ConnectGalleryData,
+    ConnectPresetView, ConnectSectionView, OnboardingIntention, SelectedSettings,
 };
 use parking_lot::Mutex;
 use pathfinder_geometry::rect::RectF;
@@ -1995,7 +1996,79 @@ impl RootView {
         ctx.subscribe_to_view(&onboarding_view, |me, _view, event, ctx| {
             me.handle_agent_onboarding_event(event, ctx);
         });
+
+        // Seed the onboarding "Connect your model" gallery with the current
+        // catalog + roster so it renders real, connectable models.
+        let gallery = Self::build_connect_gallery();
+        onboarding_view.update(ctx, |onboarding_view, ctx| {
+            onboarding_view.set_connect_gallery(gallery, ctx);
+        });
+
         onboarding_view
+    }
+
+    /// Convert the app-crate uncaged bridge (`catalog_sections` / `connections` /
+    /// `engine_active`) into the onboarding crate's plain-data gallery structs,
+    /// stamping each preset / connection with its vendor icon. The onboarding
+    /// crate can't call the bridge itself, so root_view builds this and pushes it
+    /// in — and rebuilds it after every connect/activate to refresh live.
+    fn build_connect_gallery() -> ConnectGalleryData {
+        let sections = crate::uncaged::catalog_sections()
+            .into_iter()
+            .map(|section| ConnectSectionView {
+                title: section.title,
+                subtitle: section.subtitle,
+                presets: section
+                    .presets
+                    .into_iter()
+                    .map(|preset| ConnectPresetView {
+                        icon: crate::uncaged::preset_icon(&preset.id),
+                        id: preset.id,
+                        label: preset.label,
+                        blurb: preset.blurb,
+                        local: preset.local,
+                        needs_key: preset.needs_key,
+                        wire: preset.wire,
+                    })
+                    .collect(),
+            })
+            .collect();
+
+        let connections = crate::uncaged::connections()
+            .into_iter()
+            .map(|conn| ConnectConnectionView {
+                icon: crate::uncaged::preset_icon(&conn.preset),
+                id: conn.id,
+                preset: conn.preset,
+                label: conn.label,
+                endpoint: conn.endpoint,
+                model: conn.model,
+                status: conn.status,
+                local: conn.local,
+                usable: conn.usable,
+                is_active: conn.is_active,
+            })
+            .collect();
+
+        ConnectGalleryData {
+            sections,
+            connections,
+            engine_available: crate::uncaged::engine_active(),
+        }
+    }
+
+    /// Rebuild the connect gallery from the (now-updated) roster and push it into
+    /// the active onboarding view, so a connect/activate reflects immediately.
+    fn refresh_onboarding_connect_gallery(&mut self, ctx: &mut ViewContext<Self>) {
+        let AuthOnboardingState::Onboarding { onboarding_view, .. } = &self.auth_onboarding_state
+        else {
+            return;
+        };
+        let onboarding_view = onboarding_view.clone();
+        let gallery = Self::build_connect_gallery();
+        onboarding_view.update(ctx, |onboarding_view, ctx| {
+            onboarding_view.set_connect_gallery(gallery, ctx);
+        });
     }
 
     /// Debug method to enter the onboarding state.
@@ -2092,7 +2165,7 @@ impl RootView {
                     report_if_error!(settings.use_system_theme.set_value(*enabled, ctx));
                 });
             }
-            AgentOnboardingEvent::OnboardingCompleted(selected_settings) => {
+            AgentOnboardingEvent::OnboardingCompleted(selected_settings, wants_to_connect) => {
                 let AuthOnboardingState::Onboarding {
                     target,
                     onboarding_view,
@@ -2192,10 +2265,28 @@ impl RootView {
                 let workspace = target.to_workspace(ctx);
                 let tutorial = OnboardingTutorial::from(selected_settings.clone());
                 self.pending_tutorial = Some(tutorial);
-                self.auth_onboarding_state = AuthOnboardingState::Terminal(workspace);
+                self.auth_onboarding_state = AuthOnboardingState::Terminal(workspace.clone());
                 ctx.emit(RootViewEvent::AuthOnboardingStateChanged);
                 self.start_pending_tutorial(ctx);
                 self.start_autoupdate_polling(ctx);
+
+                // Uncaged: the Connect step now wires up a real model inline, so
+                // only fall through to the full AI Models page when the user wanted
+                // to connect but nothing usable ended up active — e.g. they picked
+                // an API-key provider that still needs its key. If a model is already
+                // live (a local runtime / CLI agent they connected), or they chose
+                // "Set up later", drop straight into the terminal, ready to go.
+                // We read the roster (not the engine's in-memory state, which isn't
+                // initialised yet mid-onboarding) since that's what the gallery wrote.
+                let has_active_model = crate::uncaged::connections()
+                    .iter()
+                    .any(|c| c.is_active && c.usable);
+                if *wants_to_connect && !has_active_model {
+                    workspace.update(ctx, |ws, ctx| {
+                        ws.show_settings_with_section(Some(SettingsSection::WarpAgent), ctx);
+                    });
+                }
+
                 ctx.notify();
             }
             AgentOnboardingEvent::OnboardingSkipped => {
@@ -2226,6 +2317,30 @@ impl RootView {
             AgentOnboardingEvent::UpgradeRequested
             | AgentOnboardingEvent::UpgradeCopyUrlRequested
             | AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested => {}
+            AgentOnboardingEvent::ConnectPresetRequested(preset_id) => {
+                // Mirror ai_page.rs::uncaged_connect_preset: create (or focus) a
+                // connection for this preset; when it's immediately usable and
+                // needs no key (local runtimes, CLI agents), activate it in one
+                // click. Presets that need an API key create an incomplete
+                // connection here and surface in the "Connected" roster with a
+                // "Needs key" status — the user finishes them in Settings after
+                // onboarding. (TODO: host the CustomEndpointModal as an overlay
+                // to collect the key inline — plan step 6.)
+                if let Ok(id) = crate::uncaged::connect(preset_id) {
+                    if let Some(conn) =
+                        crate::uncaged::connections().into_iter().find(|c| c.id == id)
+                    {
+                        if conn.usable && !conn.needs_key {
+                            let _ = crate::uncaged::activate(&conn.id);
+                        }
+                    }
+                }
+                self.refresh_onboarding_connect_gallery(ctx);
+            }
+            AgentOnboardingEvent::ActivateConnectionRequested(id) => {
+                let _ = crate::uncaged::activate(id);
+                self.refresh_onboarding_connect_gallery(ctx);
+            }
             AgentOnboardingEvent::PrivacySettingsFromTerminalThemeSlideRequested => {
                 let AuthOnboardingState::Onboarding {
                     target,

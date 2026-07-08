@@ -95,17 +95,24 @@ sed \
     < "$TEMPLATE_DIR/postinst.template" \
     > "$DEBIAN_DIR/postinst"
 sed \
-    "s#@@REPO_NAME@@#$REPO_NAME#g; s#@@CHANNEL@@#$RELEASE_CHANNEL#g; s#@@ARCH@@#$ARCH#g" \
-    < "$WORKSPACE_ROOT_DIR/resources/linux/debian/common/postinst.repo.template" \
-    >> "$DEBIAN_DIR/postinst"
-sed \
     "s#@@CHANNEL_SUFFIX@@#$CHANNEL_SUFFIX#g; s#@@OPTDIR@@#$OPT_DIR#g; s#@@REPO_NAME@@#$REPO_NAME#g" \
     < "$TEMPLATE_DIR/postrm.template" \
     > "$DEBIAN_DIR/postrm"
-sed \
-    "s#@@REPO_NAME@@#$REPO_NAME#g" \
-    < "$WORKSPACE_ROOT_DIR/resources/linux/debian/common/postrm.repo.template" \
-    >> "$DEBIAN_DIR/postrm"
+
+# Uncaged: the oss channel is distributed only via GitHub Releases, not an apt
+# repository. Skip appending the apt-source/GPG-key setup (postinst.repo.template
+# / postrm.repo.template), which would otherwise wire the package to
+# releases.warp.dev and install Warp's signing key on the user's machine.
+if [ "$RELEASE_CHANNEL" != "oss" ]; then
+  sed \
+      "s#@@REPO_NAME@@#$REPO_NAME#g; s#@@CHANNEL@@#$RELEASE_CHANNEL#g; s#@@ARCH@@#$ARCH#g" \
+      < "$WORKSPACE_ROOT_DIR/resources/linux/debian/common/postinst.repo.template" \
+      >> "$DEBIAN_DIR/postinst"
+  sed \
+      "s#@@REPO_NAME@@#$REPO_NAME#g" \
+      < "$WORKSPACE_ROOT_DIR/resources/linux/debian/common/postrm.repo.template" \
+      >> "$DEBIAN_DIR/postrm"
+fi
 
 # Make the package scripts executable.
 chmod 755 \

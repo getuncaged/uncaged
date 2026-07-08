@@ -26097,6 +26097,7 @@ impl TypedActionView for TerminalView {
             | OpenSharedSessionOnDesktop { .. }
             | MakeAllParticipantsReaders { .. }
             | AskAIAssistant { .. }
+            | FixBlockWithAI { .. }
             | ToggleSnackbarInActivePane
             | SetInputModeAgent
             | SetInputModeTerminal
@@ -26507,6 +26508,22 @@ impl TypedActionView for TerminalView {
                 }
 
                 self.ask_ai(&AskAISource::Block(*block_index), ctx)
+            }
+            FixBlockWithAI { block_index } => {
+                // Uncaged: one click on the block's "Ask Uncaged AI to fix" button
+                // pins that block as context and immediately submits a fix prompt to
+                // the local agent — no manual typing.
+                let block_id = self
+                    .model
+                    .lock()
+                    .block_list()
+                    .block_at(*block_index)
+                    .map(|block| block.id().clone());
+                if let Some(block_id) = block_id {
+                    self.input().update(ctx, |input, ctx| {
+                        input.fix_block_id_with_ai(block_id, ctx);
+                    });
+                }
             }
             TriggerSubshellBootstrap => self.trigger_subshell_bootstrap(None, false, ctx),
             ShowSubshellBanner(command) => {

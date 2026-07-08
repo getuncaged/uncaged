@@ -11,13 +11,13 @@ use warpui_core::windowing::WindowManager;
 
 use crate::components::feature_optout_dialog::{render_feature_optout_dialog, FeatureOptOutDialog};
 use crate::model::{
-    OnboardingAuthState, OnboardingStateEvent, OnboardingStateModel, OnboardingStep,
+    AiAccessChoice, OnboardingAuthState, OnboardingStateEvent, OnboardingStateModel, OnboardingStep,
     SelectedSettings,
 };
 use crate::slides::{
-    AgentSlide, AiAccessSlide, AiAccessSlideEvent, AiSetupSlide, CustomizeUISlide, IntentionSlide,
-    IntroSlide, IntroSlideEvent, OnboardingModelInfo, OnboardingSlide, ProjectSlide,
-    ThemePickerSlide, ThemePickerSlideEvent, ThirdPartySlide,
+    AgentSlide, AiAccessSlide, AiAccessSlideEvent, AiSetupSlide, ConnectGalleryData,
+    CustomizeUISlide, IntentionSlide, IntroSlide, IntroSlideEvent, OnboardingModelInfo,
+    OnboardingSlide, ProjectSlide, ThemePickerSlide, ThemePickerSlideEvent, ThirdPartySlide,
 };
 use crate::telemetry::OnboardingEvent;
 
@@ -54,7 +54,10 @@ pub enum AgentOnboardingEvent {
     SyncWithOsToggled {
         enabled: bool,
     },
-    OnboardingCompleted(SelectedSettings),
+    /// Onboarding finished. The `bool` is true when the user chose "Use your own
+    /// model" (vs "Set up later"), so the app can drop them into the connect
+    /// gallery to actually wire up a model.
+    OnboardingCompleted(SelectedSettings, bool),
     OnboardingSkipped,
     LoginFromWelcomeRequested,
     /// Emitted when the user clicks the "Privacy Settings" link on the terminal
@@ -66,6 +69,12 @@ pub enum AgentOnboardingEvent {
     UpgradeRequested,
     UpgradeCopyUrlRequested,
     UpgradePasteTokenFromClipboardRequested,
+    /// The user clicked "Connect" on a catalog preset in the onboarding connect
+    /// gallery. The app crate (root_view) calls the uncaged bridge to connect it
+    /// and pushes a refreshed gallery back.
+    ConnectPresetRequested(String),
+    /// The user clicked "Use" on an already-saved connection, to make it active.
+    ActivateConnectionRequested(String),
     /// Emitted when the app regains focus (e.g. user returns from the browser).
     /// The parent should refresh any stale data: available models, workspace/billing metadata, etc.
     AppBecameActive,
@@ -135,7 +144,7 @@ impl AgentOnboardingView {
     /// Creates a new AgentOnboardingView.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        theme_picker_themes: [WarpTheme; 4],
+        theme_picker_themes: [WarpTheme; 5],
         skippable: bool,
         models: Vec<OnboardingModelInfo>,
         default_model_id: LLMId,
@@ -226,11 +235,13 @@ impl AgentOnboardingView {
         };
 
         ctx.subscribe_to_view(&ai_access_slide, |_me, _view, event, ctx| match event {
-            AiAccessSlideEvent::CopyUpgradeUrlRequested => {
-                ctx.emit(AgentOnboardingEvent::UpgradeCopyUrlRequested);
+            AiAccessSlideEvent::ConnectPresetRequested(preset_id) => {
+                ctx.emit(AgentOnboardingEvent::ConnectPresetRequested(
+                    preset_id.clone(),
+                ));
             }
-            AiAccessSlideEvent::PasteAuthTokenFromClipboardRequested => {
-                ctx.emit(AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested);
+            AiAccessSlideEvent::ActivateConnectionRequested(id) => {
+                ctx.emit(AgentOnboardingEvent::ActivateConnectionRequested(id.clone()));
             }
         });
 
@@ -295,6 +306,16 @@ impl AgentOnboardingView {
     ) {
         self.onboarding_state.update(ctx, |state, ctx| {
             state.set_models(models, default_model_id, ctx);
+        });
+        ctx.notify();
+    }
+
+    /// Pushes the connect-gallery snapshot (catalog + roster) into the AI-access
+    /// slide. Called by root_view on initial load and after each connect/activate
+    /// so the gallery reflects the roster live.
+    pub fn set_connect_gallery(&mut self, data: ConnectGalleryData, ctx: &mut ViewContext<Self>) {
+        self.ai_access_slide.update(ctx, |slide, ctx| {
+            slide.set_connect_gallery(data, ctx);
         });
         ctx.notify();
     }
@@ -436,7 +457,14 @@ impl AgentOnboardingView {
 
     fn handle_onboarding_completed(&mut self, ctx: &mut ViewContext<Self>) {
         let settings = self.onboarding_state.as_ref(ctx).settings();
-        ctx.emit(AgentOnboardingEvent::OnboardingCompleted(settings));
+        let wants_to_connect = matches!(
+            self.onboarding_state.as_ref(ctx).ai_access_choice(),
+            AiAccessChoice::Subscription
+        );
+        ctx.emit(AgentOnboardingEvent::OnboardingCompleted(
+            settings,
+            wants_to_connect,
+        ));
     }
 
     /// Reacts to a billing/auth transition. When the user becomes a paying user

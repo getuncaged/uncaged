@@ -61,8 +61,8 @@ use super::view::{
 use super::warpify::render::{draw_flag_pole, render_subshell_flag};
 use super::{heights_approx_eq, TerminalModel, HEIGHT_FUDGE_FACTOR_LINES};
 use crate::ai::blocklist::agent_view::{agent_view_bg_fill, AgentViewState};
-use crate::ai::blocklist::{ai_brand_color, ATTACH_AS_AGENT_MODE_CONTEXT_TEXT};
-use crate::ai_assistant::{AI_ASSISTANT_SVG_PATH, ASK_AI_ASSISTANT_TEXT};
+use crate::ai::blocklist::ai_brand_color;
+use crate::ai_assistant::ASK_AI_ASSISTANT_TEXT;
 use crate::appearance::Appearance;
 use crate::drive::settings::WarpDriveSettings;
 use crate::features::FeatureFlag;
@@ -150,6 +150,9 @@ const LINEAR_SCROLLING: ScrollingAcceleration = ScrollingAcceleration::Polynomia
 const BLOCK_HOVER_BUTTON_HEIGHT: f32 = 28.;
 
 const TAG_AGENT_FOR_ASSISTANCE_TEXT: &str = "Tag agent for assistance";
+/// Shown on the block AI button when the command failed, so it reads as "get help
+/// fixing this" rather than a generic attach.
+const ASK_AI_TO_FIX_TEXT: &str = "Ask Uncaged AI to fix";
 
 const SAVE_AS_WORKFLOW_TEXT: &str = "Save as Workflow";
 const SAVE_AS_WORKFLOW_SECRETS_TEXT: &str = "Blocks containing secrets cannot be saved.";
@@ -1135,18 +1138,15 @@ impl BlockListElement {
         );
 
         if AISettings::as_ref(app).is_any_ai_enabled(app) {
+            // Uncaged: always a clearly AI-branded sparkle in the AI accent colour,
+            // not a paperclip (which reads as "attach") or a muted glyph — so the
+            // button is instantly recognizable as "ask the AI about this command".
             let icon = Container::new(
-                ConstrainedBox::new(if FeatureFlag::AgentView.is_enabled() {
-                    UIIcon::Icon::Paperclip
-                        .to_warpui_icon(icon_color.into())
-                        .finish()
-                } else if FeatureFlag::AgentMode.is_enabled() {
+                ConstrainedBox::new(
                     UIIcon::Icon::Stars
-                        .to_warpui_icon(icon_color.into())
-                        .finish()
-                } else {
-                    Icon::new(AI_ASSISTANT_SVG_PATH, icon_color).finish()
-                })
+                        .to_warpui_icon(ai_brand_color(&self.warp_theme).into())
+                        .finish(),
+                )
                 .with_height(16.)
                 .with_width(16.)
                 .finish(),
@@ -1154,6 +1154,28 @@ impl BlockListElement {
             .with_vertical_padding(5.)
             .with_padding_left(6.)
             .with_padding_right(4.);
+
+            // Uncaged: when the command failed (e.g. "command not found"), frame the
+            // button as fixing it — this is the "such cases" the user asked about.
+            let block_failed = model
+                .block_list()
+                .block_at(block_index)
+                .map(|b| b.has_failed())
+                .unwrap_or(false);
+            let ask_ai_tooltip = if block_failed {
+                ASK_AI_TO_FIX_TEXT
+            } else {
+                ASK_AI_ASSISTANT_TEXT
+            };
+
+            // A failed block gets one-click "fix it": attach the block and submit a
+            // fix prompt to the local agent immediately. A successful block keeps the
+            // lighter "attach as context, then ask" behaviour.
+            let ai_action = if block_failed {
+                TerminalAction::FixBlockWithAI { block_index }
+            } else {
+                TerminalAction::AskAIAssistant { block_index }
+            };
 
             let (ai_button_action, ai_button_tooltip) = if FeatureFlag::AgentMode.is_enabled() {
                 let active_block = model.block_list().active_block();
@@ -1165,16 +1187,10 @@ impl BlockListElement {
                         TAG_AGENT_FOR_ASSISTANCE_TEXT,
                     )
                 } else {
-                    (
-                        Some(TerminalAction::AskAIAssistant { block_index }),
-                        *ATTACH_AS_AGENT_MODE_CONTEXT_TEXT,
-                    )
+                    (Some(ai_action), ask_ai_tooltip)
                 }
             } else {
-                (
-                    Some(TerminalAction::AskAIAssistant { block_index }),
-                    ASK_AI_ASSISTANT_TEXT,
-                )
+                (Some(ai_action), ask_ai_tooltip)
             };
 
             let tooltip = ToolbeltButtonTooltip {

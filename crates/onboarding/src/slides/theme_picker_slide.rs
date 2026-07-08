@@ -63,7 +63,7 @@ struct ThemeOption {
 
 pub struct ThemePickerSlide {
     onboarding_state: ModelHandle<OnboardingStateModel>,
-    theme_options: [ThemeOption; 4],
+    theme_options: [ThemeOption; 5],
     selected_theme_index: usize,
     sync_with_os: bool,
     sync_with_os_mouse: MouseStateHandle,
@@ -76,7 +76,7 @@ pub struct ThemePickerSlide {
 
 impl ThemePickerSlide {
     pub(crate) fn new(
-        themes: [WarpTheme; 4],
+        themes: [WarpTheme; 5],
         onboarding_state: ModelHandle<OnboardingStateModel>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
@@ -295,19 +295,9 @@ impl ThemePickerSlide {
             },
         );
 
-        let (step_index, step_count) = if theme_picker_last {
-            let is_terminal = matches!(
-                self.onboarding_state.as_ref(app).intention(),
-                OnboardingIntention::Terminal
-            );
-            if is_terminal {
-                (3, 4)
-            } else {
-                (4, 5)
-            }
-        } else {
-            (0, 4)
-        };
+        // Use the shared step machine so the dots match the rest of the flow
+        // (Uncaged's fixed four-step flow → theme is step 4 of 4).
+        let (step_index, step_count) = self.onboarding_state.as_ref(app).progress();
 
         bottom_nav::onboarding_bottom_nav(
             appearance,

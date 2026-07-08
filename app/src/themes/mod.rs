@@ -9,9 +9,10 @@ pub mod theme_deletion_modal;
 
 use warp_core::ui::theme::WarpTheme;
 
-pub fn onboarding_theme_picker_themes() -> [WarpTheme; 4] {
+pub fn onboarding_theme_picker_themes() -> [WarpTheme; 5] {
     [
         default_themes::uncaged(),
+        default_themes::midnight(),
         default_themes::dark_theme(),
         default_themes::light_theme(),
         default_themes::adeberry(),

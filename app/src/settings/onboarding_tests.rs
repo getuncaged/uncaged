@@ -170,11 +170,15 @@ fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_l
     })
 }
 
-/// Warp's AI features run on a Warp account. For third-party agent intent
-/// (`disable_oz = true`), AI is therefore off when the user skips creating an
-/// account and on once they have one.
+/// Agent intent means the user wants AI, so having an account turns AI on —
+/// even for third-party agent intent (`disable_oz = true`).
+///
+/// Uncaged no longer gates AI behind a Warp account: `apply_onboarding_settings`
+/// enables AI when `has_account` is true OR the local engine is active. We only
+/// assert the account branch here because it is deterministic; the engine branch
+/// depends on the machine's on-disk engine config and is exercised elsewhere.
 #[test]
-fn apply_onboarding_settings_gates_third_party_ai_on_account() {
+fn apply_onboarding_settings_enables_ai_for_agent_intent_with_account() {
     let _flag = FeatureFlag::OpenWarpNewSettingsModes.override_enabled(true);
     App::test((), |mut app| async move {
         initialize_settings_for_tests(&mut app);
@@ -204,24 +208,14 @@ fn apply_onboarding_settings_gates_third_party_ai_on_account() {
             ui_customization: None,
         };
 
-        // Skipping login (no account) leaves AI off, even for agent intent.
-        app.update(|ctx| {
-            apply_onboarding_settings(&onboarding_settings, false, ctx);
-        });
-        let ai_disabled = app.read(|ctx| !*AISettings::as_ref(ctx).is_any_ai_enabled);
-        assert!(
-            ai_disabled,
-            "skipping login must disable AI even for agent intent"
-        );
-
-        // Creating an account turns AI on, including for third-party agents.
+        // Having an account turns AI on, including for third-party agents.
         app.update(|ctx| {
             apply_onboarding_settings(&onboarding_settings, true, ctx);
         });
         let ai_enabled = app.read(|ctx| *AISettings::as_ref(ctx).is_any_ai_enabled);
         assert!(
             ai_enabled,
-            "creating an account must enable AI for third-party agent intent"
+            "an account must enable AI for third-party agent intent"
         );
     })
 }

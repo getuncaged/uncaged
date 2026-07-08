@@ -776,35 +776,19 @@ impl OnboardingStateModel {
     pub(crate) fn back(&mut self, ctx: &mut ModelContext<Self>) {
         use warp_core::features::FeatureFlag;
         let theme_picker_last = FeatureFlag::OpenWarpNewSettingsModes.is_enabled();
-        let ai_setup_flow = self.ai_setup_flow_active();
-        let agent_intention = matches!(self.intention, OnboardingIntention::AgentDrivenDevelopment);
-
         let prev = if theme_picker_last {
+            // Uncaged: reverse of the four-step flow.
             match self.step {
                 OnboardingStep::Intro => None,
-                OnboardingStep::Intention => Some(OnboardingStep::Intro),
-                OnboardingStep::AiSetup => Some(OnboardingStep::Intention),
-                OnboardingStep::Customize => {
-                    if ai_setup_flow && agent_intention {
-                        match self.ai_setup_choice {
-                            AiSetupChoice::WarpAgent => Some(OnboardingStep::AiAccess),
-                            AiSetupChoice::ThirdParty => Some(OnboardingStep::ThirdParty),
-                        }
-                    } else {
-                        Some(OnboardingStep::Intention)
-                    }
-                }
-                OnboardingStep::AiAccess => Some(OnboardingStep::Agent),
-                OnboardingStep::Agent => {
-                    if ai_setup_flow {
-                        Some(OnboardingStep::AiSetup)
-                    } else {
-                        Some(OnboardingStep::Customize)
-                    }
-                }
-                OnboardingStep::ThirdParty => Some(OnboardingStep::AiSetup),
-                OnboardingStep::Project => Some(OnboardingStep::ThirdParty),
+                OnboardingStep::AiAccess => Some(OnboardingStep::Intro),
+                OnboardingStep::Customize => Some(OnboardingStep::AiAccess),
                 OnboardingStep::ThemePicker => Some(OnboardingStep::Customize),
+                // Dropped from the flow — never entered.
+                OnboardingStep::Intention
+                | OnboardingStep::AiSetup
+                | OnboardingStep::Agent
+                | OnboardingStep::ThirdParty
+                | OnboardingStep::Project => None,
             }
         } else {
             match self.step {
@@ -841,54 +825,19 @@ impl OnboardingStateModel {
         }
 
         if theme_picker_last {
-            let ai_setup_flow = self.ai_setup_flow_active();
+            // Uncaged: a fixed four-step flow —
+            // Welcome → Connect a model → Customize UI → Pick a theme.
             match self.step {
-                OnboardingStep::Intro => self.set_step(OnboardingStep::Intention, ctx),
-                OnboardingStep::Intention => match self.intention {
-                    OnboardingIntention::Terminal => self.set_step(OnboardingStep::Customize, ctx),
-                    OnboardingIntention::AgentDrivenDevelopment => {
-                        if ai_setup_flow {
-                            self.set_step(OnboardingStep::AiSetup, ctx)
-                        } else {
-                            self.set_step(OnboardingStep::Customize, ctx)
-                        }
-                    }
-                },
-                OnboardingStep::AiSetup => match self.ai_setup_choice {
-                    AiSetupChoice::WarpAgent => self.set_step(OnboardingStep::Agent, ctx),
-                    AiSetupChoice::ThirdParty => self.set_step(OnboardingStep::ThirdParty, ctx),
-                },
-                OnboardingStep::Customize => match self.intention {
-                    OnboardingIntention::Terminal => {
-                        self.set_step(OnboardingStep::ThemePicker, ctx)
-                    }
-                    OnboardingIntention::AgentDrivenDevelopment => {
-                        if ai_setup_flow {
-                            self.set_step(OnboardingStep::ThemePicker, ctx)
-                        } else {
-                            self.set_step(OnboardingStep::Agent, ctx)
-                        }
-                    }
-                },
-                OnboardingStep::Agent => {
-                    if ai_setup_flow {
-                        self.set_step(OnboardingStep::AiAccess, ctx)
-                    } else {
-                        self.set_step(OnboardingStep::ThirdParty, ctx)
-                    }
-                }
+                OnboardingStep::Intro => self.set_step(OnboardingStep::AiAccess, ctx),
                 OnboardingStep::AiAccess => self.set_step(OnboardingStep::Customize, ctx),
-                OnboardingStep::ThirdParty => {
-                    if ai_setup_flow
-                        && matches!(self.intention, OnboardingIntention::AgentDrivenDevelopment)
-                    {
-                        self.set_step(OnboardingStep::Customize, ctx)
-                    } else {
-                        self.set_step(OnboardingStep::ThemePicker, ctx)
-                    }
-                }
-                OnboardingStep::Project => self.set_step(OnboardingStep::ThemePicker, ctx),
+                OnboardingStep::Customize => self.set_step(OnboardingStep::ThemePicker, ctx),
                 OnboardingStep::ThemePicker => {}
+                // Dropped from the flow — never entered; kept exhaustive.
+                OnboardingStep::Intention
+                | OnboardingStep::AiSetup
+                | OnboardingStep::Agent
+                | OnboardingStep::ThirdParty
+                | OnboardingStep::Project => self.set_step(OnboardingStep::AiAccess, ctx),
             }
         } else {
             match self.step {
@@ -997,7 +946,6 @@ impl OnboardingStateModel {
     pub(crate) fn progress(&self) -> (usize, usize) {
         use warp_core::features::FeatureFlag;
 
-        let is_terminal = matches!(self.intention, OnboardingIntention::Terminal);
         if !FeatureFlag::OpenWarpNewSettingsModes.is_enabled() {
             // Legacy flow: ThemePicker → Intention → Agent → Project.
             return match self.step {
@@ -1012,35 +960,19 @@ impl OnboardingStateModel {
             };
         }
 
-        // The Warp Agent path has the extra "Choose how to access AI" step, so it
-        // is one longer than the third-party-agent path.
-        let is_warp_agent_path =
-            !is_terminal && matches!(self.ai_setup_choice, AiSetupChoice::WarpAgent);
-        let step_count = if is_terminal {
-            3
-        } else if is_warp_agent_path {
-            6
-        } else {
-            5
-        };
+        // Uncaged: a fixed four-step flow — Welcome, Connect a model, Customize
+        // UI, Pick a theme. The dropped steps never render, so the dots read 4.
+        let step_count = 4;
         let step_index = match self.step {
-            OnboardingStep::Intro | OnboardingStep::Intention => 0,
-            OnboardingStep::AiSetup => 1,
-            OnboardingStep::Agent => 2,
-            OnboardingStep::AiAccess => 3,
-            OnboardingStep::Customize => {
-                if is_terminal {
-                    1
-                } else if is_warp_agent_path {
-                    4
-                } else {
-                    3
-                }
-            }
-            OnboardingStep::ThirdParty => 2,
-            // Unreachable in the new flow; keep the legacy position.
-            OnboardingStep::Project => 3,
-            OnboardingStep::ThemePicker => step_count - 1,
+            OnboardingStep::Intro => 0,
+            OnboardingStep::AiAccess => 1,
+            OnboardingStep::Customize => 2,
+            OnboardingStep::ThemePicker => 3,
+            OnboardingStep::Intention
+            | OnboardingStep::AiSetup
+            | OnboardingStep::Agent
+            | OnboardingStep::ThirdParty
+            | OnboardingStep::Project => 0,
         };
         (step_index, step_count)
     }
