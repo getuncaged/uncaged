@@ -1,0 +1,25 @@
+DOWNLOADS.md
+  s_3e4cc0ba3e0ede::t_539dd4b9bff85b 17
+  s_3e4cc0ba3e0ede::t_4381bfa7b57e23 96
+  s_3e4cc0ba3e0ede::t_0bf239b6bb9858 33,35
+packaging/homebrew/uncaged.rb
+  s_3e4cc0ba3e0ede::t_ba882f29cf1bc3 9-12,15-16,20,23-35
+.github/workflows/uncaged-release.yml
+  s_3e4cc0ba3e0ede::t_224f4de5aa2e06 48-51,53,55-59,69,74,76-77,94-97,100,103,105,107,111-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "bca50a40fd92c54ccb1ebccafe3b09fb8955c704",
+  "prompts": {},
+  "sessions": {
+    "s_3e4cc0ba3e0ede": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e772dcd-0cc7-45ef-b232-59d0e8d0d1c9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.pro@gmail.com>"
+    }
+  }
+}
