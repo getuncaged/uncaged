@@ -17,19 +17,21 @@
 
 cask "uncaged" do
   # Bumped by the release process to the git tag without the leading "v"
-  # (e.g. tag v0.2.3 -> version "0.2.3").
-  version "0.0.0"
+  # (e.g. tag v0.2.3 -> version "0.2.3"). Pinned to the current release; on each
+  # new release, bump `version` and both per-arch `sha256` below to that tag's
+  # DMG checksums (see "Updating the cask").
+  version "0.2.4"
 
   # Per-arch DMGs (there is no universal DMG). Homebrew picks the block matching
   # the host. The download URL points at a versioned release asset (not /latest/)
   # so Homebrew can verify the checksum deterministically.
   on_arm do
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    sha256 "aaa7dae799b2337b02077874f2998809d85ee82cd4d2fc7bd6405744532704fe"
     url "https://github.com/getuncaged/uncaged/releases/download/v#{version}/Uncaged-macos-aarch64.dmg",
         verified: "github.com/getuncaged/uncaged/"
   end
   on_intel do
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+    sha256 "2a0446f274c0ee435c8c28a5beba2d25dfcbce35f121bc0377d6407718e94cfd"
     url "https://github.com/getuncaged/uncaged/releases/download/v#{version}/Uncaged-macos-x86_64.dmg",
         verified: "github.com/getuncaged/uncaged/"
   end
@@ -41,7 +43,10 @@ cask "uncaged" do
   # No autoupdate feed: Uncaged ships with autoupdate disabled. `brew upgrade`
   # is the supported update path once the tap is bumped.
   auto_updates false
-  depends_on macos: ">= :mojave" # matches the 10.14 MACOSX_DEPLOYMENT_TARGET
+  # NOTE: no `depends_on macos:` minimum — modern Homebrew disabled the
+  # minimum-version constraint for casks (there is no replacement). The app
+  # targets macOS 10.14+ (MACOSX_DEPLOYMENT_TARGET); older systems simply
+  # can't launch it, which macOS itself enforces.
 
   app "Uncaged.app"
 
