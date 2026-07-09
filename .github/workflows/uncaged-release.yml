@@ -75,7 +75,7 @@ jobs:
     name: Build macOS DMG (${{ matrix.arch }})
     runs-on: macos-latest
     needs: create_release
-    timeout-minutes: 120
+    timeout-minutes: 180
     # Apple Silicon is the first-class macOS build. Intel (x86_64) is best-effort
     # — like Warp, we don't gate the release on it; if it's slow or fails it never
     # blocks the launch, and Apple Silicon ships on its own.
