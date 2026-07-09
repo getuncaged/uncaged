@@ -12,7 +12,7 @@
 # PackageVersion is a PLACEHOLDER (0.0.0); the release process replaces it with
 # the tag (without the leading "v") in all three files.
 PackageIdentifier: Uncaged.Uncaged
-PackageVersion: 0.0.0
+PackageVersion: 0.2.4
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.6.0

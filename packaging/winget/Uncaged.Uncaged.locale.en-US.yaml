@@ -3,7 +3,7 @@
 # PackageVersion is a PLACEHOLDER (0.0.0) replaced by the release process with
 # the tag (without the leading "v").
 PackageIdentifier: Uncaged.Uncaged
-PackageVersion: 0.0.0
+PackageVersion: 0.2.4
 PackageLocale: en-US
 Publisher: Uncaged
 PublisherUrl: https://getuncaged.dev/

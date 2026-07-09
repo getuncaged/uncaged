@@ -10,7 +10,7 @@
 # Uncaged's installer is Inno Setup (see script/windows/windows-installer.iss),
 # which supports the standard silent-install switches winget uses.
 PackageIdentifier: Uncaged.Uncaged
-PackageVersion: 0.0.0
+PackageVersion: 0.2.4
 InstallerType: inno
 Scope: user
 InstallModes:
@@ -18,14 +18,17 @@ InstallModes:
   - silent
   - silentWithProgress
 UpgradeBehavior: install
-# AppUserModelID matches the Rust runtime identity and the installer shortcut.
-ProductCode: "{{ProductCode}}"
+# ProductCode is intentionally omitted: the Inno AppId
+# (warp-terminal-<channel>) yields the "<AppId>_is1" ARP key, but the exact
+# channel string baked into the shipped installer isn't asserted here, and a
+# wrong ProductCode fails winget's post-install validation. winget falls back
+# to ARP name/publisher matching, which is correct for this package.
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/getuncaged/uncaged/releases/download/v0.0.0/Uncaged-windows-x86_64-setup.exe
-    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    InstallerUrl: https://github.com/getuncaged/uncaged/releases/download/v0.2.4/Uncaged-windows-x86_64-setup.exe
+    InstallerSha256: 9C3CFE500B233FD8BC2BAF935A611D854070BE715B6CBAA83CE65798E1B3DCA4
   - Architecture: arm64
-    InstallerUrl: https://github.com/getuncaged/uncaged/releases/download/v0.0.0/Uncaged-windows-aarch64-setup.exe
-    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    InstallerUrl: https://github.com/getuncaged/uncaged/releases/download/v0.2.4/Uncaged-windows-aarch64-setup.exe
+    InstallerSha256: DEA800B08B60931EBB53E8554B8520BFE2F34DCB2AAA126574666E8E5ABC21F6
 ManifestType: installer
 ManifestVersion: 1.6.0
