@@ -124,7 +124,11 @@ jobs:
       - name: Build + stage ${{ matrix.arch }} DMG (ad-hoc signed)
         run: |
           set -euo pipefail
-          ./script/bundle --channel oss --selfsign --arch ${{ matrix.arch }}
+          # --release-tag exports GIT_RELEASE_TAG before cargo runs so the tag is
+          # baked into the binary (Settings → About reads ChannelState::app_version(),
+          # which is option_env!("GIT_RELEASE_TAG")). Without it the About page falls
+          # back to the crate version (v0.1.0). Linux/Windows already pass this.
+          ./script/bundle --channel oss --selfsign --arch ${{ matrix.arch }} --release-tag "${GITHUB_REF_NAME}"
           OUT="target/release-lto/bundle/osx"
           mkdir -p dist
           cp "$OUT/Uncaged.dmg" "dist/Uncaged-macos-${{ matrix.arch }}.dmg"
