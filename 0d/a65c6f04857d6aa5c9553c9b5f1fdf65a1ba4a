@@ -1,0 +1,22 @@
+app/src/ai/blocklist/view_util.rs
+  s_3e4cc0ba3e0ede::t_e9d75c7e1d7641 41-55
+crates/onboarding/src/slides/intro_slide.rs
+  s_3e4cc0ba3e0ede::t_aaf2459339d9a5 91-93
+  s_3e4cc0ba3e0ede::t_029b31665aecc8 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "0da65c6f04857d6aa5c9553c9b5f1fdf65a1ba4a",
+  "prompts": {},
+  "sessions": {
+    "s_3e4cc0ba3e0ede": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e772dcd-0cc7-45ef-b232-59d0e8d0d1c9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.pro@gmail.com>"
+    }
+  }
+}
