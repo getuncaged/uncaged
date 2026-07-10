@@ -1192,7 +1192,10 @@ impl AppearanceSettingsPageView {
             dropdown.set_top_bar_max_width(INPUT_MODE_DROPDOWN_WIDTH);
             dropdown.set_menu_width(INPUT_MODE_DROPDOWN_WIDTH, ctx);
 
-            let values: Vec<AppIcon> = all::<AppIcon>().collect();
+            // Uncaged ships only the neutral Default icon: every other AppIcon
+            // variant maps to a Warp-branded PNG in DockTilePlugin/Resources,
+            // so we do NOT expose them (was `all::<AppIcon>().collect()`).
+            let values: Vec<AppIcon> = vec![AppIcon::Default];
             let current_value = *AppIconSettings::as_ref(ctx).app_icon;
             let selected_index = values
                 .iter()
