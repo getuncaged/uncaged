@@ -1,0 +1,21 @@
+app/Cargo.toml
+  s_3e4cc0ba3e0ede::t_250691708595f3 8
+Cargo.lock
+  s_3e4cc0ba3e0ede::t_79595313fd76f0 14991
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "3c9eae5db9a82172f5d95dc7297625bc5d08fb3f",
+  "prompts": {},
+  "sessions": {
+    "s_3e4cc0ba3e0ede": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e772dcd-0cc7-45ef-b232-59d0e8d0d1c9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.pro@gmail.com>"
+    }
+  }
+}
