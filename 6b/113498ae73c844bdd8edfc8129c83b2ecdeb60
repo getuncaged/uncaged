@@ -1,0 +1,21 @@
+crates/warp_core/build.rs
+  s_3e4cc0ba3e0ede::t_2126ffa80ce085 10-15
+app/Cargo.toml
+  s_3e4cc0ba3e0ede::t_28ac8a17cc4fd2 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6b113498ae73c844bdd8edfc8129c83b2ecdeb60",
+  "prompts": {},
+  "sessions": {
+    "s_3e4cc0ba3e0ede": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e772dcd-0cc7-45ef-b232-59d0e8d0d1c9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.pro@gmail.com>"
+    }
+  }
+}
