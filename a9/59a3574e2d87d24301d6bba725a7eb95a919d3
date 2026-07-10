@@ -1,0 +1,45 @@
+app/src/settings_view/mod.rs
+  s_bcb479132a6a7c::t_a61894f4a9692a 302
+  s_bcb479132a6a7c::t_dde585f351b663 262-264
+  s_bcb479132a6a7c::t_1a278b610ce6bd 1304
+  s_bcb479132a6a7c::t_bfab0f3fa9bb9c 1339
+  s_bcb479132a6a7c::t_f7f83894731348 2132
+  s_bcb479132a6a7c::t_516f42735bec4d 116
+  s_bcb479132a6a7c::t_f04d3c165a0c69 1092
+  s_bcb479132a6a7c::t_2de232142db068 1247-1250
+app/src/settings_view/appearance_page.rs
+  s_bcb479132a6a7c::t_8ac7fc991d97ec 60-61
+  s_bcb479132a6a7c::t_0b13d446c3f0e1 1347
+  s_bcb479132a6a7c::t_673156a1de9ea3 62-64
+  s_bcb479132a6a7c::t_634ea762f03d71 1344-1346
+crates/onboarding/src/slides/customize_slide.rs
+  s_bcb479132a6a7c::t_5984af7e5a8d44 262
+  s_bcb479132a6a7c::t_8ae76fe6b6809b 319
+app/src/settings_view/customize_ui_page.rs
+  s_bcb479132a6a7c::t_cf740d1582a9ab 18-19
+  s_bcb479132a6a7c::t_695868027fd7af 53-55,58-77
+  s_bcb479132a6a7c::t_878e0409dc44fc 36
+  s_bcb479132a6a7c::t_459e164d83ea4b 181,184-223
+  s_bcb479132a6a7c::t_8f6ad01dd35cc8 1-17,20-35,37-52,56-57,78-92,101-180,182-183,224-428
+  s_bcb479132a6a7c::t_dad31f1ca4247c 93-100
+app/src/settings_view/settings_page.rs
+  s_bcb479132a6a7c::t_90e32182489fb2 42
+  s_bcb479132a6a7c::t_8469bde92fd122 122
+  s_bcb479132a6a7c::t_36ebdd51e16b52 147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "a959a3574e2d87d24301d6bba725a7eb95a919d3",
+  "prompts": {},
+  "sessions": {
+    "s_bcb479132a6a7c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7f2a1a46-f59d-4c98-97a3-687155cb9e2a",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.pro@gmail.com>"
+    }
+  }
+}
