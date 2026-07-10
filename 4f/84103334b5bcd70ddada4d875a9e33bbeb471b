@@ -1,0 +1,21 @@
+.github/workflows/uncaged-release.yml
+  s_e77ace9f8ce871::t_c68e7986aff663 127-131
+Cargo.lock
+  s_e77ace9f8ce871::t_278bfbf6a0eda5 14991
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "4f84103334b5bcd70ddada4d875a9e33bbeb471b",
+  "prompts": {},
+  "sessions": {
+    "s_e77ace9f8ce871": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f87c6a40-84e5-439f-b472-958bf52e5edc",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.pro@gmail.com>"
+    }
+  }
+}
