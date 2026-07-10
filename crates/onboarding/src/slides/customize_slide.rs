@@ -259,7 +259,7 @@ impl CustomizeUISlide {
 
         if ui.tools_panel_enabled(&intention) {
             chips.push(ChipSpec {
-                label: "File explorer",
+                label: "Project explorer",
                 is_enabled: ui.show_project_explorer,
                 mouse_state: self.chip_file_explorer_mouse.clone(),
                 on_click: Box::new(|ctx, _, _| {
@@ -316,7 +316,7 @@ impl CustomizeUISlide {
             });
 
             chips.push(ChipSpec {
-                label: "Command history",
+                label: "Drive",
                 is_enabled: ui.show_warp_drive,
                 mouse_state: self.chip_warp_drive_mouse.clone(),
                 on_click: Box::new(|ctx, _, _| {
