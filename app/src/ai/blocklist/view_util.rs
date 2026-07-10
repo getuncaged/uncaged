@@ -38,12 +38,21 @@ pub const CLAUDE_ORANGE: ColorU = ColorU {
     a: 0xFF,
 };
 
-/// Returns the color to be used for various AI signifiers
-/// input with AI mode).
-pub fn ai_brand_color(theme: &WarpTheme) -> ColorU {
-    AnsiColorIdentifier::Magenta
-        .to_ansi_color(&theme.terminal_colors().normal)
-        .into()
+/// Uncaged's fixed AI accent — the ember brand color. Every AI signifier (the
+/// AI/agent icon, mode indicators, agent-mode accents) uses this so it looks
+/// IDENTICAL across all themes. Previously this returned the current theme's
+/// Magenta ANSI slot, so the AI icon changed colour when you switched themes.
+pub const AI_BRAND_COLOR: ColorU = ColorU {
+    r: 0xFF,
+    g: 0x7A,
+    b: 0x18,
+    a: 0xFF,
+};
+
+/// Returns the color to be used for various AI signifiers (e.g. the AI icon and
+/// input in AI mode). Theme-independent by design, for consistent AI branding.
+pub fn ai_brand_color(_theme: &WarpTheme) -> ColorU {
+    AI_BRAND_COLOR
 }
 
 /// Returns the color to be used for error UI throughout Agent Mode (like the "request limit

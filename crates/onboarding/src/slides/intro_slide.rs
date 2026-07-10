@@ -88,9 +88,10 @@ impl IntroSlide {
     fn render_centered_content(&self, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();
 
-        // The Uncaged mark, in the ember brand accent (was a 20%-opacity ghost).
-        let logo_fill = internal_colors::accent(theme);
-        let logo = ConstrainedBox::new(Icon::Oz.to_warpui_icon(logo_fill).finish())
+        // The Uncaged mark, in the fixed ember brand color so it looks identical
+        // across every theme (was internal_colors::accent, which varies per theme).
+        let logo_fill = ColorU::from_u32(0xFF7A18FF);
+        let logo = ConstrainedBox::new(Icon::Oz.to_warpui_icon(logo_fill.into()).finish())
             .with_width(64.)
             .with_height(64.)
             .finish();
