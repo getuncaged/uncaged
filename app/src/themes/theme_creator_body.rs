@@ -1,7 +1,6 @@
 use std::default::Default;
 use std::fmt;
 use std::path::{Path, PathBuf};
-#[cfg(feature = "local_fs")]
 use std::{fs::copy, io::Write};
 
 use pathfinder_color::ColorU;
@@ -32,7 +31,6 @@ use crate::appearance::{Appearance, AppearanceManager};
 use crate::editor::{EditorView, Event as EditorEvent};
 use crate::themes::theme::{InMemoryThemeOptions, ThemeKind};
 use crate::user_config;
-#[cfg(feature = "local_fs")]
 use crate::{
     send_telemetry_from_ctx, server::telemetry::TelemetryEvent, themes::theme::CustomTheme,
 };
@@ -317,7 +315,6 @@ impl ThemeCreatorBody {
         ctx.notify();
     }
 
-    #[cfg_attr(not(feature = "local_fs"), allow(unused))]
     pub fn create_theme(&mut self, ctx: &mut ViewContext<Self>) {
         if let Some(theme_options) = self.theme_options.as_mut() {
             let theme_name = theme_options.name();
@@ -342,30 +339,25 @@ impl ThemeCreatorBody {
 
             theme_options.set_path(dir.join(format!("{theme_name}.{image_extension}")));
             let mut errored = true;
-            #[cfg(feature = "local_fs")]
-            {
-                ThemeCreatorBody::write_theme(
-                    &theme_options.theme(),
-                    dir,
-                    theme_yaml_file_name,
-                    Some((
-                        original_theme_image_path_clone,
-                        theme_name.clone(),
-                        image_extension,
-                    )),
-                    |path| {
-                        send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
-                        ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
-                            theme: ThemeKind::Custom(CustomTheme::new(theme_name, path)),
-                        });
-                        errored = false;
-                        self.close(ctx);
-                        ctx.notify();
-                    },
-                );
-            }
-            #[cfg(not(feature = "local_fs"))]
-            log::warn!("Tried to save theme without a local filesystem.");
+            ThemeCreatorBody::write_theme(
+                &theme_options.theme(),
+                dir,
+                theme_yaml_file_name,
+                Some((
+                    original_theme_image_path_clone,
+                    theme_name.clone(),
+                    image_extension,
+                )),
+                |path| {
+                    send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
+                    ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
+                        theme: ThemeKind::Custom(CustomTheme::new(theme_name, path)),
+                    });
+                    errored = false;
+                    self.close(ctx);
+                    ctx.notify();
+                },
+            );
             if errored {
                 self.send_error_toast("Something went wrong".to_string(), ctx);
             }
@@ -374,7 +366,6 @@ impl ThemeCreatorBody {
 
     /// Writes a theme to the filesystem. Calls the success callback if successful.
     /// Note: the image option should be (original_theme_image_path, theme_name, image_extension).
-    #[cfg(feature = "local_fs")]
     pub fn write_theme<T>(
         theme: &WarpTheme,
         dir: PathBuf,
@@ -551,7 +542,6 @@ impl ThemeCreatorBody {
         )
     }
 
-    #[cfg_attr(not(feature = "local_fs"), allow(unused))]
     fn create_manual_theme(&mut self, ctx: &mut ViewContext<Self>) {
         let name = self.manual_name(ctx);
         // Sanitize the file name (a raw name could contain path separators). The display name is
@@ -560,43 +550,35 @@ impl ThemeCreatorBody {
         let file_name = format!("{slug}.yaml");
         let dir = user_config::themes_dir();
 
-        #[cfg(feature = "local_fs")]
-        {
-            // If a background image is set, copy it next to the theme file so the theme is
-            // self-contained, and reference the copied file (not the user's original path).
-            let src_image = self.bg_image.clone();
-            let ext = src_image
-                .as_ref()
-                .and_then(|p| p.extension())
-                .and_then(|e| e.to_str());
-            let saved_image_path = match (&src_image, ext) {
-                (Some(_), Some(ext)) => Some(dir.join(format!("{slug}.{ext}"))),
-                _ => None,
-            };
-            let image_option = match (&src_image, ext) {
-                (Some(src), Some(ext)) => Some((src.clone(), slug.clone(), ext)),
-                _ => None,
-            };
-            let theme = self.build_manual_theme(ctx, saved_image_path.as_deref());
+        // If a background image is set, copy it next to the theme file so the theme is
+        // self-contained, and reference the copied file (not the user's original path).
+        let src_image = self.bg_image.clone();
+        let ext = src_image
+            .as_ref()
+            .and_then(|p| p.extension())
+            .and_then(|e| e.to_str());
+        let saved_image_path = match (&src_image, ext) {
+            (Some(_), Some(ext)) => Some(dir.join(format!("{slug}.{ext}"))),
+            _ => None,
+        };
+        let image_option = match (&src_image, ext) {
+            (Some(src), Some(ext)) => Some((src.clone(), slug.clone(), ext)),
+            _ => None,
+        };
+        let theme = self.build_manual_theme(ctx, saved_image_path.as_deref());
 
-            let mut errored = true;
-            ThemeCreatorBody::write_theme(&theme, dir, file_name, image_option, |path| {
-                send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
-                ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
-                    theme: ThemeKind::Custom(CustomTheme::new(name.clone(), path)),
-                });
-                errored = false;
-                self.close(ctx);
-                ctx.notify();
+        let mut errored = true;
+        ThemeCreatorBody::write_theme(&theme, dir, file_name, image_option, |path| {
+            send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
+            ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
+                theme: ThemeKind::Custom(CustomTheme::new(name.clone(), path)),
             });
-            if errored {
-                self.send_error_toast("Something went wrong saving the theme.".to_string(), ctx);
-            }
-        }
-        #[cfg(not(feature = "local_fs"))]
-        {
-            let _ = (name, slug, file_name, dir);
-            log::warn!("Tried to save theme without a local filesystem.");
+            errored = false;
+            self.close(ctx);
+            ctx.notify();
+        });
+        if errored {
+            self.send_error_toast("Something went wrong saving the theme.".to_string(), ctx);
         }
     }
 
