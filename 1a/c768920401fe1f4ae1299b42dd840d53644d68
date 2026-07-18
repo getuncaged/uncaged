@@ -1,0 +1,41 @@
+app/src/themes/theme_creator_body.rs
+  s_6e5dc450e2113a::t_cb6fa1491d210d 157-158
+  s_6e5dc450e2113a::t_dfcddaf3303a32 664-682
+  s_6e5dc450e2113a::t_997648d0e4140e 1518-1521
+  s_6e5dc450e2113a::t_d10942f60c47fa 35,37-38
+  s_6e5dc450e2113a::t_64e463f62b6a14 135-136
+  s_6e5dc450e2113a::t_02a68abd798682 230-231
+  s_6e5dc450e2113a::t_b5a9704496d172 8
+  s_6e5dc450e2113a::t_e9c19975840740 920-976
+  s_6e5dc450e2113a::t_edd24ba265aaea 1048-1052
+app/src/settings_view/theme_creator_page.rs
+  s_6e5dc450e2113a::t_f64790799fe307 1-13,15-207
+  s_6e5dc450e2113a::t_d560b27f664941 14
+app/src/settings_view/appearance_page.rs
+  s_6e5dc450e2113a::t_bc4b7e1c0dc2b5 2692,2707-2709,2713-2715
+app/src/brand.rs
+  s_6e5dc450e2113a::t_723675956c86d7 80-82
+app/src/settings_view/settings_page.rs
+  s_6e5dc450e2113a::t_505605585f0208 43,124,150
+app/src/settings_view/mod.rs
+  s_6e5dc450e2113a::t_7844babde40b57 117,266-268,307,1098,1257-1260,1315,1352,2145
+app/src/themes/theme_chooser.rs
+  s_6e5dc450e2113a::t_723675956c86d7 9,38
+  s_6e5dc450e2113a::t_4734b279756b71 654-655
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "1ac768920401fe1f4ae1299b42dd840d53644d68",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
