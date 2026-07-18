@@ -1,0 +1,20 @@
+app/src/themes/theme_creator_body.rs
+  s_6e5dc450e2113a::t_81d3b0c571159b 342-360
+  s_6e5dc450e2113a::t_912fbc9d7550a2 553-568,570-574,576-581
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "24fbb029e63dc553d1246e2c116f524573812b42",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
