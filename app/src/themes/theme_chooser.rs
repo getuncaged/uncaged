@@ -654,6 +654,8 @@ impl ThemeChooser {
 
         // Custom themes are only supported on desktop platforms currently.
         if cfg!(not(target_family = "wasm")) {
+            // Labelled rather than a bare "+": theme creation is a headline
+            // feature and an unlabelled icon made it effectively undiscoverable.
             let create_theme_button = SavePosition::new(
                 icon_button(
                     appearance,
@@ -663,6 +665,7 @@ impl ThemeChooser {
                         .create_theme_button_hover_state
                         .clone(),
                 )
+                .with_centered_text_label("New theme".to_string())
                 .build()
                 .on_click(|ctx, _, _| {
                     ctx.dispatch_typed_action(ThemeChooserAction::OpenThemeCreator)
