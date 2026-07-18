@@ -55,6 +55,7 @@ fn test_input_detection() {
         let mut context = Context {
             current_input_type: InputType::AI,
             is_agent_follow_up: false,
+            prefer_shell_for_known_commands: false,
         };
 
         let token = mock_parsed_input_token("cargo --version".to_string()).await;
@@ -133,12 +134,56 @@ fn test_input_detection() {
 }
 
 #[test]
+fn test_prefer_shell_for_known_commands() {
+    futures::executor::block_on(async move {
+        let classifier = HeuristicClassifier;
+
+        // When the first token is a recognized command, a natural-language tail no longer flips
+        // the input to AI — this is the guard against the agent triggering on real commands.
+        let context_on = Context {
+            current_input_type: InputType::AI,
+            is_agent_follow_up: false,
+            prefer_shell_for_known_commands: true,
+        };
+        let token = mock_parsed_input_token("git how do I undo the last commit".to_string()).await;
+        // The mocked completion parser always gives the first token a command description.
+        assert!(token.parsed_tokens[0].token_description.is_some());
+        assert_eq!(
+            detected_input_type(&classifier, token, &context_on).await,
+            InputType::Shell
+        );
+
+        // With the guard off, the same input is free to be classified as AI (natural language).
+        let context_off = Context {
+            current_input_type: InputType::AI,
+            is_agent_follow_up: false,
+            prefer_shell_for_known_commands: false,
+        };
+        let token = mock_parsed_input_token("git how do I undo the last commit".to_string()).await;
+        assert_eq!(
+            detected_input_type(&classifier, token, &context_off).await,
+            InputType::AI
+        );
+
+        // The guard only applies to recognized commands: a natural-language first token (no
+        // command description) is unaffected and still classifies as AI.
+        let mut token = mock_parsed_input_token("how do I undo the last commit".to_string()).await;
+        token.parsed_tokens[0].token_description = None;
+        assert_eq!(
+            detected_input_type(&classifier, token, &context_on).await,
+            InputType::AI
+        );
+    });
+}
+
+#[test]
 fn test_input_detection_sources() {
     futures::executor::block_on(async move {
         let classifier = HeuristicClassifier;
         let context = Context {
             current_input_type: InputType::Shell,
             is_agent_follow_up: false,
+            prefer_shell_for_known_commands: false,
         };
 
         let token = mock_parsed_input_token_without_descriptions("echo hello");

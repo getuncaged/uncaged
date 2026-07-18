@@ -86,14 +86,15 @@ use crate::editor::{
 };
 use crate::modal::{Modal, ModalEvent, ModalViewState};
 use crate::settings::{
-    AIAutoDetectionEnabled, AICommandDenylist, AISettingsChangedEvent,
+    AIAutoDetectionEnabled, AICommandDenylist, AISettingsChangedEvent, AgentTrigger,
     AgentModeCodingPermissionsType, AgentModeCommandExecutionDenylist,
     AgentModeCommandExecutionPredicate, AgentModeQuerySuggestionsEnabled, AwsBedrockAutoLogin,
     AwsBedrockCredentialsEnabled, CanUseWarpCreditsForFallback, CodeSettings,
     CodebaseContextEnabled, FileBasedMcpEnabled, GitOperationsAutogenEnabled,
     IncludeAgentCommandsInHistory, InputSettings, IntelligentAutosuggestionsEnabled,
     LongRunningCommandSubmissionMode, MemoryEnabled, NLDInTerminalEnabled,
-    NaturalLanguageAutosuggestionsEnabled, OrchestrationMessageDisplayMode, PromptSubmissionMode,
+    NaturalLanguageAutosuggestionsEnabled, OrchestrationMessageDisplayMode,
+    PreferShellForKnownCommands, PromptSubmissionMode,
     RuleSuggestionsEnabled, SharedBlockTitleGenerationEnabled, ShouldRenderCLIAgentToolbar,
     ShouldRenderUseAgentToolbarForUserCommands, ShouldShowOzUpdatesInZeroState, ShowAgentTips,
     ShowConversationHistory, ShowHintText, ThinkingDisplayMode, VoiceInputEnabled,
@@ -643,6 +644,7 @@ pub struct AISettingsPageView {
     voice_input_toggle_key_dropdown: ViewHandle<Dropdown<AISettingsPageAction>>,
     local_only_icon_tooltip_states: RefCell<HashMap<String, MouseStateHandle>>,
     autodetection_denylist_editor: ViewHandle<EditorView>,
+    agent_trigger_editor: ViewHandle<EditorView>,
     autonomy_dropdown_menu: ViewHandle<Dropdown<AISettingsPageAction>>,
 
     code_read_autonomy_dropdown_menu: ViewHandle<Dropdown<AISettingsPageAction>>,
@@ -986,6 +988,34 @@ impl AISettingsPageView {
 
         ctx.subscribe_to_view(&autodetection_denylist_editor, move |me, _, event, ctx| {
             me.handle_detection_denylist_editor_event(event, ctx);
+        });
+
+        let agent_trigger_editor = ctx.add_typed_action_view(|ctx| {
+            let appearance = Appearance::as_ref(ctx);
+            let options = EditorOptions {
+                autogrow: true,
+                soft_wrap: false,
+                text: TextOptions {
+                    font_size_override: Some(appearance.ui_font_size()),
+                    font_family_override: Some(appearance.monospace_font_family()),
+                    text_colors_override: Some(TextColors {
+                        default_color: appearance.theme().active_ui_text_color(),
+                        disabled_color: appearance.theme().disabled_ui_text_color(),
+                        hint_color: appearance.theme().disabled_ui_text_color(),
+                    }),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let mut editor = EditorView::new(options, ctx);
+            editor.set_placeholder_text("e.g. > or ai", ctx);
+            let current_value = AISettings::as_ref(ctx).agent_trigger.value().clone();
+            editor.set_buffer_text(current_value.as_str(), ctx);
+            editor
+        });
+        Self::update_editor_interaction_state(agent_trigger_editor.clone(), is_any_ai_enabled, ctx);
+        ctx.subscribe_to_view(&agent_trigger_editor, move |me, _, event, ctx| {
+            me.handle_agent_trigger_editor_event(event, ctx);
         });
 
         let command_execution_allowlist_editor = ctx.add_typed_action_view(|ctx| {
@@ -1925,6 +1955,7 @@ impl AISettingsPageView {
             active_subpage: None,
             voice_input_toggle_key_dropdown,
             autodetection_denylist_editor,
+            agent_trigger_editor,
             local_only_icon_tooltip_states: Default::default(),
             command_execution_allowlist_editor,
             command_execution_denylist_editor,
@@ -3236,6 +3267,25 @@ impl AISettingsPageView {
         }
     }
 
+    fn handle_agent_trigger_editor_event(
+        &mut self,
+        event: &EditorEvent,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        match event {
+            EditorEvent::Blurred | EditorEvent::Enter => {
+                let buffer_text = self.agent_trigger_editor.as_ref(ctx).buffer_text(ctx);
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    if let Err(e) = settings.agent_trigger.set_value(buffer_text, ctx) {
+                        log::warn!("Failed to set agent trigger: {e:?}");
+                    }
+                })
+            }
+            EditorEvent::Escape => ctx.emit(AISettingsPageEvent::FocusModal),
+            _ => {}
+        }
+    }
+
     fn update_editor_interaction_state(
         editor: ViewHandle<EditorView>,
         is_enabled: bool,
@@ -3802,6 +3852,7 @@ pub enum AISettingsPageAction {
     ToggleSharedTitleGeneration,
     ToggleGitOperationsAutogen,
     ToggleAIInputAutoDetection,
+    TogglePreferShellForKnownCommands,
     ToggleNLDInTerminal,
     ToggleCLIAgentToolbar,
     /// Show/hide a specific CLI agent's launcher button in the coding-agent toolbar.
@@ -4107,6 +4158,18 @@ impl TypedActionView for AISettingsPageView {
                     Err(e) => {
                         log::warn!("Failed to set value for Input Auto-detection: {e:?}");
                     }
+                }
+                ctx.notify();
+            }
+            AISettingsPageAction::TogglePreferShellForKnownCommands => {
+                if let Err(e) = AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    settings
+                        .prefer_shell_for_known_commands
+                        .toggle_and_save_value(ctx)
+                }) {
+                    log::warn!(
+                        "Failed to set value for prefer-shell-for-known-commands: {e:?}"
+                    );
                 }
                 ctx.notify();
             }
@@ -6630,6 +6693,7 @@ impl AgentsWidget {
 struct AIInputWidget {
     incorrect_autodetection_highlight_index: HighlightedHyperlink,
     autodetection_toggle: SwitchStateHandle,
+    prefer_shell_toggle: SwitchStateHandle,
     nld_in_terminal_toggle: SwitchStateHandle,
     show_input_hint_toggle: SwitchStateHandle,
     show_agent_tips_toggle: SwitchStateHandle,
@@ -6663,6 +6727,7 @@ impl SettingsWidget for AIInputWidget {
         let natural_language_detection_section = Self::render_natural_language_detection_section(
             self.incorrect_autodetection_highlight_index.clone(),
             self.autodetection_toggle.clone(),
+            self.prefer_shell_toggle.clone(),
             self.nld_in_terminal_toggle.clone(),
             view,
             ai_settings,
@@ -6766,6 +6831,7 @@ impl AIInputWidget {
     fn render_natural_language_detection_section(
         incorrect_autodetection_highlight_index: HighlightedHyperlink,
         autodetection_toggle: SwitchStateHandle,
+        prefer_shell_toggle: SwitchStateHandle,
         nld_in_terminal_toggle: SwitchStateHandle,
         view: &AISettingsPageView,
         ai_settings: &AISettings,
@@ -6780,6 +6846,23 @@ impl AIInputWidget {
             .text_input(view.autodetection_denylist_editor.clone())
             .with_style(UiComponentStyles {
                 width: Some(280.),
+                padding: Some(Coords {
+                    top: 4.,
+                    bottom: 4.,
+                    left: 6.,
+                    right: 6.,
+                }),
+                background: Some(appearance.theme().surface_2().into()),
+                ..Default::default()
+            })
+            .build()
+            .finish();
+
+        let agent_trigger_input_field = appearance
+            .ui_builder()
+            .text_input(view.agent_trigger_editor.clone())
+            .with_style(UiComponentStyles {
+                width: Some(120.),
                 padding: Some(Coords {
                     top: 4.,
                     bottom: 4.,
@@ -6900,6 +6983,36 @@ impl AIInputWidget {
         }
 
         section
+            .with_child(render_ai_setting_toggle::<PreferShellForKnownCommands>(
+                "Keep real commands in Shell",
+                AISettingsPageAction::TogglePreferShellForKnownCommands,
+                *ai_settings.prefer_shell_for_known_commands,
+                is_toggleable,
+                prefer_shell_toggle,
+                &view.local_only_icon_tooltip_states,
+                app,
+            ))
+            .with_child(render_ai_setting_description(
+                "When on, input starting with a real command stays in Shell mode — the agent won't auto-trigger. Type the agent trigger below to force the agent.",
+                is_toggleable,
+                app,
+            ))
+            .with_child(render_ai_setting_label::<AgentTrigger>(
+                "Agent trigger".to_owned(),
+                is_toggleable,
+                &view.local_only_icon_tooltip_states,
+                app,
+            ))
+            .with_child(render_ai_setting_description(
+                "Type this at the start of the input to force Agent Mode (it's stripped before sending). A symbol like ‘>’ works with or without a following space; a word like ‘ai’ needs a space after it. Empty to disable.",
+                is_toggleable,
+                app,
+            ))
+            .with_child(
+                Container::new(agent_trigger_input_field)
+                    .with_margin_bottom(styles::DESCRIPTION_MARGIN_BOTTOM)
+                    .finish(),
+            )
             .with_child(render_ai_setting_label::<AICommandDenylist>(
                 "Natural language denylist".to_owned(),
                 is_toggleable,

@@ -12,7 +12,8 @@ use warp_completer::ParsedTokensSnapshot;
 
 use crate::parser::parse_query_into_tokens;
 use crate::util::{
-    is_likely_shell_command, is_one_off_natural_language_word, is_one_off_shell_command_keyword,
+    is_installed_binary, is_likely_shell_command, is_one_off_natural_language_word,
+    is_one_off_shell_command_keyword,
 };
 use crate::{
     ClassificationResult, Context, InputClassificationResult, InputClassifier,
@@ -102,6 +103,15 @@ impl InputClassifier for OnnxClassifier {
         let word_tokens = parse_query_into_tokens(input.buffer_text.as_str());
 
         let total_word_token_count = word_tokens.len();
+
+        // If the first token is a real, recognized command, keep the input in Shell mode instead
+        // of ever auto-switching to AI. See the equivalent guard in `HeuristicClassifier`.
+        if context.prefer_shell_for_known_commands && is_installed_binary(&input) {
+            return InputClassificationResult::new(
+                InputType::Shell,
+                InputClassifierDecisionSource::ShellHeuristic,
+            );
+        }
 
         // Start by applying some simple heuristics before running the full classifier.
         if let Some(first_word) = word_tokens.first() {

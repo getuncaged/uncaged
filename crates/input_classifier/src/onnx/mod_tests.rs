@@ -48,6 +48,7 @@ fn test_inference_error_reports_current_input_fallback_source() {
         let context = Context {
             current_input_type: InputType::AI,
             is_agent_follow_up: false,
+            prefer_shell_for_known_commands: false,
         };
         let input = parsed_input_without_descriptions("help migrate database");
 

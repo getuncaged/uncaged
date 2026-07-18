@@ -824,6 +824,32 @@ define_settings_group!(AISettings, settings: [
         toml_path: "agents.warp_agent.input.ai_command_denylist",
         description: "Commands to exclude from AI natural language autodetection.",
     },
+    // When enabled, if the first word of the input is a recognized/installed command, the input is
+    // kept in Shell mode and never auto-switched to AI. Prevents the agent from triggering when the
+    // user is clearly typing a real command. Type the agent trigger (default `>`) to run the agent
+    // on such input.
+    prefer_shell_for_known_commands: PreferShellForKnownCommands {
+        type: bool,
+        default: true,
+        supported_platforms: SupportedPlatforms::ALL,
+        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        private: false,
+        toml_path: "agents.warp_agent.input.prefer_shell_for_known_commands",
+        description: "When on, input starting with a real command stays in Shell mode (the agent won't auto-trigger). Type the agent trigger (default '>') to force the agent.",
+    },
+    // The symbol or word that, when typed at the start of the input, forces Agent Mode (the trigger
+    // is stripped before the prompt is sent). Defaults to `>`. A symbol trigger matches with or
+    // without a following space (`>how`, `> how`); a word trigger requires a word boundary so it
+    // doesn't match longer words (e.g. `ai ` triggers but `airflow` doesn't). Empty disables it.
+    agent_trigger: AgentTrigger {
+        type: String,
+        default: String::from(">"),
+        supported_platforms: SupportedPlatforms::ALL,
+        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        private: false,
+        toml_path: "agents.warp_agent.input.agent_trigger",
+        description: "The symbol or word that forces Agent Mode when typed at the start of the input (e.g. '>', 'ai', '?'). Stripped before sending. Empty to disable.",
+    },
     // This field should not be referenced directly to lookup intelligent autosuggestion enablement
     // -- use the `is_intelligent_autosuggestions_enabled()` getter.
     intelligent_autosuggestions_enabled_internal: IntelligentAutosuggestionsEnabled {
