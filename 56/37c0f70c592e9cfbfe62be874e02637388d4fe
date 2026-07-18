@@ -1,0 +1,28 @@
+app/src/workspace/view/skills_panel.rs
+  s_6e5dc450e2113a::t_53dc8e37f344dc 91-101
+  s_6e5dc450e2113a::t_7cd4be950ebfbf 8-12,14,18-19,21,24,26-36,38,43,51-52,56-90,102-103,107-108,110-117,120-126,128,130-131,133-151,153-165,168-170,172-173,194-196
+app/src/workspace/view/left_panel.rs
+  s_6e5dc450e2113a::t_291debe5bfda9d 1364
+  s_6e5dc450e2113a::t_0f1d8e5c3e3417 191-192
+  s_6e5dc450e2113a::t_566f94caef1ee2 380
+  s_6e5dc450e2113a::t_719f3d47192f6c 815
+  s_6e5dc450e2113a::t_26d01973fc280a 358-361,838-840
+  s_6e5dc450e2113a::t_769f0cd4e93923 832-837
+  s_6e5dc450e2113a::t_482c823cd878ec 841-843
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "5637c0f70c592e9cfbfe62be874e02637388d4fe",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
