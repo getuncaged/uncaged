@@ -67,11 +67,28 @@ pub const DISCUSSIONS_URL: &str = repo_url!("/discussions");
 /// The privacy section of the README.
 pub const PRIVACY_URL: &str = repo_url!("#privacy");
 
+// ── Brand artwork ────────────────────────────────────────────────────────────
+//
+// The monochrome glyph paths are DEFINED ONCE in `warp_core::ui::icons` (next to
+// the `Icon` -> asset mapping, which is the lowest crate every surface can reach)
+// and re-exported here so this file stays the one design entry point. Change the
+// value there — or swap the SVG — and every surface follows, including the icon
+// enum, the slash-command menu, and search filters.
+
 /// Bundled path to the in-app monochrome mark (recolour sentinel).
-pub const MARK_SVG: &str = "bundled/svg/brand/uncaged-mark.svg";
+pub use warp_core::ui::icons::BRAND_MARK_SVG as MARK_SVG;
+/// Bundled path to the AI / agent caret glyph (recolour sentinel).
+pub use warp_core::ui::icons::BRAND_AGENT_SVG as AGENT_SVG;
 
 /// Bundled path to the colour app-icon master.
 pub const ICON_SVG: &str = "bundled/svg/brand/uncaged-icon.svg";
+
+/// Full-colour square logos used on the account/auth surfaces. Unlike the
+/// monochrome glyphs above these carry their own ember gradient, so they are NOT
+/// recolour sentinels and must not be swapped for `MARK_SVG`.
+pub const LOGO_LIGHT_SVG: &str = "bundled/svg/warp-logo-light.svg";
+/// Dark-background variant of [`LOGO_LIGHT_SVG`].
+pub const LOGO_DARK_SVG: &str = "bundled/svg/warp-logo-dark.svg";
 
 /// One-line About-screen description. Factual reference to upstream is on-mission.
 pub const ABOUT_DESCRIPTION: &str = "Uncaged — an open source fork of Warp";
@@ -95,6 +112,10 @@ pub mod design {
 
     /// The app's own mark (window / tab / agent avatar identity): the terminal
     /// cage glyph — `brand/uncaged-mark.svg`.
+    ///
+    /// `Icon::Oz`, `Icon::OzCloud`, `Icon::Warp` and `Icon::WarpLogoLight` are
+    /// upstream variant names that all resolve to this same artwork, so no
+    /// surface can render a stale upstream glyph.
     pub const MARK: Icon = Icon::Oz;
     /// The AI / agent mark: the ember ❯ prompt caret (`brand/ai-caret.svg`).
     /// Shown as the agent-session identity and the AI-reply fallback when the
@@ -102,7 +123,8 @@ pub mod design {
     pub const AGENT: Icon = Icon::AiCaret;
 
     // ---- Left tool-panel rail icons ----
-    /// Local Drive panel — a database / storage cylinder (`warp-drive.svg`).
+    /// Local Drive panel — a database / storage cylinder
+    /// (`icons::BRAND_DRIVE_SVG`).
     pub const DRIVE: Icon = Icon::WarpDrive;
     /// SSH hosts panel — a connection link (`link-03.svg`).
     pub const SSH: Icon = Icon::Link;

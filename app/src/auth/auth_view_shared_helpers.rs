@@ -119,9 +119,9 @@ where
 
 pub fn render_square_logo(appearance: &Appearance) -> Box<dyn Element> {
     let image_path = if appearance.theme().inferred_color_scheme() == ColorScheme::LightOnDark {
-        "bundled/svg/warp-logo-light.svg"
+        crate::brand::LOGO_LIGHT_SVG
     } else {
-        "bundled/svg/warp-logo-dark.svg"
+        crate::brand::LOGO_DARK_SVG
     };
 
     ConstrainedBox::new(

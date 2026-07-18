@@ -5,6 +5,22 @@ use crate::ui::theme::Fill;
 /// Default icon dimensions that apply to all icons used within the ui system.
 pub const ICON_DIMENSIONS: f32 = 24.;
 
+// ── Brand glyph assets — THE single place the brand's own artwork is named ────
+//
+// Every `Icon` variant that renders the product's identity resolves to one of
+// these constants, so re-skinning a fork is a one-line change here (or a swap of
+// the SVG itself) and it propagates to every surface. Do not inline a brand SVG
+// path anywhere else — reference these instead. The semantic, role-based names
+// (MARK / AGENT / rail icons) live in `app/src/brand.rs`'s `design` module,
+// which is the design entry point; this is the asset layer it resolves to.
+
+/// The app's mark — the terminal cage holding the `❯_` prompt.
+pub const BRAND_MARK_SVG: &str = "bundled/svg/brand/uncaged-mark.svg";
+/// The AI / agent mark — the ember `❯` prompt caret.
+pub const BRAND_AGENT_SVG: &str = "bundled/svg/brand/ai-caret.svg";
+/// The Drive / local-store glyph — a database cylinder.
+pub const BRAND_DRIVE_SVG: &str = "bundled/svg/warp.svg";
+
 /// Icon enum to be used within the app in place of the warpui_core::elements::Icon directly. It
 /// abstracts things like svg paths out and provides a utility method to convert into the actual Icon.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -411,9 +427,12 @@ impl From<Icon> for &'static str {
             Icon::CloudOffline => "bundled/svg/cloud-offline.svg",
             Icon::Compass => "bundled/svg/compass-3.svg",
             Icon::CreateTeam => "bundled/svg/create-team.svg",
-            Icon::WarpDrive => "bundled/svg/warp.svg",
-            Icon::Warp => "bundled/svg/warp-drive.svg",
-            Icon::WarpLogoLight => "bundled/svg/warp-logo-light.svg",
+            // All product-identity icons resolve to the one brand mark. These
+            // variants are upstream names kept for compatibility; they must not
+            // reintroduce upstream artwork.
+            Icon::WarpDrive => BRAND_DRIVE_SVG,
+            Icon::Warp => BRAND_MARK_SVG,
+            Icon::WarpLogoLight => BRAND_MARK_SVG,
             Icon::ArrowLeft => "bundled/svg/arrow-left.svg",
             Icon::ArrowBlockLeft => "bundled/svg/arrow-block-left.svg",
             Icon::ArrowBlockUp => "bundled/svg/arrow-block-up.svg",
@@ -641,11 +660,9 @@ impl From<Icon> for &'static str {
             Icon::GooseLogo => "bundled/svg/goose.svg",
             Icon::AntigravityLogo => "bundled/svg/antigravity_cli.svg",
             Icon::NLD => "bundled/svg/nld.svg",
-            // The Uncaged mark — [ ❯_ ]. Both point at the one canonical brand
-            // asset (see app/src/brand.rs) so rebranding is a single-file change.
-            Icon::Oz => "bundled/svg/brand/uncaged-mark.svg",
-            Icon::OzCloud => "bundled/svg/brand/uncaged-mark.svg",
-            Icon::AiCaret => "bundled/svg/brand/ai-caret.svg",
+            Icon::Oz => BRAND_MARK_SVG,
+            Icon::OzCloud => BRAND_MARK_SVG,
+            Icon::AiCaret => BRAND_AGENT_SVG,
             Icon::Conversation => "bundled/svg/conversation.svg",
             Icon::Prompt => "bundled/svg/prompt.svg",
             Icon::Grid => "bundled/svg/grid.svg",
