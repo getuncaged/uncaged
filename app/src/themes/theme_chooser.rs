@@ -6,7 +6,7 @@ use warpui::elements::{
     Align, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, Element, Empty, EventHandler, Fill, Flex, Hoverable, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
-    ParentElement, ParentOffsetBounds, Radius, Rect, SavePosition, ScrollStateHandle, Scrollable,
+    ParentElement, ParentOffsetBounds, Radius, Rect, ScrollStateHandle, Scrollable,
     ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text, UniformList, UniformListState,
 };
 use warpui::fonts::{FamilyId, Weight};
@@ -35,8 +35,7 @@ use crate::settings::{respect_system_theme, ThemeSettings};
 use crate::themes::theme::{
     RespectSystemTheme, SelectedSystemThemes, ThemeKind, WarpTheme, WarpThemeConfig,
 };
-use crate::ui_components::buttons::{close_button, icon_button};
-use crate::ui_components::icons;
+use crate::ui_components::buttons::close_button;
 use crate::ui_components::window_focus_dimming::WindowFocusDimming;
 use crate::user_config::{load_theme_configs, themes_dir, WarpConfig, WarpConfigUpdateEvent};
 use crate::util::traffic_lights::{traffic_light_data, TrafficLightData, TrafficLightSide};
@@ -652,28 +651,8 @@ impl ThemeChooser {
                 .finish(),
             );
 
-        // Custom themes are only supported on desktop platforms currently.
-        if cfg!(not(target_family = "wasm")) {
-            let create_theme_button = SavePosition::new(
-                icon_button(
-                    appearance,
-                    icons::Icon::Plus,
-                    false,
-                    self.button_mouse_states
-                        .create_theme_button_hover_state
-                        .clone(),
-                )
-                .build()
-                .on_click(|ctx, _, _| {
-                    ctx.dispatch_typed_action(ThemeChooserAction::OpenThemeCreator)
-                })
-                .finish(),
-                "create_theme_button",
-            )
-            .finish();
-
-            title_row = title_row.with_child(create_theme_button);
-        }
+        // Theme creation lives on its own Settings page ("Create your own custom theme"),
+        // not in a popup, so the chooser no longer carries a create button.
 
         Container::new(title_row.finish())
             .with_margin_bottom(6.)

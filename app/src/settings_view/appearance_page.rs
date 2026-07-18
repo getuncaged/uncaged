@@ -2689,9 +2689,7 @@ fn render_group(
 }
 
 #[derive(Default)]
-struct CreateCustomThemeWidget {
-    mouse_state: MouseStateHandle,
-}
+struct CreateCustomThemeWidget;
 
 impl SettingsWidget for CreateCustomThemeWidget {
     type View = AppearanceSettingsPageView;
@@ -2706,16 +2704,16 @@ impl SettingsWidget for CreateCustomThemeWidget {
         appearance: &Appearance,
         _app: &AppContext,
     ) -> Box<dyn Element> {
+        // This used to be a link to the README, which read like "open the theme
+        // editor" but navigated out to a web page. The editor now has its own
+        // page, so point at that instead of leaving the trap in place.
         Align::new(
             appearance
                 .ui_builder()
-                .link(
-                    "Create your own custom theme".to_string(),
-                    Some(crate::brand::README_URL.to_string()),
-                    None,
-                    self.mouse_state.clone(),
+                .paragraph(
+                    "Build your own theme in \"Create your own custom theme\" in the sidebar."
+                        .to_string(),
                 )
-                .soft_wrap(false)
                 .build()
                 .with_margin_bottom(10.)
                 .finish(),

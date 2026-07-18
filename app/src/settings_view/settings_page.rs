@@ -40,6 +40,7 @@ use super::privacy_page::PrivacyPageView;
 use super::referrals_page::ReferralsPageView;
 use super::scripting_page::ScriptingSettingsPageView;
 use super::customize_ui_page::CustomizeUiSettingsPageView;
+use super::theme_creator_page::ThemeCreatorPageView;
 use super::show_blocks_view::ShowBlocksView;
 use super::teams_page::TeamsPageView;
 use super::warp_drive_page::WarpDriveSettingsPageView;
@@ -120,6 +121,7 @@ pub enum SettingsPageViewHandle {
     MCPServers(ViewHandle<MCPServersSettingsPageView>),
     WarpDrive(ViewHandle<WarpDriveSettingsPageView>),
     CustomizeUi(ViewHandle<CustomizeUiSettingsPageView>),
+    ThemeCreator(ViewHandle<ThemeCreatorPageView>),
 }
 
 impl SettingsPageViewHandle {
@@ -145,6 +147,7 @@ impl SettingsPageViewHandle {
             MCPServers(view_handle) => ChildView::new(view_handle).finish(),
             WarpDrive(view_handle) => ChildView::new(view_handle).finish(),
             CustomizeUi(view_handle) => ChildView::new(view_handle).finish(),
+            ThemeCreator(view_handle) => ChildView::new(view_handle).finish(),
         }
     }
 }

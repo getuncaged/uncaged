@@ -77,7 +77,9 @@ pub const PRIVACY_URL: &str = repo_url!("#privacy");
 
 /// Bundled path to the in-app monochrome mark (recolour sentinel).
 pub use warp_core::ui::icons::BRAND_MARK_SVG as MARK_SVG;
-/// Bundled path to the AI / agent caret glyph (recolour sentinel).
+/// Bundled path to the AI / agent caret glyph (recolour sentinel). Re-exported so the
+/// design entry point names every brand glyph, even where the app reaches it via `Icon`.
+#[allow(unused_imports)]
 pub use warp_core::ui::icons::BRAND_AGENT_SVG as AGENT_SVG;
 
 /// Bundled path to the colour app-icon master.

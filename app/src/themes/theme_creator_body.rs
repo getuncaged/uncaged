@@ -5,6 +5,7 @@ use std::{fs::copy, io::Write};
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
+use settings::Setting as _;
 use warp_core::ui::color::hex_color::coloru_from_hex_string;
 use warp_core::ui::theme::{
     AnsiColors, Details, Fill as ThemeFill, Image as ThemeImage, TerminalColors, VerticalGradient,
@@ -31,8 +32,10 @@ use crate::appearance::{Appearance, AppearanceManager};
 use crate::editor::{EditorView, Event as EditorEvent};
 use crate::themes::theme::{InMemoryThemeOptions, ThemeKind};
 use crate::user_config;
+use crate::window_settings::WindowSettings;
 use crate::{
-    send_telemetry_from_ctx, server::telemetry::TelemetryEvent, themes::theme::CustomTheme,
+    report_if_error, send_telemetry_from_ctx, server::telemetry::TelemetryEvent,
+    themes::theme::CustomTheme,
 };
 
 /// The number of editable color slots in the manual editor (background + optional gradient bottom,
@@ -129,6 +132,8 @@ pub struct ThemeCreatorBody {
     toggle_states: [MouseStateHandle; 3],
     bg_opacity_slider: SliderStateHandle,
     bg_image_opacity_slider: SliderStateHandle,
+    window_opacity_slider: SliderStateHandle,
+    window_blur_slider: SliderStateHandle,
     share_mouse_state: MouseStateHandle,
     pick_image_mouse_state: MouseStateHandle,
     scroll_state: ClippedScrollStateHandle,
@@ -149,6 +154,8 @@ pub enum ThemeCreatorBodyAction {
     ToggleAdvanced,
     SetBackgroundOpacity(f32),
     SetBackgroundImageOpacity(f32),
+    SetWindowOpacity(f32),
+    SetWindowBlurRadius(f32),
     PickBackgroundImage,
     ShareTheme,
 }
@@ -220,6 +227,8 @@ impl ThemeCreatorBody {
             toggle_states: Default::default(),
             bg_opacity_slider: Default::default(),
             bg_image_opacity_slider: Default::default(),
+            window_opacity_slider: Default::default(),
+            window_blur_slider: Default::default(),
             share_mouse_state: Default::default(),
             pick_image_mouse_state: Default::default(),
             scroll_state: Default::default(),
@@ -652,6 +661,25 @@ impl ThemeCreatorBody {
         self.bg_image_opacity = value.round().clamp(0.0, 100.0) as u8;
         self.refresh_manual_preview(ctx);
     }
+
+    /// Window opacity and blur are window-level settings rather than theme fields, but they're
+    /// part of "how my terminal looks", so they're editable here and applied live to every window.
+    fn set_window_opacity(&mut self, value: f32, ctx: &mut ViewContext<Self>) {
+        let value = value.round() as u8;
+        WindowSettings::handle(ctx).update(ctx, |window_settings, ctx| {
+            report_if_error!(window_settings.background_opacity.set_value(value, ctx));
+        });
+        ctx.notify();
+    }
+
+    fn set_window_blur_radius(&mut self, value: f32, ctx: &mut ViewContext<Self>) {
+        let value = value.round() as u8;
+        ctx.windows().set_all_windows_background_blur_radius(value);
+        WindowSettings::handle(ctx).update(ctx, |window_settings, ctx| {
+            report_if_error!(window_settings.background_blur_radius.set_value(value, ctx));
+        });
+        ctx.notify();
+    }
 }
 
 impl ThemeCreatorBody {
@@ -889,6 +917,63 @@ impl ThemeCreatorBody {
             .finish(),
         );
 
+        // Window-level appearance. Not part of the theme file, but it's what people actually mean
+        // by "how my terminal looks", so it's editable right here and applies live.
+        let window_settings = WindowSettings::as_ref(app);
+        let window_opacity = *window_settings.background_opacity.value();
+        let window_blur = *window_settings.background_blur_radius.value();
+        content.add_child(
+            Container::new(section_label("Window", appearance))
+                .with_margin_top(18.)
+                .finish(),
+        );
+        content.add_child(
+            Container::new(
+                Flex::row()
+                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                    .with_child(
+                        ConstrainedBox::new(label_text(
+                            &format!("Window opacity: {window_opacity}"),
+                            appearance,
+                        ))
+                        .with_width(150.)
+                        .finish(),
+                    )
+                    .with_child(self.opacity_slider(
+                        self.window_opacity_slider.clone(),
+                        window_opacity,
+                        ThemeCreatorBodyAction::SetWindowOpacity,
+                        appearance,
+                    ))
+                    .finish(),
+            )
+            .with_vertical_padding(6.)
+            .finish(),
+        );
+        content.add_child(
+            Container::new(
+                Flex::row()
+                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                    .with_child(
+                        ConstrainedBox::new(label_text(
+                            &format!("Window blur radius: {window_blur}"),
+                            appearance,
+                        ))
+                        .with_width(150.)
+                        .finish(),
+                    )
+                    .with_child(self.opacity_slider(
+                        self.window_blur_slider.clone(),
+                        window_blur,
+                        ThemeCreatorBodyAction::SetWindowBlurRadius,
+                        appearance,
+                    ))
+                    .finish(),
+            )
+            .with_vertical_padding(6.)
+            .finish(),
+        );
+
         // Advanced section.
         content.add_child(
             Container::new(self.pill_button(
@@ -960,19 +1045,11 @@ impl ThemeCreatorBody {
             }
         }
 
-        let scrollable = ConstrainedBox::new(
-            ClippedScrollable::vertical(
-                self.scroll_state.clone(),
-                Container::new(content.finish()).finish(),
-                ScrollbarWidth::Auto,
-                theme.disabled_text_color(theme.background()).into(),
-                theme.main_text_color(theme.background()).into(),
-                Fill::None,
-            )
-            .finish(),
-        )
-        .with_height(360.)
-        .finish();
+        // The editor lives on a full settings page, which supplies its own scrolling. Letting the
+        // content flow at its natural height (rather than boxing it into a fixed-height scroller
+        // sized for the old modal) is what keeps the lower sections — appearance, background
+        // opacity, Window, and Advanced — from being clipped off the bottom.
+        let scrollable = Container::new(content.finish()).finish();
 
         // Action buttons.
         let cancel_button = self.pill_button(
@@ -1437,6 +1514,10 @@ impl TypedActionView for ThemeCreatorBody {
             }
             ThemeCreatorBodyAction::SetBackgroundImageOpacity(value) => {
                 self.set_background_image_opacity(*value, ctx)
+            }
+            ThemeCreatorBodyAction::SetWindowOpacity(value) => self.set_window_opacity(*value, ctx),
+            ThemeCreatorBodyAction::SetWindowBlurRadius(value) => {
+                self.set_window_blur_radius(*value, ctx)
             }
             ThemeCreatorBodyAction::PickBackgroundImage => {
                 ctx.emit(ThemeCreatorBodyEvent::OpenFilePicker);
