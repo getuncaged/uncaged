@@ -1,0 +1,69 @@
+crates/input_classifier/src/onnx/mod.rs
+  s_6e5dc450e2113a::t_f4126fd9c6edc1 107-115
+  s_6e5dc450e2113a::t_8f657bbc8993bd 15-16
+crates/input_classifier/src/bin/evaluate.rs
+  s_6e5dc450e2113a::t_fc8ce473ef64b3 278
+  s_6e5dc450e2113a::t_ed6ef9928c545e 213
+app/src/ai/blocklist/input_model.rs
+  s_6e5dc450e2113a::t_873d44bb42f435 777-781
+  s_6e5dc450e2113a::t_dd57c6ca0634c6 843
+crates/input_classifier/src/lib.rs
+  s_6e5dc450e2113a::t_ccae6292099508 121-125
+crates/input_classifier/src/heuristic_classifier/mod_tests.rs
+  s_6e5dc450e2113a::t_a3992db2a02353 137-178
+  s_6e5dc450e2113a::t_f19923f752d86f 186
+  s_6e5dc450e2113a::t_07ac442eefbcfd 58
+  s_6e5dc450e2113a::t_5bd750782cf294 136
+app/src/settings/ai.rs
+  s_6e5dc450e2113a::t_2872e5066eca05 827-828,831-837,839,845,847-849,852
+  s_6e5dc450e2113a::t_0367387e7b7ee4 829-830,838,840-844,846,850-851
+crates/input_classifier/src/heuristic_classifier/mod.rs
+  s_6e5dc450e2113a::t_407f5e5ff9db86 51-61
+crates/input_classifier/src/onnx/mod_tests.rs
+  s_6e5dc450e2113a::t_31b4fadb9c66da 51
+app/src/terminal/input.rs
+  s_6e5dc450e2113a::t_7191f487eda9d4 13008-13012,13015-13016,13023-13024,13026,13031-13032,13034-13037
+  s_6e5dc450e2113a::t_92085cda3cd1fa 13307-13309
+  s_6e5dc450e2113a::t_93c76cfc5f8497 13356-13360
+  s_6e5dc450e2113a::t_ef912a50f4ebb0 12998-13007,13013-13014,13017-13022,13025,13027-13030,13033
+  s_6e5dc450e2113a::t_04e20a36427052 13304-13305,13310
+  s_6e5dc450e2113a::t_c06bbe0353d542 13434-13440
+  s_6e5dc450e2113a::t_ef6b83451c3757 13107-13110
+app/src/terminal/view.rs
+  s_6e5dc450e2113a::t_55a86228154c56 16580-16600
+  s_6e5dc450e2113a::t_fda6c68172c3b5 1490
+  s_6e5dc450e2113a::t_78d81d8349d71a 20779-20845
+  s_6e5dc450e2113a::t_05297dd9dcf69c 1354-1358
+  s_6e5dc450e2113a::t_0b43fece5cf19d 24490-24492
+app/src/settings_view/ai_page.rs
+  s_6e5dc450e2113a::t_c757e9a9e1aa6d 1958
+  s_6e5dc450e2113a::t_a1b7c567875442 96-97
+  s_6e5dc450e2113a::t_56d601f8fb2cae 6696
+  s_6e5dc450e2113a::t_75fd03294c7682 6730
+  s_6e5dc450e2113a::t_cf5a596bb44c0c 6996,7000-7015
+  s_6e5dc450e2113a::t_76084ccd55d350 3855
+  s_6e5dc450e2113a::t_1648c4462b9f1b 89
+  s_6e5dc450e2113a::t_39f83855922d64 647
+  s_6e5dc450e2113a::t_926c30548a0c49 4164-4175
+  s_6e5dc450e2113a::t_88457f612dcfd8 3270-3288
+  s_6e5dc450e2113a::t_009c8a0cb719e0 6986-6995,6997-6999
+  s_6e5dc450e2113a::t_e9fa3ed65a70ae 6834
+  s_6e5dc450e2113a::t_e143c6b62c512b 993-1020
+  s_6e5dc450e2113a::t_9247ac143e3d8e 6861-6877
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "87f770119fde33de04f6574174ad651869bf81ee",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
