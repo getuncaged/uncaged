@@ -1,0 +1,57 @@
+app/src/appearance.rs
+  s_6e5dc450e2113a::t_d8698120a09db6 155-161
+app/src/workspace/view.rs
+  s_6e5dc450e2113a::t_e6933268bab8ac 19460-19461
+  s_6e5dc450e2113a::t_fc9b8a3a220933 11193-11198
+crates/warp_core/src/ui/color/hex_color.rs
+  s_6e5dc450e2113a::t_b78f676d19bdb5 40-46
+  s_6e5dc450e2113a::t_872e80cbb55beb 100-121
+  s_6e5dc450e2113a::t_7a11785e7a1931 122
+app/src/themes/theme_creator_body.rs
+  s_6e5dc450e2113a::t_b27e8143d05a98 1364
+  s_6e5dc450e2113a::t_09244b6fc7f946 676-703
+  s_6e5dc450e2113a::t_bcda15fe018355 147-155
+  s_6e5dc450e2113a::t_331f5ab62d2077 673,675,704-782,784-813,815-1078
+  s_6e5dc450e2113a::t_27e8fa5ee1de91 814
+  s_6e5dc450e2113a::t_9a371f460ac697 1091-1094
+  s_6e5dc450e2113a::t_04edc2b5539e86 3
+  s_6e5dc450e2113a::t_6c016a7890dca5 557-560,565-581,583,598
+  s_6e5dc450e2113a::t_6580f8f883083b 473
+  s_6e5dc450e2113a::t_b0093d99057359 190-206,212-227
+  s_6e5dc450e2113a::t_d2e375f1f34a6f 9
+  s_6e5dc450e2113a::t_6d11f353dc27ce 458-472,474-496,498-533,535-556,561-564,582,584-597,599-606,608-672
+  s_6e5dc450e2113a::t_77898ec2675e32 269,295-297
+  s_6e5dc450e2113a::t_25771fc3761cd7 139
+  s_6e5dc450e2113a::t_3b5cf1b4d342b3 10-14,16-19,25,40-87
+  s_6e5dc450e2113a::t_65716ff28b12f1 534
+  s_6e5dc450e2113a::t_1ce6c24f8d4678 607
+  s_6e5dc450e2113a::t_58234268b7c9bf 242-245
+  s_6e5dc450e2113a::t_2ffa8a4bc27c21 114-136
+  s_6e5dc450e2113a::t_823e7f739289e7 783
+  s_6e5dc450e2113a::t_978a0d44f78f3a 267-268,270-294
+  s_6e5dc450e2113a::t_c1e49c5d3cfe69 497
+  s_6e5dc450e2113a::t_b4324b084c1ce3 1432-1438,1440-1446,1449-1462
+  s_6e5dc450e2113a::t_0f84a0596bf32d 88
+  s_6e5dc450e2113a::t_d4e75c30c354b8 674
+app/src/themes/theme_creator_modal.rs
+  s_6e5dc450e2113a::t_5483f7a8a94594 67-68
+  s_6e5dc450e2113a::t_5a2f565d6bcf74 22
+  s_6e5dc450e2113a::t_616e75724f6382 106-110
+  s_6e5dc450e2113a::t_63584e53bc06ad 111-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9e70b2629ca7b3018be91cf65f7ca14e160e6909",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
