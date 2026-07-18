@@ -1,22 +1,28 @@
 use std::default::Default;
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[cfg(feature = "local_fs")]
 use std::{fs::copy, io::Write};
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-#[cfg(feature = "local_fs")]
-use warp_core::ui::theme::WarpTheme;
+use warp_core::ui::color::hex_color::coloru_from_hex_string;
+use warp_core::ui::theme::{
+    AnsiColors, Details, Fill as ThemeFill, Image as ThemeImage, TerminalColors, VerticalGradient,
+    WarpTheme,
+};
+use warpui::assets::asset_cache::AssetSource;
 use warpui::elements::{
-    Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
-    EventHandler, Fill, Flex, Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle,
-    ParentElement, Radius, Rect, SavePosition, Shrinkable, Text,
+    Border, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, CornerRadius,
+    CrossAxisAlignment, DispatchEventResult, EventHandler, Fill, Flex, Icon, MainAxisAlignment,
+    MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, SavePosition, ScrollbarWidth,
+    Shrinkable, Text,
 };
 use warpui::fonts::Weight;
 use warpui::platform::Cursor;
 use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::ui_components::slider::SliderStateHandle;
 use warpui::ui_components::text_input::TextInput;
 use warpui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
@@ -30,6 +36,55 @@ use crate::user_config;
 use crate::{
     send_telemetry_from_ctx, server::telemetry::TelemetryEvent, themes::theme::CustomTheme,
 };
+
+/// The number of editable color slots in the manual editor (background + optional gradient bottom,
+/// foreground, accent, cursor, then 8 normal + 8 bright ANSI colors).
+const NUM_COLOR_SLOTS: usize = 21;
+const SLOT_BG: usize = 0;
+const SLOT_BG_BOTTOM: usize = 1;
+const SLOT_FG: usize = 2;
+const SLOT_ACCENT: usize = 3;
+const SLOT_CURSOR: usize = 4;
+const SLOT_NORMAL_START: usize = 5;
+const SLOT_BRIGHT_START: usize = 13;
+
+/// Labels + starting hex for each color slot, in slot order. Seeds the editor with the Uncaged
+/// palette.
+const COLOR_SLOTS: [(&str, &str); NUM_COLOR_SLOTS] = [
+    ("Background", "#15110c"),
+    ("Background (bottom)", "#0c0a08"),
+    ("Text", "#e9e1d4"),
+    ("Accent", "#ff7a18"),
+    ("Cursor", "#ffb23a"),
+    ("Black", "#4a443b"),
+    ("Red", "#ff6b5e"),
+    ("Green", "#8fd46e"),
+    ("Yellow", "#ffc24a"),
+    ("Blue", "#74b4e0"),
+    ("Magenta", "#f090c0"),
+    ("Cyan", "#5fc9be"),
+    ("White", "#e9e1d4"),
+    ("Bright black", "#6e655a"),
+    ("Bright red", "#ff8a76"),
+    ("Bright green", "#b2e38c"),
+    ("Bright yellow", "#ffd46e"),
+    ("Bright blue", "#9bcbee"),
+    ("Bright magenta", "#f7abd6"),
+    ("Bright cyan", "#86ded0"),
+    ("Bright white", "#fbf6ec"),
+];
+
+const THEMES_REPO_NEW_FILE_URL: &str =
+    "https://github.com/getuncaged/uncaged-themes/new/main?filename=themes/community/";
+
+/// Which authoring flow the modal is showing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeCreatorMode {
+    /// Manually edit every color, gradient, background image, and transparency.
+    Manual,
+    /// Generate a theme from the colors extracted from an image.
+    FromImage,
+}
 
 const BUTTON_PADDING: f32 = 12.;
 const BUTTON_FONT_SIZE: f32 = 14.;
@@ -56,9 +111,32 @@ pub struct ThemeCreatorBody {
     editor: ViewHandle<EditorView>,
     theme_options: Option<InMemoryThemeOptions>,
     image_state: ThemeCreatorImageState,
+
+    // Manual editor state.
+    mode: ThemeCreatorMode,
+    /// One hex text-input editor per color slot (see `COLOR_SLOTS`).
+    color_editors: Vec<ViewHandle<EditorView>>,
+    /// The current parsed value of each color slot (kept in sync as the user types valid hex).
+    manual_colors: Vec<ColorU>,
+    use_gradient: bool,
+    is_light: bool,
+    /// Background opacity, 0–100 (drives the background fill's alpha, i.e. transparency).
+    bg_opacity: u8,
+    bg_image: Option<PathBuf>,
+    /// Background image opacity, 0–100.
+    bg_image_opacity: u8,
+    advanced_expanded: bool,
+    mode_tab_states: [MouseStateHandle; 2],
+    /// Hover/click states for the gradient, light/dark, and advanced toggles.
+    toggle_states: [MouseStateHandle; 3],
+    bg_opacity_slider: SliderStateHandle,
+    bg_image_opacity_slider: SliderStateHandle,
+    share_mouse_state: MouseStateHandle,
+    pick_image_mouse_state: MouseStateHandle,
+    scroll_state: ClippedScrollStateHandle,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ThemeCreatorBodyAction {
     Create,
     OpenFilePicker,
@@ -66,6 +144,15 @@ pub enum ThemeCreatorBodyAction {
     SetBackgroundColor(usize),
     Cancel,
     FilePickerCancelled,
+    // Manual editor actions.
+    SetMode(ThemeCreatorMode),
+    ToggleGradient,
+    ToggleLightDark,
+    ToggleAdvanced,
+    SetBackgroundOpacity(f32),
+    SetBackgroundImageOpacity(f32),
+    PickBackgroundImage,
+    ShareTheme,
 }
 
 pub enum ThemeCreatorBodyEvent {
@@ -100,11 +187,44 @@ impl ThemeCreatorBody {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
         let editor = Self::editor(ctx);
 
+        let mut color_editors = Vec::with_capacity(NUM_COLOR_SLOTS);
+        let mut manual_colors = Vec::with_capacity(NUM_COLOR_SLOTS);
+        for &(_label, default_hex) in COLOR_SLOTS.iter() {
+            let color = coloru_from_hex_string(default_hex).unwrap_or_else(|_| ColorU::black());
+            manual_colors.push(color);
+
+            let color_editor =
+                ctx.add_typed_action_view(|ctx| EditorView::new(Default::default(), ctx));
+            color_editor.update(ctx, |e, ctx| e.set_buffer_text(default_hex, ctx));
+            ctx.subscribe_to_view(&color_editor, move |me, _, event, ctx| {
+                if let EditorEvent::Edited(_) = event {
+                    me.on_manual_edit(ctx);
+                }
+            });
+            color_editors.push(color_editor);
+        }
+
         Self {
             button_mouse_states: Default::default(),
             editor,
             theme_options: None,
             image_state: ThemeCreatorImageState::Empty,
+            mode: ThemeCreatorMode::Manual,
+            color_editors,
+            manual_colors,
+            use_gradient: true,
+            is_light: false,
+            bg_opacity: 100,
+            bg_image: None,
+            bg_image_opacity: 40,
+            advanced_expanded: false,
+            mode_tab_states: Default::default(),
+            toggle_states: Default::default(),
+            bg_opacity_slider: Default::default(),
+            bg_image_opacity_slider: Default::default(),
+            share_mouse_state: Default::default(),
+            pick_image_mouse_state: Default::default(),
+            scroll_state: Default::default(),
         }
     }
 
@@ -119,6 +239,10 @@ impl ThemeCreatorBody {
 
     pub fn handle_editor_event(&mut self, event: &EditorEvent, ctx: &mut ViewContext<Self>) {
         if let EditorEvent::Edited(_) = event {
+            if self.mode == ThemeCreatorMode::Manual {
+                self.on_manual_edit(ctx);
+                return;
+            }
             if let Some(theme_options) = &mut self.theme_options {
                 self.editor.update(ctx, |editor, ctx| {
                     theme_options.set_name(editor.buffer_text(ctx));
@@ -138,6 +262,37 @@ impl ThemeCreatorBody {
         self.image_state = ThemeCreatorImageState::Empty;
 
         ctx.emit(ThemeCreatorBodyEvent::Close);
+    }
+
+    /// Called when the modal is shown: reset to a fresh editor so each "New theme" starts clean,
+    /// then kick off the live preview so the terminal immediately reflects the default theme.
+    pub fn on_shown(&mut self, ctx: &mut ViewContext<Self>) {
+        self.reset_manual_state(ctx);
+        self.refresh_manual_preview(ctx);
+    }
+
+    /// Resets the manual editor back to its defaults (colors, gradient/appearance toggles,
+    /// background image, opacities, name). Called each time the modal opens so a previous
+    /// session's edits don't linger.
+    fn reset_manual_state(&mut self, ctx: &mut ViewContext<Self>) {
+        self.mode = ThemeCreatorMode::Manual;
+        self.use_gradient = true;
+        self.is_light = false;
+        self.bg_opacity = 100;
+        self.bg_image = None;
+        self.bg_image_opacity = 40;
+        self.advanced_expanded = false;
+        self.theme_options = None;
+        self.image_state = ThemeCreatorImageState::Empty;
+
+        self.editor
+            .update(ctx, |editor, ctx| editor.set_buffer_text("", ctx));
+        for (i, &(_label, default_hex)) in COLOR_SLOTS.iter().enumerate() {
+            self.manual_colors[i] =
+                coloru_from_hex_string(default_hex).unwrap_or_else(|_| ColorU::black());
+            self.color_editors[i]
+                .update(ctx, |editor, ctx| editor.set_buffer_text(default_hex, ctx));
+        }
     }
 
     pub fn cancel(&mut self, ctx: &mut ViewContext<Self>) {
@@ -300,6 +455,627 @@ impl ThemeCreatorBody {
     fn send_error_toast(&self, message: String, ctx: &mut ViewContext<Self>) {
         ctx.emit(ThemeCreatorBodyEvent::ShowErrorToast { message });
     }
+
+    // ── Manual editor ──────────────────────────────────────────────────────────
+
+    /// Re-reads every color input and refreshes the live preview from the manually-edited theme.
+    fn on_manual_edit(&mut self, ctx: &mut ViewContext<Self>) {
+        for i in 0..self.color_editors.len() {
+            let text = self.color_editors[i].as_ref(ctx).buffer_text(ctx);
+            if let Ok(color) = coloru_from_hex_string(text.trim()) {
+                self.manual_colors[i] = color;
+            }
+        }
+        self.refresh_manual_preview(ctx);
+    }
+
+    fn refresh_manual_preview(&mut self, ctx: &mut ViewContext<Self>) {
+        let theme = self.build_manual_theme(ctx, self.bg_image.as_deref());
+        AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
+            appearance_manager.set_transient_warp_theme(theme, ctx);
+        });
+        ctx.notify();
+    }
+
+    fn manual_name(&self, ctx: &AppContext) -> String {
+        let name = self.editor.as_ref(ctx).buffer_text(ctx);
+        let name = name.trim();
+        if name.is_empty() {
+            "Custom Theme".to_string()
+        } else {
+            name.to_string()
+        }
+    }
+
+    /// Applies `opacity` (0–100) to `color` as its alpha channel.
+    fn with_opacity(color: ColorU, opacity: u8) -> ColorU {
+        let alpha = ((opacity.min(100) as f32 / 100.0) * 255.0).round() as u8;
+        ColorU::new(color.r, color.g, color.b, alpha)
+    }
+
+    /// Builds a [`WarpTheme`] from the current manual editor state.
+    fn build_manual_theme(&self, ctx: &AppContext, bg_image_path: Option<&Path>) -> WarpTheme {
+        let c = &self.manual_colors;
+        let bg_top = Self::with_opacity(c[SLOT_BG], self.bg_opacity);
+        let background = if self.use_gradient {
+            let bg_bottom = Self::with_opacity(c[SLOT_BG_BOTTOM], self.bg_opacity);
+            ThemeFill::VerticalGradient(VerticalGradient::new(bg_top, bg_bottom))
+        } else {
+            ThemeFill::Solid(bg_top)
+        };
+
+        let normal = AnsiColors::new(
+            c[SLOT_NORMAL_START].into(),
+            c[SLOT_NORMAL_START + 1].into(),
+            c[SLOT_NORMAL_START + 2].into(),
+            c[SLOT_NORMAL_START + 3].into(),
+            c[SLOT_NORMAL_START + 4].into(),
+            c[SLOT_NORMAL_START + 5].into(),
+            c[SLOT_NORMAL_START + 6].into(),
+            c[SLOT_NORMAL_START + 7].into(),
+        );
+        let bright = AnsiColors::new(
+            c[SLOT_BRIGHT_START].into(),
+            c[SLOT_BRIGHT_START + 1].into(),
+            c[SLOT_BRIGHT_START + 2].into(),
+            c[SLOT_BRIGHT_START + 3].into(),
+            c[SLOT_BRIGHT_START + 4].into(),
+            c[SLOT_BRIGHT_START + 5].into(),
+            c[SLOT_BRIGHT_START + 6].into(),
+            c[SLOT_BRIGHT_START + 7].into(),
+        );
+
+        let details = if self.is_light {
+            Details::Lighter
+        } else {
+            Details::Darker
+        };
+
+        let background_image = bg_image_path.map(|path| ThemeImage {
+            source: AssetSource::LocalFile {
+                path: path.to_string_lossy().into_owned(),
+                content_version: None,
+            },
+            opacity: self.bg_image_opacity,
+        });
+
+        WarpTheme::new(
+            background,
+            c[SLOT_FG],
+            ThemeFill::Solid(c[SLOT_ACCENT]),
+            Some(ThemeFill::Solid(c[SLOT_CURSOR])),
+            Some(details),
+            TerminalColors::new(normal, bright),
+            background_image,
+            Some(self.manual_name(ctx)),
+        )
+    }
+
+    #[cfg_attr(not(feature = "local_fs"), allow(unused))]
+    fn create_manual_theme(&mut self, ctx: &mut ViewContext<Self>) {
+        let name = self.manual_name(ctx);
+        // Sanitize the file name (a raw name could contain path separators). The display name is
+        // preserved in the theme itself.
+        let slug = slugify(&name);
+        let file_name = format!("{slug}.yaml");
+        let dir = user_config::themes_dir();
+
+        #[cfg(feature = "local_fs")]
+        {
+            // If a background image is set, copy it next to the theme file so the theme is
+            // self-contained, and reference the copied file (not the user's original path).
+            let src_image = self.bg_image.clone();
+            let ext = src_image
+                .as_ref()
+                .and_then(|p| p.extension())
+                .and_then(|e| e.to_str());
+            let saved_image_path = match (&src_image, ext) {
+                (Some(_), Some(ext)) => Some(dir.join(format!("{slug}.{ext}"))),
+                _ => None,
+            };
+            let image_option = match (&src_image, ext) {
+                (Some(src), Some(ext)) => Some((src.clone(), slug.clone(), ext)),
+                _ => None,
+            };
+            let theme = self.build_manual_theme(ctx, saved_image_path.as_deref());
+
+            let mut errored = true;
+            ThemeCreatorBody::write_theme(&theme, dir, file_name, image_option, |path| {
+                send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
+                ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
+                    theme: ThemeKind::Custom(CustomTheme::new(name.clone(), path)),
+                });
+                errored = false;
+                self.close(ctx);
+                ctx.notify();
+            });
+            if errored {
+                self.send_error_toast("Something went wrong saving the theme.".to_string(), ctx);
+            }
+        }
+        #[cfg(not(feature = "local_fs"))]
+        {
+            let _ = (name, slug, file_name, dir);
+            log::warn!("Tried to save theme without a local filesystem.");
+        }
+    }
+
+    /// Serializes the current theme and opens a pre-filled GitHub PR against the community themes
+    /// repo. No in-app GitHub auth is needed — GitHub handles the fork + PR in the browser.
+    fn share_theme(&mut self, ctx: &mut ViewContext<Self>) {
+        let name = self.manual_name(ctx);
+        let theme = self.build_manual_theme(ctx, self.bg_image.as_deref());
+        let yaml = match serde_yaml::to_string(&theme) {
+            Ok(yaml) => yaml,
+            Err(e) => {
+                self.send_error_toast(format!("Couldn't serialize theme for sharing: {e}"), ctx);
+                return;
+            }
+        };
+        let slug = slugify(&name);
+        let url = format!(
+            "{THEMES_REPO_NEW_FILE_URL}{slug}.yaml&value={}",
+            urlencoding::encode(&yaml)
+        );
+        ctx.open_url(&url);
+        if self.bg_image.is_some() {
+            self.send_error_toast(
+                "Opened a PR draft in your browser. Note: attach your background image to the PR — it isn't included automatically.".to_string(),
+                ctx,
+            );
+        }
+    }
+
+    fn set_mode(&mut self, mode: ThemeCreatorMode, ctx: &mut ViewContext<Self>) {
+        self.mode = mode;
+        match mode {
+            ThemeCreatorMode::Manual => self.refresh_manual_preview(ctx),
+            ThemeCreatorMode::FromImage => {
+                if let Some(theme_options) = &self.theme_options {
+                    let theme_kind = ThemeKind::InMemory(theme_options.clone());
+                    AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
+                        appearance_manager.set_transient_theme(theme_kind, ctx);
+                    });
+                } else {
+                    AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
+                        appearance_manager.clear_transient_theme(ctx);
+                    });
+                }
+            }
+        }
+        ctx.notify();
+    }
+
+    fn toggle_gradient(&mut self, ctx: &mut ViewContext<Self>) {
+        self.use_gradient = !self.use_gradient;
+        self.refresh_manual_preview(ctx);
+    }
+
+    fn toggle_light_dark(&mut self, ctx: &mut ViewContext<Self>) {
+        self.is_light = !self.is_light;
+        self.refresh_manual_preview(ctx);
+    }
+
+    fn toggle_advanced(&mut self, ctx: &mut ViewContext<Self>) {
+        self.advanced_expanded = !self.advanced_expanded;
+        ctx.notify();
+    }
+
+    fn set_background_opacity(&mut self, value: f32, ctx: &mut ViewContext<Self>) {
+        self.bg_opacity = value.round().clamp(0.0, 100.0) as u8;
+        self.refresh_manual_preview(ctx);
+    }
+
+    fn set_background_image_opacity(&mut self, value: f32, ctx: &mut ViewContext<Self>) {
+        self.bg_image_opacity = value.round().clamp(0.0, 100.0) as u8;
+        self.refresh_manual_preview(ctx);
+    }
+}
+
+impl ThemeCreatorBody {
+    /// The "Custom | From image" mode switcher shown at the top of the modal.
+    fn mode_tabs(&self, appearance: &Appearance) -> Box<dyn Element> {
+        Container::new(
+            Flex::row()
+                .with_child(
+                    Container::new(self.pill_button(
+                        "Custom",
+                        self.mode == ThemeCreatorMode::Manual,
+                        self.mode_tab_states[0].clone(),
+                        ThemeCreatorBodyAction::SetMode(ThemeCreatorMode::Manual),
+                        appearance,
+                    ))
+                    .with_margin_right(8.)
+                    .finish(),
+                )
+                .with_child(self.pill_button(
+                    "From image",
+                    self.mode == ThemeCreatorMode::FromImage,
+                    self.mode_tab_states[1].clone(),
+                    ThemeCreatorBodyAction::SetMode(ThemeCreatorMode::FromImage),
+                    appearance,
+                ))
+                .finish(),
+        )
+        .with_margin_bottom(12.)
+        .finish()
+    }
+
+    /// A single "label + swatch + hex input" editing row for color slot `index`.
+    fn color_field_row(&self, index: usize, appearance: &Appearance) -> Box<dyn Element> {
+        let (label, _) = COLOR_SLOTS[index];
+        let color = self.manual_colors[index];
+        let theme = appearance.theme();
+
+        let swatch = ConstrainedBox::new(
+            Rect::new()
+                .with_background_color(color)
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_border(
+                    Border::all(1.).with_border_fill(theme.main_text_color(theme.background())),
+                )
+                .finish(),
+        )
+        .with_width(26.)
+        .with_height(26.)
+        .finish();
+
+        let input = ConstrainedBox::new(
+            TextInput::new(
+                self.color_editors[index].clone(),
+                UiComponentStyles::default()
+                    .set_border_color(theme.outline().into())
+                    .set_font_family_id(appearance.ui_font_family())
+                    .set_font_size(13.)
+                    .set_background(Fill::None)
+                    .set_border_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .set_padding(Coords::uniform(8.))
+                    .set_border_width(1.),
+            )
+            .build()
+            .finish(),
+        )
+        .with_width(120.)
+        .finish();
+
+        let label_el = ConstrainedBox::new(label_text(label, appearance))
+            .with_width(130.)
+            .finish();
+
+        Container::new(
+            Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(label_el)
+                .with_child(Container::new(swatch).with_margin_right(10.).finish())
+                .with_child(input)
+                .finish(),
+        )
+        .with_vertical_padding(4.)
+        .finish()
+    }
+
+    /// A small pill button that dispatches `action` when clicked.
+    fn pill_button(
+        &self,
+        label: &str,
+        active: bool,
+        mouse_state: MouseStateHandle,
+        action: ThemeCreatorBodyAction,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
+        let variant = if active {
+            ButtonVariant::Accent
+        } else {
+            ButtonVariant::Secondary
+        };
+        appearance
+            .ui_builder()
+            .button(variant, mouse_state)
+            .with_style(UiComponentStyles {
+                font_size: Some(13.),
+                font_weight: Some(Weight::Bold),
+                padding: Some(Coords::uniform(10.)),
+                ..Default::default()
+            })
+            .with_centered_text_label(label.into())
+            .build()
+            .with_cursor(Cursor::PointingHand)
+            .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
+            .finish()
+    }
+
+    fn opacity_slider(
+        &self,
+        state: SliderStateHandle,
+        value: u8,
+        make_action: fn(f32) -> ThemeCreatorBodyAction,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
+        appearance
+            .ui_builder()
+            .slider(state)
+            .with_range(0.0..100.0)
+            .with_default_value(value as f32)
+            .with_style(UiComponentStyles {
+                width: Some(180.),
+                margin: Some(Coords::default().top(3.).bottom(3.)),
+                ..Default::default()
+            })
+            .on_drag(move |ctx, _, val| ctx.dispatch_typed_action(make_action(val)))
+            .on_change(move |ctx, _, val| ctx.dispatch_typed_action(make_action(val)))
+            .build()
+            .finish()
+    }
+
+    fn render_manual(&self, app: &AppContext) -> Box<dyn Element> {
+        let appearance = Appearance::as_ref(app);
+        let theme = appearance.theme();
+
+        let tabs = self.mode_tabs(appearance);
+
+        // Name.
+        let name_field = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(Container::new(label_text("Theme name", appearance)).finish())
+            .with_child(
+                Container::new(
+                    TextInput::new(
+                        self.editor.clone(),
+                        UiComponentStyles::default()
+                            .set_border_color(theme.outline().into())
+                            .set_font_family_id(appearance.ui_font_family())
+                            .set_font_size(14.)
+                            .set_background(Fill::None)
+                            .set_border_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                            .set_padding(Coords::uniform(10.))
+                            .set_border_width(1.),
+                    )
+                    .build()
+                    .finish(),
+                )
+                .with_margin_top(6.)
+                .finish(),
+            )
+            .finish();
+
+        // Simple section.
+        let mut content = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        content.add_child(name_field);
+        content.add_child(
+            Container::new(section_label("Colors", appearance))
+                .with_margin_top(18.)
+                .finish(),
+        );
+        content.add_child(self.color_field_row(SLOT_BG, appearance));
+        content.add_child(
+            Container::new(self.pill_button(
+                if self.use_gradient {
+                    "Background gradient: On"
+                } else {
+                    "Background gradient: Off"
+                },
+                self.use_gradient,
+                self.toggle_states[0].clone(),
+                ThemeCreatorBodyAction::ToggleGradient,
+                appearance,
+            ))
+            .with_vertical_padding(4.)
+            .finish(),
+        );
+        if self.use_gradient {
+            content.add_child(self.color_field_row(SLOT_BG_BOTTOM, appearance));
+        }
+        content.add_child(self.color_field_row(SLOT_FG, appearance));
+        content.add_child(self.color_field_row(SLOT_ACCENT, appearance));
+        content.add_child(self.color_field_row(SLOT_CURSOR, appearance));
+
+        content.add_child(
+            Container::new(self.pill_button(
+                if self.is_light {
+                    "Appearance: Light"
+                } else {
+                    "Appearance: Dark"
+                },
+                false,
+                self.toggle_states[1].clone(),
+                ThemeCreatorBodyAction::ToggleLightDark,
+                appearance,
+            ))
+            .with_vertical_padding(4.)
+            .finish(),
+        );
+
+        // Background transparency.
+        content.add_child(
+            Container::new(
+                Flex::row()
+                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                    .with_child(
+                        ConstrainedBox::new(label_text("Background opacity", appearance))
+                            .with_width(150.)
+                            .finish(),
+                    )
+                    .with_child(self.opacity_slider(
+                        self.bg_opacity_slider.clone(),
+                        self.bg_opacity,
+                        ThemeCreatorBodyAction::SetBackgroundOpacity,
+                        appearance,
+                    ))
+                    .finish(),
+            )
+            .with_vertical_padding(6.)
+            .finish(),
+        );
+
+        // Advanced section.
+        content.add_child(
+            Container::new(self.pill_button(
+                if self.advanced_expanded {
+                    "▾ Advanced"
+                } else {
+                    "▸ Advanced"
+                },
+                false,
+                self.toggle_states[2].clone(),
+                ThemeCreatorBodyAction::ToggleAdvanced,
+                appearance,
+            ))
+            .with_margin_top(14.)
+            .finish(),
+        );
+
+        if self.advanced_expanded {
+            content.add_child(
+                Container::new(section_label("Terminal colors", appearance))
+                    .with_margin_top(10.)
+                    .finish(),
+            );
+            for i in SLOT_NORMAL_START..SLOT_BRIGHT_START + 8 {
+                content.add_child(self.color_field_row(i, appearance));
+            }
+
+            content.add_child(
+                Container::new(section_label("Background image", appearance))
+                    .with_margin_top(14.)
+                    .finish(),
+            );
+            content.add_child(
+                Container::new(self.pill_button(
+                    if self.bg_image.is_some() {
+                        "Change background image"
+                    } else {
+                        "Add background image"
+                    },
+                    false,
+                    self.pick_image_mouse_state.clone(),
+                    ThemeCreatorBodyAction::PickBackgroundImage,
+                    appearance,
+                ))
+                .with_vertical_padding(4.)
+                .finish(),
+            );
+            if self.bg_image.is_some() {
+                content.add_child(
+                    Container::new(
+                        Flex::row()
+                            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                            .with_child(
+                                ConstrainedBox::new(label_text("Image opacity", appearance))
+                                    .with_width(150.)
+                                    .finish(),
+                            )
+                            .with_child(self.opacity_slider(
+                                self.bg_image_opacity_slider.clone(),
+                                self.bg_image_opacity,
+                                ThemeCreatorBodyAction::SetBackgroundImageOpacity,
+                                appearance,
+                            ))
+                            .finish(),
+                    )
+                    .with_vertical_padding(6.)
+                    .finish(),
+                );
+            }
+        }
+
+        let scrollable = ConstrainedBox::new(
+            ClippedScrollable::vertical(
+                self.scroll_state.clone(),
+                Container::new(content.finish()).finish(),
+                ScrollbarWidth::Auto,
+                theme.disabled_text_color(theme.background()).into(),
+                theme.main_text_color(theme.background()).into(),
+                Fill::None,
+            )
+            .finish(),
+        )
+        .with_height(360.)
+        .finish();
+
+        // Action buttons.
+        let cancel_button = self.pill_button(
+            "Cancel",
+            false,
+            self.button_mouse_states.cancel_mouse_state.clone(),
+            ThemeCreatorBodyAction::Cancel,
+            appearance,
+        );
+        let share_button = self.pill_button(
+            "Share…",
+            false,
+            self.share_mouse_state.clone(),
+            ThemeCreatorBodyAction::ShareTheme,
+            appearance,
+        );
+        let create_button = self.pill_button(
+            "Save theme",
+            true,
+            self.button_mouse_states.create_mouse_state.clone(),
+            ThemeCreatorBodyAction::Create,
+            appearance,
+        );
+
+        let buttons = Container::new(
+            Flex::row()
+                .with_main_axis_size(MainAxisSize::Max)
+                .with_child(Shrinkable::new(0.34, cancel_button).finish())
+                .with_child(
+                    Container::new(Shrinkable::new(0.33, share_button).finish())
+                        .with_margin_left(8.)
+                        .finish(),
+                )
+                .with_child(
+                    Container::new(Shrinkable::new(0.33, create_button).finish())
+                        .with_margin_left(8.)
+                        .finish(),
+                )
+                .finish(),
+        )
+        .with_margin_top(16.)
+        .finish();
+
+        Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(tabs)
+            .with_child(scrollable)
+            .with_child(buttons)
+            .finish()
+    }
+}
+
+/// A section heading label.
+fn section_label(text: &str, appearance: &Appearance) -> Box<dyn Element> {
+    Text::new_inline(text.to_string(), appearance.ui_font_family(), 14.)
+        .with_color(appearance.theme().active_ui_text_color().into())
+        .finish()
+}
+
+/// A field label.
+fn label_text(text: &str, appearance: &Appearance) -> Box<dyn Element> {
+    Text::new_inline(text.to_string(), appearance.ui_font_family(), 13.)
+        .with_color(appearance.theme().nonactive_ui_text_color().into())
+        .finish()
+}
+
+/// Turns a theme name into a kebab-case file slug for the shared PR filename.
+fn slugify(name: &str) -> String {
+    let mut slug = String::new();
+    let mut prev_dash = false;
+    for ch in name.chars() {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch.to_ascii_lowercase());
+            prev_dash = false;
+        } else if !prev_dash && !slug.is_empty() {
+            slug.push('-');
+            prev_dash = true;
+        }
+    }
+    let slug = slug.trim_matches('-').to_string();
+    if slug.is_empty() {
+        "custom-theme".to_string()
+    } else {
+        slug
+    }
 }
 
 impl Entity for ThemeCreatorBody {
@@ -312,6 +1088,10 @@ impl View for ThemeCreatorBody {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
+        if self.mode == ThemeCreatorMode::Manual {
+            return self.render_manual(app);
+        }
+
         let appearance = Appearance::as_ref(app);
 
         let default_button_styles = UiComponentStyles {
@@ -581,6 +1361,7 @@ impl View for ThemeCreatorBody {
 
         Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(self.mode_tabs(appearance))
             .with_child(
                 Container::new(
                     flex.with_child(
@@ -648,12 +1429,37 @@ impl TypedActionView for ThemeCreatorBody {
             ThemeCreatorBodyAction::SetBackgroundColor(index) => {
                 self.set_background_color(*index, ctx)
             }
-            ThemeCreatorBodyAction::Create => self.create_theme(ctx),
+            ThemeCreatorBodyAction::Create => {
+                if self.mode == ThemeCreatorMode::Manual {
+                    self.create_manual_theme(ctx);
+                } else {
+                    self.create_theme(ctx);
+                }
+            }
             ThemeCreatorBodyAction::HandleImageSelected(path) => {
-                self.set_theme_from_image_path(path.clone(), ctx);
-                ctx.notify();
+                if self.mode == ThemeCreatorMode::Manual {
+                    self.bg_image = Some(path.clone());
+                    self.refresh_manual_preview(ctx);
+                } else {
+                    self.set_theme_from_image_path(path.clone(), ctx);
+                    ctx.notify();
+                }
             }
             ThemeCreatorBodyAction::FilePickerCancelled => self.handle_file_picker_cancelled(ctx),
+            ThemeCreatorBodyAction::SetMode(mode) => self.set_mode(*mode, ctx),
+            ThemeCreatorBodyAction::ToggleGradient => self.toggle_gradient(ctx),
+            ThemeCreatorBodyAction::ToggleLightDark => self.toggle_light_dark(ctx),
+            ThemeCreatorBodyAction::ToggleAdvanced => self.toggle_advanced(ctx),
+            ThemeCreatorBodyAction::SetBackgroundOpacity(value) => {
+                self.set_background_opacity(*value, ctx)
+            }
+            ThemeCreatorBodyAction::SetBackgroundImageOpacity(value) => {
+                self.set_background_image_opacity(*value, ctx)
+            }
+            ThemeCreatorBodyAction::PickBackgroundImage => {
+                ctx.emit(ThemeCreatorBodyEvent::OpenFilePicker);
+            }
+            ThemeCreatorBodyAction::ShareTheme => self.share_theme(ctx),
         }
     }
 }

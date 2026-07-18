@@ -152,6 +152,13 @@ impl AppearanceManager {
         self.refresh_theme_state(ctx);
     }
 
+    /// Previews an already-built [`WarpTheme`] directly, without going through a
+    /// [`ThemeKind`]. Used by the custom theme editor, which builds a theme field-by-field.
+    pub fn set_transient_warp_theme(&mut self, theme: WarpTheme, ctx: &mut ModelContext<Self>) {
+        self.transient_theme = Some(theme);
+        self.refresh_theme_state(ctx);
+    }
+
     #[cfg(target_os = "macos")]
     pub fn app_icon_at_startup(&self) -> AppIcon {
         self.app_icon_at_startup

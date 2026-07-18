@@ -19,7 +19,7 @@ use crate::themes::theme_creator_body::{
 use crate::view_components::DismissibleToast;
 use crate::workspace::ToastStack;
 
-const THEME_CREATOR_MODAL_HEADER: &str = "Create new theme from image";
+const THEME_CREATOR_MODAL_HEADER: &str = "New theme";
 
 pub struct ThemeCreatorModal {
     theme_creator_modal: ViewHandle<Modal<ThemeCreatorBody>>,
@@ -64,8 +64,8 @@ impl ThemeCreatorModal {
                 ctx,
             )
             .with_modal_style(UiComponentStyles {
-                width: Some(600.),
-                height: Some(300.),
+                width: Some(560.),
+                height: Some(620.),
                 ..Default::default()
             })
             .with_header_style(UiComponentStyles {
@@ -101,6 +101,13 @@ impl ThemeCreatorModal {
 
     pub fn close(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.emit(ThemeCreatorModalEvent::Close);
+    }
+
+    /// Kicks off the body's live preview when the modal is opened.
+    pub fn on_shown(&mut self, ctx: &mut ViewContext<Self>) {
+        self.theme_creator_modal.update(ctx, |modal, ctx| {
+            modal.body().update(ctx, |body, ctx| body.on_shown(ctx));
+        });
     }
 
     pub fn cancel(&mut self, ctx: &mut ViewContext<Self>) {

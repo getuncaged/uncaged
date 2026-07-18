@@ -11190,6 +11190,12 @@ impl Workspace {
         match event {
             ThemeCreatorModalEvent::Close => {
                 self.current_workspace_state.is_theme_creator_modal_open = false;
+                // Clear any live-preview theme the editor set, so dismissing the modal reverts to
+                // the active theme. A saved theme has already been applied via `SetCustomTheme`
+                // (emitted before `Close`), so this doesn't discard the user's new theme.
+                AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
+                    appearance_manager.clear_transient_theme(ctx);
+                });
                 ctx.notify();
             }
             ThemeCreatorModalEvent::SetCustomTheme { theme } => {
@@ -19451,6 +19457,8 @@ impl Workspace {
 
     fn open_theme_creator_modal(&mut self, ctx: &mut ViewContext<Self>) {
         self.current_workspace_state.is_theme_creator_modal_open = true;
+        self.theme_creator_modal
+            .update(ctx, |modal, ctx| modal.on_shown(ctx));
         ctx.focus(&self.theme_creator_modal);
         ctx.notify();
     }
