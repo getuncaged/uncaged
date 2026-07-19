@@ -1,4 +1,5 @@
 use asset_macro::bundled_or_fetched_asset;
+use warpui::assets::asset_cache::AssetSource;
 use pathfinder_color::ColorU;
 use warp_core::ui::color::blend::Blend;
 use warp_core::ui::color::{coloru_with_opacity, OPAQUE};
@@ -720,4 +721,52 @@ pub(super) fn received_referral_reward() -> WarpTheme {
         }),
         Some("Received Referral Reward".to_string()),
     )
+}
+
+/// Swaps a bundled theme background for its pre-scaled preview thumbnail.
+///
+/// A theme row in the picker is 190x100, but `background_image()` points at the full-size
+/// wallpaper — 2048x1536 and up. Decoding one of those and downscaling it with a Triangle filter
+/// costs 13-32ms, and both run synchronously inside `Image::paint`, so the cost lands on the frame
+/// each row is first revealed and the list stutters as it scrolls. The thumbnails under
+/// `jpg/thumbs/` are the same pictures at 380x200 — about 1/40th the pixels, and 124KB against
+/// 7.9MB for the originals.
+///
+/// This lives here, and goes through the macro rather than matching on path strings, because
+/// `build.rs` rewrites async assets to content-hashed names (`koi_bg-<sha256>.jpg`). A hand-written
+/// path would never resolve, and would fail silently as a blank preview; the macro computes the
+/// same hash at compile time, so a missing thumbnail is a build error instead.
+///
+/// Anything without a thumbnail — including every user-created theme, which is a `LocalFile` —
+/// falls through to its original source and behaves exactly as before.
+pub fn preview_source(source: AssetSource) -> AssetSource {
+    // The macro needs real string literals (it hashes the file at compile time), so each pair is
+    // spelled out rather than built with `concat!`.
+    macro_rules! thumbnail_for {
+        ($source:expr, $($full:literal => $thumb:literal),+ $(,)?) => {
+            $(
+                if $source == bundled_or_fetched_asset!($full) {
+                    return bundled_or_fetched_asset!($thumb);
+                }
+            )+
+        };
+    }
+
+    thumbnail_for!(
+        source,
+        "jpg/dark_city_bg.jpg" => "jpg/thumbs/dark_city_bg.jpg",
+        "jpg/jellyfish_bg.jpg" => "jpg/thumbs/jellyfish_bg.jpg",
+        "jpg/koi_bg.jpg" => "jpg/thumbs/koi_bg.jpg",
+        "jpg/leafy_bg.jpg" => "jpg/thumbs/leafy_bg.jpg",
+        "jpg/marble_bg.jpg" => "jpg/thumbs/marble_bg.jpg",
+        "jpg/phenomenon_bg.jpg" => "jpg/thumbs/phenomenon_bg.jpg",
+        "jpg/pink_city_bg.jpg" => "jpg/thumbs/pink_city_bg.jpg",
+        "jpg/received_referral_reward_bg.jpg" => "jpg/thumbs/received_referral_reward_bg.jpg",
+        "jpg/red_rock_bg.jpg" => "jpg/thumbs/red_rock_bg.jpg",
+        "jpg/sent_referral_reward_bg.jpg" => "jpg/thumbs/sent_referral_reward_bg.jpg",
+        "jpg/snowy_bg.jpg" => "jpg/thumbs/snowy_bg.jpg",
+        "jpg/solarflare_bg.jpg" => "jpg/thumbs/solarflare_bg.jpg",
+    );
+
+    source
 }

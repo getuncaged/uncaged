@@ -697,7 +697,7 @@ pub fn render_preview(
             Shrinkable::new(
                 1.,
                 warpui::elements::Image::new(
-                    background_image.source(),
+                    crate::themes::default_themes::preview_source(background_image.source()),
                     warpui::elements::CacheOption::BySize,
                 )
                 .cover()
