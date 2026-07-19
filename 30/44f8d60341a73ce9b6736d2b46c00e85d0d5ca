@@ -1,0 +1,21 @@
+crates/warpui_core/src/elements/gui/image_tests.rs
+  s_6e5dc450e2113a::t_7719d25c64f147 121-156
+crates/warpui_core/src/elements/gui/image.rs
+  s_6e5dc450e2113a::t_ac027a463645a1 399-410
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "3044f8d60341a73ce9b6736d2b46c00e85d0d5ca",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
