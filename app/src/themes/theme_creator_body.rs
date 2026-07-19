@@ -77,8 +77,17 @@ const COLOR_SLOTS: [(&str, &str); NUM_COLOR_SLOTS] = [
     ("Bright white", "#fbf6ec"),
 ];
 
-const THEMES_REPO_NEW_FILE_URL: &str =
-    "https://github.com/getuncaged/uncaged-themes/new/main?filename=themes/community/";
+/// Starting opacity for a background image, matching the built-in photo themes.
+///
+/// Koi, Red Rock and Leafy all ship at 30. It reads low, but the number is the share of the photo
+/// that survives — the theme's background is painted over it at `100 - opacity`, and that veil is
+/// what keeps text legible. Going higher thins the veil and the terminal turns into a wallpaper
+/// you can't read.
+const DEFAULT_BG_IMAGE_OPACITY: u8 = 30;
+
+const THEMES_REPO_BASE_URL: &str = "https://github.com/getuncaged/uncaged-themes";
+/// Where community themes live in the repo, used to build both the new-file and edit URLs.
+const COMMUNITY_THEME_DIR: &str = "themes/community";
 
 /// Which authoring flow the modal is showing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -246,7 +255,7 @@ impl ThemeCreatorBody {
             is_light: false,
             bg_opacity: 100,
             bg_image: None,
-            bg_image_opacity: 40,
+            bg_image_opacity: DEFAULT_BG_IMAGE_OPACITY,
             advanced_expanded: false,
             mode_tab_states: Default::default(),
             toggle_states: Default::default(),
@@ -314,7 +323,7 @@ impl ThemeCreatorBody {
         self.is_light = false;
         self.bg_opacity = 100;
         self.bg_image = None;
-        self.bg_image_opacity = 40;
+        self.bg_image_opacity = DEFAULT_BG_IMAGE_OPACITY;
         self.advanced_expanded = false;
         self.theme_options = None;
         self.image_state = ThemeCreatorImageState::Empty;
@@ -527,9 +536,21 @@ impl ThemeCreatorBody {
     /// Builds a [`WarpTheme`] from the current manual editor state.
     fn build_manual_theme(&self, ctx: &AppContext, bg_image_path: Option<&Path>) -> WarpTheme {
         let c = &self.manual_colors;
-        let bg_top = Self::with_opacity(c[SLOT_BG], self.bg_opacity);
+        // With a background image the fill stops being a colour and becomes the *veil* over the
+        // photo, and the app already works out how opaque that veil should be: it multiplies the
+        // fill's alpha by `(100 - image.opacity)` and again by the window opacity. Baking a third
+        // opacity in here compounds with both — at a 75% window and a 40% image, a "60%"
+        // background lands at 27% and the photo swamps the text. Every built-in image theme
+        // (Koi, Red Rock, Leafy) keeps its fill fully opaque for exactly this reason, so match
+        // them and let image + window opacity be the only two knobs that matter.
+        let bg_alpha = if bg_image_path.is_some() {
+            100
+        } else {
+            self.bg_opacity
+        };
+        let bg_top = Self::with_opacity(c[SLOT_BG], bg_alpha);
         let background = if self.use_gradient {
-            let bg_bottom = Self::with_opacity(c[SLOT_BG_BOTTOM], self.bg_opacity);
+            let bg_bottom = Self::with_opacity(c[SLOT_BG_BOTTOM], bg_alpha);
             ThemeFill::VerticalGradient(VerticalGradient::new(bg_top, bg_bottom))
         } else {
             ThemeFill::Solid(bg_top)
@@ -624,6 +645,10 @@ impl ThemeCreatorBody {
 
     /// Serializes the current theme and opens a pre-filled GitHub PR against the community themes
     /// repo. No in-app GitHub auth is needed — GitHub handles the fork + PR in the browser.
+    ///
+    /// Sharing the *same* theme twice used to open a second "add this theme" PR competing with the
+    /// first, because the URL always pointed at GitHub's new-file editor. Instead, look upstream
+    /// first and edit whatever is already there — see [`ShareTarget`].
     fn share_theme(&mut self, ctx: &mut ViewContext<Self>) {
         let name = self.manual_name(ctx);
         let theme = self.build_manual_theme(ctx, self.bg_image.as_deref());
@@ -634,18 +659,59 @@ impl ThemeCreatorBody {
                 return;
             }
         };
-        let slug = slugify(&name);
-        let url = format!(
-            "{THEMES_REPO_NEW_FILE_URL}{slug}.yaml&value={}",
-            urlencoding::encode(&yaml)
+        let path = format!("{COMMUNITY_THEME_DIR}/{}.yaml", slugify(&name));
+        let has_image = self.bg_image.is_some();
+
+        let lookup_path = path.clone();
+        ctx.spawn(
+            async move { resolve_share_target(&lookup_path).await },
+            move |me, target, ctx| {
+                let encoded = urlencoding::encode(&yaml);
+                let (url, note) = match &target {
+                    ShareTarget::ExistingPullRequest {
+                        repo,
+                        branch,
+                        number,
+                    } => (
+                        format!("https://github.com/{repo}/edit/{branch}/{path}?value={encoded}"),
+                        Some(format!(
+                            "Updating your open PR #{number} — committing here adds to it instead \
+                             of opening a second one."
+                        )),
+                    ),
+                    ShareTarget::MergedOnMain => (
+                        format!(
+                            "{THEMES_REPO_BASE_URL}/edit/main/{path}?value={encoded}"
+                        ),
+                        Some(
+                            "This theme is already in the gallery — opening a PR that updates it."
+                                .to_string(),
+                        ),
+                    ),
+                    ShareTarget::New => (
+                        format!(
+                            "{THEMES_REPO_BASE_URL}/new/main?filename={path}&value={encoded}"
+                        ),
+                        None,
+                    ),
+                };
+                ctx.open_url(&url);
+
+                // Background images can't ride a query string, so they always need a manual step.
+                let image_note = has_image.then_some(
+                    "Attach your background image to the PR — it isn't included automatically.",
+                );
+                let message = match (note, image_note) {
+                    (Some(note), Some(image)) => Some(format!("{note} {image}")),
+                    (Some(note), None) => Some(note),
+                    (None, Some(image)) => Some(image.to_string()),
+                    (None, None) => None,
+                };
+                if let Some(message) = message {
+                    me.send_error_toast(message, ctx);
+                }
+            },
         );
-        ctx.open_url(&url);
-        if self.bg_image.is_some() {
-            self.send_error_toast(
-                "Opened a PR draft in your browser. Note: attach your background image to the PR — it isn't included automatically.".to_string(),
-                ctx,
-            );
-        }
     }
 
     fn set_mode(&mut self, mode: ThemeCreatorMode, ctx: &mut ViewContext<Self>) {
@@ -1223,27 +1289,32 @@ impl ThemeCreatorBody {
             .finish(),
         );
 
-        // Background transparency.
-        content.add_child(
-            Container::new(
-                Flex::row()
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        ConstrainedBox::new(label_text("Background opacity", appearance))
-                            .with_width(150.)
-                            .finish(),
-                    )
-                    .with_child(self.opacity_slider(
-                        self.bg_opacity_slider.clone(),
-                        self.bg_opacity,
-                        ThemeCreatorBodyAction::SetBackgroundOpacity,
-                        appearance,
-                    ))
-                    .finish(),
-            )
-            .with_vertical_padding(6.)
-            .finish(),
-        );
+        // Background transparency. Hidden once there's a background image: the fill is forced
+        // opaque in that case (see `build_manual_theme`), so leaving the slider on screen would
+        // offer a control that silently does nothing. Image opacity and window opacity are the
+        // two that still bite, and both are shown elsewhere on this page.
+        if self.bg_image.is_none() {
+            content.add_child(
+                Container::new(
+                    Flex::row()
+                        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                        .with_child(
+                            ConstrainedBox::new(label_text("Background opacity", appearance))
+                                .with_width(150.)
+                                .finish(),
+                        )
+                        .with_child(self.opacity_slider(
+                            self.bg_opacity_slider.clone(),
+                            self.bg_opacity,
+                            ThemeCreatorBodyAction::SetBackgroundOpacity,
+                            appearance,
+                        ))
+                        .finish(),
+                )
+                .with_vertical_padding(6.)
+                .finish(),
+            );
+        }
 
         // Window-level appearance. Not part of the theme file, but it's what people actually mean
         // by "how my terminal looks", so it's editable right here and applies live.
@@ -1428,6 +1499,109 @@ impl ThemeCreatorBody {
             .with_child(buttons)
             .finish()
     }
+}
+
+/// Where a shared theme should land on GitHub.
+///
+/// Resolved in this order, because each case wants a different GitHub URL and only the last one
+/// should ever create a brand-new file.
+enum ShareTarget {
+    /// An open PR already carries this exact file. Editing it on that PR's own branch lands the
+    /// change as another commit on the existing PR, which is what "I tweaked my theme and shared
+    /// it again" should do.
+    ExistingPullRequest {
+        repo: String,
+        branch: String,
+        number: u64,
+    },
+    /// The theme is already merged into the gallery. Editing it on `main` opens a PR that updates
+    /// the existing file rather than adding a duplicate.
+    MergedOnMain,
+    /// Nothing upstream yet — the new-file editor is correct.
+    New,
+}
+
+/// How long to wait on GitHub before falling back to "this theme is new". Sharing must stay
+/// responsive; guessing `New` on a slow or offline network is harmless, since that's the old
+/// behaviour and GitHub itself will object if the file turns out to exist.
+const SHARE_LOOKUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
+
+/// Number of open PRs to examine. Far above what this repo will realistically carry, but bounded
+/// so a busy gallery can't turn one click into unlimited requests.
+const SHARE_LOOKUP_MAX_PRS: usize = 30;
+
+/// Works out which of the [`ShareTarget`]s applies to `path`, using only public, unauthenticated
+/// GitHub endpoints. Any failure resolves to [`ShareTarget::New`].
+async fn resolve_share_target(path: &str) -> ShareTarget {
+    let client = match reqwest::Client::builder()
+        .timeout(SHARE_LOOKUP_TIMEOUT)
+        // GitHub rejects API requests without one.
+        .user_agent(concat!("Uncaged/", env!("CARGO_PKG_VERSION")))
+        .build()
+    {
+        Ok(client) => client,
+        Err(_) => return ShareTarget::New,
+    };
+
+    if let Some(target) = find_open_pull_request_for(&client, path).await {
+        return target;
+    }
+
+    // Not in any open PR — is it already merged? `raw.githubusercontent.com` answers with a plain
+    // 200/404 and doesn't count against the API rate limit.
+    let raw_url =
+        format!("https://raw.githubusercontent.com/getuncaged/uncaged-themes/main/{path}");
+    match client.get(&raw_url).send().await {
+        Ok(response) if response.status().is_success() => ShareTarget::MergedOnMain,
+        _ => ShareTarget::New,
+    }
+}
+
+/// Scans open PRs for one that already touches `path`.
+async fn find_open_pull_request_for(client: &reqwest::Client, path: &str) -> Option<ShareTarget> {
+    let pulls: serde_json::Value = client
+        .get("https://api.github.com/repos/getuncaged/uncaged-themes/pulls?state=open&per_page=100")
+        .send()
+        .await
+        .ok()?
+        .json()
+        .await
+        .ok()?;
+
+    for pull in pulls.as_array()?.iter().take(SHARE_LOOKUP_MAX_PRS) {
+        let number = pull.get("number")?.as_u64()?;
+        let files: serde_json::Value = client
+            .get(format!(
+                "https://api.github.com/repos/getuncaged/uncaged-themes/pulls/{number}/files"
+            ))
+            .send()
+            .await
+            .ok()?
+            .json()
+            .await
+            .ok()?;
+
+        let touches_path = files
+            .as_array()
+            .is_some_and(|files| {
+                files
+                    .iter()
+                    .any(|file| file.get("filename").and_then(|f| f.as_str()) == Some(path))
+            });
+        if !touches_path {
+            continue;
+        }
+
+        // The branch lives in the contributor's fork when they lack write access, and in this repo
+        // when they don't, so take the repo the PR itself reports rather than assuming.
+        let head = pull.get("head")?;
+        return Some(ShareTarget::ExistingPullRequest {
+            repo: head.get("repo")?.get("full_name")?.as_str()?.to_string(),
+            branch: head.get("ref")?.as_str()?.to_string(),
+            number,
+        });
+    }
+    None
 }
 
 // ── Colour wheel geometry ────────────────────────────────────────────────────
