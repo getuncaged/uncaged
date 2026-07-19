@@ -118,3 +118,39 @@ fn loading_timeout_survives_image_rebuild_for_same_source() {
     assert_eq!(timed_out_kind, Some(BackupElementKind::LoadTimeout));
     assert_eq!(timed_out_repaint_after, None);
 }
+
+/// A `Cover` image must never come out smaller than the box it is covering.
+///
+/// The sizes here are the realistic failure: an image whose aspect ratio makes the covering scale
+/// land on a fraction. Rounding to nearest used to shave that fraction off, and because the image
+/// is centred the missing strip split across opposite edges as a hairline of background.
+#[test]
+fn cover_never_rounds_below_the_destination() {
+    let original = vec2f(1000., 750.);
+
+    for dest in [
+        vec2f(1015., 630.),
+        vec2f(1279., 831.),
+        vec2f(1440.5, 900.5),
+        vec2f(333., 777.),
+    ] {
+        let covered = dimensions(original, dest, FitType::Cover);
+        assert!(
+            covered.x() >= dest.x() && covered.y() >= dest.y(),
+            "cover {dest:?} produced {covered:?}, which leaves an uncovered edge",
+        );
+    }
+}
+
+/// The mirror of the above: `Contain` must never exceed its box, so it keeps nearest-pixel rounding.
+#[test]
+fn contain_never_exceeds_the_destination() {
+    let original = vec2f(1000., 750.);
+    let dest = vec2f(1015., 630.);
+
+    let contained = dimensions(original, dest, FitType::Contain);
+    assert!(
+        contained.x() <= dest.x() && contained.y() <= dest.y(),
+        "contain {dest:?} produced {contained:?}, which overflows",
+    );
+}

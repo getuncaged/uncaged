@@ -396,8 +396,18 @@ fn dimensions(original: Vector2F, dest: Vector2F, fit_type: FitType) -> Vector2F
 
     let x = original.x() * ratio;
     let y = original.y() * ratio;
+    let size = vec2f(x.max(1.), y.max(1.));
 
-    vec2f(x.max(1.), y.max(1.)).round()
+    match fit_type {
+        // Cover promises to fill its container, so round *up*. Rounding to nearest can land up to
+        // half a pixel short on the axis that fits exactly, and since the image is then centred
+        // (see `image_rect`) that shortfall splits across opposite edges — leaving a hairline of
+        // whatever sits behind showing through. On a themed window that hairline is the terminal
+        // background painting over nothing, which reads as the theme's raw colour down the edges.
+        FitType::Cover => size.ceil(),
+        // Contain promises the opposite — never exceed the container — so nearest-pixel stays.
+        _ => size.round(),
+    }
 }
 
 impl Element for Image {
