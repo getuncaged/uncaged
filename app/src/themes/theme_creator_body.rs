@@ -1,7 +1,7 @@
 use std::default::Default;
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::{fs::copy, io::Write};
+use std::io::Write;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
@@ -33,6 +33,7 @@ use warpui::{
 use crate::appearance::{Appearance, AppearanceManager};
 use crate::editor::{EditorView, Event as EditorEvent};
 use crate::themes::theme::{InMemoryThemeOptions, ThemeKind};
+use crate::themes::theme_background_image;
 use crate::user_config;
 use crate::window_settings::WindowSettings;
 use crate::{
@@ -367,32 +368,19 @@ impl ThemeCreatorBody {
             let original_theme_image_path = theme_options.path();
             let original_theme_image_path_clone = original_theme_image_path.clone();
 
-            let image_extension = original_theme_image_path
-                .extension()
-                .and_then(|extension| extension.to_str());
-
-            let Some(image_extension) = image_extension else {
-                self.send_error_toast(
-                    "Failed to process selected image. Please try again with a different image."
-                        .to_string(),
-                    ctx,
-                );
-                return;
-            };
-
             let dir = user_config::themes_dir();
 
-            theme_options.set_path(dir.join(format!("{theme_name}.{image_extension}")));
+            // The import re-encodes to JPEG whatever the source was, so the saved name is fixed.
+            theme_options.set_path(dir.join(format!(
+                "{theme_name}.{}",
+                theme_background_image::IMPORTED_EXTENSION
+            )));
             let mut errored = true;
             ThemeCreatorBody::write_theme(
                 &theme_options.theme(),
                 dir,
                 theme_yaml_file_name,
-                Some((
-                    original_theme_image_path_clone,
-                    theme_name.clone(),
-                    image_extension,
-                )),
+                Some((original_theme_image_path_clone, theme_name.clone())),
                 |path| {
                     send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
                     ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
@@ -410,12 +398,13 @@ impl ThemeCreatorBody {
     }
 
     /// Writes a theme to the filesystem. Calls the success callback if successful.
-    /// Note: the image option should be (original_theme_image_path, theme_name, image_extension).
+    /// Note: the image option should be (original_theme_image_path, theme_name). The image is
+    /// normalised on the way in and always lands as `<theme_name>.jpg`.
     pub fn write_theme<T>(
         theme: &WarpTheme,
         dir: PathBuf,
         theme_yaml_file_name: String,
-        image_option: Option<(PathBuf, String, &str)>,
+        image_option: Option<(PathBuf, String)>,
         success_callback: impl FnOnce(PathBuf) -> T,
     ) -> Option<T> {
         if let Ok(theme_yaml) = serde_yaml::to_string(theme) {
@@ -423,12 +412,12 @@ impl ThemeCreatorBody {
             if let Ok(mut file) = crate::util::file::create_file(&path) {
                 if write!(file, "{theme_yaml}").is_ok() {
                     match image_option {
-                        Some((image_path, theme_name, image_extension)) => {
-                            if copy(
-                                image_path.clone(),
-                                dir.join(format!("{theme_name}.{image_extension}")),
-                            )
-                            .is_ok()
+                        // Normalise rather than copy: an imported wallpaper is capped, flattened
+                        // and re-encoded so a theme can't carry a 7.7MP screenshot with an alpha
+                        // channel that every preview then pays to decode.
+                        Some((image_path, theme_name)) => {
+                            if theme_background_image::import(&image_path, &dir, &theme_name)
+                                .is_ok()
                             {
                                 return Some((success_callback)(path));
                             }
@@ -613,19 +602,18 @@ impl ThemeCreatorBody {
 
         // If a background image is set, copy it next to the theme file so the theme is
         // self-contained, and reference the copied file (not the user's original path).
+        // The import always re-encodes to JPEG, so the saved name is known ahead of time and no
+        // longer depends on what the user picked.
         let src_image = self.bg_image.clone();
-        let ext = src_image
+        let saved_image_path = src_image.as_ref().map(|_| {
+            dir.join(format!(
+                "{slug}.{}",
+                theme_background_image::IMPORTED_EXTENSION
+            ))
+        });
+        let image_option = src_image
             .as_ref()
-            .and_then(|p| p.extension())
-            .and_then(|e| e.to_str());
-        let saved_image_path = match (&src_image, ext) {
-            (Some(_), Some(ext)) => Some(dir.join(format!("{slug}.{ext}"))),
-            _ => None,
-        };
-        let image_option = match (&src_image, ext) {
-            (Some(src), Some(ext)) => Some((src.clone(), slug.clone(), ext)),
-            _ => None,
-        };
+            .map(|src| (src.clone(), slug.clone()));
         let theme = self.build_manual_theme(ctx, saved_image_path.as_deref());
 
         let mut errored = true;
@@ -651,7 +639,18 @@ impl ThemeCreatorBody {
     /// first and edit whatever is already there — see [`ShareTarget`].
     fn share_theme(&mut self, ctx: &mut ViewContext<Self>) {
         let name = self.manual_name(ctx);
-        let theme = self.build_manual_theme(ctx, self.bg_image.as_deref());
+        let slug = slugify(&name);
+
+        // Share the image by the name it will have *in the gallery repo*, not the path it happens
+        // to sit at on this machine. `self.bg_image` is wherever the user picked the file from, so
+        // serializing it verbatim produced a YAML pointing at someone's Pictures folder. A
+        // relative name works because the deserializer resolves anything non-absolute against the
+        // themes dir, so it lands correctly on whoever installs the theme next.
+        let shared_image = self
+            .bg_image
+            .as_ref()
+            .map(|_| PathBuf::from(format!("./{slug}.{}", theme_background_image::IMPORTED_EXTENSION)));
+        let theme = self.build_manual_theme(ctx, shared_image.as_deref());
         let yaml = match serde_yaml::to_string(&theme) {
             Ok(yaml) => yaml,
             Err(e) => {
@@ -659,8 +658,12 @@ impl ThemeCreatorBody {
                 return;
             }
         };
-        let path = format!("{COMMUNITY_THEME_DIR}/{}.yaml", slugify(&name));
-        let has_image = self.bg_image.is_some();
+        let path = format!("{COMMUNITY_THEME_DIR}/{slug}.yaml");
+        // Named so the toast can tell the user exactly which file to attach and what to call it.
+        let image_file_name = shared_image
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().into_owned());
 
         let lookup_path = path.clone();
         ctx.spawn(
@@ -697,14 +700,19 @@ impl ThemeCreatorBody {
                 };
                 ctx.open_url(&url);
 
-                // Background images can't ride a query string, so they always need a manual step.
-                let image_note = has_image.then_some(
-                    "Attach your background image to the PR — it isn't included automatically.",
-                );
+                // A GitHub file-editor URL carries text only — a background image cannot ride a
+                // query string at any size, so attaching it stays a manual step. The theme now
+                // references it by the name below, so that is what the file has to be called.
+                let image_note = image_file_name.as_ref().map(|file_name| {
+                    format!(
+                        "Attach your background image to the PR as \"{file_name}\" — it can't be \
+                         included automatically."
+                    )
+                });
                 let message = match (note, image_note) {
                     (Some(note), Some(image)) => Some(format!("{note} {image}")),
                     (Some(note), None) => Some(note),
-                    (None, Some(image)) => Some(image.to_string()),
+                    (None, Some(image)) => Some(image),
                     (None, None) => None,
                 };
                 if let Some(message) = message {
