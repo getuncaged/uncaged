@@ -4,19 +4,20 @@ use std::path::{Path, PathBuf};
 use std::{fs::copy, io::Write};
 
 use pathfinder_color::ColorU;
-use pathfinder_geometry::vector::vec2f;
+use pathfinder_geometry::vector::{vec2f, Vector2F};
 use settings::Setting as _;
-use warp_core::ui::color::hex_color::coloru_from_hex_string;
+use palette::{FromColor, Hsv, Srgb};
+use warp_core::ui::color::hex_color::{coloru_from_hex_string, coloru_to_hex_string};
 use warp_core::ui::theme::{
     AnsiColors, Details, Fill as ThemeFill, Image as ThemeImage, TerminalColors, VerticalGradient,
     WarpTheme,
 };
 use warpui::assets::asset_cache::AssetSource;
 use warpui::elements::{
-    Border, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, CornerRadius,
+    Border, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DispatchEventResult, EventHandler, Fill, Flex, Icon, MainAxisAlignment,
-    MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, SavePosition, ScrollbarWidth,
-    Shrinkable, Text,
+    MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, SavePosition, Shrinkable, Stack,
+    Text,
 };
 use warpui::fonts::Weight;
 use warpui::platform::Cursor;
@@ -25,7 +26,8 @@ use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::slider::SliderStateHandle;
 use warpui::ui_components::text_input::TextInput;
 use warpui::{
-    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+    AppContext, Element, Entity, EventContext, SingletonEntity, TypedActionView, View, ViewContext,
+    ViewHandle,
 };
 
 use crate::appearance::{Appearance, AppearanceManager};
@@ -134,9 +136,21 @@ pub struct ThemeCreatorBody {
     bg_image_opacity_slider: SliderStateHandle,
     window_opacity_slider: SliderStateHandle,
     window_blur_slider: SliderStateHandle,
+    /// Which colour slot currently has its picker expanded, if any.
+    open_picker: Option<usize>,
+    /// The open picker's colour as hue (0–360), saturation and value (both 0–1).
+    ///
+    /// This is the picker's source of truth rather than the slot's `ColorU`, because HSV loses
+    /// information at the edges: every fully-dark colour is black whatever its hue, and every
+    /// desaturated one is grey. Re-deriving these from the colour each frame would make the hue
+    /// strip jump back to red the moment you dragged into a corner, so the wheel remembers where
+    /// you actually are and only the *colour* is derived. Photoshop behaves the same way.
+    picker_hsv: (f32, f32, f32),
+    /// Whether a drag that began inside the saturation/value square is still in progress, so
+    /// pointer drags that merely pass over the square don't repaint the colour.
+    picker_dragging: bool,
     share_mouse_state: MouseStateHandle,
     pick_image_mouse_state: MouseStateHandle,
-    scroll_state: ClippedScrollStateHandle,
 }
 
 #[derive(Debug, Clone)]
@@ -156,6 +170,17 @@ pub enum ThemeCreatorBodyAction {
     SetBackgroundImageOpacity(f32),
     SetWindowOpacity(f32),
     SetWindowBlurRadius(f32),
+    /// Expand/collapse the colour picker for a colour slot.
+    TogglePicker(usize),
+    /// A click or drag inside the saturation/value square, in normalized element coordinates:
+    /// `x` runs 0 (grey) → 1 (saturated), `y` runs 0 (bright) → 1 (black).
+    PickSaturationValue { x: f32, y: f32, start_drag: bool },
+    /// A click or drag on the hue strip, as a normalized 0–1 position down the strip.
+    PickHue(f32),
+    /// The pointer was released, ending any saturation/value drag.
+    EndPickerDrag,
+    /// Apply a preset swatch (0xRRGGBB) to the slot whose picker is open.
+    SetPresetColor(u32),
     PickBackgroundImage,
     ShareTheme,
 }
@@ -229,9 +254,11 @@ impl ThemeCreatorBody {
             bg_image_opacity_slider: Default::default(),
             window_opacity_slider: Default::default(),
             window_blur_slider: Default::default(),
+            open_picker: None,
+            picker_hsv: (0., 0., 0.),
+            picker_dragging: false,
             share_mouse_state: Default::default(),
             pick_image_mouse_state: Default::default(),
-            scroll_state: Default::default(),
         }
     }
 
@@ -466,6 +493,10 @@ impl ThemeCreatorBody {
                 self.manual_colors[i] = color;
             }
         }
+        // Typing a hex is the other half of the same control, so move the wheel to match it.
+        if let Some(index) = self.open_picker {
+            self.resync_picker_from_slot(index);
+        }
         self.refresh_manual_preview(ctx);
     }
 
@@ -662,6 +693,81 @@ impl ThemeCreatorBody {
         self.refresh_manual_preview(ctx);
     }
 
+    /// Expands the colour wheel for `index`, collapsing whichever one was open, and seeds the
+    /// wheel's position from that slot's current colour.
+    fn toggle_picker(&mut self, index: usize, ctx: &mut ViewContext<Self>) {
+        self.open_picker = if self.open_picker == Some(index) {
+            None
+        } else {
+            self.picker_hsv = coloru_to_hsv(self.manual_colors[index]);
+            Some(index)
+        };
+        self.picker_dragging = false;
+        ctx.notify();
+    }
+
+    /// Moves the wheel's crosshair to a point in the saturation/value square. `x`/`y` arrive
+    /// normalized to the square, with `y` measured downwards from the bright edge.
+    fn pick_saturation_value(
+        &mut self,
+        x: f32,
+        y: f32,
+        start_drag: bool,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if start_drag {
+            self.picker_dragging = true;
+        } else if !self.picker_dragging {
+            // A drag that began somewhere else and happens to pass over the square shouldn't
+            // repaint the colour under the pointer.
+            return;
+        }
+        self.picker_hsv.1 = x.clamp(0., 1.);
+        self.picker_hsv.2 = (1.0 - y).clamp(0., 1.);
+        self.apply_picker_hsv(ctx);
+    }
+
+    /// Moves the hue strip's marker, keeping saturation and value where the user left them.
+    fn pick_hue(&mut self, position: f32, ctx: &mut ViewContext<Self>) {
+        self.picker_hsv.0 = (position.clamp(0., 1.) * 360.0).clamp(0., 360.0);
+        self.apply_picker_hsv(ctx);
+    }
+
+    /// Writes the wheel's current HSV position into the open slot as a concrete colour.
+    fn apply_picker_hsv(&mut self, ctx: &mut ViewContext<Self>) {
+        let (hue, saturation, value) = self.picker_hsv;
+        self.apply_color_to_open_slot(hsv_to_coloru(hue, saturation, value), ctx);
+    }
+
+    /// Writes `color` into the slot whose picker is open, keeping the hex field in sync so the two
+    /// inputs never disagree, and refreshes the live preview.
+    fn apply_color_to_open_slot(&mut self, color: ColorU, ctx: &mut ViewContext<Self>) {
+        let Some(index) = self.open_picker else {
+            return;
+        };
+        self.manual_colors[index] = color;
+        let hex = coloru_to_hex_string(&color);
+        self.color_editors[index].update(ctx, |editor, ctx| {
+            editor.set_buffer_text(&hex, ctx);
+        });
+        self.refresh_manual_preview(ctx);
+    }
+
+    /// Re-seeds the wheel from the open slot's colour after that colour was changed by something
+    /// other than the wheel — typing in the hex field, or clicking a preset swatch.
+    ///
+    /// A colour that is fully dark or fully grey doesn't say what hue it came from, so in those
+    /// cases the wheel keeps the hue it already had rather than snapping the strip back to red.
+    fn resync_picker_from_slot(&mut self, index: usize) {
+        let (hue, saturation, value) = coloru_to_hsv(self.manual_colors[index]);
+        let hue = if saturation <= f32::EPSILON || value <= f32::EPSILON {
+            self.picker_hsv.0
+        } else {
+            hue
+        };
+        self.picker_hsv = (hue, saturation, value);
+    }
+
     /// Window opacity and blur are window-level settings rather than theme fields, but they're
     /// part of "how my terminal looks", so they're editable here and applied live to every window.
     fn set_window_opacity(&mut self, value: f32, ctx: &mut ViewContext<Self>) {
@@ -717,17 +823,31 @@ impl ThemeCreatorBody {
         let color = self.manual_colors[index];
         let theme = appearance.theme();
 
-        let swatch = ConstrainedBox::new(
-            Rect::new()
-                .with_background_color(color)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
-                .with_border(
-                    Border::all(1.).with_border_fill(theme.main_text_color(theme.background())),
-                )
-                .finish(),
+        // The swatch is the picker's affordance: click it to open sliders for this colour. The hex
+        // field beside it stays editable for anyone who'd rather type a value.
+        let is_open = self.open_picker == Some(index);
+        let swatch = EventHandler::new(
+            ConstrainedBox::new(
+                Rect::new()
+                    .with_background_color(color)
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_border(
+                        Border::all(if is_open { 2. } else { 1. }).with_border_fill(if is_open {
+                            theme.accent()
+                        } else {
+                            theme.main_text_color(theme.background())
+                        }),
+                    )
+                    .finish(),
+            )
+            .with_width(26.)
+            .with_height(26.)
+            .finish(),
         )
-        .with_width(26.)
-        .with_height(26.)
+        .on_left_mouse_down(move |ctx, _, _| {
+            ctx.dispatch_typed_action(ThemeCreatorBodyAction::TogglePicker(index));
+            DispatchEventResult::StopPropagation
+        })
         .finish();
 
         let input = ConstrainedBox::new(
@@ -752,7 +872,7 @@ impl ThemeCreatorBody {
             .with_width(130.)
             .finish();
 
-        Container::new(
+        let row = Container::new(
             Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_child(label_el)
@@ -761,7 +881,215 @@ impl ThemeCreatorBody {
                 .finish(),
         )
         .with_vertical_padding(4.)
+        .finish();
+
+        if !is_open {
+            return row;
+        }
+
+        let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        column.add_child(row);
+        column.add_child(self.render_color_picker(color, appearance));
+        column.finish()
+    }
+
+    /// The expanded colour wheel for a slot: a saturation/value square with a crosshair you drag,
+    /// a hue strip down the side, and quick-pick swatches — the arrangement every image editor
+    /// uses. The hex field in the row above stays live the whole time, so you can drag to find a
+    /// shade or type an exact value, whichever you prefer.
+    fn render_color_picker(&self, _color: ColorU, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let (hue, saturation, value) = self.picker_hsv;
+        let outline = theme.disabled_text_color(theme.background());
+
+        let wheel = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(self.render_saturation_value_square(hue, saturation, value, outline))
+            .with_child(
+                Container::new(self.render_hue_strip(hue, outline))
+                    .with_margin_left(10.)
+                    .finish(),
+            )
+            .finish();
+
+        let mut picker = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Start);
+        picker.add_child(wheel);
+        picker.add_child(
+            Container::new(self.render_preset_swatches(outline))
+                .with_margin_top(10.)
+                .finish(),
+        );
+
+        Container::new(picker.finish())
+            .with_margin_left(130.)
+            .with_margin_top(6.)
+            .with_margin_bottom(10.)
+            .finish()
+    }
+
+    /// The saturation/value square.
+    ///
+    /// The renderer draws two-stop linear gradients, so a genuine 2D field is built the way image
+    /// editors build it: the pure hue underneath, a white-to-clear wash across for saturation, and
+    /// a clear-to-black wash down for value. Stacked, they multiply out to the familiar square.
+    fn render_saturation_value_square(
+        &self,
+        hue: f32,
+        saturation: f32,
+        value: f32,
+        outline: ThemeFill,
+    ) -> Box<dyn Element> {
+        let radius = CornerRadius::with_all(Radius::Pixels(6.));
+
+        let mut square = Stack::new();
+        square.add_child(
+            Rect::new()
+                .with_background_color(hsv_to_coloru(hue, 1.0, 1.0))
+                .with_corner_radius(radius)
+                .finish(),
+        );
+        square.add_child(
+            Rect::new()
+                .with_horizontal_background_gradient(OPAQUE_WHITE, CLEAR_WHITE)
+                .with_corner_radius(radius)
+                .finish(),
+        );
+        square.add_child(
+            Rect::new()
+                .with_background_gradient(vec2f(0.0, 0.0), vec2f(0.0, 1.0), CLEAR_BLACK, OPAQUE_BLACK)
+                .with_corner_radius(radius)
+                .finish(),
+        );
+        square.add_child(
+            Rect::new()
+                .with_corner_radius(radius)
+                .with_border(Border::all(1.).with_border_fill(outline))
+                .finish(),
+        );
+        square.add_child(render_crosshair(saturation, value));
+
+        EventHandler::new(
+            SavePosition::new(
+                ConstrainedBox::new(square.finish())
+                    .with_width(SV_SQUARE_WIDTH)
+                    .with_height(SV_SQUARE_HEIGHT)
+                    .finish(),
+                SV_SQUARE_POSITION_ID,
+            )
+            .finish(),
+        )
+        .on_left_mouse_down(|ctx, _, position| {
+            if let Some((x, y)) = normalized_position_in(ctx, SV_SQUARE_POSITION_ID, position) {
+                ctx.dispatch_typed_action(ThemeCreatorBodyAction::PickSaturationValue {
+                    x,
+                    y,
+                    start_drag: true,
+                });
+            }
+            DispatchEventResult::StopPropagation
+        })
+        .on_mouse_dragged(|ctx, _, position| {
+            if let Some((x, y)) = normalized_position_in(ctx, SV_SQUARE_POSITION_ID, position) {
+                ctx.dispatch_typed_action(ThemeCreatorBodyAction::PickSaturationValue {
+                    x,
+                    y,
+                    start_drag: false,
+                });
+            }
+            DispatchEventResult::StopPropagation
+        })
+        .on_left_mouse_up(|ctx, _, _| {
+            ctx.dispatch_typed_action(ThemeCreatorBodyAction::EndPickerDrag);
+            DispatchEventResult::StopPropagation
+        })
         .finish()
+    }
+
+    /// The hue strip beside the square: the spectrum as six two-stop gradients stacked end to end,
+    /// with a marker showing where the current hue sits.
+    fn render_hue_strip(&self, hue: f32, outline: ThemeFill) -> Box<dyn Element> {
+        let segment_height = SV_SQUARE_HEIGHT / (HUE_STOPS.len() - 1) as f32;
+
+        let mut spectrum = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        for pair in HUE_STOPS.windows(2) {
+            let (from, to) = (rgb_to_coloru(pair[0]), rgb_to_coloru(pair[1]));
+            spectrum.add_child(
+                ConstrainedBox::new(
+                    Rect::new()
+                        .with_background_gradient(vec2f(0.0, 0.0), vec2f(0.0, 1.0), from, to)
+                        .finish(),
+                )
+                .with_width(HUE_STRIP_WIDTH)
+                .with_height(segment_height)
+                .finish(),
+            );
+        }
+
+        let mut strip = Stack::new();
+        strip.add_child(spectrum.finish());
+        strip.add_child(
+            Rect::new()
+                .with_border(Border::all(1.).with_border_fill(outline))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+                .finish(),
+        );
+        strip.add_child(render_hue_marker(hue));
+
+        EventHandler::new(
+            SavePosition::new(
+                ConstrainedBox::new(strip.finish())
+                    .with_width(HUE_STRIP_WIDTH)
+                    .with_height(SV_SQUARE_HEIGHT)
+                    .finish(),
+                HUE_STRIP_POSITION_ID,
+            )
+            .finish(),
+        )
+        .on_left_mouse_down(|ctx, _, position| {
+            if let Some((_, y)) = normalized_position_in(ctx, HUE_STRIP_POSITION_ID, position) {
+                ctx.dispatch_typed_action(ThemeCreatorBodyAction::PickHue(y));
+            }
+            DispatchEventResult::StopPropagation
+        })
+        .on_mouse_dragged(|ctx, _, position| {
+            if let Some((_, y)) = normalized_position_in(ctx, HUE_STRIP_POSITION_ID, position) {
+                ctx.dispatch_typed_action(ThemeCreatorBodyAction::PickHue(y));
+            }
+            DispatchEventResult::StopPropagation
+        })
+        .finish()
+    }
+
+    /// Quick-pick swatches, so the common choices stay one click away.
+    fn render_preset_swatches(&self, outline: ThemeFill) -> Box<dyn Element> {
+        let mut presets = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        for rgb in PRESET_COLORS {
+            let preset = ColorU::from_u32((rgb << 8) | 0xFF);
+            presets.add_child(
+                Container::new(
+                    EventHandler::new(
+                        ConstrainedBox::new(
+                            Rect::new()
+                                .with_background_color(preset)
+                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+                                .with_border(Border::all(1.).with_border_fill(outline))
+                                .finish(),
+                        )
+                        .with_width(18.)
+                        .with_height(18.)
+                        .finish(),
+                    )
+                    .on_left_mouse_down(move |ctx, _, _| {
+                        ctx.dispatch_typed_action(ThemeCreatorBodyAction::SetPresetColor(rgb));
+                        DispatchEventResult::StopPropagation
+                    })
+                    .finish(),
+                )
+                .with_margin_right(5.)
+                .finish(),
+            );
+        }
+        presets.finish()
     }
 
     /// A small pill button that dispatches `action` when clicked.
@@ -1100,6 +1428,172 @@ impl ThemeCreatorBody {
             .with_child(buttons)
             .finish()
     }
+}
+
+// ── Colour wheel geometry ────────────────────────────────────────────────────
+//
+// The square's size is fixed here rather than measured, because the crosshair is positioned with
+// plain spacers and has to agree with the element it sits on.
+const SV_SQUARE_WIDTH: f32 = 232.;
+const SV_SQUARE_HEIGHT: f32 = 148.;
+const HUE_STRIP_WIDTH: f32 = 20.;
+const CROSSHAIR_SIZE: f32 = 14.;
+const HUE_MARKER_HEIGHT: f32 = 6.;
+
+/// Position IDs used to turn a global pointer position into one local to the wheel. Only one
+/// slot's wheel is open at a time, so one ID apiece is enough.
+const SV_SQUARE_POSITION_ID: &str = "theme_creator_sv_square";
+const HUE_STRIP_POSITION_ID: &str = "theme_creator_hue_strip";
+
+const OPAQUE_WHITE: ColorU = ColorU { r: 255, g: 255, b: 255, a: 255 };
+const CLEAR_WHITE: ColorU = ColorU { r: 255, g: 255, b: 255, a: 0 };
+const OPAQUE_BLACK: ColorU = ColorU { r: 0, g: 0, b: 0, a: 255 };
+const CLEAR_BLACK: ColorU = ColorU { r: 0, g: 0, b: 0, a: 0 };
+
+/// The corners of the hue spectrum, red round to red, as gradient stops for the strip.
+const HUE_STOPS: [(u8, u8, u8); 7] = [
+    (255, 0, 0),
+    (255, 255, 0),
+    (0, 255, 0),
+    (0, 255, 255),
+    (0, 0, 255),
+    (255, 0, 255),
+    (255, 0, 0),
+];
+
+fn rgb_to_coloru((r, g, b): (u8, u8, u8)) -> ColorU {
+    ColorU::new(r, g, b, 255)
+}
+
+/// A transparent box that pushes an overlay to where it belongs inside the wheel.
+fn spacer(width: f32, height: f32) -> Box<dyn Element> {
+    ConstrainedBox::new(Rect::new().finish())
+        .with_width(width)
+        .with_height(height)
+        .finish()
+}
+
+/// The crosshair marking the picked saturation/value.
+///
+/// It's ringed in white inside and dark outside so it stays visible over any part of the square —
+/// a plain white ring vanishes against the top-left corner, and a dark one against the bottom.
+fn render_crosshair(saturation: f32, value: f32) -> Box<dyn Element> {
+    let half = CROSSHAIR_SIZE / 2.;
+    let x = (saturation.clamp(0., 1.) * SV_SQUARE_WIDTH - half).clamp(0., SV_SQUARE_WIDTH - CROSSHAIR_SIZE);
+    let y = ((1.0 - value.clamp(0., 1.)) * SV_SQUARE_HEIGHT - half)
+        .clamp(0., SV_SQUARE_HEIGHT - CROSSHAIR_SIZE);
+
+    let mut rings = Stack::new();
+    rings.add_child(
+        Rect::new()
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(half)))
+            .with_border(Border::all(1.).with_border_fill(ColorU::new(0, 0, 0, 160)))
+            .finish(),
+    );
+    rings.add_child(
+        Container::new(
+            Rect::new()
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(half - 1.)))
+                .with_border(Border::all(2.).with_border_fill(OPAQUE_WHITE))
+                .finish(),
+        )
+        .with_uniform_margin(1.)
+        .finish(),
+    );
+
+    Flex::column()
+        .with_main_axis_size(MainAxisSize::Min)
+        .with_child(spacer(0., y))
+        .with_child(
+            Flex::row()
+                .with_main_axis_size(MainAxisSize::Min)
+                .with_child(spacer(x, 0.))
+                .with_child(
+                    ConstrainedBox::new(rings.finish())
+                        .with_width(CROSSHAIR_SIZE)
+                        .with_height(CROSSHAIR_SIZE)
+                        .finish(),
+                )
+                .finish(),
+        )
+        .finish()
+}
+
+/// The bar showing where the current hue sits on the strip.
+fn render_hue_marker(hue: f32) -> Box<dyn Element> {
+    let y = ((hue.clamp(0., 360.) / 360.0) * SV_SQUARE_HEIGHT - HUE_MARKER_HEIGHT / 2.)
+        .clamp(0., SV_SQUARE_HEIGHT - HUE_MARKER_HEIGHT);
+
+    Flex::column()
+        .with_main_axis_size(MainAxisSize::Min)
+        .with_child(spacer(0., y))
+        .with_child(
+            ConstrainedBox::new(
+                Rect::new()
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(2.)))
+                    .with_border(Border::all(2.).with_border_fill(OPAQUE_WHITE))
+                    .finish(),
+            )
+            .with_width(HUE_STRIP_WIDTH)
+            .with_height(HUE_MARKER_HEIGHT)
+            .finish(),
+        )
+        .finish()
+}
+
+/// Turns a global pointer position into a 0–1 position inside the element saved under
+/// `position_id`, or `None` if that element hasn't been laid out yet.
+fn normalized_position_in(
+    ctx: &EventContext,
+    position_id: &str,
+    position: Vector2F,
+) -> Option<(f32, f32)> {
+    let rect = ctx.element_position_by_id(position_id)?;
+    if rect.width() <= 0.0 || rect.height() <= 0.0 {
+        return None;
+    }
+    Some((
+        ((position.x() - rect.origin_x()) / rect.width()).clamp(0., 1.),
+        ((position.y() - rect.origin_y()) / rect.height()).clamp(0., 1.),
+    ))
+}
+
+/// Quick-pick swatches shown in the picker: the Uncaged ember palette plus a neutral ramp and the
+/// usual terminal hues, so most choices are one click.
+const PRESET_COLORS: [u32; 14] = [
+    0x15110c, 0x2c2620, 0x8c8378, 0xece6dc, 0xffffff, 0xffce4e, 0xff7a18, 0xff3b47, 0xff6b5e,
+    0x8fd46e, 0x5fc9be, 0x74b4e0, 0xc8a9f0, 0xf090c0,
+];
+
+/// Splits a colour into hue (0–360), saturation and value (both 0–1).
+///
+/// The wheel works in HSV rather than HSL because the saturation/value square is an HSV plane:
+/// full value across the top, black along the bottom. An HSL square would put white and black in
+/// opposite corners and waste half its area.
+fn coloru_to_hsv(color: ColorU) -> (f32, f32, f32) {
+    let srgb = Srgb::new(
+        color.r as f32 / 255.0,
+        color.g as f32 / 255.0,
+        color.b as f32 / 255.0,
+    );
+    let hsv = Hsv::from_color(srgb);
+    (
+        hsv.hue.to_positive_degrees(),
+        hsv.saturation.clamp(0.0, 1.0),
+        hsv.value.clamp(0.0, 1.0),
+    )
+}
+
+/// Rebuilds an opaque colour from hue (0–360), saturation and value (both 0–1).
+fn hsv_to_coloru(hue: f32, saturation: f32, value: f32) -> ColorU {
+    let hsv = Hsv::new(hue, saturation.clamp(0.0, 1.0), value.clamp(0.0, 1.0));
+    let srgb = Srgb::from_color(hsv);
+    ColorU::new(
+        (srgb.red.clamp(0.0, 1.0) * 255.0).round() as u8,
+        (srgb.green.clamp(0.0, 1.0) * 255.0).round() as u8,
+        (srgb.blue.clamp(0.0, 1.0) * 255.0).round() as u8,
+        255,
+    )
 }
 
 /// A section heading label.
@@ -1518,6 +2012,20 @@ impl TypedActionView for ThemeCreatorBody {
             ThemeCreatorBodyAction::SetWindowOpacity(value) => self.set_window_opacity(*value, ctx),
             ThemeCreatorBodyAction::SetWindowBlurRadius(value) => {
                 self.set_window_blur_radius(*value, ctx)
+            }
+            ThemeCreatorBodyAction::TogglePicker(index) => self.toggle_picker(*index, ctx),
+            ThemeCreatorBodyAction::PickSaturationValue { x, y, start_drag } => {
+                self.pick_saturation_value(*x, *y, *start_drag, ctx)
+            }
+            ThemeCreatorBodyAction::PickHue(position) => self.pick_hue(*position, ctx),
+            ThemeCreatorBodyAction::EndPickerDrag => self.picker_dragging = false,
+            ThemeCreatorBodyAction::SetPresetColor(rgb) => {
+                let color = ColorU::from_u32((rgb << 8) | 0xFF);
+                self.apply_color_to_open_slot(color, ctx);
+                // Move the wheel onto the swatch the user just clicked.
+                if let Some(index) = self.open_picker {
+                    self.resync_picker_from_slot(index);
+                }
             }
             ThemeCreatorBodyAction::PickBackgroundImage => {
                 ctx.emit(ThemeCreatorBodyEvent::OpenFilePicker);
