@@ -1,0 +1,28 @@
+app/src/themes/theme_background_image.rs
+  s_6e5dc450e2113a::t_992c299a2d447b 1-73,75,83-95,100,113-117
+  s_6e5dc450e2113a::t_d0e7faf3b7d945 74,76-82,96-99,101-112
+app/src/themes/theme_background_image_tests.rs
+  s_6e5dc450e2113a::t_9d9a6604b1024e 1-105
+app/src/themes/theme_creator_body.rs
+  s_6e5dc450e2113a::t_780e8a4825d337 4,36,401-402,407,415-420,605-606,608-614,616
+  s_6e5dc450e2113a::t_717e0c5ce690fc 373-377,383
+  s_6e5dc450e2113a::t_0ba85d3aed5798 642-653,661-666,703-711,715
+app/src/themes/mod.rs
+  s_6e5dc450e2113a::t_780e8a4825d337 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "a0dedd619effc77cc3bbcf75ece4156a60bc146a",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
