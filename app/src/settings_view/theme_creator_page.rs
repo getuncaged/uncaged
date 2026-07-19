@@ -58,7 +58,10 @@ impl ThemeCreatorPageView {
             page: PageType::new_monolith(
                 ThemeCreatorWidget,
                 Some("Create your own custom theme"),
-                false,
+                // Let the page own its scrolling. The editor is taller than any window once the
+                // colour wheel is open, and unlike the modal it came from it renders no scrollable
+                // of its own — passing `false` here would leave the overflow simply unreachable.
+                true,
             ),
             body,
         }
