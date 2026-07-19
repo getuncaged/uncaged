@@ -49,6 +49,7 @@ const CLOSE_BUTTON_MARGIN_RIGHT: f32 = 6.;
 const TITLE_FONT_SIZE: f32 = 16.;
 const TITLE_MARGIN: f32 = 12.;
 const SCROLLBAR_WIDTH: ScrollbarWidth = ScrollbarWidth::Auto;
+const THEME_BADGE_FONT_SIZE: f32 = 10.;
 const THEME_NAME_FONT_SIZE: f32 = 14.;
 const THEME_NAME_MARGIN_LEFT: f32 = 16.;
 const DELETE_BUTTON_LINE_WIDTH: f32 = 10.;
@@ -734,6 +735,10 @@ impl ThemeChooser {
                 let font_family = appearance.ui_font_family();
                 let monospace_font_family = appearance.monospace_font_family();
                 let text_color = appearance.theme().active_ui_text_color().into();
+                let badge_text_color = appearance
+                    .theme()
+                    .disabled_text_color(appearance.theme().surface_2())
+                    .into_solid();
                 let selected_background_color = appearance.theme().surface_2();
 
                 themes
@@ -752,6 +757,7 @@ impl ThemeChooser {
                             font_family,
                             monospace_font_family,
                             text_color,
+                            badge_text_color,
                             selected_background_color.into(),
                         );
                         EventHandler::new(element)
@@ -873,6 +879,7 @@ impl ThemeChooserItem {
         font_family: FamilyId,
         monospace_font_family: FamilyId,
         text_color: ColorU,
+        badge_text_color: ColorU,
         selected_background_color: ColorU,
     ) -> Box<dyn Element> {
         Hoverable::new(self.mouse_state.clone(), |state| {
@@ -898,6 +905,20 @@ impl ThemeChooserItem {
                 .with_child(name_text)
                 .with_main_axis_size(MainAxisSize::Max)
                 .with_main_axis_alignment(MainAxisAlignment::SpaceBetween);
+
+            // Where the theme came from. Built-ins carry no badge — they are the unremarkable
+            // case, and tagging two dozen of them would be noise rather than information.
+            if let Some(badge) = self.kind.group().badge() {
+                name_with_delete.add_child(
+                    Container::new(
+                        Text::new_inline(badge.to_string(), font_family, THEME_BADGE_FONT_SIZE)
+                            .with_color(badge_text_color)
+                            .finish(),
+                    )
+                    .with_margin_right(THEME_NAME_MARGIN_LEFT)
+                    .finish(),
+                );
+            }
 
             // Only show deletion button if custom theme and on hover
             if matches!(self.kind, ThemeKind::Custom(_)) && state.is_hovered() {
