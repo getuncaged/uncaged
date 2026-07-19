@@ -1,0 +1,30 @@
+app/src/workspace/view.rs
+  s_6e5dc450e2113a::t_871a8d3c28392b 26386,26397
+  s_6e5dc450e2113a::t_a28719942c6ed5 26360-26372
+  s_6e5dc450e2113a::t_182261c831b508 27466-27474
+  s_19ea60e5ecfa24::t_3300d7113e93aa 27475
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b7eb1956576b4ecf07bd59a81a5c66f4aa2a6711",
+  "prompts": {},
+  "sessions": {
+    "s_19ea60e5ecfa24": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1f287062-b533-421b-923e-087d18d346f1",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    },
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
