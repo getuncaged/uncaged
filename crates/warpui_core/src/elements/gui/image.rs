@@ -278,7 +278,8 @@ impl Image {
             }
             _ => image.size().to_f32(),
         };
-        let logical_image_size = desired_image_size / ctx.scene.scale_factor();
+        let logical_image_size =
+            cover_at_least(desired_image_size / ctx.scene.scale_factor(), size, self.fit_type);
         let Some(rect) = image_rect(
             size,
             origin,
@@ -396,17 +397,26 @@ fn dimensions(original: Vector2F, dest: Vector2F, fit_type: FitType) -> Vector2F
 
     let x = original.x() * ratio;
     let y = original.y() * ratio;
-    let size = vec2f(x.max(1.), y.max(1.));
 
+    vec2f(x.max(1.), y.max(1.)).round()
+}
+
+/// Enforces Cover's actual promise: the drawn image is never smaller than the element it covers.
+///
+/// This can't be done in [`dimensions`] alone, because by the time it runs the shortfall has
+/// already happened. `paint` converts the element size to whole physical pixels with `to_i32()`,
+/// which truncates; `dimensions` then fits the bitmap to those truncated bounds, and dividing back
+/// by the scale factor lands a fraction under the element. The image is centred, so that fraction
+/// splits across opposite edges as a hairline of whatever sits behind — on a window with a
+/// background image, that hairline is the terminal background painting over nothing, which reads
+/// as the theme's undimmed colour down the edges.
+///
+/// Only Cover is clamped. Contain promises the opposite — never exceed the element — so it keeps
+/// whatever `dimensions` produced.
+fn cover_at_least(logical_image_size: Vector2F, element_size: Vector2F, fit_type: FitType) -> Vector2F {
     match fit_type {
-        // Cover promises to fill its container, so round *up*. Rounding to nearest can land up to
-        // half a pixel short on the axis that fits exactly, and since the image is then centred
-        // (see `image_rect`) that shortfall splits across opposite edges — leaving a hairline of
-        // whatever sits behind showing through. On a themed window that hairline is the terminal
-        // background painting over nothing, which reads as the theme's raw colour down the edges.
-        FitType::Cover => size.ceil(),
-        // Contain promises the opposite — never exceed the container — so nearest-pixel stays.
-        _ => size.round(),
+        FitType::Cover => logical_image_size.max(element_size),
+        _ => logical_image_size,
     }
 }
 

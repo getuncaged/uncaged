@@ -119,38 +119,41 @@ fn loading_timeout_survives_image_rebuild_for_same_source() {
     assert_eq!(timed_out_repaint_after, None);
 }
 
-/// A `Cover` image must never come out smaller than the box it is covering.
+/// Cover must never draw smaller than the element it covers.
 ///
-/// The sizes here are the realistic failure: an image whose aspect ratio makes the covering scale
-/// land on a fraction. Rounding to nearest used to shave that fraction off, and because the image
-/// is centred the missing strip split across opposite edges as a hairline of background.
+/// The regression this pins: `paint` truncates the element size to whole physical pixels with
+/// `to_i32()` before fitting the bitmap, so dividing back by the scale factor can land a fraction
+/// short. Centred, that fraction became a hairline of background down the window edges.
 #[test]
-fn cover_never_rounds_below_the_destination() {
-    let original = vec2f(1000., 750.);
+fn cover_is_clamped_to_the_element_it_covers() {
+    let element = vec2f(507.7, 314.85);
+    let scale = 2.0;
 
-    for dest in [
-        vec2f(1015., 630.),
-        vec2f(1279., 831.),
-        vec2f(1440.5, 900.5),
-        vec2f(333., 777.),
-    ] {
-        let covered = dimensions(original, dest, FitType::Cover);
-        assert!(
-            covered.x() >= dest.x() && covered.y() >= dest.y(),
-            "cover {dest:?} produced {covered:?}, which leaves an uncovered edge",
-        );
-    }
+    // Reproduce the real pipeline: truncate to physical pixels, fit, then convert back.
+    let bounds = (element * scale).to_i32();
+    let desired = dimensions(vec2f(1000., 750.), bounds.to_f32(), FitType::Cover);
+    let logical = desired / scale;
+
+    assert!(
+        logical.x() < element.x() || logical.y() < element.y(),
+        "expected the truncation to leave a shortfall, got {logical:?} for {element:?}",
+    );
+
+    let clamped = cover_at_least(logical, element, FitType::Cover);
+    assert!(
+        clamped.x() >= element.x() && clamped.y() >= element.y(),
+        "cover {element:?} still short at {clamped:?}",
+    );
 }
 
-/// The mirror of the above: `Contain` must never exceed its box, so it keeps nearest-pixel rounding.
+/// Contain promises the opposite, so it must be left alone.
 #[test]
-fn contain_never_exceeds_the_destination() {
-    let original = vec2f(1000., 750.);
-    let dest = vec2f(1015., 630.);
+fn contain_is_not_clamped_up() {
+    let element = vec2f(500., 300.);
+    let contained = vec2f(400., 300.);
 
-    let contained = dimensions(original, dest, FitType::Contain);
-    assert!(
-        contained.x() <= dest.x() && contained.y() <= dest.y(),
-        "contain {dest:?} produced {contained:?}, which overflows",
+    assert_eq!(
+        cover_at_least(contained, element, FitType::Contain),
+        contained,
     );
 }
