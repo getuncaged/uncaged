@@ -26357,6 +26357,19 @@ impl View for Workspace {
             }
         }
 
+        // The dimming veil over a background image is painted at window level instead of here, so
+        // that it covers exactly the area the image does. This container is sized to its content
+        // (tab bar + panels); when that lays out even a fraction short of the window, a veil
+        // painted here stops before the edge while the full-bleed image does not, and the
+        // undimmed image shows through as a bright rim along the edges. Painting it in both
+        // places would dim twice, so with an image this one goes transparent.
+        let has_background_image = appearance.theme().background_image().is_some();
+        let panels_background = if has_background_image {
+            warpui::elements::Fill::None
+        } else {
+            util::get_terminal_background_fill(self.window_id, app)
+        };
+
         let panels = if use_simplified_wasm_tab_bar {
             // For the simplified WASM tab bar, we want to render the tab bar on top of all other content
             // so that content being added/moved around in the workspace (for example the details panel being toggled)
@@ -26370,7 +26383,7 @@ impl View for Workspace {
             let panels_row = self.render_panels(app, Shrinkable::new(1.0, content).finish(), true);
             outer_column.add_child(Shrinkable::new(1.0, panels_row).finish());
             Container::new(outer_column.finish())
-                .with_background(util::get_terminal_background_fill(self.window_id, app))
+                .with_background(panels_background)
                 .finish()
         } else {
             let mut outer_column = Flex::column();
@@ -26381,7 +26394,7 @@ impl View for Workspace {
             let panels_row = self.render_panels(app, Shrinkable::new(1.0, content).finish(), false);
             outer_column.add_child(Shrinkable::new(1.0, panels_row).finish());
             Container::new(outer_column.finish())
-                .with_background(util::get_terminal_background_fill(self.window_id, app))
+                .with_background(panels_background)
                 .finish()
         };
         let mut stack = Stack::new();
@@ -27449,6 +27462,16 @@ impl View for Workspace {
                         .finish(),
                 )
                 .finish(),
+            );
+            // The veil that dims the image, as its own full-bleed layer directly on top of it and
+            // sharing its corner radius. It sits here rather than on the content container so the
+            // two are laid out identically and cannot disagree at the edges — the content is sized
+            // to what it holds, and any shortfall there used to leave a rim of raw image showing.
+            stack.add_child(
+                Rect::new()
+                    .with_background(util::get_terminal_background_fill(self.window_id, app))
+                    .with_corner_radius(window_corner_radius)
+                    .finish(),
             );
             stack.add_child(workspace.finish());
         } else {
