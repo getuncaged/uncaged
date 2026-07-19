@@ -278,8 +278,7 @@ impl Image {
             }
             _ => image.size().to_f32(),
         };
-        let logical_image_size =
-            cover_at_least(desired_image_size / ctx.scene.scale_factor(), size, self.fit_type);
+        let logical_image_size = desired_image_size / ctx.scene.scale_factor();
         let Some(rect) = image_rect(
             size,
             origin,
@@ -399,25 +398,6 @@ fn dimensions(original: Vector2F, dest: Vector2F, fit_type: FitType) -> Vector2F
     let y = original.y() * ratio;
 
     vec2f(x.max(1.), y.max(1.)).round()
-}
-
-/// Enforces Cover's actual promise: the drawn image is never smaller than the element it covers.
-///
-/// This can't be done in [`dimensions`] alone, because by the time it runs the shortfall has
-/// already happened. `paint` converts the element size to whole physical pixels with `to_i32()`,
-/// which truncates; `dimensions` then fits the bitmap to those truncated bounds, and dividing back
-/// by the scale factor lands a fraction under the element. The image is centred, so that fraction
-/// splits across opposite edges as a hairline of whatever sits behind — on a window with a
-/// background image, that hairline is the terminal background painting over nothing, which reads
-/// as the theme's undimmed colour down the edges.
-///
-/// Only Cover is clamped. Contain promises the opposite — never exceed the element — so it keeps
-/// whatever `dimensions` produced.
-fn cover_at_least(logical_image_size: Vector2F, element_size: Vector2F, fit_type: FitType) -> Vector2F {
-    match fit_type {
-        FitType::Cover => logical_image_size.max(element_size),
-        _ => logical_image_size,
-    }
 }
 
 impl Element for Image {
