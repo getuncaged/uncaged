@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "themes": [
+    {
+      "id": "system/dark",
+      "slug": "dark",
+      "name": "Dark",
+      "group": "system",
+      "path": "themes/system/dark.yaml",
+      "definition": {
+        "name": "Dark",
+        "background": "#000000",
+        "foreground": "#ffffff",
+        "accent": "#19aad8",
+        "details": "darker",
+        "terminal_colors": {
+          "normal": {
+            "black": "#616161",
+            "red": "#ff8272",
+            "green": "#b4fa72",
+            "yellow": "#fefdc2",
+            "blue": "#a5d5fe",
+            "magenta": "#ff8ffd",
+            "cyan": "#d0d1fe",
+            "white": "#f1f1f1"
+          },
+          "bright": {
+            "black": "#8e8e8e",
+            "red": "#ffc4bd",
+            "green": "#d6fcb9",
+            "yellow": "#fefdd5",
+            "blue": "#c1e3fe",
+            "magenta": "#ffb1fe",
+            "cyan": "#e5e6fe",
+            "white": "#feffff"
+          }
+        }
+      }
+    },
+    {
+      "id": "system/light",
+      "slug": "light",
+      "name": "Light",
+      "group": "system",
+      "path": "themes/system/light.yaml",
+      "definition": {
+        "name": "Light",
+        "background": "#ffffff",
+        "foreground": "#111111",
+        "accent": "#00c2ff",
+        "details": "lighter",
+        "terminal_colors": {
+          "normal": {
+            "black": "#212121",
+            "red": "#c30771",
+            "green": "#10a778",
+            "yellow": "#a89c14",
+            "blue": "#008ec4",
+            "magenta": "#523c79",
+            "cyan": "#20a5ba",
+            "white": "#e0e0e0"
+          },
+          "bright": {
+            "black": "#212121",
+            "red": "#fb007a",
+            "green": "#5fd7af",
+            "yellow": "#f3e430",
+            "blue": "#20bbfc",
+            "magenta": "#6855de",
+            "cyan": "#4fb8cc",
+            "white": "#f1f1f1"
+          }
+        }
+      }
+    },
+    {
+      "id": "system/midnight",
+      "slug": "midnight",
+      "name": "Midnight",
+      "group": "system",
+      "path": "themes/system/midnight.yaml",
+      "definition": {
+        "name": "Midnight",
+        "background": {
+          "top": "#12151d",
+          "bottom": "#0b0d12"
+        },
+        "foreground": "#e8ebf2",
+        "accent": "#ff7a18",
+        "cursor": "#ffb23a",
+        "details": "darker",
+        "terminal_colors": {
+          "normal": {
+            "black": "#363e4f",
+            "red": "#f06a78",
+            "green": "#7bd88f",
+            "yellow": "#ffb23a",
+            "blue": "#6aa8ff",
+            "magenta": "#c8a9f0",
+            "cyan": "#5fc7d6",
+            "white": "#c7ccd6"
+          },
+          "bright": {
+            "black": "#5d6577",
+            "red": "#ff8089",
+            "green": "#a5e4b4",
+            "yellow": "#ffc96b",
+            "blue": "#8fc1ff",
+            "magenta": "#dcc2ff",
+            "cyan": "#86dce8",
+            "white": "#e8ebf2"
+          }
+        }
+      }
+    },
+    {
+      "id": "system/solarized-dark",
+      "slug": "solarized-dark",
+      "name": "Solarized Dark",
+      "group": "system",
+      "path": "themes/system/solarized-dark.yaml",
+      "definition": {
+        "name": "Solarized Dark",
+        "background": "#002b36",
+        "foreground": "#f8f8f2",
+        "accent": "#cb4b16",
+        "details": "darker",
+        "terminal_colors": {
+          "normal": {
+            "black": "#073642",
+            "red": "#dc322f",
+            "green": "#859900",
+            "yellow": "#b58900",
+            "blue": "#268bd2",
+            "magenta": "#d33682",
+            "cyan": "#2aa198",
+            "white": "#eee8d5"
+          },
+          "bright": {
+            "black": "#002b36",
+            "red": "#cb4b16",
+            "green": "#586e75",
+            "yellow": "#657b83",
+            "blue": "#839496",
+            "magenta": "#6c71c4",
+            "cyan": "#93a1a1",
+            "white": "#fdf6e3"
+          }
+        }
+      }
+    },
+    {
+      "id": "system/uncaged",
+      "slug": "uncaged",
+      "name": "Uncaged",
+      "group": "system",
+      "path": "themes/system/uncaged.yaml",
+      "definition": {
+        "name": "Uncaged",
+        "background": {
+          "top": "#15110c",
+          "bottom": "#0c0a08"
+        },
+        "foreground": "#e9e1d4",
+        "accent": "#ff7a18",
+        "cursor": "#ffb23a",
+        "details": "darker",
+        "terminal_colors": {
+          "normal": {
+            "black": "#4a443b",
+            "red": "#ff6b5e",
+            "green": "#8fd46e",
+            "yellow": "#ffc24a",
+            "blue": "#74b4e0",
+            "magenta": "#f090c0",
+            "cyan": "#5fc9be",
+            "white": "#e9e1d4"
+          },
+          "bright": {
+            "black": "#6e655a",
+            "red": "#ff8a76",
+            "green": "#b2e38c",
+            "yellow": "#ffd46e",
+            "blue": "#9bcbee",
+            "magenta": "#f7abd6",
+            "cyan": "#86ded0",
+            "white": "#fbf6ec"
+          }
+        }
+      }
+    }
+  ]
+}
