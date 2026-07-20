@@ -1,0 +1,21 @@
+app/src/themes/theme_gallery_tests.rs
+  s_6e5dc450e2113a::t_d2a38aaf87ce87 104
+app/src/themes/theme_gallery.rs
+  s_6e5dc450e2113a::t_d2a38aaf87ce87 20-28,33-35,38-43,94,154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "9e5d81ac20d88ee0ef31378a75bd1daffe5e772e",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
