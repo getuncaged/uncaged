@@ -17,15 +17,30 @@ use serde::Deserialize;
 use crate::themes::theme::{ThemeGroup, COMMUNITY_SUBFOLDER};
 use warp_core::ui::theme::WarpTheme;
 
+/// The branch the gallery reads from.
+///
+/// Overridable with `UNCAGED_THEME_GALLERY_REF` so a fork, or a pull request that has not landed
+/// yet, can be pointed at without rebuilding — which is also how the gallery gets verified before
+/// its catalogue is published to `main`.
+pub fn gallery_ref() -> String {
+    std::env::var("UNCAGED_THEME_GALLERY_REF").unwrap_or_else(|_| "main".to_owned())
+}
+
 /// Where the catalogue is fetched from.
 ///
 /// Served by raw.githubusercontent rather than the API so it needs no token and no rate-limit
 /// handling, and is edge-cached.
-pub const INDEX_URL: &str =
-    "https://raw.githubusercontent.com/getuncaged/uncaged-themes/main/index.json";
+pub fn index_url() -> String {
+    format!("{}/index.json", raw_base_url())
+}
 
 /// Base for anything else in the repo, such as a theme's background image.
-pub const RAW_BASE_URL: &str = "https://raw.githubusercontent.com/getuncaged/uncaged-themes/main";
+pub fn raw_base_url() -> String {
+    format!(
+        "https://raw.githubusercontent.com/getuncaged/uncaged-themes/{}",
+        gallery_ref()
+    )
+}
 
 /// The shape this client understands. A future breaking change to the catalogue bumps this, and an
 /// older client refuses it politely instead of misreading the contents.
@@ -76,7 +91,7 @@ impl GalleryTheme {
     pub fn image_url(&self) -> Option<String> {
         self.image
             .as_ref()
-            .map(|path| format!("{RAW_BASE_URL}/{path}"))
+            .map(|path| format!("{}/{path}", raw_base_url()))
     }
 
     /// Does the search box's text match this theme?
@@ -136,7 +151,7 @@ fn client() -> Result<reqwest::Client> {
 /// Downloads the catalogue of installable themes.
 pub async fn fetch_index() -> Result<GalleryIndex> {
     let response = client()?
-        .get(INDEX_URL)
+        .get(index_url())
         .send()
         .await
         .context("Couldn't reach the theme gallery — check your connection.")?;

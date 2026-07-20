@@ -101,7 +101,7 @@ fn image_urls_are_built_against_the_raw_host() {
     };
     assert_eq!(
         sample.image_url().unwrap(),
-        format!("{RAW_BASE_URL}/themes/community/tokyo-rain.png"),
+        format!("{}/themes/community/tokyo-rain.png", raw_base_url()),
     );
 }
 
