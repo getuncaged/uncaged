@@ -574,6 +574,10 @@ impl ThemeChooser {
             self.referral_theme_status.as_ref(ctx),
             WarpConfig::as_ref(ctx).theme_config(),
         );
+        // The full list changed — a theme was installed or deleted elsewhere — so rebuild the
+        // filtered view against it. Without this the group filter keeps showing the stale
+        // pre-reload set: a just-deleted theme lingers, a just-installed one never appears.
+        self.recompute_filter(ctx);
     }
 
     fn up(&mut self, ctx: &mut ViewContext<Self>) {

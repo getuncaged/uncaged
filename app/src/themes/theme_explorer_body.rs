@@ -7,7 +7,7 @@
 //! "find me a theme" is one screen rather than two.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use settings::Setting as _;
 use warpui::assets::asset_cache::AssetSource;
@@ -216,6 +216,18 @@ impl ThemeExplorerBody {
         let mut present: HashSet<String> = HashSet::new();
 
         for (kind, definition) in WarpConfig::as_ref(app).theme_config().theme_items() {
+            // The referral reward themes are promotional and tied to referral state. They are
+            // always present in the theme map, so without this every user would see two System
+            // cards for rewards they may not have earned — and the explorer can neither install nor
+            // delete them, so they'd be inert. They remain selectable from the Appearance chooser,
+            // which is the surface that gates them on referral status.
+            if matches!(
+                kind,
+                ThemeKind::SentReferralReward | ThemeKind::ReceivedReferralReward
+            ) {
+                continue;
+            }
+
             let name = kind.to_string();
             present.insert(name.clone());
 
@@ -326,6 +338,43 @@ impl ThemeExplorerBody {
         ctx.notify();
     }
 
+    /// Resets every place a theme is selected — the plain choice and both Sync-with-OS slots — back
+    /// to the default wherever it equals `deleted`.
+    ///
+    /// All three settings persist regardless of which is active, so a slot still pointing at a
+    /// just-deleted theme would activate a missing file the moment Sync is toggled or the OS flips.
+    fn clear_theme_everywhere(&mut self, deleted: &ThemeKind, ctx: &mut ViewContext<Self>) {
+        let plain = ThemeSettings::as_ref(ctx).theme_kind.value().clone();
+        let selected = ThemeSettings::as_ref(ctx)
+            .selected_system_themes
+            .value()
+            .clone();
+
+        ThemeSettings::handle(ctx).update(ctx, |theme_settings, ctx| {
+            if plain == *deleted {
+                report_if_error!(theme_settings
+                    .theme_kind
+                    .set_value(ThemeKind::default(), ctx));
+            }
+            if selected.light == *deleted || selected.dark == *deleted {
+                let updated = SelectedSystemThemes {
+                    light: if selected.light == *deleted {
+                        ThemeKind::default()
+                    } else {
+                        selected.light.clone()
+                    },
+                    dark: if selected.dark == *deleted {
+                        ThemeKind::default()
+                    } else {
+                        selected.dark.clone()
+                    },
+                };
+                report_if_error!(theme_settings.selected_system_themes.set_value(updated, ctx));
+            }
+        });
+        ctx.notify();
+    }
+
     /// Removes a theme's files, then reloads so it disappears from the grid.
     fn delete(&mut self, path: PathBuf, ctx: &mut ViewContext<Self>) {
         self.pending_delete = None;
@@ -340,20 +389,22 @@ impl ThemeExplorerBody {
         if !entry.origin.deletable() {
             return;
         }
-        // Take the theme off first if it is the one in use, so the window is not left pointing at
-        // a file that no longer exists.
-        if entry.kind.as_ref() == Some(&active_theme_kind(ThemeSettings::as_ref(ctx), ctx)) {
-            self.apply(ThemeKind::default(), ctx);
+        // Take the theme off wherever it is selected, so no slot is left pointing at a file that is
+        // about to vanish. With Sync-with-OS on, the light and dark slots are independent and the
+        // deleted theme may sit in either or both — not only the one currently showing — so every
+        // reference is cleared, not just the active one.
+        if let Some(deleted) = entry.kind.clone() {
+            self.clear_theme_everywhere(&deleted, ctx);
         }
 
-        // A theme's image is only removed when it lives in the themes dir. A theme can legitimately
-        // point at a wallpaper elsewhere on the disk, and deleting the theme must not take the
-        // user's own picture with it. Its preview thumbnail, which is ours and sits beside it, goes
-        // too so it does not linger as an orphan.
+        // A theme's image is only removed when it genuinely lives in the themes dir. A theme can
+        // legitimately point at a wallpaper elsewhere on the disk, and deleting the theme must not
+        // take the user's own picture with it. Its preview thumbnail, which is ours and sits beside
+        // it, goes too so it does not linger as an orphan.
         if let Some(image) = entry.definition.background_image() {
             if let AssetSource::LocalFile { path: image_path, .. } = image.source() {
                 let image_path = PathBuf::from(image_path);
-                if image_path.starts_with(themes_dir()) {
+                if path_is_within(&image_path, &themes_dir()) {
                     let _ = std::fs::remove_file(theme_background_image::thumbnail_path(&image_path));
                     let _ = std::fs::remove_file(image_path);
                 }
@@ -801,5 +852,20 @@ impl View for ThemeExplorerBody {
         }
 
         Container::new(column.finish()).finish()
+    }
+}
+
+
+/// True only when `path` genuinely resolves inside `base`, with `..` and symlinks accounted for.
+///
+/// A lexical `starts_with` is not enough: `<base>/../../etc/x` passes it component-for-component
+/// yet resolves outside `base`. Canonicalising both first collapses those, so a theme whose image
+/// path has been crafted to escape the themes dir cannot trick delete into removing a file
+/// elsewhere. Canonicalisation needs the paths to exist, which they do at delete time; if either
+/// can't be resolved the answer is a safe `false`.
+fn path_is_within(path: &Path, base: &Path) -> bool {
+    match (path.canonicalize(), base.canonicalize()) {
+        (Ok(path), Ok(base)) => path.starts_with(base),
+        _ => false,
     }
 }

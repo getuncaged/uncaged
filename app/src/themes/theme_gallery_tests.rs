@@ -134,3 +134,43 @@ fn rewriting_a_theme_without_an_image_does_nothing() {
 
     assert!(definition.get("background_image").is_none());
 }
+
+/// The slug becomes a filename, and the catalogue is community-editable. A slug that isn't a plain
+/// path component must be refused, or `install` could write outside the themes dir.
+#[test]
+fn unsafe_slugs_are_rejected() {
+    // Safe: the shapes a real theme uses.
+    assert!(is_safe_slug("tokyo-rain"));
+    assert!(is_safe_slug("solarized_dark"));
+    assert!(is_safe_slug("Adeberry2"));
+
+    // Unsafe: every way a path could escape.
+    assert!(!is_safe_slug(""));
+    assert!(!is_safe_slug(".."));
+    assert!(!is_safe_slug("../../etc/passwd"));
+    assert!(!is_safe_slug("/etc/passwd"));
+    assert!(!is_safe_slug("a/b"));
+    assert!(!is_safe_slug("a\\b"));
+    assert!(!is_safe_slug("with space"));
+    assert!(!is_safe_slug("dot.dot"));
+    assert!(!is_safe_slug(&"x".repeat(200)));
+}
+
+/// A theme fetched from the gallery could carry an out-of-range opacity. It must be clamped on
+/// deserialize so no downstream `100 - opacity` can underflow — a panic on debug builds.
+#[test]
+fn a_gallery_opacity_over_100_is_clamped_on_parse() {
+    let mut json = String::from_utf8(REAL_INDEX.to_vec()).unwrap();
+    // Give the first theme an image with a hostile opacity.
+    let needle = "\"definition\": {";
+    let inject = "\"definition\": {\n\"background_image\": { \"path\": \"./x.png\", \"opacity\": 240 },";
+    json = json.replacen(needle, inject, 1);
+
+    let index = parse_index(json.as_bytes()).expect("parse");
+    let opacity = index.themes[0]
+        .definition
+        .background_image()
+        .expect("image present")
+        .opacity;
+    assert!(opacity <= 100, "opacity should be clamped, got {opacity}");
+}

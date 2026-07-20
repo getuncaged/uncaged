@@ -364,7 +364,11 @@ impl ThemeCreatorBody {
     pub fn create_theme(&mut self, ctx: &mut ViewContext<Self>) {
         if let Some(theme_options) = self.theme_options.as_mut() {
             let theme_name = theme_options.name();
-            let theme_yaml_file_name = format!("{theme_name}.yaml");
+            // Sanitize the name before it becomes a filename — a name can contain path separators
+            // or `..`. The display name is preserved in the theme itself; only the on-disk paths
+            // use the slug. This matches how the manual editor saves.
+            let slug = slugify(&theme_name);
+            let theme_yaml_file_name = format!("{slug}.yaml");
             let original_theme_image_path = theme_options.path();
             let original_theme_image_path_clone = original_theme_image_path.clone();
 
@@ -372,7 +376,7 @@ impl ThemeCreatorBody {
 
             // The import re-encodes to JPEG whatever the source was, so the saved name is fixed.
             theme_options.set_path(dir.join(format!(
-                "{theme_name}.{}",
+                "{slug}.{}",
                 theme_background_image::IMPORTED_EXTENSION
             )));
             let mut errored = true;
@@ -380,7 +384,7 @@ impl ThemeCreatorBody {
                 &theme_options.theme(),
                 dir,
                 theme_yaml_file_name,
-                Some((original_theme_image_path_clone, theme_name.clone())),
+                Some((original_theme_image_path_clone, slug.clone())),
                 |path| {
                     send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
                     ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {

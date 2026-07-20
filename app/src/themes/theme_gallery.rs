@@ -105,6 +105,19 @@ impl GalleryTheme {
     }
 }
 
+/// Whether a catalogue slug is safe to use as a filename.
+///
+/// It must be a single, boring path component: no separators, no `..`, no absolute prefix, nothing
+/// that could redirect a `join` out of the themes dir. Anything else is refused rather than
+/// sanitised, so a malformed catalogue entry fails loudly instead of installing somewhere strange.
+pub fn is_safe_slug(slug: &str) -> bool {
+    !slug.is_empty()
+        && slug.len() <= 128
+        && slug
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
 /// Parses a fetched catalogue, rejecting a version this client does not understand.
 pub fn parse_index(bytes: &[u8]) -> anyhow::Result<GalleryIndex> {
     if bytes.len() > MAX_INDEX_BYTES {
@@ -168,6 +181,15 @@ pub async fn fetch_index() -> Result<GalleryIndex> {
         .error_for_status()
         .context("The theme gallery is temporarily unavailable.")?;
 
+    // Refuse a catalogue that announces itself as oversized before reading it into memory. The
+    // post-read cap in parse_index is the real guarantee, but this avoids buffering a body that a
+    // hostile or misconfigured host claims is enormous.
+    if let Some(length) = response.content_length() {
+        if length > MAX_INDEX_BYTES as u64 {
+            bail!("the theme gallery is unreasonably large ({length} bytes)");
+        }
+    }
+
     let bytes = response
         .bytes()
         .await
@@ -183,6 +205,15 @@ pub async fn fetch_index() -> Result<GalleryIndex> {
 /// itself rather than the file's own folder, so a relative path written here would be looked up
 /// one directory too high and the background would silently not load.
 pub async fn install(theme: &GalleryTheme, themes_dir: &Path) -> Result<PathBuf> {
+    // The slug comes straight from the downloaded catalogue and becomes a filename. The catalogue
+    // is community-editable, so this is a trust boundary: a slug containing `..`, a path separator,
+    // or an absolute prefix would make the joins below escape the themes dir and write elsewhere on
+    // disk. Refuse anything that isn't a plain, single path component before touching the
+    // filesystem.
+    if !is_safe_slug(&theme.slug) {
+        bail!("this theme has an unsafe name and won't be installed");
+    }
+
     let dir = themes_dir.join(COMMUNITY_SUBFOLDER);
     std::fs::create_dir_all(&dir)
         .with_context(|| format!("couldn't create {}", dir.display()))?;
