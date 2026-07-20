@@ -56,6 +56,17 @@ impl Origin {
     fn deletable(&self) -> bool {
         matches!(self, Origin::Downloaded | Origin::Mine)
     }
+
+    /// Shown under a theme's name. Names are not unique — a downloaded theme may share a built-in's
+    /// name — so without this two cards would read identically.
+    fn label(&self) -> &'static str {
+        match self {
+            Origin::System => "System",
+            Origin::Downloaded => "Downloaded",
+            Origin::Mine => "Yours",
+            Origin::Available => "Community",
+        }
+    }
 }
 
 /// Which slice of the explorer is on screen.
@@ -130,8 +141,8 @@ pub enum ThemeExplorerBodyAction {
     SetFilter(Filter),
     Install(String),
     Apply(ThemeKind),
-    ConfirmDelete(String),
-    Delete(String),
+    ConfirmDelete(PathBuf),
+    Delete(PathBuf),
     CancelDelete,
 }
 
@@ -140,9 +151,12 @@ pub struct ThemeExplorerBody {
     filter: Filter,
     search_editor: ViewHandle<EditorView>,
     installing: HashSet<String>,
-    /// The theme whose delete button has been armed. Removing a theme is not undoable, so it takes
-    /// a second, deliberate click rather than a single stray one.
-    pending_delete: Option<String>,
+    /// The theme whose delete button has been armed, identified by path. Removing a theme is not
+    /// undoable, so it takes a second, deliberate click rather than a single stray one.
+    ///
+    /// Keyed on the path rather than the name because names are not unique — a downloaded theme
+    /// can share a built-in's name, and the built-in sorts first.
+    pending_delete: Option<PathBuf>,
     filter_states: [MouseStateHandle; 5],
     retry_state: MouseStateHandle,
 }
@@ -286,19 +300,19 @@ impl ThemeExplorerBody {
     }
 
     /// Removes a theme's files, then reloads so it disappears from the grid.
-    fn delete(&mut self, name: String, ctx: &mut ViewContext<Self>) {
+    fn delete(&mut self, path: PathBuf, ctx: &mut ViewContext<Self>) {
         self.pending_delete = None;
 
-        let Some(entry) = self.entries(ctx).into_iter().find(|e| e.name == name) else {
+        let Some(entry) = self
+            .entries(ctx)
+            .into_iter()
+            .find(|e| e.path.as_deref() == Some(path.as_path()))
+        else {
             return;
         };
         if !entry.origin.deletable() {
             return;
         }
-        let Some(path) = entry.path else {
-            return;
-        };
-
         // Take the theme off first if it is the one in use, so the window is not left pointing at
         // a file that no longer exists.
         if entry.kind.as_ref() == Some(&*ThemeSettings::as_ref(ctx).theme_kind) {
@@ -401,7 +415,7 @@ impl ThemeExplorerBody {
             .slug
             .as_ref()
             .is_some_and(|slug| self.installing.contains(slug));
-        let armed = self.pending_delete.as_deref() == Some(entry.name.as_str());
+        let armed = self.pending_delete.is_some() && self.pending_delete == entry.path;
 
         let preview = Container::new(theme::render_preview(
             &entry.definition,
@@ -446,11 +460,28 @@ impl ThemeExplorerBody {
         let mut card = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
         card.add_child(preview);
         card.add_child(Container::new(footer.finish()).with_margin_top(10.).finish());
+        card.add_child(
+            Container::new(
+                Text::new_inline(entry.origin.label().to_string(), appearance.ui_font_family(), 10.)
+                    .with_color(theme.disabled_text_color(theme.surface_2()).into_solid())
+                    .finish(),
+            )
+            .with_margin_top(2.)
+            .finish(),
+        );
 
         // Deleting is destructive and irreversible, so the button arms first and only removes on a
         // second, deliberate click.
         if entry.origin.deletable() {
-            let name = entry.name.clone();
+            let Some(path) = entry.path.clone() else {
+                return ConstrainedBox::new(
+                    Container::new(card.finish())
+                        .with_uniform_padding(10.)
+                        .finish(),
+                )
+                .with_width(CARD_WIDTH)
+                .finish();
+            };
             let (label, colour): (&str, warpui::color::ColorU) = if armed {
                 ("Really delete?", theme.ui_error_color())
             } else {
@@ -468,9 +499,9 @@ impl ThemeExplorerBody {
                     )
                     .on_left_mouse_down(move |ctx, _, _| {
                         ctx.dispatch_typed_action(if armed {
-                            ThemeExplorerBodyAction::Delete(name.clone())
+                            ThemeExplorerBodyAction::Delete(path.clone())
                         } else {
-                            ThemeExplorerBodyAction::ConfirmDelete(name.clone())
+                            ThemeExplorerBodyAction::ConfirmDelete(path.clone())
                         });
                         DispatchEventResult::StopPropagation
                     })
@@ -565,11 +596,11 @@ impl TypedActionView for ThemeExplorerBody {
                 self.pending_delete = None;
                 self.apply(kind.clone(), ctx);
             }
-            ThemeExplorerBodyAction::ConfirmDelete(name) => {
-                self.pending_delete = Some(name.clone());
+            ThemeExplorerBodyAction::ConfirmDelete(path) => {
+                self.pending_delete = Some(path.clone());
                 ctx.notify();
             }
-            ThemeExplorerBodyAction::Delete(name) => self.delete(name.clone(), ctx),
+            ThemeExplorerBodyAction::Delete(path) => self.delete(path.clone(), ctx),
             ThemeExplorerBodyAction::CancelDelete => {
                 self.pending_delete = None;
                 ctx.notify();
