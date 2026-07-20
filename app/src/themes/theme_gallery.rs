@@ -139,14 +139,23 @@ pub async fn fetch_index() -> Result<GalleryIndex> {
         .get(INDEX_URL)
         .send()
         .await
-        .context("couldn't reach the theme gallery")?
+        .context("Couldn't reach the theme gallery — check your connection.")?;
+
+    // A missing catalogue and an unreachable network are different problems and deserve different
+    // messages: one means the gallery hasn't been published, the other means this machine is
+    // offline. Reporting both as "unavailable" sends people looking in the wrong place.
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        bail!("The theme gallery hasn't been published yet.");
+    }
+
+    let response = response
         .error_for_status()
-        .context("the theme gallery isn't available right now")?;
+        .context("The theme gallery is temporarily unavailable.")?;
 
     let bytes = response
         .bytes()
         .await
-        .context("couldn't read the theme gallery")?;
+        .context("Couldn't read the theme gallery.")?;
 
     parse_index(&bytes)
 }
