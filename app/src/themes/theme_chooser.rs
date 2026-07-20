@@ -32,8 +32,11 @@ use crate::resource_center::{
 };
 use crate::server::telemetry::TelemetryEvent;
 use crate::settings::{respect_system_theme, ThemeSettings};
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::Coords;
+
 use crate::themes::theme::{
-    RespectSystemTheme, SelectedSystemThemes, ThemeKind, WarpTheme, WarpThemeConfig,
+    RespectSystemTheme, SelectedSystemThemes, ThemeGroup, ThemeKind, WarpTheme, WarpThemeConfig,
 };
 use crate::ui_components::buttons::close_button;
 use crate::ui_components::window_focus_dimming::WindowFocusDimming;
@@ -139,11 +142,53 @@ pub struct ThemeChooser {
     selected_theme: Tracked<Option<ThemeKind>>,
     themes: Tracked<Vec<ThemeChooserItem>>,
     filtered_themes: Tracked<Option<Vec<ThemeChooserItem>>>,
+    group_filter: ThemeGroupFilter,
+    group_filter_states: [MouseStateHandle; 4],
     mode: ThemeChooserMode,
     search_editor: ViewHandle<EditorView>,
     referral_theme_status: ModelHandle<ReferralThemeStatus>,
     tips_completed: ModelHandle<TipsCompleted>,
     window_id: warpui::WindowId,
+}
+
+/// Narrows the list to themes of one provenance.
+///
+/// Sits alongside the text search rather than replacing it — the two compose, so "solar" with
+/// System selected finds the built-in Solarized themes and not a community one of the same name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ThemeGroupFilter {
+    #[default]
+    All,
+    System,
+    Community,
+    Mine,
+}
+
+impl ThemeGroupFilter {
+    const ALL: [ThemeGroupFilter; 4] = [
+        ThemeGroupFilter::All,
+        ThemeGroupFilter::System,
+        ThemeGroupFilter::Community,
+        ThemeGroupFilter::Mine,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            ThemeGroupFilter::All => "All",
+            ThemeGroupFilter::System => "System",
+            ThemeGroupFilter::Community => "Community",
+            ThemeGroupFilter::Mine => "Yours",
+        }
+    }
+
+    fn accepts(&self, group: ThemeGroup) -> bool {
+        match self {
+            ThemeGroupFilter::All => true,
+            ThemeGroupFilter::System => group == ThemeGroup::System,
+            ThemeGroupFilter::Community => group == ThemeGroup::Community,
+            ThemeGroupFilter::Mine => group == ThemeGroup::Mine,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -155,6 +200,7 @@ pub enum ThemeChooserAction {
     Down,
     OpenThemeCreator,
     OpenThemeDeletionModal(ThemeKind),
+    SetGroupFilter(ThemeGroupFilter),
 }
 
 pub fn init(app: &mut AppContext) {
@@ -251,6 +297,8 @@ impl ThemeChooser {
             scroll_state: Default::default(),
             selected_theme: Tracked::new(None),
             filtered_themes: Tracked::new(None),
+            group_filter: ThemeGroupFilter::default(),
+            group_filter_states: Default::default(),
             mode: ThemeChooserMode::for_active_theme(ctx),
             search_editor,
             referral_theme_status,
@@ -325,26 +373,39 @@ impl ThemeChooser {
             },
         );
     }
+    /// Recomputes the visible list from the search text and the group filter together.
+    ///
+    /// Both narrowings go through here so they always compose. `None` means "everything", so it is
+    /// only used when neither is active — a group filter with an empty search still has to produce
+    /// a list, or selecting "Community" would show all themes.
+    fn recompute_filter(&mut self, ctx: &mut ViewContext<Self>) {
+        let search_term = self.search_editor.as_ref(ctx).buffer_text(ctx);
+        let filtering_by_group = self.group_filter != ThemeGroupFilter::All;
+
+        *self.filtered_themes = if search_term.is_empty() && !filtering_by_group {
+            None
+        } else {
+            Some(
+                self.themes
+                    .iter()
+                    .filter(|item| {
+                        self.group_filter.accepts(item.kind.group())
+                            && (search_term.is_empty() || item.kind.matches(&search_term))
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            )
+        };
+
+        // Keep the scroll on the selected theme, which may have moved or dropped out of the list.
+        let index = self.theme_position(self.selected_theme.clone().unwrap_or_default());
+        self.list_state.scroll_to(index.unwrap_or_default());
+        ctx.notify();
+    }
+
     fn handle_editor_event(&mut self, event: &EditorEvent, ctx: &mut ViewContext<Self>) {
         match event {
-            EditorEvent::Edited(_) => {
-                let search_term = self.search_editor.as_ref(ctx).buffer_text(ctx);
-                *self.filtered_themes = if search_term.is_empty() {
-                    None
-                } else {
-                    Some(
-                        self.themes
-                            .iter()
-                            .filter(|item| item.kind.matches(&search_term))
-                            .cloned()
-                            .collect::<Vec<_>>(),
-                    )
-                };
-                // Finding the position of the selected theme to adjust the scroll position of the
-                // list of visible themes.
-                let index = self.theme_position(self.selected_theme.clone().unwrap_or_default());
-                self.list_state.scroll_to(index.unwrap_or_default());
-            }
+            EditorEvent::Edited(_) => self.recompute_filter(ctx),
             EditorEvent::Navigate(NavigationKey::Up) => self.up(ctx),
             EditorEvent::Navigate(NavigationKey::Down) => self.down(ctx),
             EditorEvent::Enter => self.enter(ctx),
@@ -662,6 +723,49 @@ impl ThemeChooser {
             .finish()
     }
 
+    /// The provenance pills under the search box.
+    fn render_group_filters(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let mut row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+
+        for (index, filter) in ThemeGroupFilter::ALL.into_iter().enumerate() {
+            let active = self.group_filter == filter;
+            row.add_child(
+                Container::new(
+                    appearance
+                        .ui_builder()
+                        .button(
+                            if active {
+                                ButtonVariant::Accent
+                            } else {
+                                ButtonVariant::Secondary
+                            },
+                            self.group_filter_states[index].clone(),
+                        )
+                        .with_style(UiComponentStyles {
+                            font_size: Some(11.),
+                            padding: Some(Coords::uniform(6.)),
+                            ..Default::default()
+                        })
+                        .with_centered_text_label(filter.label().into())
+                        .build()
+                        .with_cursor(Cursor::PointingHand)
+                        .on_click(move |ctx, _, _| {
+                            ctx.dispatch_typed_action(ThemeChooserAction::SetGroupFilter(filter))
+                        })
+                        .finish(),
+                )
+                .with_margin_right(5.)
+                .finish(),
+            );
+        }
+
+        Container::new(row.finish())
+            .with_margin_left(TITLE_MARGIN)
+            .with_margin_right(TITLE_MARGIN)
+            .with_margin_bottom(6.)
+            .finish()
+    }
+
     fn render_search_bar(&self, appearance: &Appearance) -> Box<dyn Element> {
         Container::new(
             Flex::row()
@@ -813,6 +917,10 @@ impl TypedActionView for ThemeChooser {
             Enter => self.enter(ctx),
             OpenThemeCreator => self.open_theme_creator_modal(ctx),
             OpenThemeDeletionModal(kind) => self.open_theme_deletion_modal(kind.clone(), ctx),
+            SetGroupFilter(filter) => {
+                self.group_filter = *filter;
+                self.recompute_filter(ctx);
+            }
         }
     }
 }
@@ -840,6 +948,7 @@ impl View for ThemeChooser {
                 .with_child(self.render_title_row(appearance))
                 .with_child(self.mode.render_hint_text(appearance))
                 .with_child(self.render_search_bar(appearance))
+                .with_child(self.render_group_filters(appearance))
                 .with_child(self.render_list(appearance))
                 .finish(),
         )
