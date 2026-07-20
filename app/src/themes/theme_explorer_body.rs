@@ -470,46 +470,77 @@ impl ThemeExplorerBody {
             .finish(),
         );
 
-        // Deleting is destructive and irreversible, so the button arms first and only removes on a
-        // second, deliberate click.
+        // Deleting is destructive and irreversible. The resting state is a quiet trash icon, and
+        // acting on it swaps in an explicit confirm button rather than removing anything — so a
+        // stray click on a small target can never destroy a theme.
         if entry.origin.deletable() {
-            let Some(path) = entry.path.clone() else {
-                return ConstrainedBox::new(
-                    Container::new(card.finish())
-                        .with_uniform_padding(10.)
-                        .finish(),
-                )
-                .with_width(CARD_WIDTH)
-                .finish();
-            };
-            let (label, colour): (&str, warpui::color::ColorU) = if armed {
-                ("Really delete?", theme.ui_error_color())
-            } else {
-                (
-                    "Delete",
-                    theme.disabled_text_color(theme.surface_2()).into_solid(),
-                )
-            };
-            card.add_child(
-                Container::new(
-                    EventHandler::new(
-                        Text::new_inline(label.to_string(), appearance.ui_font_family(), 10.)
-                            .with_color(colour)
+            if let Some(path) = entry.path.clone() {
+                let control: Box<dyn Element> = if armed {
+                    let confirm_path = path.clone();
+                    Flex::row()
+                        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                        .with_child(
+                            Container::new(
+                                EventHandler::new(pill(
+                                    "Delete",
+                                    theme.ui_error_color().into(),
+                                    theme.background().into_solid(),
+                                    appearance,
+                                ))
+                                .on_left_mouse_down(move |ctx, _, _| {
+                                    ctx.dispatch_typed_action(ThemeExplorerBodyAction::Delete(
+                                        confirm_path.clone(),
+                                    ));
+                                    DispatchEventResult::StopPropagation
+                                })
+                                .finish(),
+                            )
+                            .with_margin_right(6.)
                             .finish(),
+                        )
+                        .with_child(
+                            EventHandler::new(
+                                Text::new_inline(
+                                    "Cancel".to_string(),
+                                    appearance.ui_font_family(),
+                                    11.,
+                                )
+                                .with_color(
+                                    theme.disabled_text_color(theme.surface_2()).into_solid(),
+                                )
+                                .finish(),
+                            )
+                            .on_left_mouse_down(|ctx, _, _| {
+                                ctx.dispatch_typed_action(ThemeExplorerBodyAction::CancelDelete);
+                                DispatchEventResult::StopPropagation
+                            })
+                            .finish(),
+                        )
+                        .finish()
+                } else {
+                    EventHandler::new(
+                        ConstrainedBox::new(
+                            Icon::new(
+                                "bundled/svg/trash-02.svg",
+                                theme.disabled_text_color(theme.surface_2()),
+                            )
+                            .finish(),
+                        )
+                        .with_width(14.)
+                        .with_height(14.)
+                        .finish(),
                     )
                     .on_left_mouse_down(move |ctx, _, _| {
-                        ctx.dispatch_typed_action(if armed {
-                            ThemeExplorerBodyAction::Delete(path.clone())
-                        } else {
-                            ThemeExplorerBodyAction::ConfirmDelete(path.clone())
-                        });
+                        ctx.dispatch_typed_action(ThemeExplorerBodyAction::ConfirmDelete(
+                            path.clone(),
+                        ));
                         DispatchEventResult::StopPropagation
                     })
-                    .finish(),
-                )
-                .with_margin_top(6.)
-                .finish(),
-            );
+                    .finish()
+                };
+
+                card.add_child(Container::new(control).with_margin_top(8.).finish());
+            }
         }
 
         let body = Container::new(card.finish())
