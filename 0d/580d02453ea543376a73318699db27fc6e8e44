@@ -1,0 +1,22 @@
+app/src/themes/theme_explorer_body.rs
+  s_6e5dc450e2113a::t_964f4339e453de 30
+  s_6e5dc450e2113a::t_81b40dc727df72 19,31,296-301,303-307,309-323,344,679-680
+app/src/settings_view/mod.rs
+  s_6e5dc450e2113a::t_210591f8133bd5 1358
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "0d580d02453ea543376a73318699db27fc6e8e44",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
