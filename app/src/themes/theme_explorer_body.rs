@@ -16,7 +16,7 @@ use warpui::elements::{
     Element, EventHandler, Fill, Flex, Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, Shrinkable, Text, Wrap,
 };
-use warpui::platform::Cursor;
+use warpui::platform::{Cursor, SystemTheme};
 use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{
@@ -27,7 +27,8 @@ use warp_core::ui::theme::WarpTheme;
 
 use crate::appearance::Appearance;
 use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions, TextOptions};
-use crate::settings::ThemeSettings;
+use crate::settings::{active_theme_kind, ThemeSettings};
+use crate::themes::theme::SelectedSystemThemes;
 use crate::themes::theme::{self, ThemeGroup, ThemeKind};
 use crate::themes::theme_gallery::{self, GalleryTheme};
 use crate::user_config::{load_theme_configs, themes_dir, WarpConfig};
@@ -292,9 +293,34 @@ impl ThemeExplorerBody {
         );
     }
 
+    /// Selects a theme, writing to whichever setting is actually in effect.
+    ///
+    /// With "Sync with OS" on, the live theme comes from `selected_system_themes` and `theme_kind`
+    /// is ignored entirely — so writing only `theme_kind`, as this used to, marked the card in use
+    /// while the window kept its old theme. The slot written is the one matching the current system
+    /// appearance, so the change is visible immediately rather than the next time the OS flips.
     fn apply(&mut self, kind: ThemeKind, ctx: &mut ViewContext<Self>) {
+        let settings = ThemeSettings::as_ref(ctx);
+        let syncing_with_os = *settings.use_system_theme.value();
+        let selected = settings.selected_system_themes.value().clone();
+        let system_theme = ctx.system_theme();
+
         ThemeSettings::handle(ctx).update(ctx, |theme_settings, ctx| {
-            report_if_error!(theme_settings.theme_kind.set_value(kind, ctx));
+            if syncing_with_os {
+                let updated = match system_theme {
+                    SystemTheme::Light => SelectedSystemThemes {
+                        light: kind.clone(),
+                        dark: selected.dark.clone(),
+                    },
+                    SystemTheme::Dark => SelectedSystemThemes {
+                        light: selected.light.clone(),
+                        dark: kind.clone(),
+                    },
+                };
+                report_if_error!(theme_settings.selected_system_themes.set_value(updated, ctx));
+            } else {
+                report_if_error!(theme_settings.theme_kind.set_value(kind.clone(), ctx));
+            }
         });
         ctx.notify();
     }
@@ -315,7 +341,7 @@ impl ThemeExplorerBody {
         }
         // Take the theme off first if it is the one in use, so the window is not left pointing at
         // a file that no longer exists.
-        if entry.kind.as_ref() == Some(&*ThemeSettings::as_ref(ctx).theme_kind) {
+        if entry.kind.as_ref() == Some(&active_theme_kind(ThemeSettings::as_ref(ctx), ctx)) {
             self.apply(ThemeKind::default(), ctx);
         }
 
@@ -650,7 +676,8 @@ impl View for ThemeExplorerBody {
         let theme = appearance.theme();
         let query = self.search_editor.as_ref(app).buffer_text(app);
         let query = query.trim().to_lowercase();
-        let active = ThemeSettings::as_ref(app).theme_kind.clone();
+        // What is genuinely in effect, which is not `theme_kind` when syncing with the OS.
+        let active = active_theme_kind(ThemeSettings::as_ref(app), app);
 
         let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
 
