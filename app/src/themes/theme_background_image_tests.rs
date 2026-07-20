@@ -103,3 +103,54 @@ fn a_missing_source_is_an_error_rather_than_a_panic() {
 
     assert!(import(&missing, dir.path(), "missing").is_err());
 }
+
+/// Importing writes a preview thumbnail beside the full image, much smaller on the longest edge.
+/// The explorer and picker draw cards from the thumbnail so they never decode the full wallpaper.
+#[test]
+fn import_writes_a_smaller_thumbnail_beside_the_full_image() {
+    let (dir, source) = rgba_png(2000, 1200, Rgba([90, 140, 210, 255]));
+
+    let full = import(&source, dir.path(), "with-thumb").expect("import");
+    let thumb = thumbnail_path(&full);
+
+    assert!(thumb.exists(), "a thumbnail should sit beside the full image");
+
+    let full_edge = {
+        let img = image::open(&full).unwrap();
+        img.width().max(img.height())
+    };
+    let thumb_img = image::open(&thumb).unwrap();
+    assert_eq!(thumb_img.width().max(thumb_img.height()), THUMB_EDGE);
+    assert!(
+        thumb_img.width().max(thumb_img.height()) < full_edge,
+        "thumbnail should be smaller than the full image",
+    );
+    // The thumbnail is a real preview, not the placeholder the fallback would show.
+    assert!(!thumb_img.color().has_alpha());
+}
+
+/// `thumbnail_path` is a pure sibling derivation — no filesystem — so it is cheap to call per card.
+#[test]
+fn thumbnail_path_is_a_sibling_of_the_full_image() {
+    let derived = thumbnail_path(std::path::Path::new("/themes/community/koi.jpg"));
+    assert_eq!(
+        derived,
+        std::path::PathBuf::from("/themes/community/koi.thumb.jpg"),
+    );
+}
+
+/// Downloaded images arrive as bytes rather than a file, and must be normalised the same way.
+#[test]
+fn importing_from_bytes_caps_and_thumbnails_too() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    RgbaImage::from_pixel(3000, 2000, Rgba([200, 50, 50, 255]))
+        .write_to(&mut buffer, ImageFormat::Png)
+        .expect("encode source");
+
+    let full = import_bytes(buffer.get_ref(), dir.path(), "downloaded").expect("import bytes");
+
+    let full_img = image::open(&full).unwrap();
+    assert_eq!(full_img.width().max(full_img.height()), MAX_EDGE);
+    assert!(thumbnail_path(&full).exists());
+}

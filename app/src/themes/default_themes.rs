@@ -768,5 +768,28 @@ pub fn preview_source(source: AssetSource) -> AssetSource {
         "jpg/solarflare_bg.jpg" => "jpg/thumbs/solarflare_bg.jpg",
     );
 
+    // A theme loaded from disk — downloaded or user-made — carries its image as a LocalFile. The
+    // importer writes a `<name>.thumb.jpg` next to the full image, so a card can decode that
+    // instead of a 2560px original. This is the difference between a ~0.3MB preview and ~15MB of
+    // decoded RGBA held resident for the process's life, since theme-image sources are never
+    // evicted from the asset cache.
+    //
+    // The `exists()` check keeps two things honest: a theme installed before thumbnails existed
+    // still previews (it falls back to the full image), and the check is cheap because a preview
+    // grid only repaints on interaction, not per frame. Only paths inside the themes dir are
+    // touched — a theme may point at a wallpaper elsewhere, which is not ours to look beside.
+    if let AssetSource::LocalFile { path, .. } = &source {
+        let full = std::path::Path::new(path);
+        if full.starts_with(crate::user_config::themes_dir()) {
+            let thumb = crate::themes::theme_background_image::thumbnail_path(full);
+            if thumb.exists() {
+                return AssetSource::LocalFile {
+                    path: thumb.to_string_lossy().into_owned(),
+                    content_version: None,
+                };
+            }
+        }
+    }
+
     source
 }

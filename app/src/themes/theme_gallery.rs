@@ -15,6 +15,7 @@ use anyhow::{bail, Context as _, Result};
 use serde::Deserialize;
 
 use crate::themes::theme::{ThemeGroup, COMMUNITY_SUBFOLDER};
+use crate::themes::theme_background_image;
 use warp_core::ui::theme::WarpTheme;
 
 /// The branch the gallery reads from.
@@ -190,16 +191,12 @@ pub async fn install(theme: &GalleryTheme, themes_dir: &Path) -> Result<PathBuf>
         .context("couldn't prepare the theme for saving")?;
 
     if let Some(url) = theme.image_url() {
-        let extension = Path::new(&url)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("jpg")
-            .to_owned();
-        let image_path = dir.join(format!("{}.{extension}", theme.slug));
-
+        // Normalise the download exactly like an editor import: cap it, flatten it, re-encode it,
+        // and write a preview thumbnail alongside. A community image is only bounded to a file size
+        // on the wire, so without this a theme could ship a 4K wallpaper that every card decodes.
         let bytes = fetch_image(&url).await?;
-        std::fs::write(&image_path, &bytes)
-            .with_context(|| format!("couldn't save {}", image_path.display()))?;
+        let image_path = theme_background_image::import_bytes(&bytes, &dir, &theme.slug)
+            .context("couldn't process the theme's background image")?;
 
         set_image_path(&mut definition, &image_path);
     }

@@ -24,6 +24,15 @@ use image::{DynamicImage, GenericImageView, ImageReader, RgbImage};
 /// the pixels the renderer touches for a typical phone or camera capture.
 pub const MAX_EDGE: u32 = 2560;
 
+/// Longest edge kept for the small preview written beside the full image.
+///
+/// The theme picker and explorer draw cards at roughly this size, and a card that decodes a 380px
+/// JPEG instead of a 2560px one is the difference between a cheap paint and the multi-millisecond
+/// decode-plus-resize that the bundled themes were given `jpg/thumbs/` to avoid. It also caps what
+/// the asset cache keeps resident: theme-image sources are never evicted, so a full-res card would
+/// hold ~15MB of decoded RGBA for the life of the process, per image theme.
+pub const THUMB_EDGE: u32 = 380;
+
 /// Quality passed to the JPEG encoder. Matches the perceptual ballpark of the bundled images,
 /// which land between 420KB and 1MB at these dimensions.
 const JPEG_QUALITY: u8 = 82;
@@ -35,9 +44,20 @@ const MAX_INPUT_PIXELS: u64 = 100_000_000;
 /// The extension every imported background ends up with, since the output is always JPEG.
 pub const IMPORTED_EXTENSION: &str = "jpg";
 
-/// Decodes `source`, normalises it, and writes it as `<dir>/<slug>.jpg`.
+/// The preview thumbnail that sits next to `<slug>.jpg`.
 ///
-/// Returns the path written. The source file is never modified.
+/// Named as a sibling with a `.thumb.jpg` suffix so it travels with the theme and is trivial to
+/// derive from the full image's path without another lookup.
+pub fn thumbnail_path(full_image: &Path) -> PathBuf {
+    let stem = full_image
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    full_image.with_file_name(format!("{stem}.thumb.{IMPORTED_EXTENSION}"))
+}
+
+/// Decodes the file at `source`, normalises it, and writes it as `<dir>/<slug>.jpg` with a preview
+/// thumbnail alongside. Returns the full image's path. The source file is never modified.
 pub fn import(source: &Path, dir: &Path, slug: &str) -> Result<PathBuf> {
     let reader = ImageReader::open(source)
         .with_context(|| format!("couldn't open {}", source.display()))?
@@ -58,17 +78,42 @@ pub fn import(source: &Path, dir: &Path, slug: &str) -> Result<PathBuf> {
         .decode()
         .with_context(|| format!("couldn't decode {}", source.display()))?;
 
-    let normalised = normalise(decoded);
-    let destination = dir.join(format!("{slug}.{IMPORTED_EXTENSION}"));
+    write_normalised(decoded, dir, slug)
+}
 
-    let file = File::create(&destination)
+/// The same as [`import`] but for an image already in memory — a background downloaded from the
+/// gallery, which arrives as bytes rather than a file. Community images are normalised on the way
+/// in exactly like imported ones, so a theme can't ship a 4K wallpaper that every card then pays to
+/// decode.
+pub fn import_bytes(bytes: &[u8], dir: &Path, slug: &str) -> Result<PathBuf> {
+    let decoded = image::load_from_memory(bytes).context("couldn't decode the downloaded image")?;
+
+    let (w, h) = (decoded.width() as u64, decoded.height() as u64);
+    if w * h > MAX_INPUT_PIXELS {
+        bail!("that image is {w}x{h}, which is too large to use as a background");
+    }
+
+    write_normalised(decoded, dir, slug)
+}
+
+/// Writes the capped full image and its preview thumbnail, and returns the full image's path.
+fn write_normalised(decoded: DynamicImage, dir: &Path, slug: &str) -> Result<PathBuf> {
+    let full_path = dir.join(format!("{slug}.{IMPORTED_EXTENSION}"));
+    write_jpeg(&normalise(&decoded, MAX_EDGE), &full_path)?;
+
+    // A best-effort thumbnail: a card without one still works — it falls back to the full image —
+    // so a thumbnail failure must not sink the whole install.
+    let _ = write_jpeg(&normalise(&decoded, THUMB_EDGE), &thumbnail_path(&full_path));
+
+    Ok(full_path)
+}
+
+fn write_jpeg(image: &RgbImage, destination: &Path) -> Result<()> {
+    let file = File::create(destination)
         .with_context(|| format!("couldn't create {}", destination.display()))?;
-    let mut encoder = JpegEncoder::new_with_quality(BufWriter::new(file), JPEG_QUALITY);
-    encoder
-        .encode_image(&normalised)
-        .with_context(|| format!("couldn't encode {}", destination.display()))?;
-
-    Ok(destination)
+    JpegEncoder::new_with_quality(BufWriter::new(file), JPEG_QUALITY)
+        .encode_image(image)
+        .with_context(|| format!("couldn't encode {}", destination.display()))
 }
 
 /// Caps the longest edge and resolves any alpha channel.
@@ -79,17 +124,21 @@ pub fn import(source: &Path, dir: &Path, slug: &str) -> Result<PathBuf> {
 /// a transparent pixel would have shown anyway, since a background image sits at the very back of
 /// the window with nothing painted behind it.
 ///
-/// Images that are already within the cap and already opaque pass straight through.
-fn normalise(image: DynamicImage) -> RgbImage {
+/// Images already within `max_edge` and already opaque pass through with only the colour-model
+/// conversion. The caller decodes once and normalises to more than one size (full and thumbnail),
+/// so this borrows rather than consumes.
+fn normalise(image: &DynamicImage, max_edge: u32) -> RgbImage {
     let (width, height) = image.dimensions();
     let longest = width.max(height);
 
-    let image = if longest > MAX_EDGE {
-        let scale = MAX_EDGE as f32 / longest as f32;
+    let resized;
+    let image: &DynamicImage = if longest > max_edge {
+        let scale = max_edge as f32 / longest as f32;
         // Round up so neither edge can land on zero for an extreme aspect ratio.
         let target_w = ((width as f32 * scale).ceil() as u32).max(1);
         let target_h = ((height as f32 * scale).ceil() as u32).max(1);
-        image.resize_exact(target_w, target_h, FilterType::Lanczos3)
+        resized = image.resize_exact(target_w, target_h, FilterType::Lanczos3);
+        &resized
     } else {
         image
     };

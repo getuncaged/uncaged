@@ -30,6 +30,7 @@ use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions, T
 use crate::settings::{active_theme_kind, ThemeSettings};
 use crate::themes::theme::SelectedSystemThemes;
 use crate::themes::theme::{self, ThemeGroup, ThemeKind};
+use crate::themes::theme_background_image;
 use crate::themes::theme_gallery::{self, GalleryTheme};
 use crate::user_config::{load_theme_configs, themes_dir, WarpConfig};
 use crate::report_if_error;
@@ -347,11 +348,13 @@ impl ThemeExplorerBody {
 
         // A theme's image is only removed when it lives in the themes dir. A theme can legitimately
         // point at a wallpaper elsewhere on the disk, and deleting the theme must not take the
-        // user's own picture with it.
+        // user's own picture with it. Its preview thumbnail, which is ours and sits beside it, goes
+        // too so it does not linger as an orphan.
         if let Some(image) = entry.definition.background_image() {
             if let AssetSource::LocalFile { path: image_path, .. } = image.source() {
                 let image_path = PathBuf::from(image_path);
                 if image_path.starts_with(themes_dir()) {
+                    let _ = std::fs::remove_file(theme_background_image::thumbnail_path(&image_path));
                     let _ = std::fs::remove_file(image_path);
                 }
             }
