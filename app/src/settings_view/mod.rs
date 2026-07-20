@@ -307,7 +307,7 @@ impl Display for SettingsSection {
             SettingsSection::WarpDrive => write!(f, "Warp Drive"),
             SettingsSection::CustomizeUi => write!(f, "Customize UI"),
             SettingsSection::ThemeCreator => write!(f, "Create your own custom theme"),
-            SettingsSection::ThemeGallery => write!(f, "Theme gallery"),
+            SettingsSection::ThemeGallery => write!(f, "Explore themes"),
             SettingsSection::WarpAgent => write!(f, "AI Models"),
             SettingsSection::AgentProfiles => write!(f, "Profiles"),
             SettingsSection::AgentMCPServers => write!(f, "MCP servers"),
