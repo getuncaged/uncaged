@@ -1,0 +1,40 @@
+app/src/themes/theme_gallery_tests.rs
+  s_6e5dc450e2113a::t_b12cb934b66a8b 137-176
+app/src/workspace/util.rs
+  s_6e5dc450e2113a::t_310c0383892c12 412-415
+app/src/themes/theme_creator_body.rs
+  s_6e5dc450e2113a::t_ad6764ffde4df1 367-371,379,387
+app/src/themes/theme.rs
+  s_6e5dc450e2113a::t_483eef8c578548 743,745-763,766-769
+app/src/themes/theme_explorer_body.rs
+  s_6e5dc450e2113a::t_caed64903f03cd 10,857-869
+  s_6e5dc450e2113a::t_3fbe8c4942e5d5 341-377,870
+  s_6e5dc450e2113a::t_c6057af214a7e9 219-228
+  s_6e5dc450e2113a::t_636e256aad732d 229-230
+  s_6e5dc450e2113a::t_d6ee1d6d250d80 392-397,400-403,407
+  s_6e5dc450e2113a::t_4d53023685b6d3 871
+app/src/themes/theme_chooser.rs
+  s_6e5dc450e2113a::t_73859a906b2c72 577-580
+crates/warp_core/src/ui/theme/mod.rs
+  s_6e5dc450e2113a::t_3e4c22c123d9cd 80-84
+app/src/themes/theme_gallery.rs
+  s_6e5dc450e2113a::t_96979c6ca6f915 208-216
+  s_6e5dc450e2113a::t_a487ceee36baf5 108-120
+  s_6e5dc450e2113a::t_1e4f6c9c2c3b42 184-192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e1640418e39c1d88e9adbf2d70a8964c17458d50",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
