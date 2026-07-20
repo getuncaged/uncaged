@@ -1,0 +1,32 @@
+app/src/themes/mod.rs
+  s_6e5dc450e2113a::t_db9ccc6fa56f49 6
+app/src/settings_view/mod.rs
+  s_6e5dc450e2113a::t_a75acbe715a384 118,270,310,1102,1265,1359,2154
+  s_6e5dc450e2113a::t_971bea3c128114 1264,1321
+app/src/settings_view/settings_page.rs
+  s_6e5dc450e2113a::t_742dfdafc5ef6b 44,126
+  s_6e5dc450e2113a::t_380f883e43d068 153
+app/src/settings_view/theme_gallery_page.rs
+  s_6e5dc450e2113a::t_4db8328c52b718 1-179
+app/src/themes/theme_gallery_body.rs
+  s_6e5dc450e2113a::t_f3805eb7141e31 15-17
+  s_6e5dc450e2113a::t_0fd1be2a08413a 9-11
+  s_6e5dc450e2113a::t_f7eee441019f2d 1-8,12-14,18-467,472-480
+  s_6e5dc450e2113a::t_dca3c7c4511c89 468-471
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e26b329a67d2c5479a64b52abcabf60e494b589b",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
