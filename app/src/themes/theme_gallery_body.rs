@@ -6,9 +6,9 @@
 use std::collections::HashSet;
 
 use warpui::elements::{
-    ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Element,
-    EventHandler, Fill, Flex, Icon, MainAxisSize, MouseStateHandle, ParentElement, Radius,
-    Shrinkable, Text, Wrap,
+    Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
+    Element, EventHandler, Fill, Flex, Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    ParentElement, Radius, Shrinkable, Text, Wrap,
 };
 use warpui::platform::Cursor;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
@@ -20,7 +20,7 @@ use crate::appearance::Appearance;
 use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions, TextOptions};
 use crate::themes::theme;
 use crate::themes::theme_gallery::{self, GalleryTheme};
-use crate::user_config::themes_dir;
+use crate::user_config::{themes_dir, WarpConfig};
 
 /// Card geometry. The preview inside a card is the same one the picker draws, scaled up a little
 /// so a grid reads as a gallery rather than a list.
@@ -139,7 +139,22 @@ impl ThemeGalleryBody {
         );
     }
 
-    /// Notes which gallery themes are already on disk, so cards show the right action.
+    /// Whether this machine already has the theme, under any provenance.
+    ///
+    /// A gallery entry can already be present two ways: downloaded into `community/`, or shipped
+    /// with the app. Every theme in the catalogue's `system/` folder is also a built-in, so
+    /// checking only the download folder offered to "Get" themes the user already had.
+    fn already_have(&self, gallery_theme: &GalleryTheme, app: &AppContext) -> bool {
+        if self.installed.contains(&gallery_theme.slug) {
+            return true;
+        }
+        WarpConfig::as_ref(app)
+            .theme_config()
+            .theme_items()
+            .any(|(kind, _)| kind.to_string() == gallery_theme.name)
+    }
+
+    /// Notes which gallery themes are already downloaded, so cards show the right action.
     ///
     /// Reads the directory rather than tracking state, so a theme deleted by hand outside the app
     /// stops claiming to be installed.
@@ -245,80 +260,103 @@ impl ThemeGalleryBody {
         row.finish()
     }
 
-    fn render_card(&self, gallery_theme: &GalleryTheme, appearance: &Appearance) -> Box<dyn Element> {
+    fn render_card(
+        &self,
+        gallery_theme: &GalleryTheme,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
         let theme = appearance.theme();
         let slug = gallery_theme.slug.clone();
-        let is_installed = self.installed.contains(&slug);
+        let have_it = self.already_have(gallery_theme, app);
         let is_installing = self.installing.contains(&slug);
 
-        let action_label = if is_installing {
-            "Installing…"
-        } else if is_installed {
-            "Installed"
-        } else {
-            "Get"
-        };
-
-        let mut card = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
-        card.add_child(theme::render_preview(
+        // The preview is the card's subject, so it gets the full width and its own rounded frame.
+        let preview = Container::new(theme::render_preview(
             &gallery_theme.definition,
             appearance.monospace_font_family(),
             Some(CARD_PREVIEW_SCALE),
-        ));
+        ))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(6.)))
+        .finish();
+
+        let name = Shrinkable::new(
+            1.,
+            Text::new_inline(gallery_theme.name.clone(), appearance.ui_font_family(), 13.)
+                .with_color(theme.active_ui_text_color().into())
+                .finish(),
+        )
+        .finish();
+
+        // The action reads as a control when there is something to do, and as a quiet label when
+        // there is not.
+        let action: Box<dyn Element> = if have_it {
+            Text::new_inline(
+                "Installed".to_string(),
+                appearance.ui_font_family(),
+                11.,
+            )
+            .with_color(theme.disabled_text_color(theme.surface_2()).into_solid())
+            .finish()
+        } else {
+            let label = if is_installing { "Installing…" } else { "Get" };
+            Container::new(
+                Text::new_inline(label.to_string(), appearance.ui_font_family(), 11.)
+                    .with_color(theme.background().into_solid())
+                    .finish(),
+            )
+            .with_horizontal_padding(10.)
+            .with_vertical_padding(4.)
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(10.)))
+            .with_background(theme.accent())
+            .finish()
+        };
+
+        let mut card = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        card.add_child(preview);
         card.add_child(
             Container::new(
                 Flex::row()
                     .with_main_axis_size(MainAxisSize::Max)
+                    // Without this the name and the action render flush against each other.
+                    .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
                     .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        Shrinkable::new(
-                            1.,
-                            Text::new_inline(
-                                gallery_theme.name.clone(),
-                                appearance.ui_font_family(),
-                                13.,
-                            )
-                            .with_color(theme.active_ui_text_color().into())
-                            .finish(),
-                        )
-                        .finish(),
-                    )
-                    .with_child(
-                        Text::new_inline(
-                            action_label.to_string(),
-                            appearance.ui_font_family(),
-                            11.,
-                        )
-                        .with_color(if is_installed {
-                            theme.disabled_text_color(theme.surface_2()).into_solid()
-                        } else {
-                            theme.accent().into_solid()
-                        })
-                        .finish(),
-                    )
+                    .with_child(name)
+                    .with_child(action)
                     .finish(),
             )
-            .with_margin_top(8.)
+            .with_margin_top(10.)
             .finish(),
         );
 
-        let element = Container::new(card.finish())
+        let body = Container::new(card.finish())
             .with_uniform_padding(10.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(10.)))
             .with_background(theme.surface_2())
+            .with_border(Border::all(1.).with_border_fill(theme.outline()))
             .finish();
 
-        let clickable = EventHandler::new(element)
-            .on_left_mouse_down(move |ctx, _, _| {
-                ctx.dispatch_typed_action(ThemeGalleryBodyAction::Install(slug.clone()));
-                DispatchEventResult::StopPropagation
-            })
-            .finish();
+        // Nothing to do for a theme that is already here, so it is not clickable either.
+        let element: Box<dyn Element> = if have_it || is_installing {
+            body
+        } else {
+            EventHandler::new(body)
+                .on_left_mouse_down(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(ThemeGalleryBodyAction::Install(slug.clone()));
+                    DispatchEventResult::StopPropagation
+                })
+                .finish()
+        };
 
-        ConstrainedBox::new(clickable).with_width(CARD_WIDTH).finish()
+        ConstrainedBox::new(element).with_width(CARD_WIDTH).finish()
     }
 
-    fn render_grid(&self, themes: &[&GalleryTheme], appearance: &Appearance) -> Box<dyn Element> {
+    fn render_grid(
+        &self,
+        themes: &[&GalleryTheme],
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
         if themes.is_empty() {
             return Container::new(
                 Text::new_inline(
@@ -342,7 +380,7 @@ impl ThemeGalleryBody {
             .with_spacing(GRID_GUTTER)
             .with_run_spacing(GRID_GUTTER)
             .with_cross_axis_alignment(CrossAxisAlignment::Start);
-        grid.extend(themes.iter().map(|t| self.render_card(t, appearance)));
+        grid.extend(themes.iter().map(|t| self.render_card(t, appearance, app)));
         grid.finish()
     }
 
@@ -471,7 +509,7 @@ impl View for ThemeGalleryBody {
             }
             LoadState::Loaded(themes) => {
                 let visible = self.visible(themes, query);
-                column.add_child(self.render_grid(&visible, &appearance));
+                column.add_child(self.render_grid(&visible, &appearance, app));
             }
         }
 
