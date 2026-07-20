@@ -115,6 +115,7 @@ mod transfer_ownership_confirmation_modal;
 pub mod update_environment_form;
 mod customize_ui_page;
 mod theme_creator_page;
+mod theme_gallery_page;
 mod warp_drive_page;
 mod warpify_page;
 
@@ -266,6 +267,7 @@ pub enum SettingsSection {
     /// Uncaged: full page for building a custom theme (replaces the old
     /// image-only modal).
     ThemeCreator,
+    ThemeGallery,
     /// Internal backing-page identifier for AISettingsPageView. Multiple subpages
     /// (WarpAgent, AgentProfiles, Knowledge, ThirdPartyCLIAgents) share this single
     /// backing page, so this variant is needed as the key in `settings_pages`.
@@ -305,6 +307,7 @@ impl Display for SettingsSection {
             SettingsSection::WarpDrive => write!(f, "Warp Drive"),
             SettingsSection::CustomizeUi => write!(f, "Customize UI"),
             SettingsSection::ThemeCreator => write!(f, "Create your own custom theme"),
+            SettingsSection::ThemeGallery => write!(f, "Theme gallery"),
             SettingsSection::WarpAgent => write!(f, "AI Models"),
             SettingsSection::AgentProfiles => write!(f, "Profiles"),
             SettingsSection::AgentMCPServers => write!(f, "MCP servers"),
@@ -1096,6 +1099,7 @@ macro_rules! update_page {
             SettingsPageViewHandle::WarpDrive(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::CustomizeUi(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::ThemeCreator(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::ThemeGallery(handle) => $ctx.update_view(handle, $update),
         }
     };
 }
@@ -1257,6 +1261,8 @@ impl SettingsView {
         // Uncaged: dedicated theme-builder page. Owns its own side effects, so no subscription.
         let theme_creator_page_handle =
             ctx.add_typed_action_view(theme_creator_page::ThemeCreatorPageView::new);
+        let theme_gallery_page_handle =
+            ctx.add_typed_action_view(theme_gallery_page::ThemeGalleryPageView::new);
 
         let platform_page_handle = ctx.add_typed_action_view(platform_page::PlatformPageView::new);
         ctx.subscribe_to_view(&platform_page_handle, |me, _, event, ctx| {
@@ -1312,6 +1318,7 @@ impl SettingsView {
             SettingsPage::new(show_blocks_view_handle),
             SettingsPage::new(warp_drive_page_handle),
             SettingsPage::new(customize_ui_page_handle),
+            SettingsPage::new(theme_gallery_page_handle),
             SettingsPage::new(theme_creator_page_handle),
         ];
 
@@ -1349,6 +1356,7 @@ impl SettingsView {
             )),
             SettingsNavItem::Page(SettingsSection::CustomizeUi),
             SettingsNavItem::Page(SettingsSection::Appearance),
+            SettingsNavItem::Page(SettingsSection::ThemeGallery),
             SettingsNavItem::Page(SettingsSection::ThemeCreator),
             SettingsNavItem::Page(SettingsSection::Features),
             SettingsNavItem::Page(SettingsSection::Keybindings),
@@ -2143,6 +2151,7 @@ impl SettingsView {
             SettingsPageViewHandle::WarpDrive(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::CustomizeUi(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::ThemeCreator(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::ThemeGallery(v) => v.as_ref(app).should_render(app),
         }
     }
 
