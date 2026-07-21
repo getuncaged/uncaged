@@ -86,7 +86,7 @@ const COLOR_SLOTS: [(&str, &str); NUM_COLOR_SLOTS] = [
 /// you can't read.
 const DEFAULT_BG_IMAGE_OPACITY: u8 = 30;
 
-const THEMES_REPO_BASE_URL: &str = "https://github.com/getuncaged/uncaged-themes";
+use crate::brand::THEMES_REPO_URL as THEMES_REPO_BASE_URL;
 /// Where community themes live in the repo, used to build both the new-file and edit URLs.
 const COMMUNITY_THEME_DIR: &str = "themes/community";
 
@@ -1548,7 +1548,7 @@ async fn resolve_share_target(path: &str) -> ShareTarget {
     let client = match reqwest::Client::builder()
         .timeout(SHARE_LOOKUP_TIMEOUT)
         // GitHub rejects API requests without one.
-        .user_agent(concat!("Uncaged/", env!("CARGO_PKG_VERSION")))
+        .user_agent(crate::brand::HTTP_USER_AGENT)
         .build()
     {
         Ok(client) => client,
@@ -1561,8 +1561,7 @@ async fn resolve_share_target(path: &str) -> ShareTarget {
 
     // Not in any open PR — is it already merged? `raw.githubusercontent.com` answers with a plain
     // 200/404 and doesn't count against the API rate limit.
-    let raw_url =
-        format!("https://raw.githubusercontent.com/getuncaged/uncaged-themes/main/{path}");
+    let raw_url = format!("{}/main/{path}", crate::brand::THEMES_RAW_BASE);
     match client.get(&raw_url).send().await {
         Ok(response) if response.status().is_success() => ShareTarget::MergedOnMain,
         _ => ShareTarget::New,
@@ -1572,7 +1571,10 @@ async fn resolve_share_target(path: &str) -> ShareTarget {
 /// Scans open PRs for one that already touches `path`.
 async fn find_open_pull_request_for(client: &reqwest::Client, path: &str) -> Option<ShareTarget> {
     let pulls: serde_json::Value = client
-        .get("https://api.github.com/repos/getuncaged/uncaged-themes/pulls?state=open&per_page=100")
+        .get(format!(
+            "{}/pulls?state=open&per_page=100",
+            crate::brand::THEMES_API_BASE
+        ))
         .send()
         .await
         .ok()?
@@ -1584,7 +1586,8 @@ async fn find_open_pull_request_for(client: &reqwest::Client, path: &str) -> Opt
         let number = pull.get("number")?.as_u64()?;
         let files: serde_json::Value = client
             .get(format!(
-                "https://api.github.com/repos/getuncaged/uncaged-themes/pulls/{number}/files"
+                "{}/pulls/{number}/files",
+                crate::brand::THEMES_API_BASE
             ))
             .send()
             .await

@@ -67,6 +67,43 @@ pub const DISCUSSIONS_URL: &str = repo_url!("/discussions");
 /// The privacy section of the README.
 pub const PRIVACY_URL: &str = repo_url!("#privacy");
 
+// ── Community themes repository ────────────────────────────────────────────────
+//
+// A SEPARATE repo from the main one above: the theme gallery browses it and the
+// theme editor opens pull requests against it. The `owner/repo` slug lives once,
+// in the macro below; every URL derives from it, and the `theme_gallery` /
+// `theme_creator` modules build all their links from these constants rather than
+// hard-coding anything. A fork changes the one literal to point at its own gallery.
+
+/// Prefixes/suffixes the community-themes `owner/repo` slug at compile time, so the
+/// slug itself appears exactly once. Mirrors [`repo_url!`] for the main repo.
+macro_rules! themes_url {
+    ($prefix:literal, $suffix:literal) => {
+        concat!($prefix, "getuncaged/uncaged-themes", $suffix)
+    };
+}
+
+/// `owner/repo` of the community themes gallery.
+pub const THEMES_REPO_SLUG: &str = themes_url!("", "");
+
+/// The themes repo's web home — where a shared theme's pull request opens.
+pub const THEMES_REPO_URL: &str = themes_url!("https://github.com/", "");
+
+/// Base for `raw.githubusercontent.com`, without a trailing ref. Callers append
+/// `/{ref}/{path}` to fetch a file's contents.
+pub const THEMES_RAW_BASE: &str = themes_url!("https://raw.githubusercontent.com/", "");
+
+/// Base for the GitHub REST API for this repo. Callers append `/pulls`, etc.
+pub const THEMES_API_BASE: &str = themes_url!("https://api.github.com/repos/", "");
+
+/// The env var that overrides which gallery branch the app reads, named after the
+/// product so a fork's variable matches its own name.
+pub const THEME_GALLERY_REF_ENV: &str = "UNCAGED_THEME_GALLERY_REF";
+
+/// The `User-Agent` product token for the app's own HTTP requests, e.g. to GitHub.
+/// `concat!` keeps it a compile-time `&'static str`; a fork changes the literal.
+pub const HTTP_USER_AGENT: &str = concat!("Uncaged/", env!("CARGO_PKG_VERSION"));
+
 // ── Brand artwork ────────────────────────────────────────────────────────────
 //
 // The monochrome glyph paths are DEFINED ONCE in `warp_core::ui::icons` (next to
@@ -166,4 +203,32 @@ pub mod ground {
     pub const INK: u32 = 0xECE6DC;
     pub const MUTED: u32 = 0x8C8378;
     pub const FAINT: u32 = 0x5A5349;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The community-themes URLs must all derive from the one slug, so a fork that changes
+    /// `THEMES_REPO_SLUG` (via the `themes_url!` macro) can trust every link to follow.
+    #[test]
+    fn theme_repo_urls_all_derive_from_one_slug() {
+        assert_eq!(THEMES_REPO_SLUG, "getuncaged/uncaged-themes");
+        for url in [THEMES_REPO_URL, THEMES_RAW_BASE, THEMES_API_BASE] {
+            assert!(
+                url.ends_with(THEMES_REPO_SLUG),
+                "{url} should end with the slug {THEMES_REPO_SLUG}",
+            );
+        }
+        assert!(THEMES_REPO_URL.starts_with("https://github.com/"));
+        assert!(THEMES_RAW_BASE.starts_with("https://raw.githubusercontent.com/"));
+        assert!(THEMES_API_BASE.starts_with("https://api.github.com/repos/"));
+    }
+
+    /// The user agent carries the product name and the crate version.
+    #[test]
+    fn user_agent_names_the_product() {
+        assert!(HTTP_USER_AGENT.starts_with("Uncaged/"));
+        assert!(HTTP_USER_AGENT.len() > "Uncaged/".len());
+    }
 }

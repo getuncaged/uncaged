@@ -14,17 +14,18 @@ use std::time::Duration;
 use anyhow::{bail, Context as _, Result};
 use serde::Deserialize;
 
+use crate::brand;
 use crate::themes::theme::{ThemeGroup, COMMUNITY_SUBFOLDER};
 use crate::themes::theme_background_image;
 use warp_core::ui::theme::WarpTheme;
 
 /// The branch the gallery reads from.
 ///
-/// Overridable with `UNCAGED_THEME_GALLERY_REF` so a fork, or a pull request that has not landed
-/// yet, can be pointed at without rebuilding — which is also how the gallery gets verified before
-/// its catalogue is published to `main`.
+/// Overridable via [`brand::THEME_GALLERY_REF_ENV`] so a fork, or a pull request that has not
+/// landed yet, can be pointed at without rebuilding — which is also how the gallery gets verified
+/// before its catalogue is published to `main`.
 pub fn gallery_ref() -> String {
-    std::env::var("UNCAGED_THEME_GALLERY_REF").unwrap_or_else(|_| "main".to_owned())
+    std::env::var(brand::THEME_GALLERY_REF_ENV).unwrap_or_else(|_| "main".to_owned())
 }
 
 /// Where the catalogue is fetched from.
@@ -35,12 +36,10 @@ pub fn index_url() -> String {
     format!("{}/index.json", raw_base_url())
 }
 
-/// Base for anything else in the repo, such as a theme's background image.
+/// Base for anything else in the repo, such as a theme's background image. The repo and host come
+/// from [`brand`]; only the branch varies at runtime.
 pub fn raw_base_url() -> String {
-    format!(
-        "https://raw.githubusercontent.com/getuncaged/uncaged-themes/{}",
-        gallery_ref()
-    )
+    format!("{}/{}", brand::THEMES_RAW_BASE, gallery_ref())
 }
 
 /// The shape this client understands. A future breaking change to the catalogue bumps this, and an
@@ -157,7 +156,7 @@ const MAX_IMAGE_BYTES: u64 = 16 * 1024 * 1024;
 fn client() -> Result<reqwest::Client> {
     reqwest::Client::builder()
         .timeout(REQUEST_TIMEOUT)
-        .user_agent(concat!("Uncaged/", env!("CARGO_PKG_VERSION")))
+        .user_agent(brand::HTTP_USER_AGENT)
         .build()
         .context("couldn't start a network client")
 }

@@ -25,7 +25,16 @@ Change these and the whole app follows:
   (~190 call sites across 46 files) reads those constants. Change the one literal
   in the macro → every "docs / issues / source / learn-more" link in the app
   repoints. No sweep required.
+- **`themes_url!` macro + `THEMES_REPO_*` constants** — the *community themes*
+  repo (a separate repo from the main one) that the theme gallery browses and the
+  theme editor opens PRs against. The `owner/repo` slug lives in one macro;
+  `THEMES_REPO_URL` / `THEMES_RAW_BASE` / `THEMES_API_BASE`, the gallery-ref env
+  var name, and the HTTP `User-Agent` all derive from `brand.rs`. Point the slug at
+  your own gallery and the whole theme-download/share flow follows.
 - `ember` / `ground` color modules — your accent gradient and neutral palette.
+  (The bundled `Uncaged` / `Midnight` themes in `themes/default_themes.rs` are
+  hand-tuned near these values but not bound to them, so change a default theme's
+  look in that file, not here.)
 
 ### 2. The mark — `app/assets/bundled/svg/brand/`
 
@@ -80,6 +89,40 @@ scheme) so it never collides with Warp or with Uncaged:
   bring-your-own-model layer.
 
 ---
+
+## Removing a feature — everything Uncaged added is deletable
+
+Uncaged's additions on top of Warp are built to come out cleanly. Each is a set
+of **self-contained files** plus a few references in shared files. You don't need
+a map of the references: **delete the files and remove the one or two enum
+variants, then run `cargo build` — the compiler enumerates every remaining site**
+(non-exhaustive `match`, unresolved name), and the tree is clean when it compiles.
+Rust's exhaustiveness is the strip guide.
+
+- **Theme gallery + "Explore themes" page** (browse/download/install community
+  themes). Delete `app/src/themes/theme_gallery.rs`, `theme_explorer_body.rs`,
+  `theme_gallery_tests.rs`, `test_data/gallery_index.json`, and
+  `app/src/settings_view/theme_gallery_page.rs`; drop the `theme_explorer_body` /
+  `theme_gallery` lines from `app/src/themes/mod.rs`; remove the `ThemeGallery`
+  variant from `SettingsSection` (`settings_view/mod.rs`) and from
+  `SettingsPageViewHandle` (`settings_view/settings_page.rs`). Build; fix what it
+  names.
+- **In-app theme editor page** (colour wheel, gradients, image, share-as-PR).
+  Delete `app/src/settings_view/theme_creator_page.rs` and remove the
+  `ThemeCreator` variant from the same two enums. Note the editor *widget*
+  (`themes/theme_creator_body.rs`) is shared with the pre-existing
+  `theme_creator_modal.rs`, so it stays unless you also strip the modal.
+- **Background-image import** (`themes/theme_background_image.rs`) and **theme
+  provenance grouping** (`ThemeGroup` in `themes/theme.rs`, the picker's group
+  filter in `theme_chooser.rs`). These are prerequisites of the gallery, so remove
+  them only after it, and again let the compiler point at the call sites.
+- **Agent-vs-command triggering** is a config toggle, not a hard-wire: it lives
+  behind the default-on `prefer_shell_for_known_commands` setting and the
+  `agent_trigger` setting (`app/src/settings/ai.rs`). Set the default off, or
+  remove the two settings and the guard in `crates/input_classifier`, to disable
+  it. No brand strings involved.
+- **Skills viewer** — `app/src/workspace/view/skills_panel.rs` plus its rows in
+  `left_panel.rs`.
 
 ## Honest residuals
 
