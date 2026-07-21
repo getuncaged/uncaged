@@ -6,7 +6,7 @@ use warpui::elements::{
     Align, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, Element, Empty, EventHandler, Fill, Flex, Hoverable, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
-    ParentElement, ParentOffsetBounds, Radius, Rect, SavePosition, ScrollStateHandle, Scrollable,
+    ParentElement, ParentOffsetBounds, Radius, Rect, ScrollStateHandle, Scrollable,
     ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text, UniformList, UniformListState,
 };
 use warpui::fonts::{FamilyId, Weight};
@@ -32,11 +32,13 @@ use crate::resource_center::{
 };
 use crate::server::telemetry::TelemetryEvent;
 use crate::settings::{respect_system_theme, ThemeSettings};
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::Coords;
+
 use crate::themes::theme::{
-    RespectSystemTheme, SelectedSystemThemes, ThemeKind, WarpTheme, WarpThemeConfig,
+    RespectSystemTheme, SelectedSystemThemes, ThemeGroup, ThemeKind, WarpTheme, WarpThemeConfig,
 };
-use crate::ui_components::buttons::{close_button, icon_button};
-use crate::ui_components::icons;
+use crate::ui_components::buttons::close_button;
 use crate::ui_components::window_focus_dimming::WindowFocusDimming;
 use crate::user_config::{load_theme_configs, themes_dir, WarpConfig, WarpConfigUpdateEvent};
 use crate::util::traffic_lights::{traffic_light_data, TrafficLightData, TrafficLightSide};
@@ -50,6 +52,7 @@ const CLOSE_BUTTON_MARGIN_RIGHT: f32 = 6.;
 const TITLE_FONT_SIZE: f32 = 16.;
 const TITLE_MARGIN: f32 = 12.;
 const SCROLLBAR_WIDTH: ScrollbarWidth = ScrollbarWidth::Auto;
+const THEME_BADGE_FONT_SIZE: f32 = 10.;
 const THEME_NAME_FONT_SIZE: f32 = 14.;
 const THEME_NAME_MARGIN_LEFT: f32 = 16.;
 const DELETE_BUTTON_LINE_WIDTH: f32 = 10.;
@@ -139,11 +142,53 @@ pub struct ThemeChooser {
     selected_theme: Tracked<Option<ThemeKind>>,
     themes: Tracked<Vec<ThemeChooserItem>>,
     filtered_themes: Tracked<Option<Vec<ThemeChooserItem>>>,
+    group_filter: ThemeGroupFilter,
+    group_filter_states: [MouseStateHandle; 4],
     mode: ThemeChooserMode,
     search_editor: ViewHandle<EditorView>,
     referral_theme_status: ModelHandle<ReferralThemeStatus>,
     tips_completed: ModelHandle<TipsCompleted>,
     window_id: warpui::WindowId,
+}
+
+/// Narrows the list to themes of one provenance.
+///
+/// Sits alongside the text search rather than replacing it — the two compose, so "solar" with
+/// System selected finds the built-in Solarized themes and not a community one of the same name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ThemeGroupFilter {
+    #[default]
+    All,
+    System,
+    Community,
+    Mine,
+}
+
+impl ThemeGroupFilter {
+    const ALL: [ThemeGroupFilter; 4] = [
+        ThemeGroupFilter::All,
+        ThemeGroupFilter::System,
+        ThemeGroupFilter::Community,
+        ThemeGroupFilter::Mine,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            ThemeGroupFilter::All => "All",
+            ThemeGroupFilter::System => "System",
+            ThemeGroupFilter::Community => "Community",
+            ThemeGroupFilter::Mine => "Yours",
+        }
+    }
+
+    fn accepts(&self, group: ThemeGroup) -> bool {
+        match self {
+            ThemeGroupFilter::All => true,
+            ThemeGroupFilter::System => group == ThemeGroup::System,
+            ThemeGroupFilter::Community => group == ThemeGroup::Community,
+            ThemeGroupFilter::Mine => group == ThemeGroup::Mine,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -155,6 +200,7 @@ pub enum ThemeChooserAction {
     Down,
     OpenThemeCreator,
     OpenThemeDeletionModal(ThemeKind),
+    SetGroupFilter(ThemeGroupFilter),
 }
 
 pub fn init(app: &mut AppContext) {
@@ -251,6 +297,8 @@ impl ThemeChooser {
             scroll_state: Default::default(),
             selected_theme: Tracked::new(None),
             filtered_themes: Tracked::new(None),
+            group_filter: ThemeGroupFilter::default(),
+            group_filter_states: Default::default(),
             mode: ThemeChooserMode::for_active_theme(ctx),
             search_editor,
             referral_theme_status,
@@ -325,26 +373,39 @@ impl ThemeChooser {
             },
         );
     }
+    /// Recomputes the visible list from the search text and the group filter together.
+    ///
+    /// Both narrowings go through here so they always compose. `None` means "everything", so it is
+    /// only used when neither is active — a group filter with an empty search still has to produce
+    /// a list, or selecting "Community" would show all themes.
+    fn recompute_filter(&mut self, ctx: &mut ViewContext<Self>) {
+        let search_term = self.search_editor.as_ref(ctx).buffer_text(ctx);
+        let filtering_by_group = self.group_filter != ThemeGroupFilter::All;
+
+        *self.filtered_themes = if search_term.is_empty() && !filtering_by_group {
+            None
+        } else {
+            Some(
+                self.themes
+                    .iter()
+                    .filter(|item| {
+                        self.group_filter.accepts(item.kind.group())
+                            && (search_term.is_empty() || item.kind.matches(&search_term))
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            )
+        };
+
+        // Keep the scroll on the selected theme, which may have moved or dropped out of the list.
+        let index = self.theme_position(self.selected_theme.clone().unwrap_or_default());
+        self.list_state.scroll_to(index.unwrap_or_default());
+        ctx.notify();
+    }
+
     fn handle_editor_event(&mut self, event: &EditorEvent, ctx: &mut ViewContext<Self>) {
         match event {
-            EditorEvent::Edited(_) => {
-                let search_term = self.search_editor.as_ref(ctx).buffer_text(ctx);
-                *self.filtered_themes = if search_term.is_empty() {
-                    None
-                } else {
-                    Some(
-                        self.themes
-                            .iter()
-                            .filter(|item| item.kind.matches(&search_term))
-                            .cloned()
-                            .collect::<Vec<_>>(),
-                    )
-                };
-                // Finding the position of the selected theme to adjust the scroll position of the
-                // list of visible themes.
-                let index = self.theme_position(self.selected_theme.clone().unwrap_or_default());
-                self.list_state.scroll_to(index.unwrap_or_default());
-            }
+            EditorEvent::Edited(_) => self.recompute_filter(ctx),
             EditorEvent::Navigate(NavigationKey::Up) => self.up(ctx),
             EditorEvent::Navigate(NavigationKey::Down) => self.down(ctx),
             EditorEvent::Enter => self.enter(ctx),
@@ -513,6 +574,10 @@ impl ThemeChooser {
             self.referral_theme_status.as_ref(ctx),
             WarpConfig::as_ref(ctx).theme_config(),
         );
+        // The full list changed — a theme was installed or deleted elsewhere — so rebuild the
+        // filtered view against it. Without this the group filter keeps showing the stale
+        // pre-reload set: a just-deleted theme lingers, a just-installed one never appears.
+        self.recompute_filter(ctx);
     }
 
     fn up(&mut self, ctx: &mut ViewContext<Self>) {
@@ -652,33 +717,56 @@ impl ThemeChooser {
                 .finish(),
             );
 
-        // Custom themes are only supported on desktop platforms currently.
-        if cfg!(not(target_family = "wasm")) {
-            let create_theme_button = SavePosition::new(
-                icon_button(
-                    appearance,
-                    icons::Icon::Plus,
-                    false,
-                    self.button_mouse_states
-                        .create_theme_button_hover_state
-                        .clone(),
-                )
-                .build()
-                .on_click(|ctx, _, _| {
-                    ctx.dispatch_typed_action(ThemeChooserAction::OpenThemeCreator)
-                })
-                .finish(),
-                "create_theme_button",
-            )
-            .finish();
-
-            title_row = title_row.with_child(create_theme_button);
-        }
+        // Theme creation lives on its own Settings page ("Create your own custom theme"),
+        // not in a popup, so the chooser no longer carries a create button.
 
         Container::new(title_row.finish())
             .with_margin_bottom(6.)
             .with_margin_left(TITLE_MARGIN)
             .with_margin_right(TITLE_MARGIN)
+            .finish()
+    }
+
+    /// The provenance pills under the search box.
+    fn render_group_filters(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let mut row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+
+        for (index, filter) in ThemeGroupFilter::ALL.into_iter().enumerate() {
+            let active = self.group_filter == filter;
+            row.add_child(
+                Container::new(
+                    appearance
+                        .ui_builder()
+                        .button(
+                            if active {
+                                ButtonVariant::Accent
+                            } else {
+                                ButtonVariant::Secondary
+                            },
+                            self.group_filter_states[index].clone(),
+                        )
+                        .with_style(UiComponentStyles {
+                            font_size: Some(11.),
+                            padding: Some(Coords::uniform(6.)),
+                            ..Default::default()
+                        })
+                        .with_centered_text_label(filter.label().into())
+                        .build()
+                        .with_cursor(Cursor::PointingHand)
+                        .on_click(move |ctx, _, _| {
+                            ctx.dispatch_typed_action(ThemeChooserAction::SetGroupFilter(filter))
+                        })
+                        .finish(),
+                )
+                .with_margin_right(5.)
+                .finish(),
+            );
+        }
+
+        Container::new(row.finish())
+            .with_margin_left(TITLE_MARGIN)
+            .with_margin_right(TITLE_MARGIN)
+            .with_margin_bottom(6.)
             .finish()
     }
 
@@ -755,6 +843,10 @@ impl ThemeChooser {
                 let font_family = appearance.ui_font_family();
                 let monospace_font_family = appearance.monospace_font_family();
                 let text_color = appearance.theme().active_ui_text_color().into();
+                let badge_text_color = appearance
+                    .theme()
+                    .disabled_text_color(appearance.theme().surface_2())
+                    .into_solid();
                 let selected_background_color = appearance.theme().surface_2();
 
                 themes
@@ -773,6 +865,7 @@ impl ThemeChooser {
                             font_family,
                             monospace_font_family,
                             text_color,
+                            badge_text_color,
                             selected_background_color.into(),
                         );
                         EventHandler::new(element)
@@ -828,6 +921,10 @@ impl TypedActionView for ThemeChooser {
             Enter => self.enter(ctx),
             OpenThemeCreator => self.open_theme_creator_modal(ctx),
             OpenThemeDeletionModal(kind) => self.open_theme_deletion_modal(kind.clone(), ctx),
+            SetGroupFilter(filter) => {
+                self.group_filter = *filter;
+                self.recompute_filter(ctx);
+            }
         }
     }
 }
@@ -855,6 +952,7 @@ impl View for ThemeChooser {
                 .with_child(self.render_title_row(appearance))
                 .with_child(self.mode.render_hint_text(appearance))
                 .with_child(self.render_search_bar(appearance))
+                .with_child(self.render_group_filters(appearance))
                 .with_child(self.render_list(appearance))
                 .finish(),
         )
@@ -894,6 +992,7 @@ impl ThemeChooserItem {
         font_family: FamilyId,
         monospace_font_family: FamilyId,
         text_color: ColorU,
+        badge_text_color: ColorU,
         selected_background_color: ColorU,
     ) -> Box<dyn Element> {
         Hoverable::new(self.mouse_state.clone(), |state| {
@@ -919,6 +1018,20 @@ impl ThemeChooserItem {
                 .with_child(name_text)
                 .with_main_axis_size(MainAxisSize::Max)
                 .with_main_axis_alignment(MainAxisAlignment::SpaceBetween);
+
+            // Where the theme came from. Built-ins carry no badge — they are the unremarkable
+            // case, and tagging two dozen of them would be noise rather than information.
+            if let Some(badge) = self.kind.group().badge() {
+                name_with_delete.add_child(
+                    Container::new(
+                        Text::new_inline(badge.to_string(), font_family, THEME_BADGE_FONT_SIZE)
+                            .with_color(badge_text_color)
+                            .finish(),
+                    )
+                    .with_margin_right(THEME_NAME_MARGIN_LEFT)
+                    .finish(),
+                );
+            }
 
             // Only show deletion button if custom theme and on hover
             if matches!(self.kind, ThemeKind::Custom(_)) && state.is_hovered() {

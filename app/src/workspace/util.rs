@@ -409,8 +409,10 @@ fn get_terminal_background_opacity(window_id: WindowId, app: &AppContext) -> u8 
 
     if let Some(img) = theme.background_image() {
         let opacity_ratio = background_opacity as f32 / 100.;
-        // Scale the overlay opacity with the background opacity ratio.
-        (((100 - img.opacity) as f32) * opacity_ratio) as u8
+        // Scale the overlay opacity with the background opacity ratio. `saturating_sub` because a
+        // theme's image opacity is only clamped on the deserialize path; this stays correct even if
+        // an out-of-range value reaches here another way.
+        ((100u8.saturating_sub(img.opacity) as f32) * opacity_ratio) as u8
     } else {
         background_opacity
     }

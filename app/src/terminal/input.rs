@@ -12995,6 +12995,46 @@ impl Input {
         });
     }
 
+    /// If `command` begins with the user-configured agent trigger (the `agent_trigger` setting,
+    /// default `>`), returns the prompt to send to the agent with the trigger stripped. Returns
+    /// `None` when there is no trigger match or AI is disabled. This lets the user force Agent Mode
+    /// for input that would otherwise run as a shell command (the complement of
+    /// `prefer_shell_for_known_commands`).
+    ///
+    /// The trigger is matched case-insensitively at the very start. A trigger ending in an
+    /// alphanumeric character (a word like `ai`) requires a word boundary so it doesn't match
+    /// longer words (`ai …` triggers, `airflow …` doesn't); a symbol trigger like `>` matches with
+    /// or without a following space (`>how`, `> how`).
+    fn agent_trigger_prompt(&self, command: &str, ctx: &AppContext) -> Option<String> {
+        if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
+            return None;
+        }
+
+        let trigger = AISettings::as_ref(ctx).agent_trigger.value().trim().to_owned();
+        if trigger.is_empty() {
+            return None;
+        }
+
+        // Case-insensitive match of the trigger at the very start of the command. Compare over the
+        // original string's first `trigger`-length chars so the byte offset used below is valid.
+        let trigger_char_count = trigger.chars().count();
+        let command_prefix: String = command.chars().take(trigger_char_count).collect();
+        if command_prefix.to_lowercase() != trigger.to_lowercase() {
+            return None;
+        }
+
+        let rest = &command[command_prefix.len()..];
+
+        // Word triggers need a boundary so `ai` doesn't fire on `airflow`; symbol triggers don't.
+        let trigger_ends_alphanumeric = trigger.chars().next_back().is_some_and(char::is_alphanumeric);
+        if trigger_ends_alphanumeric && rest.chars().next().is_some_and(char::is_alphanumeric) {
+            return None;
+        }
+
+        let prompt = rest.trim_start();
+        (!prompt.is_empty()).then(|| prompt.to_owned())
+    }
+
     /// Handles the user's 'Enter' keypress.
     ///
     /// Depending on input state, this method may either execute a command, accept an input
@@ -13063,6 +13103,10 @@ impl Input {
             return;
         }
         let command = self.editor.as_ref(ctx).buffer_text(ctx);
+
+        // An explicit agent trigger (`>` prefix or configured trigger word) forces Agent Mode for
+        // this submission, regardless of the autodetected input type.
+        let agent_trigger = self.agent_trigger_prompt(&command, ctx);
 
         ctx.emit(Event::Enter);
 
@@ -13257,8 +13301,13 @@ impl Input {
         } else if FeatureFlag::AgentMode.is_enabled()
             && AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
             && (self.ai_input_model.as_ref(ctx).is_ai_input_enabled()
-                || self.is_cloud_mode_input_v2_composing(ctx))
+                || self.is_cloud_mode_input_v2_composing(ctx)
+                || agent_trigger.is_some())
         {
+            // NOTE: when an explicit agent trigger (`>` prefix or trigger word) was used, the
+            // trigger is stripped at each actual submit point below (not here), so that an
+            // early-return guard doesn't leave the buffer stripped and drop a retry into Shell.
+
             // If we're submitting an AI query, we want to send telemetry for the input type.
             let input_model = self.ai_input_model.as_ref(ctx);
             let input_type = input_model.input_type();
@@ -13304,7 +13353,11 @@ impl Input {
                     }
                 }
 
-                let prompt = command.trim().to_owned();
+                // Use the trigger-stripped prompt when an explicit agent trigger was typed, so the
+                // `>` / trigger word doesn't leak into the spawned agent's prompt.
+                let prompt = agent_trigger
+                    .clone()
+                    .unwrap_or_else(|| command.trim().to_owned());
                 if prompt.is_empty() {
                     return;
                 }
@@ -13378,6 +13431,13 @@ impl Input {
                 return;
             }
 
+            // Strip the explicit agent trigger (`>` / trigger word) from the buffer now, right
+            // before submitting, so `submit_ai_query` re-reads only the prompt.
+            if let Some(stripped) = agent_trigger.clone() {
+                self.editor.update(ctx, |editor, ctx| {
+                    editor.set_buffer_text(&stripped, ctx);
+                });
+            }
             self.submit_ai_query(None, ctx);
         } else {
             // If we're submitting a shell command, we want to send telemetry for the input type.

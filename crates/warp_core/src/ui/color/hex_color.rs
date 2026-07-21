@@ -37,6 +37,13 @@ pub fn coloru_from_hex_string(s: &str) -> Result<ColorU, HexColorError> {
     }
     let mut s: Cow<str> = s[1..].into();
 
+    // Hex colors are ASCII. Bail before any byte-indexed slicing below so multibyte input (which
+    // can pass the byte-length check yet slice across a char boundary) returns an error instead of
+    // panicking. Guards every caller, including live editor input in the theme editor.
+    if !s.is_ascii() {
+        return Err(HexColorError::InvalidValue);
+    }
+
     if s.len() != SHORT_COLOR_LEN && s.len() != FULL_COLOR_LEN {
         return Err(HexColorError::InvalidLength);
     }
@@ -89,4 +96,27 @@ where
 {
     let coloru: ColorU = color.to_owned().into();
     coloru_to_hex_string(&coloru).serialize(serializer)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn multibyte_input_returns_err_and_does_not_panic() {
+        // Regression: multibyte strings whose byte length matches a valid hex length must return
+        // Err rather than panic on a char-boundary slice. `€` is 3 bytes and `é` is 2 bytes, so
+        // each of these is 6 bytes after the `#` yet crosses char boundaries when byte-sliced.
+        assert!(coloru_from_hex_string("#€€").is_err());
+        assert!(coloru_from_hex_string("#€aaa").is_err());
+        assert!(coloru_from_hex_string("#ééé").is_err());
+    }
+
+    #[test]
+    fn valid_and_invalid_ascii_hex() {
+        assert!(coloru_from_hex_string("#ff007f").is_ok());
+        assert!(coloru_from_hex_string("#abc").is_ok());
+        assert!(coloru_from_hex_string("fff").is_err()); // missing '#'
+        assert!(coloru_from_hex_string("#gggggg").is_err()); // non-hex digits
+    }
 }

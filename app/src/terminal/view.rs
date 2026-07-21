@@ -1351,6 +1351,11 @@ pub enum ContextMenuAction {
     /// Ask AI about the current context. Handled by blocklist AI if its feature flag is enabled and
     /// the AI assistant panel otherwise.
     AskAI(AskAISource),
+    /// Ask the agent to fix a failed command block: composes a "help me fix this" prompt from the
+    /// block's command and output and hands it to the agent.
+    AskAgentToFixBlock {
+        block_index: BlockIndex,
+    },
     OpenWorkflowModal,
     CopyAIDebuggingLink {
         conversation_token: ServerConversationToken,
@@ -1482,6 +1487,7 @@ impl fmt::Debug for ContextMenuAction {
             EditAgentToolbar => f.write_str("EditAgentToolbar"),
             EditCLIAgentToolbar => f.write_str("EditCLIAgentToolbar"),
             AskAI(_) => f.write_str("AskAIAssistant"),
+            AskAgentToFixBlock { .. } => f.write_str("AskAgentToFixBlock"),
             OpenWorkflowModal => f.write_str("OpenWorkflowModal"),
             OpenShareSessionModal => f.write_str("OpenShareSessionModal"),
             CopyBlockFilteredOutputs => f.write_str("CopyBlockFilteredOutput"),
@@ -16571,6 +16577,27 @@ impl TerminalView {
                         .into_item(),
                 ];
 
+                // For a single failed command block, offer a one-click "Ask agent to fix this"
+                // that hands the command + its output to the agent. Nothing is sent until the
+                // user picks this item.
+                if is_single_selection
+                    && tail_block.has_failed()
+                    && FeatureFlag::AgentMode.is_enabled()
+                    && AISettings::as_ref(ctx).is_any_ai_enabled(ctx)
+                    && self.is_input_box_visible(&model, ctx)
+                {
+                    items.push(MenuItem::Separator);
+                    items.push(
+                        MenuItemFields::new("Ask agent to fix this")
+                            .with_on_select_action(TerminalAction::ContextMenu(
+                                ContextMenuAction::AskAgentToFixBlock {
+                                    block_index: tail_block_index,
+                                },
+                            ))
+                            .into_item(),
+                    );
+                }
+
                 if FeatureFlag::CreatingSharedSessions.is_enabled()
                     && ContextFlag::CreateSharedSession.is_enabled()
                 {
@@ -20749,6 +20776,73 @@ impl TerminalView {
         self.copy_blocks(BlockEntity::Command, ctx);
     }
 
+    /// Composes a "help me fix this" prompt from a failed command block and hands it to the agent.
+    /// When AgentView is enabled the prompt is submitted directly (a new conversation auto-sends the
+    /// initial prompt); otherwise it is staged in the AI input for the user to send.
+    fn context_menu_ask_agent_to_fix(
+        &mut self,
+        block_index: BlockIndex,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let prompt = {
+            let model = self.model.lock();
+            let Some(block) = model.block_list().block_at(block_index) else {
+                return;
+            };
+            Self::compose_fix_prompt(
+                &block.command_to_string(),
+                &block.output_to_string(),
+                block.exit_code().was_command_not_found(),
+            )
+        };
+
+        self.close_context_menu(ctx, false);
+
+        if FeatureFlag::AgentView.is_enabled() {
+            self.enter_agent_view_for_new_conversation(
+                Some(prompt),
+                AgentViewEntryOrigin::Input {
+                    was_prompt_autodetected: false,
+                },
+                ctx,
+            );
+        } else {
+            self.set_ai_input_mode_with_query(Some(prompt.as_str()), ctx);
+        }
+    }
+
+    /// Builds the prompt sent to the agent when asked to fix a failed command. The output is trimmed
+    /// and tail-truncated so very long output doesn't blow up the request.
+    fn compose_fix_prompt(command: &str, output: &str, was_command_not_found: bool) -> String {
+        const MAX_OUTPUT_CHARS: usize = 4000;
+        let output = output.trim();
+        let output = if output.chars().count() > MAX_OUTPUT_CHARS {
+            let tail: String = output
+                .chars()
+                .rev()
+                .take(MAX_OUTPUT_CHARS)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            format!("…(earlier output truncated)…\n{tail}")
+        } else {
+            output.to_string()
+        };
+
+        let reason = if was_command_not_found {
+            "the command was not found"
+        } else {
+            "it exited with an error"
+        };
+
+        format!(
+            "This command failed because {reason}:\n\n```\n{}\n```\n\nOutput:\n\n```\n{}\n```\n\nHelp me understand why it failed and how to fix it.",
+            command.trim(),
+            output
+        )
+    }
+
     fn context_menu_copy_block_outputs(&mut self, ctx: &mut ViewContext<Self>) {
         self.copy_blocks(BlockEntity::Output, ctx);
     }
@@ -24392,6 +24486,9 @@ impl TerminalView {
             CopyBlockOutputs => self.context_menu_copy_block_outputs(ctx),
             OpenShareBlockModal { block_index } => {
                 self.context_menu_open_share_block_modal(*block_index, ctx)
+            }
+            AskAgentToFixBlock { block_index } => {
+                self.context_menu_ask_agent_to_fix(*block_index, ctx)
             }
             FindWithinBlock => self.find_within_block(ctx),
             ScrollToBottomOfBlock => self.scroll_to_bottom_of_bottommost_selected_block(ctx),

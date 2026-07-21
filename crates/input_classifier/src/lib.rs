@@ -118,4 +118,9 @@ pub struct Context {
     pub current_input_type: InputType,
     /// Whether or not the input is a follow-up to an agent query.
     pub is_agent_follow_up: bool,
+    /// When `true`, if the first token is a recognized/installed shell command, the input is kept
+    /// in Shell mode and never auto-switched to AI. This prevents the agent from being triggered
+    /// when the user is clearly typing a real command (e.g. `git how do I rebase`). Users who want
+    /// the agent for such input can use an explicit agent trigger (a `>` prefix or trigger word).
+    pub prefer_shell_for_known_commands: bool,
 }

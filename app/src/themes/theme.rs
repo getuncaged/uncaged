@@ -147,7 +147,56 @@ impl std::fmt::Display for ThemeKind {
     }
 }
 
+/// Where a theme came from.
+///
+/// Built-ins ship with the app. Everything else is a file under the themes dir, and the
+/// distinction that matters there is whether the user wrote it or installed it: themes pulled from
+/// the gallery land in a `community/` subfolder, so provenance is derived from the path rather
+/// than stored in the file. That keeps the theme format unchanged and means a theme stays
+/// correctly labelled even if it is copied in by hand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ThemeGroup {
+    /// Ships with the app.
+    System,
+    /// Installed from the community gallery.
+    Community,
+    /// Written by this user.
+    Mine,
+}
+
+impl ThemeGroup {
+    /// Label shown beside a theme in the picker. Built-ins are the unremarkable case and carry no
+    /// badge, so they have no label.
+    pub fn badge(&self) -> Option<&'static str> {
+        match self {
+            ThemeGroup::System => None,
+            ThemeGroup::Community => Some("Community"),
+            ThemeGroup::Mine => Some("Yours"),
+        }
+    }
+}
+
+/// The themes-dir subfolder that gallery installs are written into.
+pub const COMMUNITY_SUBFOLDER: &str = "community";
+
 impl ThemeKind {
+    /// Which group this theme belongs to, for the picker's provenance badge.
+    pub fn group(&self) -> ThemeGroup {
+        let path = match self {
+            ThemeKind::Custom(theme) | ThemeKind::CustomBase16(theme) => theme.path(),
+            // An unsaved in-memory theme is by definition the user's own work in progress.
+            ThemeKind::InMemory(_) => return ThemeGroup::Mine,
+            _ => return ThemeGroup::System,
+        };
+
+        let community_dir = crate::user_config::themes_dir().join(COMMUNITY_SUBFOLDER);
+        if path.starts_with(&community_dir) {
+            ThemeGroup::Community
+        } else {
+            ThemeGroup::Mine
+        }
+    }
+
     pub fn matches(&self, query: &str) -> bool {
         let theme_name = format!("{self}").to_lowercase();
         theme_name.contains(&query.to_lowercase())
@@ -691,21 +740,33 @@ pub fn render_preview(
     .finish();
 
     let mut thumbnail = Stack::new();
-    let mut background_opacity = 100;
+    let mut background_opacity: u8 = 100;
     if let Some(background_image) = theme.background_image() {
-        thumbnail.add_child(
-            Shrinkable::new(
-                1.,
-                warpui::elements::Image::new(
-                    background_image.source(),
-                    warpui::elements::CacheOption::BySize,
+        let source = crate::themes::default_themes::preview_source(background_image.source());
+
+        // A gallery theme that hasn't been installed yet carries an image path that isn't on disk.
+        // Painting nothing for it while still dimming the card would wash it out, so the image
+        // layer and its opacity are both skipped unless the file is actually there. Bundled sources
+        // are always present. This stat is cheap because a preview grid repaints on interaction,
+        // not per frame.
+        let loadable = match &source {
+            AssetSource::LocalFile { path, .. } => std::path::Path::new(path).exists(),
+            _ => true,
+        };
+
+        if loadable {
+            thumbnail.add_child(
+                Shrinkable::new(
+                    1.,
+                    warpui::elements::Image::new(source, warpui::elements::CacheOption::BySize)
+                        .cover()
+                        .finish(),
                 )
-                .cover()
                 .finish(),
-            )
-            .finish(),
-        );
-        background_opacity -= background_image.opacity;
+            );
+            // Clamped on deserialize; saturating here too so the arithmetic is locally safe.
+            background_opacity = background_opacity.saturating_sub(background_image.opacity);
+        }
     }
 
     thumbnail.add_child(

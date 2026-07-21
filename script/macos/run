@@ -33,7 +33,7 @@ if [ "$WARP_CHANNEL" = "local" ]; then
     WARP_APP_PATH="${TARGET_DIR}/debug/bundle/osx/WarpLocal.app"
     WARP_SCHEME_NAME="warplocal"
 else
-    WARP_APP_PATH="${TARGET_DIR}/debug/bundle/osx/WarpOss.app"
+    WARP_APP_PATH="${TARGET_DIR}/debug/bundle/osx/Uncaged.app"
     WARP_SCHEME_NAME="uncagedoss"
 fi
 DONT_OPEN=false
@@ -70,7 +70,7 @@ while (( "$#" )); do
       if [ "$WARP_CHANNEL" = "local" ]; then
           WARP_APP_PATH="${TARGET_DIR}/release/bundle/osx/WarpLocal.app"
       else
-          WARP_APP_PATH="${TARGET_DIR}/release/bundle/osx/WarpOss.app"
+          WARP_APP_PATH="${TARGET_DIR}/release/bundle/osx/Uncaged.app"
       fi
       PARAMS="$PARAMS $1"
       shift
@@ -81,7 +81,7 @@ while (( "$#" )); do
       if [ "$WARP_CHANNEL" = "local" ]; then
           WARP_APP_PATH="${TARGET_DIR}/${PROFILE}/bundle/osx/WarpLocal.app"
       else
-          WARP_APP_PATH="${TARGET_DIR}/${PROFILE}/bundle/osx/WarpOss.app"
+          WARP_APP_PATH="${TARGET_DIR}/${PROFILE}/bundle/osx/Uncaged.app"
       fi
       PARAMS="$PARAMS --profile $PROFILE"
       ;;

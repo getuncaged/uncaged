@@ -48,6 +48,17 @@ impl InputClassifier for HeuristicClassifier {
         let word_tokens = parse_query_into_tokens(input.buffer_text.as_str());
         let total_word_token_count = word_tokens.len();
 
+        // If the first token is a real, recognized command, keep the input in Shell mode instead
+        // of ever auto-switching to AI. This is the primary guard against the agent triggering when
+        // the user is clearly typing a command (e.g. `git how do I rebase`). Users who do want the
+        // agent for such input can use an explicit agent trigger (a `>` prefix or trigger word).
+        if context.prefer_shell_for_known_commands && is_installed_binary(&input) {
+            return InputClassificationResult::new(
+                InputType::Shell,
+                InputClassifierDecisionSource::ShellHeuristic,
+            );
+        }
+
         if total_word_token_count == 1
             && is_one_off_natural_language_word_or_prefix(&word_tokens[0].to_lowercase())
         {

@@ -77,7 +77,11 @@ impl<'de> Deserialize<'de> for Image {
                 path: path.to_str().unwrap_or_default().to_owned(),
                 content_version: None,
             },
-            opacity: value.opacity,
+            // Opacity is a percentage and callers subtract it from 100. A theme file — including one
+            // fetched from the community gallery — can carry any u8, and 100 - 150 underflows: a
+            // panic on debug/dogfood builds, a silently over-opaque background on release. Clamp at
+            // the boundary so no downstream arithmetic can go negative.
+            opacity: value.opacity.min(100),
         })
     }
 }

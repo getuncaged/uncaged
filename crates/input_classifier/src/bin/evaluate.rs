@@ -210,6 +210,7 @@ async fn handle_classify(
     let context = Context {
         current_input_type: InputType::Shell,
         is_agent_follow_up: false,
+        prefer_shell_for_known_commands: false,
     };
 
     println!("Input: \"{input}\"");
@@ -274,6 +275,7 @@ async fn handle_verify(
             let context = Context {
                 current_input_type: InputType::Shell,
                 is_agent_follow_up: false,
+                prefer_shell_for_known_commands: false,
             };
 
             // Use classify_input to get probabilities

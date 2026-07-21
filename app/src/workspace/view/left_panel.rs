@@ -188,7 +188,8 @@ pub struct LeftPanelView {
     ssh_row_states: Vec<MouseStateHandle>,
     ssh_add_button_state: MouseStateHandle,
     ssh_scroll_state: ClippedScrollStateHandle,
-    installed_skills: Vec<String>,
+    installed_skills: Vec<skills_panel::SkillEntry>,
+    skills_row_states: Vec<MouseStateHandle>,
     skills_scroll_state: ClippedScrollStateHandle,
     config_entries: Vec<config_panel::ConfigEntry>,
     config_row_states: Vec<MouseStateHandle>,
@@ -354,6 +355,10 @@ impl LeftPanelView {
             .collect();
 
         let installed_skills = skills_panel::read_installed_skills();
+        let skills_row_states = installed_skills
+            .iter()
+            .map(|_| MouseStateHandle::default())
+            .collect();
 
         let config_entries = config_panel::read_config_entries();
         let config_row_states = config_entries
@@ -372,6 +377,7 @@ impl LeftPanelView {
             ssh_add_button_state: Default::default(),
             ssh_scroll_state: Default::default(),
             installed_skills,
+            skills_row_states,
             skills_scroll_state: Default::default(),
             config_entries,
             config_row_states,
@@ -806,7 +812,7 @@ impl LeftPanelView {
                 });
             }
             ToolPanelView::Ssh => self.refresh_ssh_hosts(ctx),
-            ToolPanelView::Skills => {}
+            ToolPanelView::Skills => self.refresh_installed_skills(ctx),
             ToolPanelView::Config => self.refresh_config_entries(ctx),
         }
     }
@@ -817,6 +823,18 @@ impl LeftPanelView {
         self.ssh_hosts = ssh_panel::read_ssh_hosts();
         self.ssh_row_states = self
             .ssh_hosts
+            .iter()
+            .map(|_| MouseStateHandle::default())
+            .collect();
+        ctx.notify();
+    }
+
+    /// Re-scans the skill provider directories so skills added since the panel
+    /// was created show up. Called every time the Skills panel is entered.
+    fn refresh_installed_skills(&mut self, ctx: &mut ViewContext<Self>) {
+        self.installed_skills = skills_panel::read_installed_skills();
+        self.skills_row_states = self
+            .installed_skills
             .iter()
             .map(|_| MouseStateHandle::default())
             .collect();
@@ -1343,6 +1361,7 @@ impl View for LeftPanelView {
                 1.0,
                 skills_panel::render_skills_content(
                     &self.installed_skills,
+                    &self.skills_row_states,
                     &self.skills_scroll_state,
                     appearance,
                 ),

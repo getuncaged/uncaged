@@ -774,6 +774,11 @@ impl BlocklistAIInputModel {
 
         let is_udi_enabled = InputSettings::as_ref(ctx).is_universal_developer_input_enabled(ctx);
 
+        // When enabled, a recognized command as the first token keeps the input in Shell mode
+        // instead of being auto-switched to AI.
+        let prefer_shell_for_known_commands =
+            *AISettings::as_ref(ctx).prefer_shell_for_known_commands;
+
         // Determine if the input is a follow-up to an AI block.
         let is_agent_follow_up = {
             let model = self.model.lock();
@@ -835,6 +840,7 @@ impl BlocklistAIInputModel {
                     let context = input_classifier::Context {
                         current_input_type,
                         is_agent_follow_up,
+                        prefer_shell_for_known_commands,
                     };
                     let classification =
                         classifier.detect_input_type(input.clone(), &context).await;
