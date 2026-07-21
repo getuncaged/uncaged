@@ -4826,7 +4826,9 @@ pub(super) fn render_summary_pane_kind_icon_circle(
     let padding = total_size * SUMMARY_INLINE_PADDING_RATIO;
     let (icon_element, background): (Box<dyn Element>, ElementFill) = match kind {
         SummaryPaneKind::OzAgent { .. } => (
-            crate::brand::design::AGENT.to_warpui_icon(oz_icon_fill(theme)).finish(),
+            crate::brand::design::AGENT
+                .to_warpui_icon(oz_icon_fill(theme))
+                .finish(),
             theme.background().into(),
         ),
         SummaryPaneKind::CLIAgent { agent, .. } => {

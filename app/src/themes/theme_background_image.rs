@@ -66,7 +66,11 @@ pub fn import(source: &Path, dir: &Path, slug: &str) -> Result<PathBuf> {
         .with_guessed_format()
         .with_context(|| format!("couldn't read {}", source.display()))?;
 
-    if let Some((w, h)) = reader.into_dimensions().ok().map(|d| (d.0 as u64, d.1 as u64)) {
+    if let Some((w, h)) = reader
+        .into_dimensions()
+        .ok()
+        .map(|d| (d.0 as u64, d.1 as u64))
+    {
         if w * h > MAX_INPUT_PIXELS {
             bail!("that image is {w}x{h}, which is too large to use as a background");
         }
@@ -103,7 +107,10 @@ fn write_normalised(decoded: DynamicImage, dir: &Path, slug: &str) -> Result<Pat
 
     // A best-effort thumbnail: a card without one still works — it falls back to the full image —
     // so a thumbnail failure must not sink the whole install.
-    let _ = write_jpeg(&normalise(&decoded, THUMB_EDGE), &thumbnail_path(&full_path));
+    let _ = write_jpeg(
+        &normalise(&decoded, THUMB_EDGE),
+        &thumbnail_path(&full_path),
+    );
 
     Ok(full_path)
 }

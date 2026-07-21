@@ -82,10 +82,7 @@ pub fn import_from(archive: &Path) -> Result<()> {
 
     let dir = config_dir();
     if dir.exists() {
-        let name = dir
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("config");
+        let name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("config");
         let bak = dir.with_file_name(format!("{name}.bak-{}", timestamp()));
         // Best-effort snapshot of the current config before overwriting.
         let _ = Command::new("cp").arg("-R").arg(&dir).arg(&bak).status();

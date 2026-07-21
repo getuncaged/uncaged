@@ -239,7 +239,10 @@ impl AiAccessSlide {
     fn tile_muted(text: &str, size: f32, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();
         FormattedTextElement::from_str(text.to_string(), appearance.ui_font_family(), size)
-            .with_color(internal_colors::text_sub(theme, theme.background().into_solid()))
+            .with_color(internal_colors::text_sub(
+                theme,
+                theme.background().into_solid(),
+            ))
             .with_weight(Weight::Normal)
             .with_alignment(TextAlignment::Left)
             .with_line_height_ratio(1.2)
@@ -576,7 +579,6 @@ impl AiAccessSlide {
             layout::FOREGROUND_LAYOUT_DEFAULT,
         )
     }
-
 }
 
 impl Entity for AiAccessSlide {
@@ -617,7 +619,9 @@ impl TypedActionView for AiAccessSlide {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
             AiAccessSlideAction::ConnectPreset(preset_id) => {
-                ctx.emit(AiAccessSlideEvent::ConnectPresetRequested(preset_id.clone()));
+                ctx.emit(AiAccessSlideEvent::ConnectPresetRequested(
+                    preset_id.clone(),
+                ));
             }
             AiAccessSlideAction::UseConnection(id) => {
                 ctx.emit(AiAccessSlideEvent::ActivateConnectionRequested(id.clone()));

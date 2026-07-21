@@ -221,10 +221,7 @@ impl EnableAutoReloadModalBody {
             FormattedTextFragment::plain_text(
                 " will automatically purchase your selected package when you run out. ",
             ),
-            FormattedTextFragment::hyperlink(
-                "Learn more",
-                crate::brand::README_URL,
-            ),
+            FormattedTextFragment::hyperlink("Learn more", crate::brand::README_URL),
         ];
         let explanation_text = warpui::elements::FormattedTextElement::new(
             FormattedText::new([FormattedTextLine::Line(explanation_fragments)]),

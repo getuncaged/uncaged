@@ -15,8 +15,8 @@ use std::path::{Path, PathBuf};
 
 use ai::skills::SKILL_PROVIDER_DEFINITIONS;
 use warpui::elements::{
-    ClippedScrollStateHandle, ClippedScrollable, Container, CrossAxisAlignment, Element, Fill, Flex,
-    Hoverable, MainAxisSize, MouseStateHandle, ParentElement, ScrollbarWidth, Text,
+    ClippedScrollStateHandle, ClippedScrollable, Container, CrossAxisAlignment, Element, Fill,
+    Flex, Hoverable, MainAxisSize, MouseStateHandle, ParentElement, ScrollbarWidth, Text,
 };
 use warpui::platform::Cursor;
 
@@ -92,9 +92,11 @@ fn parse_skill_description(skill_md: &Path) -> Option<String> {
             // A block-scalar indicator (`>`, `|`, optionally with a chomping/indent modifier like
             // `>-`) means the value spans following lines; we don't parse those, so treat it as no
             // inline description rather than rendering a bare `>`/`|` as the subtitle.
-            let is_block_scalar = desc
-                .strip_prefix(['>', '|'])
-                .is_some_and(|after| after.chars().all(|c| c == '-' || c == '+' || c.is_ascii_digit()));
+            let is_block_scalar = desc.strip_prefix(['>', '|']).is_some_and(|after| {
+                after
+                    .chars()
+                    .all(|c| c == '-' || c == '+' || c.is_ascii_digit())
+            });
             if is_block_scalar {
                 return None;
             }
@@ -195,7 +197,9 @@ pub fn render_skills_content(
         let state = row_states.get(i).cloned().unwrap_or_default();
         column.add_child(skill_row(entry, state, appearance));
     }
-    let body = Container::new(column.finish()).with_padding_top(4.).finish();
+    let body = Container::new(column.finish())
+        .with_padding_top(4.)
+        .finish();
 
     // The list can be arbitrarily long, so bound it to the panel height and
     // scroll — an unbounded `Flex::column` here paints at infinite height.

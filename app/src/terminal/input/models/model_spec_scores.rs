@@ -19,7 +19,8 @@ const CORNER_RADIUS: f32 = 4.0;
 const ROW_SPACING: f32 = 12.0;
 
 pub const MODEL_SPECS_TITLE: &str = "Model Specs";
-pub const MODEL_SPECS_DESCRIPTION: &str = "Uncaged's benchmarks for how well a model performs in our harness, and task speed.";
+pub const MODEL_SPECS_DESCRIPTION: &str =
+    "Uncaged's benchmarks for how well a model performs in our harness, and task speed.";
 
 pub const REASONING_LEVEL_TITLE: &str = "Reasoning level";
 pub const REASONING_LEVEL_DESCRIPTION: &str = "Increased reasoning levels consume more credits and have higher latency, but higher performance for complicated tasks.";

@@ -762,10 +762,7 @@ impl CategoriesView {
                 .ui_builder()
                 .link(
                     "creating your own workflow".into(),
-                    Some(
-                        crate::brand::README_URL
-                            .into(),
-                    ),
+                    Some(crate::brand::README_URL.into()),
                     None,
                     self.link_mouse_state_handles
                         .documentation_link_handle

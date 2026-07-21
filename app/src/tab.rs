@@ -1446,7 +1446,11 @@ impl<'a> TabComponent<'a> {
                     }
                 } else {
                     let icon_color = self.appearance.theme().nonactive_ui_text_color();
-                    Some(crate::brand::design::AGENT.to_warpui_icon(icon_color).finish())
+                    Some(
+                        crate::brand::design::AGENT
+                            .to_warpui_icon(icon_color)
+                            .finish(),
+                    )
                 }
             }
             Indicator::AmbientAgent => {

@@ -649,8 +649,8 @@ impl DriveIndex {
 
         // Uncaged (Oss) is account-free and has no teams — the Drive is a purely
         // local, personal store, so never surface the Create/Join team sections.
-        let teams_supported = warp_core::channel::ChannelState::channel()
-            != warp_core::channel::Channel::Oss;
+        let teams_supported =
+            warp_core::channel::ChannelState::channel() != warp_core::channel::Channel::Oss;
         if teams_supported && !user_workspaces.as_ref(ctx).has_teams() {
             if user_workspaces
                 .as_ref(ctx)
@@ -735,8 +735,8 @@ impl DriveIndex {
         // Uncaged (Oss) has no cloud and no upstream sync, so Warp's seeded
         // "welcome/starter" objects (Starter prompts/workflows, "Getting started
         // with Warp") aren't ours — hide them so the Drive is a clean personal store.
-        let hide_welcome = warp_core::channel::ChannelState::channel()
-            == warp_core::channel::Channel::Oss;
+        let hide_welcome =
+            warp_core::channel::ChannelState::channel() == warp_core::channel::Channel::Oss;
         let item_iter = match (self.index_variant, location) {
             (DriveIndexVariant::MainIndex, CloudObjectLocation::Space(Space::Shared)) => {
                 let user_uid = AuthStateProvider::as_ref(app).get().user_id();
@@ -2540,7 +2540,9 @@ impl DriveIndex {
             appearance,
             Icon::UploadCloud,
             false,
-            self.mouse_state_handles.gist_sync_button_mouse_state.clone(),
+            self.mouse_state_handles
+                .gist_sync_button_mouse_state
+                .clone(),
         )
         .build()
         .on_click(|ctx, _, _| {

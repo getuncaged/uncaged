@@ -35,12 +35,9 @@ pub fn learn_more_url_for_harness(harness: Harness) -> &'static str {
     }
 }
 
-const DEFAULT_LEARN_MORE_URL: &str =
-    crate::brand::README_URL;
-const CODEX_LEARN_MORE_URL: &str =
-    crate::brand::README_URL;
-const CLAUDE_LEARN_MORE_URL: &str =
-    crate::brand::README_URL;
+const DEFAULT_LEARN_MORE_URL: &str = crate::brand::README_URL;
+const CODEX_LEARN_MORE_URL: &str = crate::brand::README_URL;
+const CLAUDE_LEARN_MORE_URL: &str = crate::brand::README_URL;
 
 pub fn build_managed_secret_value(
     info: &AuthSecretTypeInfo,

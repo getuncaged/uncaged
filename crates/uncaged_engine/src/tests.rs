@@ -160,12 +160,18 @@ fn attached_block_context_is_surfaced_to_the_model() {
         .collect::<Vec<_>>()
         .join("\n");
 
-    assert!(user_text.contains("git stus"), "attached command missing:\n{user_text}");
+    assert!(
+        user_text.contains("git stus"),
+        "attached command missing:\n{user_text}"
+    );
     assert!(
         user_text.contains("not a git command"),
         "attached output missing:\n{user_text}"
     );
-    assert!(user_text.contains("let x = broken;"), "selected text missing:\n{user_text}");
+    assert!(
+        user_text.contains("let x = broken;"),
+        "selected text missing:\n{user_text}"
+    );
 }
 
 // ---- passive suggestions (chip after a shell command completes) ----
@@ -215,7 +221,10 @@ fn passive_suggestion_request_prompts_for_a_tool_call() {
         })
         .collect::<Vec<_>>()
         .join("\n");
-    assert!(user_text.contains("git stat"), "command missing:\n{user_text}");
+    assert!(
+        user_text.contains("git stat"),
+        "command missing:\n{user_text}"
+    );
     assert!(
         user_text.contains("suggest_prompt"),
         "directive to call the tool missing:\n{user_text}"

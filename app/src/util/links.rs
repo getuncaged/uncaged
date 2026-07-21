@@ -7,8 +7,7 @@ pub const SLACK_URL: &str = crate::brand::DISCUSSIONS_URL;
 pub const PRIVACY_POLICY_URL: &str = crate::brand::PRIVACY_URL;
 
 pub fn feedback_form_url() -> String {
-    let mut url = url::Url::parse(crate::brand::NEW_ISSUE_URL)
-        .expect("Should not fail to parse");
+    let mut url = url::Url::parse(crate::brand::NEW_ISSUE_URL).expect("Should not fail to parse");
     if let Some(version) = ChannelState::app_version() {
         url.query_pairs_mut().append_pair("warp-version", version);
     }

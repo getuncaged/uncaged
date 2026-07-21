@@ -265,7 +265,9 @@ impl SettingsWidget for WarpControlCliInstallWidget {
             ToggleState::Enabled,
             appearance,
             button,
-            Some("Install the warpctrl command for scripting Uncaged from your terminal.".to_owned()),
+            Some(
+                "Install the warpctrl command for scripting Uncaged from your terminal.".to_owned(),
+            ),
         )
     }
 }

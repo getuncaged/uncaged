@@ -1,5 +1,4 @@
 use asset_macro::bundled_or_fetched_asset;
-use warpui::assets::asset_cache::AssetSource;
 use pathfinder_color::ColorU;
 use warp_core::ui::color::blend::Blend;
 use warp_core::ui::color::{coloru_with_opacity, OPAQUE};
@@ -8,6 +7,7 @@ use warp_core::ui::theme::{
     AnsiColor, AnsiColors, Details, Fill, HorizontalGradient, Image, TerminalColors,
     VerticalGradient, WarpTheme,
 };
+use warpui::assets::asset_cache::AssetSource;
 
 const DARK_MODE_NORMAL_COLORS: AnsiColors = AnsiColors::new(
     AnsiColor::from_u32(0x616161FF),
@@ -650,7 +650,7 @@ pub(super) fn uncaged() -> WarpTheme {
             ColorU::from_u32(0x15110CFF),
             ColorU::from_u32(0x0C0A08FF),
         )),
-        ColorU::from_u32(0xE9E1D4FF), // warm ink foreground
+        ColorU::from_u32(0xE9E1D4FF),              // warm ink foreground
         Fill::Solid(ColorU::from_u32(0xFF7A18FF)), // ember accent
         // A bright gold caret — the ember that lights the [ ❯_ ] mark.
         Some(Fill::Solid(ColorU::from_u32(0xFFB23AFF))),

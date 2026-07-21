@@ -217,7 +217,10 @@ impl SettingsWidget for VerticalTabsWidget {
                     ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::ToggleVerticalTabs);
                 })
                 .finish(),
-            Some("Stack tabs vertically in a side panel instead of horizontally along the top.".into()),
+            Some(
+                "Stack tabs vertically in a side panel instead of horizontally along the top."
+                    .into(),
+            ),
         )
     }
 }
@@ -419,7 +422,9 @@ impl SettingsWidget for CodeReviewButtonWidget {
                 .check(*tab_settings.show_code_review_button)
                 .build()
                 .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::ToggleCodeReviewButton);
+                    ctx.dispatch_typed_action(
+                        CustomizeUiSettingsPageAction::ToggleCodeReviewButton,
+                    );
                 })
                 .finish(),
             Some("Adds a code review button to the tab bar.".into()),

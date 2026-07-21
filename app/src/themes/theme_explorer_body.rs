@@ -10,6 +10,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use settings::Setting as _;
+use warp_core::ui::theme::WarpTheme;
 use warpui::assets::asset_cache::AssetSource;
 use warpui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
@@ -23,17 +24,16 @@ use warpui::{
     AppContext, Entity, SingletonEntity, TypedActionView, UpdateModel, View, ViewContext,
     ViewHandle,
 };
-use warp_core::ui::theme::WarpTheme;
 
 use crate::appearance::{Appearance, AppearanceManager};
 use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions, TextOptions};
+use crate::report_if_error;
 use crate::settings::{active_theme_kind, ThemeSettings};
 use crate::themes::theme::SelectedSystemThemes;
 use crate::themes::theme::{self, ThemeGroup, ThemeKind};
 use crate::themes::theme_background_image;
 use crate::themes::theme_gallery::{self, GalleryTheme};
 use crate::user_config::{load_theme_configs, themes_dir, WarpConfig};
-use crate::report_if_error;
 
 const CARD_WIDTH: f32 = 240.;
 const CARD_PREVIEW_SCALE: f32 = 1.2;
@@ -199,7 +199,11 @@ impl ThemeExplorerBody {
         ctx.notify();
 
         ctx.spawn(
-            async move { theme_gallery::fetch_index().await.map_err(|e| e.to_string()) },
+            async move {
+                theme_gallery::fetch_index()
+                    .await
+                    .map_err(|e| e.to_string())
+            },
             |me, result, ctx| {
                 me.catalogue = match result {
                     Ok(index) => CatalogueState::Loaded(index.themes),
@@ -251,7 +255,12 @@ impl ThemeExplorerBody {
             });
         }
 
-        entries.sort_by(|a, b| a.origin.cmp_key().cmp(&b.origin.cmp_key()).then(a.name.cmp(&b.name)));
+        entries.sort_by(|a, b| {
+            a.origin
+                .cmp_key()
+                .cmp(&b.origin.cmp_key())
+                .then(a.name.cmp(&b.name))
+        });
 
         if let CatalogueState::Loaded(catalogue) = &self.catalogue {
             for gallery_theme in catalogue {
@@ -330,7 +339,9 @@ impl ThemeExplorerBody {
                         dark: kind.clone(),
                     },
                 };
-                report_if_error!(theme_settings.selected_system_themes.set_value(updated, ctx));
+                report_if_error!(theme_settings
+                    .selected_system_themes
+                    .set_value(updated, ctx));
             } else {
                 report_if_error!(theme_settings.theme_kind.set_value(kind.clone(), ctx));
             }
@@ -377,7 +388,9 @@ impl ThemeExplorerBody {
                         selected.dark.clone()
                     },
                 };
-                report_if_error!(theme_settings.selected_system_themes.set_value(updated, ctx));
+                report_if_error!(theme_settings
+                    .selected_system_themes
+                    .set_value(updated, ctx));
             }
         });
         ctx.notify();
@@ -410,10 +423,14 @@ impl ThemeExplorerBody {
         // take the user's own picture with it. Its preview thumbnail, which is ours and sits beside
         // it, goes too so it does not linger as an orphan.
         if let Some(image) = entry.definition.background_image() {
-            if let AssetSource::LocalFile { path: image_path, .. } = image.source() {
+            if let AssetSource::LocalFile {
+                path: image_path, ..
+            } = image.source()
+            {
                 let image_path = PathBuf::from(image_path);
                 if path_is_within(&image_path, &themes_dir()) {
-                    let _ = std::fs::remove_file(theme_background_image::thumbnail_path(&image_path));
+                    let _ =
+                        std::fs::remove_file(theme_background_image::thumbnail_path(&image_path));
                     let _ = std::fs::remove_file(image_path);
                 }
             }
@@ -516,7 +533,12 @@ impl ThemeExplorerBody {
         // The right-hand control says what this card will do if you click it.
         let action: Box<dyn Element> = if entry.origin == Origin::Available {
             let label = if installing { "Installing…" } else { "Get" };
-            pill(label, theme.accent(), theme.background().into_solid(), appearance)
+            pill(
+                label,
+                theme.accent(),
+                theme.background().into_solid(),
+                appearance,
+            )
         } else if is_active {
             pill(
                 "In use",
@@ -547,12 +569,20 @@ impl ThemeExplorerBody {
 
         let mut card = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
         card.add_child(preview);
-        card.add_child(Container::new(footer.finish()).with_margin_top(10.).finish());
+        card.add_child(
+            Container::new(footer.finish())
+                .with_margin_top(10.)
+                .finish(),
+        );
         card.add_child(
             Container::new(
-                Text::new_inline(entry.origin.label().to_string(), appearance.ui_font_family(), 10.)
-                    .with_color(theme.disabled_text_color(theme.surface_2()).into_solid())
-                    .finish(),
+                Text::new_inline(
+                    entry.origin.label().to_string(),
+                    appearance.ui_font_family(),
+                    10.,
+                )
+                .with_color(theme.disabled_text_color(theme.surface_2()).into_solid())
+                .finish(),
             )
             .with_margin_top(2.)
             .finish(),
@@ -635,13 +665,13 @@ impl ThemeExplorerBody {
             .with_uniform_padding(10.)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(10.)))
             .with_background(theme.surface_2())
-            .with_border(Border::all(if is_active { 2. } else { 1. }).with_border_fill(
-                if is_active {
+            .with_border(
+                Border::all(if is_active { 2. } else { 1. }).with_border_fill(if is_active {
                     theme.accent()
                 } else {
                     theme.outline()
-                },
-            ))
+                }),
+            )
             .finish();
 
         // Clicking the card does the obvious thing: install it if it is not here, use it if it is.
@@ -750,7 +780,8 @@ impl View for ThemeExplorerBody {
                     .with_child(
                         Container::new(
                             ConstrainedBox::new(
-                                Icon::new("bundled/svg/find.svg", theme.active_ui_detail()).finish(),
+                                Icon::new("bundled/svg/find.svg", theme.active_ui_detail())
+                                    .finish(),
                             )
                             .with_height(12.)
                             .with_width(12.)
@@ -856,13 +887,16 @@ impl View for ThemeExplorerBody {
                 .with_margin_top(8.)
                 .finish(),
             );
-            column.add_child(Container::new(notice.finish()).with_margin_top(20.).finish());
+            column.add_child(
+                Container::new(notice.finish())
+                    .with_margin_top(20.)
+                    .finish(),
+            );
         }
 
         Container::new(column.finish()).finish()
     }
 }
-
 
 /// True only when `path` genuinely resolves inside `base`, with `..` and symlinks accounted for.
 ///

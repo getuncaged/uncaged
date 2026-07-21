@@ -415,10 +415,7 @@ pub fn get_agent_tips(ctx: &AppContext) -> Vec<AgentTip> {
         tips.push(AgentTip {
             description: "Hold <keybinding> to speak your prompt directly to the agent."
                 .to_string(),
-            link: Some(
-                crate::brand::README_URL
-                    .to_string(),
-            ),
+            link: Some(crate::brand::README_URL.to_string()),
             binding_name: Some("FN"),
             action: None,
             kind: AgentTipKind::General,

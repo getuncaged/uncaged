@@ -163,7 +163,8 @@ fn a_gallery_opacity_over_100_is_clamped_on_parse() {
     let mut json = String::from_utf8(REAL_INDEX.to_vec()).unwrap();
     // Give the first theme an image with a hostile opacity.
     let needle = "\"definition\": {";
-    let inject = "\"definition\": {\n\"background_image\": { \"path\": \"./x.png\", \"opacity\": 240 },";
+    let inject =
+        "\"definition\": {\n\"background_image\": { \"path\": \"./x.png\", \"opacity\": 240 },";
     json = json.replacen(needle, inject, 1);
 
     let index = parse_index(json.as_bytes()).expect("parse");

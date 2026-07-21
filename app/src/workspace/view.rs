@@ -2,6 +2,7 @@ pub(crate) mod auto_handoff_sleep_modal;
 mod build_plan_migration_modal;
 pub(crate) mod cloud_agent_capacity_modal;
 pub(crate) mod codex_modal;
+pub(crate) mod config_panel;
 pub mod conversation_list;
 #[cfg(enable_crash_recovery)]
 mod crash_recovery;
@@ -11,12 +12,11 @@ pub mod global_search;
 pub(crate) mod launch_modal;
 pub(crate) mod left_panel;
 pub(crate) mod onboarding;
-pub(crate) mod config_panel;
-pub(crate) mod skills_panel;
-pub(crate) mod ssh_panel;
 pub(crate) mod openwarp_launch_modal;
 pub(crate) mod orchestration_launch_modal;
 pub(crate) mod right_panel;
+pub(crate) mod skills_panel;
+pub(crate) mod ssh_panel;
 mod startup_directory;
 mod tab_grouping;
 #[cfg(test)]
@@ -3368,11 +3368,9 @@ impl Workspace {
             palette,
             ctrl_tab_palette,
             mouse_states: Default::default(),
-            cli_agent_launcher_states: enum_iterator::all::<
-                crate::terminal::cli_agent::CLIAgent,
-            >()
-            .map(|_| MouseStateHandle::default())
-            .collect(),
+            cli_agent_launcher_states: enum_iterator::all::<crate::terminal::cli_agent::CLIAgent>()
+                .map(|_| MouseStateHandle::default())
+                .collect(),
             previous_theme: None,
             settings_pane,
             theme_chooser_view,
@@ -6829,9 +6827,7 @@ impl Workspace {
                     open_in_active_window: false,
                 },
             ),
-            NewSessionMenuItem::OpenLaunchConfigDocs => {
-                ctx.open_url(crate::brand::README_URL)
-            }
+            NewSessionMenuItem::OpenLaunchConfigDocs => ctx.open_url(crate::brand::README_URL),
             #[cfg(feature = "local_fs")]
             NewSessionMenuItem::CreateNewTabConfig => {
                 self.create_and_open_new_tab_config(ctx);
@@ -10641,9 +10637,7 @@ impl Workspace {
                         Ok(url) => DismissibleToast::success(
                             "Config synced to your private gist.".to_string(),
                         )
-                        .with_link(
-                            ToastLink::new("Open gist".to_string()).with_href(url),
-                        ),
+                        .with_link(ToastLink::new("Open gist".to_string()).with_href(url)),
                         Err(e) => {
                             log::error!("gist sync (push) failed: {e:#}");
                             DismissibleToast::error(format!("{e}"))
@@ -12328,9 +12322,7 @@ impl Workspace {
     }
 
     pub fn open_autoupdate_failure_link(&mut self, ctx: &mut ViewContext<Self>) {
-        ctx.open_url(
-            crate::brand::README_URL,
-        );
+        ctx.open_url(crate::brand::README_URL);
     }
 
     pub fn add_terminal_tab(&mut self, hide_homepage: bool, ctx: &mut ViewContext<Self>) {
@@ -20642,7 +20634,9 @@ impl Workspace {
                 .finish()
             })
             .on_click(|ctx, _, _| {
-                ctx.dispatch_typed_action(WorkspaceAction::OpenLink(crate::brand::HOME_URL.to_owned()));
+                ctx.dispatch_typed_action(WorkspaceAction::OpenLink(
+                    crate::brand::HOME_URL.to_owned(),
+                ));
             })
             .with_cursor(Cursor::PointingHand)
             .finish();
@@ -22119,13 +22113,14 @@ impl Workspace {
                 AutoupdateStage::UnableToUpdateToNewVersion { new_version }
                     if !self.autoupdate_unable_to_update_banner_dismissed =>
                 {
-                    let description =
-                        if is_incoming_version_past_current(new_version.soft_cutoff.as_deref()) {
-                            VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT.to_owned()
-                        } else {
-                            "A new version is available but Uncaged is unable to perform the update."
-                                .to_owned()
-                        };
+                    let description = if is_incoming_version_past_current(
+                        new_version.soft_cutoff.as_deref(),
+                    ) {
+                        VERSION_DEPRECATION_WITHOUT_PERMISSIONS_BANNER_TEXT.to_owned()
+                    } else {
+                        "A new version is available but Uncaged is unable to perform the update."
+                            .to_owned()
+                    };
 
                     Some(WorkspaceBannerFields {
                         banner_type: WorkspaceBanner::UnableToUpdateToNewVersion,
@@ -27101,7 +27096,8 @@ impl View for Workspace {
         // cloud tour, "Warp is now open-source", orchestration, cloud-handoff, and
         // free-AI-removal. They're cloud/billing announcements that don't apply to
         // a free, local, account-free fork.
-        let should_show_modal = false && one_time_modal_model.target_window_id() == Some(self.window_id);
+        let should_show_modal =
+            false && one_time_modal_model.target_window_id() == Some(self.window_id);
 
         if should_show_modal && one_time_modal_model.is_oz_launch_modal_open() {
             stack.add_child(ChildView::new(&self.oz_launch_modal.view).finish());

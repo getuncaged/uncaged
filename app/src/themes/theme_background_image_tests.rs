@@ -113,7 +113,10 @@ fn import_writes_a_smaller_thumbnail_beside_the_full_image() {
     let full = import(&source, dir.path(), "with-thumb").expect("import");
     let thumb = thumbnail_path(&full);
 
-    assert!(thumb.exists(), "a thumbnail should sit beside the full image");
+    assert!(
+        thumb.exists(),
+        "a thumbnail should sit beside the full image"
+    );
 
     let full_edge = {
         let img = image::open(&full).unwrap();

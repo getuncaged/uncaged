@@ -38,11 +38,11 @@ mod tools;
 mod wire;
 
 #[cfg(test)]
-mod tests;
+mod connections_tests;
 #[cfg(test)]
 mod live_tests;
 #[cfg(test)]
-mod connections_tests;
+mod tests;
 
 pub use catalog::Group;
 pub use catalog::PRESETS;

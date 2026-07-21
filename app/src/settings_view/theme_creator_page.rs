@@ -25,6 +25,7 @@ use super::settings_page::{
 };
 use super::SettingsSection;
 use crate::appearance::Appearance;
+use crate::report_if_error;
 use crate::settings::ThemeSettings;
 use crate::themes::theme_creator_body::{
     ThemeCreatorBody, ThemeCreatorBodyAction, ThemeCreatorBodyEvent,
@@ -32,7 +33,6 @@ use crate::themes::theme_creator_body::{
 use crate::user_config::{load_theme_configs, themes_dir, WarpConfig};
 use crate::view_components::DismissibleToast;
 use crate::workspace::ToastStack;
-use crate::report_if_error;
 
 /// This page emits no events; the empty enum satisfies the `Entity` bound.
 pub enum ThemeCreatorPageEvent {}
@@ -115,11 +115,9 @@ impl ThemeCreatorPageView {
             move |result, ctx| {
                 let action = match result {
                     Ok(paths) => match paths.into_iter().next() {
-                        Some(path) => {
-                            ThemeCreatorBodyAction::HandleImageSelected(std::path::PathBuf::from(
-                                path,
-                            ))
-                        }
+                        Some(path) => ThemeCreatorBodyAction::HandleImageSelected(
+                            std::path::PathBuf::from(path),
+                        ),
                         None => ThemeCreatorBodyAction::FilePickerCancelled,
                     },
                     Err(err) => {

@@ -157,7 +157,9 @@ pub fn render_config_content(
         appearance,
     ));
 
-    let body = Container::new(column.finish()).with_padding_top(4.).finish();
+    let body = Container::new(column.finish())
+        .with_padding_top(4.)
+        .finish();
 
     ClippedScrollable::vertical(
         scroll_state.clone(),

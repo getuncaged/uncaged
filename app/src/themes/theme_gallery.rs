@@ -120,7 +120,10 @@ pub fn is_safe_slug(slug: &str) -> bool {
 /// Parses a fetched catalogue, rejecting a version this client does not understand.
 pub fn parse_index(bytes: &[u8]) -> anyhow::Result<GalleryIndex> {
     if bytes.len() > MAX_INDEX_BYTES {
-        anyhow::bail!("theme catalogue is unreasonably large ({} bytes)", bytes.len());
+        anyhow::bail!(
+            "theme catalogue is unreasonably large ({} bytes)",
+            bytes.len()
+        );
     }
 
     let index: GalleryIndex = serde_json::from_slice(bytes)?;
@@ -214,11 +217,10 @@ pub async fn install(theme: &GalleryTheme, themes_dir: &Path) -> Result<PathBuf>
     }
 
     let dir = themes_dir.join(COMMUNITY_SUBFOLDER);
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("couldn't create {}", dir.display()))?;
+    std::fs::create_dir_all(&dir).with_context(|| format!("couldn't create {}", dir.display()))?;
 
-    let mut definition = serde_yaml::to_value(&theme.definition)
-        .context("couldn't prepare the theme for saving")?;
+    let mut definition =
+        serde_yaml::to_value(&theme.definition).context("couldn't prepare the theme for saving")?;
 
     if let Some(url) = theme.image_url() {
         // Normalise the download exactly like an editor import: cap it, flatten it, re-encode it,
