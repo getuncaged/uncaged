@@ -1,0 +1,30 @@
+app/src/themes/theme_creator_body.rs
+  s_6e5dc450e2113a::t_2f20f9d11b30a8 89,1551,1564,1574-1577,1589-1590
+app/src/brand.rs
+  s_6e5dc450e2113a::t_4a27c5f471ef1d 70-72,85-86,88-89,91-93,95-96,98-106
+  s_6e5dc450e2113a::t_ac61f6beb0ec67 73-84,87,90,94,97
+  s_6e5dc450e2113a::t_e054989b280d26 207-234
+app/src/themes/theme_gallery.rs
+  s_6e5dc450e2113a::t_b5037eec98086b 17
+  s_6e5dc450e2113a::t_b8a274153f0db5 24-26,28,39-40,42
+  s_6e5dc450e2113a::t_0379f35374790f 159
+FORKING.md
+  s_6e5dc450e2113a::t_32428daa16fa70 93-126
+  s_6e5dc450e2113a::t_49839412525aaf 28-33,35-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "665323aa7b62a5e15047a3d2dcd28752090e45da",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
