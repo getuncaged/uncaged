@@ -1,0 +1,161 @@
+app/src/themes/theme_explorer_body.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 13,30,202-206,258-263,342-344,391-393,426-429,432-433,536-541,572-576,579-585,668-669,673-674,783-784,890-894
+app/src/settings_view/ai_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 89,91-92,97-98,195,2336-2338,2375-2378,2469-2472,2491-2493,4176,7350,7829-7833,8505-8512,8593-8597,8716-8720,8796-8800
+app/src/themes/default_themes.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 10,653
+app/src/workspace/view/config_panel.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 160-162
+app/src/terminal/profile_model_selector.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 2145-2146
+crates/onboarding/src/slides/mod.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 20-21
+app/src/themes/theme_creator_body.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 4,6,17-19,186-190,621,654-659,693,700,911-912,916-917,1036-1041,1603-1607,1639-1662,1693-1694
+app/src/root_view.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 2063-2065,2194,2330-2332
+app/src/settings_view/features_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 4574,4657,5621,6778,7040,7325
+app/src/settings_view/theme_gallery_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 10
+app/src/settings_view/customize_ui_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 220-223,425-427
+crates/onboarding/src/visuals/customize_visual.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 45-48,53-56,58-69,75-78,83-86,88-95,106-109,112-119,124-130,132-135,145-148,150-157,161-164,166-184,190-197,207-214,216-219,224-235
+app/src/gist_sync.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 89-90,190,276-277
+app/src/terminal/view/open_in_warp.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 31
+crates/uncaged_engine/src/live_tests.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 285-288
+app/src/terminal/input/models/model_spec_scores.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 22-23
+app/src/settings_view/theme_creator_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 28,118-120
+app/src/themes/mod.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 10-11
+app/src/settings_backup.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 85
+app/src/ai_assistant/panel.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 71-72
+crates/uncaged_engine/src/connections.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 175-179,241-243
+app/src/workspace/hoa_onboarding/hoa_onboarding_flow.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 471
+app/src/auth/login_failure_notification.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 11
+app/src/settings_view/main_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 690
+app/src/workspace/view/left_panel.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 20-22
+app/src/terminal/view.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 630,633,636,651-652
+app/src/themes/theme_background_image_tests.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 116-119
+app/src/workspace/view.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 5,18-19,3371-3373,6830,10640,12325,20637-20639,22116-22123,27099-27100
+app/src/launch_configs/save_modal.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 533
+app/src/workspace/action.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 866-868
+app/src/settings_view/warpify_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 488
+app/src/themes/theme_gallery.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 123-126,220,222-223
+crates/onboarding/src/agent_onboarding_view.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 14-15,244-246,450-451
+app/src/workspace/view/skills_panel.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 18-19,95-99,200-202
+app/src/terminal/input.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 13013-13017,13033-13036
+app/src/workspace/view/ssh_panel.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 53-57,165-167
+app/src/themes/theme_gallery_tests.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 166-167
+app/src/tab.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 1449-1453
+app/src/settings_view/privacy_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 83
+app/src/settings_view/mod.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 87,117-118
+app/src/settings_view/referrals_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 94
+app/src/settings_view/features/external_editor.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 153-156
+crates/uncaged_engine/src/request_parse.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 210-213
+app/src/settings_view/custom_inference_modal.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 721-724
+crates/uncaged_engine/src/tests.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 163-166,171-174,224-227
+crates/onboarding/src/slides/ai_access_slide.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 242-245,622-624
+app/src/ai/agent_management/cloud_setup_guide_view.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 35
+app/src/ai/agent_tips.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 418
+app/src/ai/agent/mod.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 818-821
+app/src/settings_view/mcp_servers/list_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 1180
+crates/uncaged_engine/src/lib.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 41,45
+app/src/drive/index.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 652-653,738-739,2543-2545
+app/src/terminal/view/block_onboarding/onboarding_prompt_block.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 68
+app/src/settings_view/platform/create_api_key_modal.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 33
+app/src/drive/import/modal_body.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 37
+app/src/settings_view/mcp_servers/destructive_mcp_confirmation_dialog.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 59-83
+app/src/terminal/enable_auto_reload_modal.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 224
+app/src/themes/theme_background_image.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 69-73,110-113
+app/src/workspace/view/vertical_tabs.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 4829-4831
+app/src/brand.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 119-120
+app/src/lib.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 80,93-94
+app/src/ai/auth_secret_types.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 38-40
+app/src/settings_view/update_environment_form.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 3098-3099
+app/src/settings_view/scripting_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 268-270
+crates/uncaged_engine/src/connections_tests.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 295-298,308-311,346-350
+app/src/util/links.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 10
+app/src/settings_view/settings_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 34,45-46
+app/src/settings_view/appearance_page.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 60-64
+app/src/workflows/categories.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 765
+app/src/font_fallback.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 116
+crates/uncaged_engine/src/catalog.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 182,208
+app/src/pane_group/mod.rs
+  s_6e5dc450e2113a::t_d7bb0d5e40b98d 275
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "3079033ad2d84df4a1d0526b1d9e267ee4492da5",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
