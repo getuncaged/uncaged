@@ -39,6 +39,16 @@ jobs:
           # Git LFS — fetch them so the build has its resources.
           lfs: true
 
+      # `warp_multi_agent_api`'s build script needs protoc (proto3), and the
+      # macOS runner doesn't ship it — the Linux/Windows jobs install it too.
+      # (This was latent: the fmt check below used to fail first, so the build
+      # step never ran to hit the missing compiler.)
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       # rust-toolchain.toml pins the exact channel (1.92.0 + rustfmt/clippy);
       # actions/checkout + the default toolchain honor it automatically, but we
       # install explicitly so fmt/clippy components are guaranteed present.
