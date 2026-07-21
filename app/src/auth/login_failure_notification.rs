@@ -8,8 +8,7 @@ use warpui::{Action, AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 
-const LOGIN_TROUBLESHOOTING_DOCS_URL: &str =
-    crate::brand::README_URL;
+const LOGIN_TROUBLESHOOTING_DOCS_URL: &str = crate::brand::README_URL;
 
 /// Represents reasons why login failed.
 pub enum LoginFailureReason {

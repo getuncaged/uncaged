@@ -485,10 +485,7 @@ impl TitleWidget {
                 "Configure whether Warp attempts to “Warpify” (add support for blocks, \
                     input modes, etc) certain shells. ",
             ),
-            FormattedTextFragment::hyperlink(
-                "Learn more",
-                crate::brand::README_URL,
-            ),
+            FormattedTextFragment::hyperlink("Learn more", crate::brand::README_URL),
         ];
 
         let warpify_description = FormattedTextElement::new(

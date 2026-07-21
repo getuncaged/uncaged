@@ -17,8 +17,8 @@ mod two_line_button;
 
 pub use agent_slide::{AgentAutonomy, AgentDevelopmentSettings, AgentSlide, OnboardingModelInfo};
 pub use ai_access_slide::{
-    AiAccessSlide, AiAccessSlideEvent, ConnectConnectionView, ConnectGalleryData, ConnectPresetView,
-    ConnectSectionView,
+    AiAccessSlide, AiAccessSlideEvent, ConnectConnectionView, ConnectGalleryData,
+    ConnectPresetView, ConnectSectionView,
 };
 pub use ai_setup_slide::AiSetupSlide;
 pub use bottom_nav::onboarding_bottom_nav;

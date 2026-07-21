@@ -292,7 +292,10 @@ fn connect_or_focus_never_duplicates() {
 
     let id1 = connections::connect_or_focus("lmstudio").unwrap();
     let id2 = connections::connect_or_focus("lmstudio").unwrap();
-    assert_eq!(id1, id2, "connecting the same preset twice reuses the connection");
+    assert_eq!(
+        id1, id2,
+        "connecting the same preset twice reuses the connection"
+    );
     let r = connections::load();
     assert_eq!(r.connections.len(), 1, "no duplicate created");
     assert_eq!(r.active_id.as_deref(), Some(id1.as_str()));
@@ -302,7 +305,10 @@ fn connect_or_focus_never_duplicates() {
     connections::connect_or_focus("custom").unwrap();
     let r = connections::load();
     assert_eq!(
-        r.connections.iter().filter(|c| c.preset == "custom").count(),
+        r.connections
+            .iter()
+            .filter(|c| c.preset == "custom")
+            .count(),
         2,
         "custom presets are allowed to repeat"
     );
@@ -337,5 +343,9 @@ fn dedupe_collapses_existing_duplicate_roster() {
     assert_eq!(presets.iter().filter(|p| **p == "claude-code").count(), 1);
     // The active lmstudio row survives; the other two are gone.
     assert!(r.connections.iter().any(|c| c.id == "lmstudio-3"));
-    assert!(!r.connections.iter().any(|c| c.id == "lmstudio" || c.id == "lmstudio-2"));
+    assert!(
+        !r.connections
+            .iter()
+            .any(|c| c.id == "lmstudio" || c.id == "lmstudio-2")
+    );
 }

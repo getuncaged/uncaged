@@ -718,14 +718,10 @@ impl View for CustomEndpointModal {
         };
         column.add_child(
             Container::new(
-                Text::new(
-                    description,
-                    appearance.ui_font_family(),
-                    LABEL_FONT_SIZE,
-                )
-                .with_color(theme.nonactive_ui_text_color().into())
-                .soft_wrap(true)
-                .finish(),
+                Text::new(description, appearance.ui_font_family(), LABEL_FONT_SIZE)
+                    .with_color(theme.nonactive_ui_text_color().into())
+                    .soft_wrap(true)
+                    .finish(),
             )
             .with_margin_bottom(16.)
             .finish(),

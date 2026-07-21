@@ -91,8 +91,7 @@ const CLAIMED_REFERRAL_COUNT_LEFT_MARGIN: f32 = 40.;
 const CLAIMED_REFERRAL_CLIP: usize = 999;
 
 const TERMS_LINK_TEXT: &str = "Certain restrictions apply.";
-const TERMS_URL: &str =
-    crate::brand::README_URL;
+const TERMS_URL: &str = crate::brand::README_URL;
 const TERMS_CONTACT_TEXT: &str =
     " If you have any questions about the referral program, please contact referrals@warp.dev.";
 

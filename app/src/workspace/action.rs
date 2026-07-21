@@ -863,7 +863,9 @@ pub enum WorkspaceAction {
     /// Toggles automated (no-confirmation) gist sync on/off.
     ToggleGistAutoSync,
     /// Opens a new terminal tab and connects to an `~/.ssh/config` host via `ssh`.
-    ConnectSsh { host: String },
+    ConnectSsh {
+        host: String,
+    },
     /// Opens `~/.ssh/config` in a code editor tab (creating it if missing) so
     /// the user can add/manage SSH hosts.
     OpenSshConfig,

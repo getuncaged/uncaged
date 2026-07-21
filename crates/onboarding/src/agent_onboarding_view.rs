@@ -11,8 +11,8 @@ use warpui_core::windowing::WindowManager;
 
 use crate::components::feature_optout_dialog::{render_feature_optout_dialog, FeatureOptOutDialog};
 use crate::model::{
-    AiAccessChoice, OnboardingAuthState, OnboardingStateEvent, OnboardingStateModel, OnboardingStep,
-    SelectedSettings,
+    AiAccessChoice, OnboardingAuthState, OnboardingStateEvent, OnboardingStateModel,
+    OnboardingStep, SelectedSettings,
 };
 use crate::slides::{
     AgentSlide, AiAccessSlide, AiAccessSlideEvent, AiSetupSlide, ConnectGalleryData,
@@ -241,7 +241,9 @@ impl AgentOnboardingView {
                 ));
             }
             AiAccessSlideEvent::ActivateConnectionRequested(id) => {
-                ctx.emit(AgentOnboardingEvent::ActivateConnectionRequested(id.clone()));
+                ctx.emit(AgentOnboardingEvent::ActivateConnectionRequested(
+                    id.clone(),
+                ));
             }
         });
 
@@ -445,7 +447,8 @@ impl AgentOnboardingView {
             appearance,
             FeatureOptOutDialog {
                 title: "Are you sure you don't want AI?",
-                body: "Without AI, you'll still get Uncaged's terminal experience, but you'll miss \
+                body:
+                    "Without AI, you'll still get Uncaged's terminal experience, but you'll miss \
                        our agentic features like automatic fixes for terminal errors.",
                 features: &[],
                 close_button,

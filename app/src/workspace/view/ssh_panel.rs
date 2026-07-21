@@ -50,7 +50,11 @@ pub fn read_ssh_hosts() -> Vec<String> {
     hosts
 }
 
-fn host_row(host: &str, mouse_state: MouseStateHandle, appearance: &Appearance) -> Box<dyn Element> {
+fn host_row(
+    host: &str,
+    mouse_state: MouseStateHandle,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
     let theme = appearance.theme();
     let ui_font_family = appearance.ui_font_family();
     let text_color = theme.main_text_color(theme.surface_1()).into_solid();
@@ -158,7 +162,9 @@ pub fn render_ssh_content(
         let state = row_states.get(i).cloned().unwrap_or_default();
         column.add_child(host_row(host, state, appearance));
     }
-    let body = Container::new(column.finish()).with_padding_top(4.).finish();
+    let body = Container::new(column.finish())
+        .with_padding_top(4.)
+        .finish();
 
     // Bound the list to the panel height and scroll — an unbounded
     // `Flex::column` here paints at infinite height and panics.

@@ -4571,9 +4571,7 @@ impl SettingsWidget for SessionRestorationWidget {
             "Restore windows, tabs, and panes on startup".into(),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    crate::brand::README_URL.into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl(crate::brand::README_URL.into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),
@@ -4656,9 +4654,7 @@ impl SettingsWidget for SnackbarHeaderWidget {
             "Show sticky command header".into(),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    crate::brand::README_URL.into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl(crate::brand::README_URL.into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),
@@ -5622,10 +5618,7 @@ impl SettingsWidget for GlobalHotkeyWidget {
                         ui_builder
                             .link(
                                 "See docs.".to_owned(),
-                                Some(
-                                    crate::brand::README_URL
-                                        .to_owned(),
-                                ),
+                                Some(crate::brand::README_URL.to_owned()),
                                 None,
                                 view.button_mouse_states.global_hotkey_link.clone(),
                             )
@@ -6782,10 +6775,7 @@ impl SettingsWidget for MouseReportingWidget {
             "Enable Mouse Reporting".into(),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    crate::brand::README_URL
-                        .into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl(crate::brand::README_URL.into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),
@@ -7047,9 +7037,7 @@ impl SettingsWidget for SmartSelectWidget {
             "Double-click smart selection".into(),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    crate::brand::README_URL.into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl(crate::brand::README_URL.into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),
@@ -7334,9 +7322,7 @@ impl SettingsWidget for WorkflowsInCommandSearch {
             "Show Global Workflows in Command Search (ctrl-r)".into(),
             Some(AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
-                on_click_action: Some(FeaturesPageAction::OpenUrl(
-                    crate::brand::README_URL.into(),
-                )),
+                on_click_action: Some(FeaturesPageAction::OpenUrl(crate::brand::README_URL.into())),
                 secondary_text: None,
                 tooltip_override_text: None,
             }),

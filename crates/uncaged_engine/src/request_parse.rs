@@ -207,7 +207,10 @@ fn lower_attached_context(ctx: &api::InputContext, builder: &mut Conversation) {
         {
             push_user_deduped(
                 builder,
-                &format!("[Attached file: {}]\n{}", content.file_path, content.content),
+                &format!(
+                    "[Attached file: {}]\n{}",
+                    content.file_path, content.content
+                ),
             );
         }
     }

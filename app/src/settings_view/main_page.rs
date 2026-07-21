@@ -687,9 +687,7 @@ impl SettingsWidget for SettingsSyncWidget {
 
         let label_info = AdditionalInfo {
             mouse_state: self.tooltip_state.clone(),
-            on_click_action: Some(MainPageAction::OpenUrl(
-                crate::brand::README_URL.into(),
-            )),
+            on_click_action: Some(MainPageAction::OpenUrl(crate::brand::README_URL.into())),
             secondary_text: None,
             tooltip_override_text: None,
         };

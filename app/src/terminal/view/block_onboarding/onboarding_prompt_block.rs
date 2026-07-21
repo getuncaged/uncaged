@@ -65,8 +65,7 @@ impl OnboardingPromptBlock {
         const LINE_TWO: &str =
             "Uncaged works with many custom prompts like oh-my-zsh, Starship, Powerlevel10K. ";
         const LINK_TEXT: &str = "Learn more";
-        const LINK_DESTINATION: &str =
-            crate::brand::README_URL;
+        const LINK_DESTINATION: &str = crate::brand::README_URL;
 
         Flex::column()
             .with_children([

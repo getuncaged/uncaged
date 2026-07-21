@@ -815,7 +815,10 @@ impl Display for RenderableAIError {
                 }
             }
             Self::ServerOverloaded => {
-                write!(f, "The model is currently overloaded. Please try again later.")
+                write!(
+                    f,
+                    "The model is currently overloaded. Please try again later."
+                )
             }
             Self::InternalWarpError => write!(f, "Internal error."),
             Self::ContextWindowExceeded(message) => {

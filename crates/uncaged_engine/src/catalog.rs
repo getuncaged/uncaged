@@ -179,9 +179,7 @@ pub const PRESETS: &[Preset] = &[
         local: true,
         key_url: "https://ollama.com/download",
         cli_command: &[],
-        note: Some(
-            "Start Ollama, then `ollama pull qwen2.5-coder`. Nothing leaves your machine.",
-        ),
+        note: Some("Start Ollama, then `ollama pull qwen2.5-coder`. Nothing leaves your machine."),
     },
     Preset {
         id: "lmstudio",
@@ -207,11 +205,7 @@ pub const PRESETS: &[Preset] = &[
         wire: Wire::Anthropic,
         base_url: "https://api.anthropic.com",
         model: "claude-sonnet-4-5",
-        models: &[
-            "claude-opus-4-8",
-            "claude-sonnet-4-5",
-            "claude-haiku-4-5",
-        ],
+        models: &["claude-opus-4-8", "claude-sonnet-4-5", "claude-haiku-4-5"],
         needs_key: true,
         local: false,
         key_url: "https://console.anthropic.com/settings/keys",

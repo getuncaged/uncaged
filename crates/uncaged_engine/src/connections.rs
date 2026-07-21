@@ -172,7 +172,11 @@ impl Roster {
 
     /// A readable, unique id for a new connection seeded from `base`.
     fn unique_id(&self, base: &str) -> String {
-        let base = if base.trim().is_empty() { "model" } else { base };
+        let base = if base.trim().is_empty() {
+            "model"
+        } else {
+            base
+        };
         if self.get(base).is_none() {
             return base.to_string();
         }
@@ -234,7 +238,9 @@ pub fn roster_path() -> PathBuf {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(".uncaged").join("connections.json")
+    PathBuf::from(home)
+        .join(".uncaged")
+        .join("connections.json")
 }
 
 /// Read the roster from disk (missing / unparseable → empty).

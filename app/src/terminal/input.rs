@@ -13010,7 +13010,11 @@ impl Input {
             return None;
         }
 
-        let trigger = AISettings::as_ref(ctx).agent_trigger.value().trim().to_owned();
+        let trigger = AISettings::as_ref(ctx)
+            .agent_trigger
+            .value()
+            .trim()
+            .to_owned();
         if trigger.is_empty() {
             return None;
         }
@@ -13026,7 +13030,10 @@ impl Input {
         let rest = &command[command_prefix.len()..];
 
         // Word triggers need a boundary so `ai` doesn't fire on `airflow`; symbol triggers don't.
-        let trigger_ends_alphanumeric = trigger.chars().next_back().is_some_and(char::is_alphanumeric);
+        let trigger_ends_alphanumeric = trigger
+            .chars()
+            .next_back()
+            .is_some_and(char::is_alphanumeric);
         if trigger_ends_alphanumeric && rest.chars().next().is_some_and(char::is_alphanumeric) {
             return None;
         }

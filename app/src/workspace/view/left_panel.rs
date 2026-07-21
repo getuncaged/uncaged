@@ -17,6 +17,9 @@ use warpui::{
     ViewContext, ViewHandle, WeakViewHandle,
 };
 
+use super::config_panel;
+use super::skills_panel;
+use super::ssh_panel;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::appearance::Appearance;
@@ -28,9 +31,6 @@ use crate::coding_panel_enablement_state::CodingPanelEnablementState;
 use crate::drive::panel::{
     DrivePanel, DrivePanelEvent, MAX_SIDEBAR_WIDTH_RATIO, MIN_SIDEBAR_WIDTH,
 };
-use super::config_panel;
-use super::skills_panel;
-use super::ssh_panel;
 use crate::pane_group::pane::view::header::components::HEADER_EDGE_PADDING;
 use crate::pane_group::pane::view::header::PANE_HEADER_HEIGHT;
 use crate::pane_group::working_directories::WorkingDirectory;

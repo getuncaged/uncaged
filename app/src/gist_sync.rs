@@ -86,7 +86,8 @@ fn write_state(gist_id: &str) -> Result<()> {
         updated_at: now_secs(),
         auto_sync,
     };
-    let json = serde_json::to_string_pretty(&state).context("failed to serialize gist_sync state")?;
+    let json =
+        serde_json::to_string_pretty(&state).context("failed to serialize gist_sync state")?;
     std::fs::write(state_path(), json).context("failed to write gist_sync.json")?;
     Ok(())
 }
@@ -186,8 +187,7 @@ pub async fn push(path_env: Option<&str>) -> Result<String> {
     // GitHub gists reject binary files, so base64-encode the `.tgz` into a text
     // file with a stable name (so `gh gist edit` overwrites in place instead of
     // accumulating copies, and `pull` always finds the same file).
-    let tgz_bytes =
-        std::fs::read(&exported).context("failed to read the config backup bundle")?;
+    let tgz_bytes = std::fs::read(&exported).context("failed to read the config backup bundle")?;
     let _ = std::fs::remove_file(&exported);
     let encoded = base64::engine::general_purpose::STANDARD.encode(&tgz_bytes);
     let archive = std::env::temp_dir().join(GIST_ARCHIVE_NAME);
@@ -273,8 +273,8 @@ pub async fn pull(path_env: Option<&str>) -> Result<()> {
     // Base64 text files (`.base64`) hold the encoded `.tgz`; decode them back to
     // bytes. A legacy raw `.tgz` file is used as-is.
     let tgz_bytes = if file_name.ends_with(".base64") {
-        let text = String::from_utf8(contents)
-            .context("downloaded gist file was not valid UTF-8")?;
+        let text =
+            String::from_utf8(contents).context("downloaded gist file was not valid UTF-8")?;
         let cleaned: String = text.split_whitespace().collect();
         base64::engine::general_purpose::STANDARD
             .decode(cleaned.as_bytes())

@@ -1,12 +1,12 @@
 use std::default::Default;
 use std::fmt;
-use std::path::{Path, PathBuf};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
+use palette::{FromColor, Hsv, Srgb};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use settings::Setting as _;
-use palette::{FromColor, Hsv, Srgb};
 use warp_core::ui::color::hex_color::{coloru_from_hex_string, coloru_to_hex_string};
 use warp_core::ui::theme::{
     AnsiColors, Details, Fill as ThemeFill, Image as ThemeImage, TerminalColors, VerticalGradient,
@@ -14,10 +14,9 @@ use warp_core::ui::theme::{
 };
 use warpui::assets::asset_cache::AssetSource;
 use warpui::elements::{
-    Border, ConstrainedBox, Container, CornerRadius,
-    CrossAxisAlignment, DispatchEventResult, EventHandler, Fill, Flex, Icon, MainAxisAlignment,
-    MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, SavePosition, Shrinkable, Stack,
-    Text,
+    Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
+    EventHandler, Fill, Flex, Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    ParentElement, Radius, Rect, SavePosition, Shrinkable, Stack, Text,
 };
 use warpui::fonts::Weight;
 use warpui::platform::Cursor;
@@ -184,7 +183,11 @@ pub enum ThemeCreatorBodyAction {
     TogglePicker(usize),
     /// A click or drag inside the saturation/value square, in normalized element coordinates:
     /// `x` runs 0 (grey) → 1 (saturated), `y` runs 0 (bright) → 1 (black).
-    PickSaturationValue { x: f32, y: f32, start_drag: bool },
+    PickSaturationValue {
+        x: f32,
+        y: f32,
+        start_drag: bool,
+    },
     /// A click or drag on the hue strip, as a normalized 0–1 position down the strip.
     PickHue(f32),
     /// The pointer was released, ending any saturation/value drag.
@@ -615,9 +618,7 @@ impl ThemeCreatorBody {
                 theme_background_image::IMPORTED_EXTENSION
             ))
         });
-        let image_option = src_image
-            .as_ref()
-            .map(|src| (src.clone(), slug.clone()));
+        let image_option = src_image.as_ref().map(|src| (src.clone(), slug.clone()));
         let theme = self.build_manual_theme(ctx, saved_image_path.as_deref());
 
         let mut errored = true;
@@ -650,10 +651,12 @@ impl ThemeCreatorBody {
         // serializing it verbatim produced a YAML pointing at someone's Pictures folder. A
         // relative name works because the deserializer resolves anything non-absolute against the
         // themes dir, so it lands correctly on whoever installs the theme next.
-        let shared_image = self
-            .bg_image
-            .as_ref()
-            .map(|_| PathBuf::from(format!("./{slug}.{}", theme_background_image::IMPORTED_EXTENSION)));
+        let shared_image = self.bg_image.as_ref().map(|_| {
+            PathBuf::from(format!(
+                "./{slug}.{}",
+                theme_background_image::IMPORTED_EXTENSION
+            ))
+        });
         let theme = self.build_manual_theme(ctx, shared_image.as_deref());
         let yaml = match serde_yaml::to_string(&theme) {
             Ok(yaml) => yaml,
@@ -687,18 +690,14 @@ impl ThemeCreatorBody {
                         )),
                     ),
                     ShareTarget::MergedOnMain => (
-                        format!(
-                            "{THEMES_REPO_BASE_URL}/edit/main/{path}?value={encoded}"
-                        ),
+                        format!("{THEMES_REPO_BASE_URL}/edit/main/{path}?value={encoded}"),
                         Some(
                             "This theme is already in the gallery — opening a PR that updates it."
                                 .to_string(),
                         ),
                     ),
                     ShareTarget::New => (
-                        format!(
-                            "{THEMES_REPO_BASE_URL}/new/main?filename={path}&value={encoded}"
-                        ),
+                        format!("{THEMES_REPO_BASE_URL}/new/main?filename={path}&value={encoded}"),
                         None,
                     ),
                 };
@@ -909,13 +908,13 @@ impl ThemeCreatorBody {
                 Rect::new()
                     .with_background_color(color)
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
-                    .with_border(
-                        Border::all(if is_open { 2. } else { 1. }).with_border_fill(if is_open {
+                    .with_border(Border::all(if is_open { 2. } else { 1. }).with_border_fill(
+                        if is_open {
                             theme.accent()
                         } else {
                             theme.main_text_color(theme.background())
-                        }),
-                    )
+                        },
+                    ))
                     .finish(),
             )
             .with_width(26.)
@@ -1034,7 +1033,12 @@ impl ThemeCreatorBody {
         );
         square.add_child(
             Rect::new()
-                .with_background_gradient(vec2f(0.0, 0.0), vec2f(0.0, 1.0), CLEAR_BLACK, OPAQUE_BLACK)
+                .with_background_gradient(
+                    vec2f(0.0, 0.0),
+                    vec2f(0.0, 1.0),
+                    CLEAR_BLACK,
+                    OPAQUE_BLACK,
+                )
                 .with_corner_radius(radius)
                 .finish(),
         );
@@ -1596,13 +1600,11 @@ async fn find_open_pull_request_for(client: &reqwest::Client, path: &str) -> Opt
             .await
             .ok()?;
 
-        let touches_path = files
-            .as_array()
-            .is_some_and(|files| {
-                files
-                    .iter()
-                    .any(|file| file.get("filename").and_then(|f| f.as_str()) == Some(path))
-            });
+        let touches_path = files.as_array().is_some_and(|files| {
+            files
+                .iter()
+                .any(|file| file.get("filename").and_then(|f| f.as_str()) == Some(path))
+        });
         if !touches_path {
             continue;
         }
@@ -1634,10 +1636,30 @@ const HUE_MARKER_HEIGHT: f32 = 6.;
 const SV_SQUARE_POSITION_ID: &str = "theme_creator_sv_square";
 const HUE_STRIP_POSITION_ID: &str = "theme_creator_hue_strip";
 
-const OPAQUE_WHITE: ColorU = ColorU { r: 255, g: 255, b: 255, a: 255 };
-const CLEAR_WHITE: ColorU = ColorU { r: 255, g: 255, b: 255, a: 0 };
-const OPAQUE_BLACK: ColorU = ColorU { r: 0, g: 0, b: 0, a: 255 };
-const CLEAR_BLACK: ColorU = ColorU { r: 0, g: 0, b: 0, a: 0 };
+const OPAQUE_WHITE: ColorU = ColorU {
+    r: 255,
+    g: 255,
+    b: 255,
+    a: 255,
+};
+const CLEAR_WHITE: ColorU = ColorU {
+    r: 255,
+    g: 255,
+    b: 255,
+    a: 0,
+};
+const OPAQUE_BLACK: ColorU = ColorU {
+    r: 0,
+    g: 0,
+    b: 0,
+    a: 255,
+};
+const CLEAR_BLACK: ColorU = ColorU {
+    r: 0,
+    g: 0,
+    b: 0,
+    a: 0,
+};
 
 /// The corners of the hue spectrum, red round to red, as gradient stops for the strip.
 const HUE_STOPS: [(u8, u8, u8); 7] = [
@@ -1668,7 +1690,8 @@ fn spacer(width: f32, height: f32) -> Box<dyn Element> {
 /// a plain white ring vanishes against the top-left corner, and a dark one against the bottom.
 fn render_crosshair(saturation: f32, value: f32) -> Box<dyn Element> {
     let half = CROSSHAIR_SIZE / 2.;
-    let x = (saturation.clamp(0., 1.) * SV_SQUARE_WIDTH - half).clamp(0., SV_SQUARE_WIDTH - CROSSHAIR_SIZE);
+    let x = (saturation.clamp(0., 1.) * SV_SQUARE_WIDTH - half)
+        .clamp(0., SV_SQUARE_WIDTH - CROSSHAIR_SIZE);
     let y = ((1.0 - value.clamp(0., 1.)) * SV_SQUARE_HEIGHT - half)
         .clamp(0., SV_SQUARE_HEIGHT - CROSSHAIR_SIZE);
 

@@ -2060,7 +2060,9 @@ impl RootView {
     /// Rebuild the connect gallery from the (now-updated) roster and push it into
     /// the active onboarding view, so a connect/activate reflects immediately.
     fn refresh_onboarding_connect_gallery(&mut self, ctx: &mut ViewContext<Self>) {
-        let AuthOnboardingState::Onboarding { onboarding_view, .. } = &self.auth_onboarding_state
+        let AuthOnboardingState::Onboarding {
+            onboarding_view, ..
+        } = &self.auth_onboarding_state
         else {
             return;
         };
@@ -2189,9 +2191,7 @@ impl RootView {
                 // With old onboarding, we ask user to log in before onboarding, so don't do it after onboarding completes.
                 // Uncaged: never require login after onboarding. AI runs on the
                 // local engine and settings apply locally, so no account is needed.
-                let requires_login = !is_logged_in
-                    && (ai_enabled || warp_drive_enabled)
-                    && false;
+                let requires_login = !is_logged_in && (ai_enabled || warp_drive_enabled) && false;
 
                 if requires_login {
                     let tutorial = OnboardingTutorial::from(selected_settings.clone());
@@ -2327,8 +2327,9 @@ impl RootView {
                 // onboarding. (TODO: host the CustomEndpointModal as an overlay
                 // to collect the key inline — plan step 6.)
                 if let Ok(id) = crate::uncaged::connect(preset_id) {
-                    if let Some(conn) =
-                        crate::uncaged::connections().into_iter().find(|c| c.id == id)
+                    if let Some(conn) = crate::uncaged::connections()
+                        .into_iter()
+                        .find(|c| c.id == id)
                     {
                         if conn.usable && !conn.needs_key {
                             let _ = crate::uncaged::activate(&conn.id);

@@ -468,9 +468,7 @@ impl HoaOnboardingFlow {
             text: "Learn more".into(),
             styles: FormattedTextStyles {
                 underline: true,
-                hyperlink: Some(Hyperlink::Url(
-                    crate::brand::README_URL.into(),
-                )),
+                hyperlink: Some(Hyperlink::Url(crate::brand::README_URL.into())),
                 ..Default::default()
             },
         };

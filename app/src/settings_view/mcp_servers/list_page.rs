@@ -1177,10 +1177,7 @@ impl MCPServersListPageView {
     fn render_page_body(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
         let description_fragments = vec![
             FormattedTextFragment::plain_text(DESCRIPTION_TEXT),
-            FormattedTextFragment::hyperlink(
-                "Learn more.",
-                crate::brand::README_URL,
-            ),
+            FormattedTextFragment::hyperlink("Learn more.", crate::brand::README_URL),
         ];
 
         let description = FormattedTextElement::new(

@@ -113,10 +113,7 @@ pub fn fallback_font_fn(ch: char) -> Option<ExternalFontFamily> {
     // emoji, CJK, Arabic, and the rest), so those glyphs still render — with zero
     // network egress. See `glyph_for_char`: app fallback is tried first, then
     // `.or(system_font_fallback)`.
-    if matches!(
-        ChannelState::channel(),
-        warp_core::channel::Channel::Oss
-    ) {
+    if matches!(ChannelState::channel(), warp_core::channel::Channel::Oss) {
         return None;
     }
     match ch {

@@ -32,8 +32,7 @@ use crate::workflows::workflow::{Argument, ArgumentType, Workflow};
 use crate::workflows::WorkflowType;
 
 const DOCS_URL: &str = crate::brand::README_URL;
-const ENV_DOCS_URL: &str =
-    crate::brand::README_URL;
+const ENV_DOCS_URL: &str = crate::brand::README_URL;
 const OZ_URL: &str = "https://oz.warp.dev";
 
 const CONTENT_MAX_WIDTH: f32 = 720.;

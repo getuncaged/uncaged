@@ -2,8 +2,6 @@
 
 mod ai;
 mod alloc;
-/// Bridge to the local Uncaged engine (see `uncaged.rs`).
-mod uncaged;
 mod antivirus;
 #[cfg(target_os = "macos")]
 mod app_menus;
@@ -42,7 +40,6 @@ mod experiments;
 mod external_secrets;
 #[cfg(target_family = "wasm")]
 mod font_fallback;
-mod settings_backup;
 mod gist_sync;
 mod global_resource_handles;
 mod gpu_state;
@@ -80,6 +77,7 @@ mod safe_triangle;
 mod search_bar;
 mod server;
 mod session_management;
+mod settings_backup;
 mod shell_indicator;
 mod suggestions;
 mod system;
@@ -92,6 +90,8 @@ mod tracing;
 #[cfg(feature = "tui")]
 mod tui;
 mod ui_components;
+/// Bridge to the local Uncaged engine (see `uncaged.rs`).
+mod uncaged;
 mod undo_close;
 mod uri;
 mod user_config;

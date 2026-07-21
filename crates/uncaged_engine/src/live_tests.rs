@@ -282,7 +282,10 @@ async fn live_acp_responds_and_reuses_session() {
         "[acp] turn1 init={} done={} text={:?}",
         c1.saw_init, c1.saw_finished_done, c1.text
     );
-    assert!(c1.saw_init && c1.saw_finished_done, "ACP turn should init + finish");
+    assert!(
+        c1.saw_init && c1.saw_finished_done,
+        "ACP turn should init + finish"
+    );
     assert!(
         !c1.text.trim().is_empty(),
         "Claude Code should reply — empty means the CLI didn't spawn/answer"

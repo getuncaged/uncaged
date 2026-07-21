@@ -86,16 +86,16 @@ use crate::editor::{
 };
 use crate::modal::{Modal, ModalEvent, ModalViewState};
 use crate::settings::{
-    AIAutoDetectionEnabled, AICommandDenylist, AISettingsChangedEvent, AgentTrigger,
+    AIAutoDetectionEnabled, AICommandDenylist, AISettingsChangedEvent,
     AgentModeCodingPermissionsType, AgentModeCommandExecutionDenylist,
-    AgentModeCommandExecutionPredicate, AgentModeQuerySuggestionsEnabled, AwsBedrockAutoLogin,
-    AwsBedrockCredentialsEnabled, CanUseWarpCreditsForFallback, CodeSettings,
+    AgentModeCommandExecutionPredicate, AgentModeQuerySuggestionsEnabled, AgentTrigger,
+    AwsBedrockAutoLogin, AwsBedrockCredentialsEnabled, CanUseWarpCreditsForFallback, CodeSettings,
     CodebaseContextEnabled, FileBasedMcpEnabled, GitOperationsAutogenEnabled,
     IncludeAgentCommandsInHistory, InputSettings, IntelligentAutosuggestionsEnabled,
     LongRunningCommandSubmissionMode, MemoryEnabled, NLDInTerminalEnabled,
     NaturalLanguageAutosuggestionsEnabled, OrchestrationMessageDisplayMode,
-    PreferShellForKnownCommands, PromptSubmissionMode,
-    RuleSuggestionsEnabled, SharedBlockTitleGenerationEnabled, ShouldRenderCLIAgentToolbar,
+    PreferShellForKnownCommands, PromptSubmissionMode, RuleSuggestionsEnabled,
+    SharedBlockTitleGenerationEnabled, ShouldRenderCLIAgentToolbar,
     ShouldRenderUseAgentToolbarForUserCommands, ShouldShowOzUpdatesInZeroState, ShowAgentTips,
     ShowConversationHistory, ShowHintText, ThinkingDisplayMode, VoiceInputEnabled,
     WarpDriveContextEnabled,
@@ -192,8 +192,7 @@ const SHARED_BLOCK_TITLE_GENERATION_DESCRIPTION: &str =
 const GIT_OPERATIONS_AUTOGEN_DESCRIPTION: &str =
     "Let AI generate commit messages and pull request titles and descriptions.";
 const WISPR_FLOW_URL: &str = "https://wisprflow.ai/";
-const CUSTOM_INFERENCE_LEARN_MORE_URL: &str =
-    crate::brand::README_URL;
+const CUSTOM_INFERENCE_LEARN_MORE_URL: &str = crate::brand::README_URL;
 const CUSTOM_INFERENCE_TERMS_URL: &str = crate::brand::HOME_URL;
 const CUSTOM_INFERENCE_INFO_TOOLTIP_MAX_WIDTH: f32 = 320.;
 
@@ -2334,9 +2333,9 @@ impl AISettingsPageView {
                         .with_icon(Icon::Plus)
                         .with_size(ButtonSize::Small)
                         .on_click(move |ctx| {
-                            ctx.dispatch_typed_action(
-                                AISettingsPageAction::UncagedConnectPreset(preset_id.clone()),
-                            );
+                            ctx.dispatch_typed_action(AISettingsPageAction::UncagedConnectPreset(
+                                preset_id.clone(),
+                            ));
                         })
                 })
             })
@@ -2373,7 +2372,10 @@ impl AISettingsPageView {
     /// immediately; anything that needs a key opens the editor to collect it.
     fn uncaged_connect_preset(&mut self, preset_id: &str, ctx: &mut ViewContext<Self>) {
         match crate::uncaged::connect(preset_id) {
-            Ok(id) => match crate::uncaged::connections().into_iter().find(|c| c.id == id) {
+            Ok(id) => match crate::uncaged::connections()
+                .into_iter()
+                .find(|c| c.id == id)
+            {
                 Some(conn) if conn.usable && !conn.needs_key => {
                     let _ = crate::uncaged::activate(&conn.id);
                     self.uncaged_toast(format!("Connected {} — ready to use.", conn.label), ctx);
@@ -2464,7 +2466,10 @@ impl AISettingsPageView {
         models: &[(String, Option<String>, Option<String>)],
         ctx: &mut ViewContext<Self>,
     ) {
-        let model = models.first().map(|(n, _, _)| n.clone()).unwrap_or_default();
+        let model = models
+            .first()
+            .map(|(n, _, _)| n.clone())
+            .unwrap_or_default();
         // For a CLI connection the modal's URL field actually holds the command
         // line, so split it into argv and store it as the command (leaving the
         // base_url empty); for an API connection the URL is the base_url as before.
@@ -2483,8 +2488,9 @@ impl AISettingsPageView {
         };
         // `Some("")` is the roster's "keep the stored key" sentinel (unused for CLI).
         let key = Some(api_key.to_string());
-        let result = crate::uncaged::update(id, name.to_string(), base_url, model, key, cli_command)
-            .and_then(|()| crate::uncaged::activate(id));
+        let result =
+            crate::uncaged::update(id, name.to_string(), base_url, model, key, cli_command)
+                .and_then(|()| crate::uncaged::activate(id));
         self.hide_custom_endpoint_modal(ctx);
         match result {
             Ok(()) => self.uncaged_toast("Model connected.".to_string(), ctx),
@@ -4167,9 +4173,7 @@ impl TypedActionView for AISettingsPageView {
                         .prefer_shell_for_known_commands
                         .toggle_and_save_value(ctx)
                 }) {
-                    log::warn!(
-                        "Failed to set value for prefer-shell-for-known-commands: {e:?}"
-                    );
+                    log::warn!("Failed to set value for prefer-shell-for-known-commands: {e:?}");
                 }
                 ctx.notify();
             }
@@ -7343,9 +7347,7 @@ impl SettingsWidget for AIFactWidget {
             column.add_child(self.render_rule_suggestions_toggle(view, ai_settings, app));
         }
 
-        column
-            .with_child(button)
-            .finish()
+        column.with_child(button).finish()
     }
 }
 
@@ -7824,7 +7826,11 @@ impl SettingsWidget for CLIAgentWidget {
                         app,
                     )
                 } else {
-                    let pill_text = if !scanned { "Checking…" } else { "Not installed" };
+                    let pill_text = if !scanned {
+                        "Checking…"
+                    } else {
+                        "Not installed"
+                    };
                     Container::new(
                         Text::new(pill_text.to_string(), appearance.ui_font_family(), 10.)
                             .with_color(theme.nonactive_ui_text_color().into())
@@ -8496,10 +8502,14 @@ impl ConnectModelWidget {
 
     /// Section header (12px semibold).
     fn label(text: &str, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
-        Text::new(text.to_string(), appearance.ui_font_family(), CONTENT_FONT_SIZE)
-            .with_color(styles::header_font_color(true, app).into())
-            .with_style(Properties::default().weight(Weight::Semibold))
-            .finish()
+        Text::new(
+            text.to_string(),
+            appearance.ui_font_family(),
+            CONTENT_FONT_SIZE,
+        )
+        .with_color(styles::header_font_color(true, app).into())
+        .with_style(Properties::default().weight(Weight::Semibold))
+        .finish()
     }
 
     fn muted(text: &str, size: f32, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
@@ -8580,8 +8590,11 @@ impl ConnectModelWidget {
             name_row = name_row.with_child(Self::pill("Active", theme.accent(), appearance));
         }
         if conn.local {
-            name_row =
-                name_row.with_child(Self::pill("Local", theme.nonactive_ui_text_color(), appearance));
+            name_row = name_row.with_child(Self::pill(
+                "Local",
+                theme.nonactive_ui_text_color(),
+                appearance,
+            ));
         }
 
         // Skip the "no model" placeholder — the status pill carries "incomplete".
@@ -8700,7 +8713,11 @@ impl ConnectModelWidget {
                 let right: Box<dyn Element> = if is_active {
                     Self::pill("In use", theme.accent(), appearance)
                 } else if is_connected {
-                    Self::pill("Connected", ThemeFill::Solid(theme.ansi_fg_green()), appearance)
+                    Self::pill(
+                        "Connected",
+                        ThemeFill::Solid(theme.ansi_fg_green()),
+                        appearance,
+                    )
                 } else if let Some(button) = button {
                     button
                 } else {
@@ -8776,7 +8793,11 @@ impl SettingsWidget for ConnectModelWidget {
             for (index, conn) in connections.iter().enumerate() {
                 list.add_child(self.connection_row(view, index, conn, appearance, app));
             }
-            column.add_child(Container::new(list.finish()).with_margin_bottom(4.).finish());
+            column.add_child(
+                Container::new(list.finish())
+                    .with_margin_bottom(4.)
+                    .finish(),
+            );
 
             // Divider between the roster and the "add a model" gallery.
             column.add_child(

@@ -28,8 +28,7 @@ use crate::util::openable_file_type::{is_file_openable_in_warp, OpenableFileType
 #[path = "open_in_warp_tests.rs"]
 mod tests;
 
-const LEARN_MORE_MARKDOWN_URL: &str =
-    crate::brand::README_URL;
+const LEARN_MORE_MARKDOWN_URL: &str = crate::brand::README_URL;
 const LEARN_MORE_CODE_URL: &str = crate::brand::README_URL;
 
 /// A path to a file that can be opened in Warp, along with its type.

@@ -627,16 +627,13 @@ const BOOTSTRAP_FAILED_DURATION: Duration = Duration::from_secs(7);
 /// a user needing to type in one or many secret manager passwords
 /// during the bootstrap period.
 const ENV_VAR_BOOTSTRAP_FAILED_DURATION: Duration = Duration::from_secs(60);
-const KNOWN_ISSUES_URL: &str =
-    crate::brand::README_URL;
+const KNOWN_ISSUES_URL: &str = crate::brand::README_URL;
 
 /// Link to supported custom prompts.
-const PROMPT_COMPATIBILITY_URL: &str =
-    crate::brand::README_URL;
+const PROMPT_COMPATIBILITY_URL: &str = crate::brand::README_URL;
 
 /// Link to troubleshooting steps for ControlMaster errors.
-const CONTROLMASTER_ISSUES_URL: &str =
-    crate::brand::README_URL;
+const CONTROLMASTER_ISSUES_URL: &str = crate::brand::README_URL;
 
 /// Link to instructions on how to update p10k.
 const P10K_UPDATE_INSTRUCTIONS_URL: &str =
@@ -651,10 +648,8 @@ const MIN_DELTA_FOR_TEXT_SELECTION: f32 = 0.5;
 
 /// Notifications-specific info
 /// TODO (suraj): add documentation for notifications in gitbook
-const NOTIFICATIONS_LEARN_MORE_URL: &str =
-    crate::brand::README_URL;
-pub const NOTIFICATIONS_TROUBLESHOOT_URL: &str =
-    crate::brand::README_URL;
+const NOTIFICATIONS_LEARN_MORE_URL: &str = crate::brand::README_URL;
+pub const NOTIFICATIONS_TROUBLESHOOT_URL: &str = crate::brand::README_URL;
 
 const DEBOUNCE_PERIOD: Duration = Duration::from_millis(40);
 
