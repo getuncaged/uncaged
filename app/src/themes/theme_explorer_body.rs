@@ -25,7 +25,7 @@ use warpui::{
 };
 use warp_core::ui::theme::WarpTheme;
 
-use crate::appearance::Appearance;
+use crate::appearance::{Appearance, AppearanceManager};
 use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions, TextOptions};
 use crate::settings::{active_theme_kind, ThemeSettings};
 use crate::themes::theme::SelectedSystemThemes;
@@ -334,6 +334,14 @@ impl ThemeExplorerBody {
             } else {
                 report_if_error!(theme_settings.theme_kind.set_value(kind.clone(), ctx));
             }
+        });
+
+        // Writing the setting persists the choice, but the window only repaints when the
+        // AppearanceManager is told to apply it. Without this the card flips to "In use" while the
+        // window keeps its old theme until something else — opening Appearance — reloads the
+        // setting. The chooser does the same two steps: persist, then apply now.
+        AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
+            appearance_manager.set_transient_theme(kind.clone(), ctx);
         });
         ctx.notify();
     }
