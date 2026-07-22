@@ -270,16 +270,17 @@ jobs:
             dist/Uncaged-linux-x86_64.tar.gz
           fail_on_unmatched_files: false
 
-  # --- Linux aarch64: wired, but genuinely best-effort ---------------------
-  # Cross-compiling the full GPU/Metal-less Linux app to aarch64 on a hosted
-  # x86_64 runner is not reliably supported yet (needs a cross sysroot for the
-  # X11/Wayland/EGL/fontconfig dev libs). This job is wired so the matrix is
-  # complete and easy to finish, but is expected to be flaky/skipped until an
-  # arm64 runner (or a solid cross toolchain) is available. It never blocks a
-  # release. See RELEASING.md for the follow-up.
+  # --- Linux aarch64: native arm64 runner ----------------------------------
+  # Built on GitHub's native arm64 Linux runner (ubuntu-24.04-arm, free for
+  # public repos), mirroring the x86_64 job exactly — same apt deps, the same
+  # arduino/setup-protoc, the same bundle driver. This replaced an earlier
+  # QEMU-emulated docker approach that silently ran the HOST x86_64 rustup
+  # toolchain (uname -m reports x86_64 under binfmt and $HOME leaked to
+  # /home/runner), so the build never actually targeted arm64 and could not
+  # see the container's protoc. Still best-effort: it never blocks a release.
   linux-aarch64:
     name: Build Linux packages (aarch64, best-effort)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: create_release
     continue-on-error: true
     timeout-minutes: 180
@@ -289,63 +290,65 @@ jobs:
         with:
           lfs: true
 
-      - name: Set up QEMU (for arm64 emulation)
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config python-is-python3 \
+            libssl-dev libfreetype-dev libexpat1-dev libgit2-dev \
+            libfontconfig1-dev jq brotli libasound2-dev libclang-dev \
+            libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
+            libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev \
+            dpkg-dev fakeroot rpm libfuse2 wget zstd libarchive-tools
 
-      - name: Build aarch64 Linux packages (best-effort, emulated)
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install linuxdeploy (for AppImage)
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          wget -q -O "$HOME/.local/bin/linuxdeploy" \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage
+          chmod +x "$HOME/.local/bin/linuxdeploy"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: linux-arm64-release-warp-oss
+
+      - name: Install cargo-about
+        run: cargo install --locked cargo-about@0.8.4
+
+      # Native arm64 build (no cross sysroot, no QEMU): the runner IS aarch64, so
+      # the pinned rustup toolchain, protoc (from setup-protoc), and the bundle
+      # driver all behave exactly like the x86_64 job. makepkg isn't present, so
+      # the Arch package is skipped gracefully.
+      - name: Build Linux packages (deb, rpm, AppImage) — aarch64
         run: |
           set -euxo pipefail
-          # Run the native Ubuntu arm64 toolchain under QEMU emulation inside an
-          # arm64 container. This is slow but avoids maintaining a cross sysroot.
-          # If it fails (it may: heavy GPU/graphics deps, long build), the job is
-          # continue-on-error and the release proceeds without arm64 Linux.
-          docker run --rm --platform linux/arm64 \
-            -v "$PWD:/src" -w /src \
-            -e GITHUB_ACTIONS=true \
-            ubuntu:24.04 bash -euxo pipefail -c '
-              export DEBIAN_FRONTEND=noninteractive
-              apt-get update
-              # `git` is needed for CARGO_NET_GIT_FETCH_WITH_CLI below, and is not
-              # otherwise pulled in by build-essential.
-              apt-get install -y \
-                build-essential cmake pkg-config python-is-python3 curl ca-certificates git \
-                libssl-dev libfreetype-dev libexpat1-dev libgit2-dev \
-                libfontconfig1-dev jq brotli libasound2-dev libclang-dev \
-                libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
-                libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev \
-                protobuf-compiler dpkg-dev fakeroot rpm zstd libarchive-tools
-              # prost-build (pulled in by warp_multi_agent_api) locates protoc via
-              # the PROTOC env var and does not reliably fall back to searching
-              # PATH, so apt-installing protobuf-compiler alone leaves it with
-              # "Could not find protoc". The x86_64 and macOS jobs get PROTOC for
-              # free from arduino/setup-protoc; here we pin it ourselves. The
-              # version check also fails the job loudly if protoc is ever missing
-              # rather than dying deep in the cargo build.
-              protoc --version
-              export PROTOC="$(command -v protoc)"
-              # This is a fresh container with no cargo cache, so every git
-              # dependency is cloned cold. cargo bundles a git `rev` for
-              # core-foundation-rs whose commit is not the branch tip, and cargo's
-              # built-in shallow fetch can't find a non-tip rev — it fails with
-              # "revision ... not found". Shelling out to the git CLI does a full
-              # fetch that resolves it (the native x86_64 runner sidesteps this via
-              # its warm cargo cache).
-              export CARGO_NET_GIT_FETCH_WITH_CLI=true
-              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-              . "$HOME/.cargo/env"
-              rustup show active-toolchain || rustup toolchain install
-              ./script/linux/bundle \
-                --channel oss \
-                --arch aarch64 \
-                --release-tag "'"${GITHUB_REF_NAME}"'" \
-                --packages deb,rpm
-            '
+          PKGS="deb,rpm,appimage"
+          if command -v makepkg >/dev/null 2>&1; then
+            PKGS="$PKGS,arch"
+          else
+            echo "makepkg not available on this runner; skipping the Arch .pkg.tar.zst build."
+          fi
+          ./script/linux/bundle \
+            --channel oss \
+            --arch aarch64 \
+            --release-tag "${GITHUB_REF_NAME}" \
+            --packages "$PKGS"
 
       - name: Stage aarch64 Linux assets
         run: |
-          set -uxo pipefail
+          set -euxo pipefail
           OUT="target/release-lto/bundle/linux"
           mkdir -p dist
           DEB="$(ls "$OUT"/*arm64.deb 2>/dev/null | head -1 || true)"
@@ -356,6 +359,13 @@ jobs:
           [ -n "$ARCHPKG" ] && cp "$ARCHPKG" dist/Uncaged-linux-aarch64.pkg.tar.zst || echo "no aarch64 Arch pkg produced"
           APPIMG="$(ls "$OUT"/*aarch64.AppImage 2>/dev/null | head -1 || true)"
           [ -n "$APPIMG" ] && cp "$APPIMG" dist/Uncaged-linux-aarch64.AppImage || echo "no aarch64 AppImage produced"
+          mkdir -p stage/Uncaged-linux-aarch64
+          cp target/release-lto/warp-oss stage/Uncaged-linux-aarch64/uncaged 2>/dev/null \
+            || cp target/release/warp-oss stage/Uncaged-linux-aarch64/uncaged
+          [ -f README.md ] && cp README.md stage/Uncaged-linux-aarch64/ || true
+          [ -f LICENSE ] && cp LICENSE stage/Uncaged-linux-aarch64/ || true
+          tar -C stage -czf dist/Uncaged-linux-aarch64.tar.gz Uncaged-linux-aarch64
+          echo "Staged Linux assets:"
           ls -la dist/ || true
 
       - name: Upload aarch64 Linux assets to Release
@@ -366,6 +376,7 @@ jobs:
             dist/Uncaged-linux-aarch64.rpm
             dist/Uncaged-linux-aarch64.pkg.tar.zst
             dist/Uncaged-linux-aarch64.AppImage
+            dist/Uncaged-linux-aarch64.tar.gz
           fail_on_unmatched_files: false
 
   # --- Windows: Inno Setup installer (best-effort) -------------------------

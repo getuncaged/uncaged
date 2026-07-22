@@ -126,7 +126,7 @@ them to the GitHub Release. Asset names are the contract in
 |---|---|---|---|
 | macOS | `macos-latest` | `Uncaged-macos-{aarch64,x86_64,universal}.dmg` + `Uncaged-macos-aarch64.zip` | **first-class** (fails the release if broken) |
 | Linux x86_64 | `ubuntu-latest` | `.deb`, `.rpm`, `.pkg.tar.zst`, `.AppImage`, `.tar.gz` | best-effort |
-| Linux aarch64 | `ubuntu-latest` (QEMU) | `.deb`, `.rpm` (best-effort) | best-effort / may skip |
+| Linux aarch64 | `ubuntu-24.04-arm` (native) | `.deb`, `.rpm`, `.pkg.tar.zst`, `.AppImage`, `.tar.gz` | best-effort |
 | Windows x86_64 | `windows-latest` | `…-setup.exe` (Inno Setup) + `.zip` | best-effort |
 | Windows aarch64 | `windows-latest` (cross) | `…-setup.exe` | best-effort |
 
@@ -156,9 +156,12 @@ Runner tooling installed by the workflow: `dpkg-dev`+`fakeroot` (deb), `rpm`
 (rpm), `libfuse2`+`linuxdeploy` (AppImage), `protoc`, and the graphics/X11 dev
 libs. **Arch `.pkg.tar.zst`** needs `makepkg`, which is not present on
 `ubuntu-latest`; the workflow builds it only when `makepkg` is available and
-otherwise logs a skip. **aarch64** is wired via QEMU emulation but is genuinely
-best-effort on a hosted x86_64 runner and may time out or be skipped until an
-arm64 runner (or a solid cross sysroot) is available.
+otherwise logs a skip. **aarch64** builds natively on GitHub's `ubuntu-24.04-arm`
+runner (free for public repos), mirroring the x86_64 job — same deps, the same
+`arduino/setup-protoc`, the same bundle driver. Kept best-effort so a slow or
+flaky arm64 build never blocks a release. (It previously ran under QEMU
+emulation, which silently used the host x86_64 toolchain and never truly
+targeted arm64.)
 
 ### Windows packaging — what the fork changed
 
