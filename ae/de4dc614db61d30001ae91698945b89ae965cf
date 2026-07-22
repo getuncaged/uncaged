@@ -1,0 +1,21 @@
+packaging/homebrew/uncaged.rb
+  s_6e5dc450e2113a::t_e98438cc847fe0 23
+  s_6e5dc450e2113a::t_3637e5f8bebc19 34
+  s_6e5dc450e2113a::t_60d6c443ddc457 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "aede4dc614db61d30001ae91698945b89ae965cf",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
