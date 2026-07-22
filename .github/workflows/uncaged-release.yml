@@ -307,13 +307,23 @@ jobs:
             ubuntu:24.04 bash -euxo pipefail -c '
               export DEBIAN_FRONTEND=noninteractive
               apt-get update
+              # `git` is needed for CARGO_NET_GIT_FETCH_WITH_CLI below, and is not
+              # otherwise pulled in by build-essential.
               apt-get install -y \
-                build-essential cmake pkg-config python-is-python3 curl ca-certificates \
+                build-essential cmake pkg-config python-is-python3 curl ca-certificates git \
                 libssl-dev libfreetype-dev libexpat1-dev libgit2-dev \
                 libfontconfig1-dev jq brotli libasound2-dev libclang-dev \
                 libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
                 libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev \
                 protobuf-compiler dpkg-dev fakeroot rpm zstd libarchive-tools
+              # This is a fresh container with no cargo cache, so every git
+              # dependency is cloned cold. cargo bundles a git `rev` for
+              # core-foundation-rs whose commit is not the branch tip, and cargo's
+              # built-in shallow fetch can't find a non-tip rev — it fails with
+              # "revision ... not found". Shelling out to the git CLI does a full
+              # fetch that resolves it (the native x86_64 runner sidesteps this via
+              # its warm cargo cache).
+              export CARGO_NET_GIT_FETCH_WITH_CLI=true
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
               . "$HOME/.cargo/env"
               rustup show active-toolchain || rustup toolchain install
