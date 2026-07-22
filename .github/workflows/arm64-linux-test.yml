@@ -107,7 +107,7 @@ jobs:
           echo "ALL_ARM64_PACKAGES_BUILT"
 
       - name: Upload arm64 packages as artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: uncaged-linux-aarch64
           path: dist/
