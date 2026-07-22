@@ -316,6 +316,15 @@ jobs:
                 libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
                 libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev \
                 protobuf-compiler dpkg-dev fakeroot rpm zstd libarchive-tools
+              # prost-build (pulled in by warp_multi_agent_api) locates protoc via
+              # the PROTOC env var and does not reliably fall back to searching
+              # PATH, so apt-installing protobuf-compiler alone leaves it with
+              # "Could not find protoc". The x86_64 and macOS jobs get PROTOC for
+              # free from arduino/setup-protoc; here we pin it ourselves. The
+              # version check also fails the job loudly if protoc is ever missing
+              # rather than dying deep in the cargo build.
+              protoc --version
+              export PROTOC="$(command -v protoc)"
               # This is a fresh container with no cargo cache, so every git
               # dependency is cloned cold. cargo bundles a git `rev` for
               # core-foundation-rs whose commit is not the branch tip, and cargo's
