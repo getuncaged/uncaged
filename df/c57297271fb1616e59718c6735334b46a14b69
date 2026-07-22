@@ -1,0 +1,23 @@
+app/src/bin/oss.rs
+  s_6e5dc450e2113a::t_14f018d7aee0d9 54
+app/Cargo.toml
+  s_6e5dc450e2113a::t_1d18bca7f72723 8
+Cargo.lock
+  s_6e5dc450e2113a::t_562e6d138e3595 14991
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "dfc57297271fb1616e59718c6735334b46a14b69",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
