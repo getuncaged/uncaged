@@ -1,0 +1,23 @@
+.github/workflows/uncaged-release.yml
+  s_6e5dc450e2113a::t_686b2900104117 293-323,325-328,330-334,337-347,351,362-368,379
+  s_6e5dc450e2113a::t_0c6d5008973abb 273-280,283
+RELEASING.md
+  s_6e5dc450e2113a::t_8f5394e39c6f9f 129
+  s_6e5dc450e2113a::t_7a99322dd12930 159-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "b9309d9354e91bfdc259bf7fa3085ddde83e7f0b",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
