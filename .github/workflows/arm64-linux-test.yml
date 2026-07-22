@@ -1,0 +1,114 @@
+# Scratch validation workflow (manual only). Builds the arm64 Linux packages on
+# a native arm64 runner and uploads them as artifacts — NO release, NO tag, NO
+# Homebrew touch. Proves the native-runner fix in uncaged-release.yml genuinely
+# produces every arm64 package AND that the binary is really aarch64 (the old
+# QEMU job silently built x86_64). Delete this file once the fix is validated.
+name: arm64 Linux build test (scratch)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux-aarch64-test:
+    name: Test arm64 Linux packages (native)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config python-is-python3 \
+            libssl-dev libfreetype-dev libexpat1-dev libgit2-dev \
+            libfontconfig1-dev jq brotli libasound2-dev libclang-dev \
+            libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
+            libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev \
+            dpkg-dev fakeroot rpm libfuse2 wget zstd libarchive-tools
+
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install linuxdeploy (for AppImage)
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          wget -q -O "$HOME/.local/bin/linuxdeploy" \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage
+          chmod +x "$HOME/.local/bin/linuxdeploy"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - name: Sanity — runner + toolchain must be aarch64, protoc present
+        run: |
+          set -euxo pipefail
+          test "$(uname -m)" = aarch64
+          rustup show active-toolchain | grep -q aarch64
+          rustc -vV | grep -q 'host: aarch64'
+          protoc --version
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: linux-arm64-test-warp-oss
+
+      - name: Install cargo-about
+        run: cargo install --locked cargo-about@0.8.4
+
+      - name: Build Linux packages (deb, rpm, AppImage) — aarch64
+        run: |
+          set -euxo pipefail
+          PKGS="deb,rpm,appimage"
+          if command -v makepkg >/dev/null 2>&1; then
+            PKGS="$PKGS,arch"
+          else
+            echo "makepkg not available; Arch .pkg.tar.zst skipped (matches x86_64 job)."
+          fi
+          ./script/linux/bundle \
+            --channel oss \
+            --arch aarch64 \
+            --release-tag "v0.2.9" \
+            --packages "$PKGS"
+
+      - name: Collect + HARD-VERIFY every arm64 package is present
+        run: |
+          set -euxo pipefail
+          OUT="target/release-lto/bundle/linux"
+          mkdir -p dist stage/Uncaged-linux-aarch64
+
+          # The build must have produced a genuinely aarch64 binary (the whole
+          # point — the QEMU job silently produced x86_64).
+          file target/release-lto/warp-oss | tee /tmp/arch.txt
+          grep -Eq 'ARM aarch64|aarch64' /tmp/arch.txt
+
+          DEB="$(ls "$OUT"/*arm64.deb | head -1)";       cp "$DEB" dist/Uncaged-linux-aarch64.deb
+          RPM="$(ls "$OUT"/*aarch64.rpm | head -1)";      cp "$RPM" dist/Uncaged-linux-aarch64.rpm
+          APP="$(ls "$OUT"/*aarch64.AppImage | head -1)"; cp "$APP" dist/Uncaged-linux-aarch64.AppImage
+
+          cp target/release-lto/warp-oss stage/Uncaged-linux-aarch64/uncaged
+          [ -f README.md ] && cp README.md stage/Uncaged-linux-aarch64/ || true
+          [ -f LICENSE ] && cp LICENSE stage/Uncaged-linux-aarch64/ || true
+          tar -C stage -czf dist/Uncaged-linux-aarch64.tar.gz Uncaged-linux-aarch64
+
+          ls -la dist/
+          for f in Uncaged-linux-aarch64.deb Uncaged-linux-aarch64.rpm \
+                   Uncaged-linux-aarch64.AppImage Uncaged-linux-aarch64.tar.gz; do
+            test -s "dist/$f" || { echo "MISSING PACKAGE: $f"; exit 1; }
+          done
+          echo "ALL_ARM64_PACKAGES_BUILT"
+
+      - name: Upload arm64 packages as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: uncaged-linux-aarch64
+          path: dist/
+          if-no-files-found: error
