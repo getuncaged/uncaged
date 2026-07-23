@@ -50,7 +50,7 @@ jobs:
 
       - name: Claude Code review
         if: env.ANTHROPIC_API_KEY != ''
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@v1.0.170
         with:
           # You MUST add this repo secret for the action to work.
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
