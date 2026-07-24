@@ -1,0 +1,22 @@
+app/src/settings_view/mod.rs
+  s_6e5dc450e2113a::t_a25e381834ad00 991-1020
+  s_6e5dc450e2113a::t_6a47ee29955a7a 1375
+app/src/settings_view/mod_tests.rs
+  s_6e5dc450e2113a::t_c7e2fb0d5e9591 20-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "4af76ef548be585c91b200053dff393368a5a6eb",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
