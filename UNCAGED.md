@@ -150,11 +150,15 @@ release. Straight talk on what's solid vs. what's still rough:
   release build packaged as an ad-hoc-signed `.app` + `.dmg` (see
   [RELEASING.md](RELEASING.md)).
 - **Enforced in code:** on the `oss` channel the agent seam hard-fails instead of
-  falling back to Warp's servers, autoupdate never polls, login is refused (so
-  every account-gated call is structurally unreachable), telemetry/analytics/crash
-  reporting are off, and the on-demand fallback-font fetch is disabled in favor of
-  OS system fonts — so a release build cannot silently phone home. The only egress
-  is to the model endpoint you configure.
+  falling back to Warp's servers, autoupdate never polls, login is refused (no
+  credential is ever stored, so the account-gated paths have no user to act on),
+  telemetry/analytics/crash reporting are off, and the on-demand fallback-font
+  fetch is disabled in favor of OS system fonts — so a release build cannot
+  silently phone home. Every Warp endpoint is additionally pointed at an
+  unroutable RFC 5737 sentinel (`192.0.2.0:9`), so a missed path fails to
+  *connect* rather than reaching `app.warp.dev`. The only egress Uncaged starts
+  on its own is to the model endpoint you configure; user-initiated fetches
+  (language-server install, the theme gallery) go to nodejs.org, npm and GitHub.
 - **Deferred / follow-ups:** a from-scratch interactive "connect your engine"
   onboarding slide (today: rebranded copy + configure in Settings /
   `uncaged-setup`); the ACP backend is experimental (text-only, bypasses native
