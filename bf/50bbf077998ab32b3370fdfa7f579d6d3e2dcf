@@ -1,0 +1,24 @@
+packaging/winget/Uncaged.Uncaged.locale.en-US.yaml
+  s_6e5dc450e2113a::t_3cf981c0eb0774 14
+.github/workflows/uncaged-winget.yml
+  s_6e5dc450e2113a::t_47d4939635224d 1-72,77,79-81,86-89,91-147,149-181
+  s_6e5dc450e2113a::t_ac0254b8b872a0 73-76,78,82-85,90,148
+.github/workflows/uncaged-release.yml
+  s_6e5dc450e2113a::t_2f926ca2626812 529-548
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "bf50bbf077998ab32b3370fdfa7f579d6d3e2dcf",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}

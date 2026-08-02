@@ -1,0 +1,25 @@
+UNCAGED.md
+  s_6e5dc450e2113a::t_998b2cb159fd67 153-161
+README.md
+  s_6e5dc450e2113a::t_84ff020b25f09f 38-43
+  s_6e5dc450e2113a::t_dd02a0101e80c2 15-24
+  s_6e5dc450e2113a::t_f3a97b986d17c3 74-97,100-102
+FAQ.md
+  s_6e5dc450e2113a::t_210d4c5752c676 32-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "1a6858365738e1f21419fdb317e5eb3f275dd450",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
