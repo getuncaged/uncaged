@@ -92,6 +92,12 @@ confidence we'll ever get. They arrived at the same answers on:
   `APPLE_TEAM_ID=2BBY89MBSN` (Warp's own team id) and their CoC still says
   `warp-coc@warp.dev` — those are rename bugs. If we adapt their CI, parameterize
   the team id and fix every contact string.
+  (We had the same bug: `warp_core::macos::APPLE_TEAM_ID` carried Warp's team id
+  and `script/Entitlements.plist` declared the `<team>.dev.warp` app group, so we
+  were shipping another company's signing identity in a bundle we distribute.
+  Both are fixed — the constant is empty, since Uncaged is ad-hoc signed, and the
+  app-group entitlement is gone. Nothing read it on `Channel::Oss`. Worth
+  re-checking after every upstream merge.)
 
 ---
 

@@ -16,9 +16,18 @@
 	<true/>
 	<key>com.apple.security.personal-information.photos-library</key>
 	<true/>
-    <key>com.apple.security.application-groups</key>
-    <array>
-    <string>2BBY89MBSN.dev.warp</string>
-    </array>
+	<!--
+	  No `com.apple.security.application-groups` entry.
+
+	  Upstream declares the group `<Warp's Apple Team ID>.dev.warp` so the app can
+	  share a container with other first-party Warp processes. Uncaged must not
+	  ship that: it is another company's Apple Team identifier, in a bundle we
+	  distribute under our own name, and it could never resolve anyway because
+	  Uncaged is ad-hoc signed with no Apple Developer Team.
+
+	  Nothing is lost. `warp_core::paths` returns `None` for the shared container
+	  on `Channel::Oss` before it ever looks the group up, so every caller already
+	  falls back to the local state directory (~/.uncaged).
+	-->
 </dict>
 </plist>
