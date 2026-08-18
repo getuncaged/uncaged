@@ -19,12 +19,9 @@
 //! Nothing in this module runs before the user opts in; see
 //! `autoupdate::uncaged_updates_consented`.
 
-use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{bail, Context as _, Result};
-use futures_lite::{AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _};
-use sha2::{Digest as _, Sha256};
 
 use channel_versions::{ReleaseAsset, VersionInfo};
 use serde::Deserialize;
@@ -37,13 +34,6 @@ use crate::brand;
 const MAX_RELEASE_JSON_BYTES: u64 = 1024 * 1024;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
-
-/// Downloads are big (the macOS DMG is ~150 MB) and slow links are real.
-const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(900);
-
-/// A hard ceiling on what we will write to disk for an update. Our largest
-/// artifact is around 160 MB; anything past this is not one of ours.
-const MAX_ASSET_BYTES: u64 = 512 * 1024 * 1024;
 
 /// The subset of GitHub's release object we rely on.
 #[derive(Debug, Deserialize)]
@@ -214,110 +204,6 @@ fn parse_sha256_digest(digest: &str) -> Option<String> {
         return None;
     }
     Some(hex.to_ascii_lowercase())
-}
-
-/// Downloads `asset` to `dest`, then verifies the file on disk against the
-/// SHA-256 the release API reported.
-///
-/// Two deliberate choices.
-///
-/// The hash is computed from the file we just wrote, not from the bytes as they
-/// stream past. What matters is that the artifact we are about to mount and
-/// install is the right one; hashing the stream would leave a window in which
-/// the file changed between the check and the use, and would also miss a bad
-/// write.
-///
-/// The URL is re-validated here even though it was validated when the release
-/// was parsed, because this is the last point before we fetch it. Host checks
-/// are cheap and the cost of getting one wrong is executing someone else's code.
-///
-/// On any mismatch the partial file is removed. A half-verified download left on
-/// disk is exactly the kind of thing a later "we already have it" optimisation
-/// would pick up.
-pub async fn download_and_verify(asset: &ReleaseAsset, dest: &Path) -> Result<()> {
-    let url = reqwest::Url::parse(&asset.url)
-        .with_context(|| format!("release asset URL is not a URL: {}", asset.url))?;
-    if !host_is_allowed(&url) {
-        bail!("refusing to download from {url}: not an https GitHub host");
-    }
-
-    let client = client()?;
-    let response = client
-        .get(url.clone())
-        .timeout(DOWNLOAD_TIMEOUT)
-        .send()
-        .await
-        .with_context(|| format!("downloading {}", asset.name))?
-        .error_for_status()
-        .with_context(|| format!("downloading {}", asset.name))?;
-
-    // GitHub redirects to an object host; confirm we did not get walked
-    // somewhere else, since a redirect chain is only as good as its last hop.
-    if !host_is_allowed(response.url()) {
-        bail!("download ended at {}, which is not a GitHub host", response.url());
-    }
-
-    if let Some(length) = response.content_length() {
-        if length > MAX_ASSET_BYTES {
-            bail!("{} is {length} bytes, refusing to download", asset.name);
-        }
-    }
-
-    let mut file = async_fs::File::create(dest)
-        .await
-        .with_context(|| format!("creating {}", dest.display()))?;
-    let mut stream = response.bytes_stream();
-    let mut written: u64 = 0;
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.context("reading the download")?;
-        written += chunk.len() as u64;
-        if written > MAX_ASSET_BYTES {
-            drop(file);
-            let _ = async_fs::remove_file(dest).await;
-            bail!("{} exceeded {MAX_ASSET_BYTES} bytes mid-download", asset.name);
-        }
-        file.write_all(&chunk)
-            .await
-            .with_context(|| format!("writing {}", dest.display()))?;
-    }
-    file.flush().await.context("flushing the download")?;
-    drop(file);
-
-    match verify_sha256(dest, &asset.sha256).await {
-        Ok(()) => Ok(()),
-        Err(err) => {
-            let _ = async_fs::remove_file(dest).await;
-            Err(err)
-        }
-    }
-}
-
-/// Hashes the file at `path` and compares it to `expected` (lowercase hex).
-///
-/// This is the check that stands in for a code signature. If it does not hold,
-/// nothing downstream should touch the file.
-pub async fn verify_sha256(path: &Path, expected: &str) -> Result<()> {
-    let mut file = async_fs::File::open(path)
-        .await
-        .with_context(|| format!("opening {} to hash it", path.display()))?;
-    let mut hasher = Sha256::new();
-    let mut buf = vec![0u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buf).await.context("reading to hash")?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buf[..read]);
-    }
-    let actual = format!("{:x}", hasher.finalize());
-    if actual != expected {
-        bail!(
-            "checksum mismatch for {}: release says {expected}, downloaded file is {actual}",
-            path.display()
-        );
-    }
-    log::info!("Verified {} against the release checksum", path.display());
-    Ok(())
 }
 
 /// The asset-name fragment identifying the running platform, e.g.
