@@ -77,8 +77,11 @@ pub const LATEST_RELEASE_URL: &str = repo_url!("/releases/latest");
 /// `repo_url!` literal also repoints its updater — there is no second place to
 /// forget. The updater additionally requires that a download URL resolve to a
 /// GitHub host before it will fetch it; see `autoupdate::github_releases`.
-pub const LATEST_RELEASE_API_URL: &str =
-    concat!("https://api.github.com/repos/", "getuncaged/uncaged", "/releases/latest");
+pub const LATEST_RELEASE_API_URL: &str = concat!(
+    "https://api.github.com/repos/",
+    "getuncaged/uncaged",
+    "/releases/latest"
+);
 
 /// Hosts the updater is willing to download a release asset from.
 ///

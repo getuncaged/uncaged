@@ -51,7 +51,10 @@ pub(super) async fn download_update_and_cleanup(
     // by us as an unattended installer. Always download; never adopt a file we
     // did not just fetch ourselves.
     let mut new_installer = tempfile::Builder::new()
-        .suffix(&format!("-{}-{}", version_info.version, installer_file_name))
+        .suffix(&format!(
+            "-{}-{}",
+            version_info.version, installer_file_name
+        ))
         .tempfile()?;
 
     log::info!("Downloading {url} to {}...", new_installer.path().display());

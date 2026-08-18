@@ -5,7 +5,6 @@ pub mod app_icon;
 pub mod app_installation_detection;
 mod block_visibility;
 mod changelog;
-mod updates;
 pub mod cloud_preferences;
 pub mod cloud_preferences_syncer;
 mod code;
@@ -33,6 +32,7 @@ mod scroll;
 mod select;
 mod ssh;
 mod theme;
+mod updates;
 mod vim_banner;
 
 #[cfg(test)]
@@ -44,7 +44,6 @@ pub use ai::*;
 pub use alias_expansion::*;
 pub use block_visibility::*;
 pub use changelog::*;
-pub use updates::*;
 pub use cloud_preferences::*;
 pub use code::*;
 pub use debug::*;
@@ -67,6 +66,7 @@ pub use scroll::*;
 pub use select::*;
 pub use ssh::*;
 pub use theme::*;
+pub use updates::*;
 pub use vim_banner::*;
 use warp_core::user_preferences::GetUserPreferences as _;
 

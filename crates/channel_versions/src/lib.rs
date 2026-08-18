@@ -338,7 +338,10 @@ mod uncaged_version_tests {
     fn parses_our_tag_format() {
         assert!(UncagedVersion::parse("v0.2.9").is_some());
         assert!(UncagedVersion::parse("0.2.9").is_some());
-        assert_eq!(UncagedVersion::parse("v1.2.3"), UncagedVersion::parse("1.2.3"));
+        assert_eq!(
+            UncagedVersion::parse("v1.2.3"),
+            UncagedVersion::parse("1.2.3")
+        );
     }
 
     #[test]

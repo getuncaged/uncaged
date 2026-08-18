@@ -107,7 +107,10 @@ fn only_sha256_digests_are_accepted() {
     assert_eq!(parse_sha256_digest("md5:abc"), None);
     assert_eq!(parse_sha256_digest("sha512:abc"), None);
     assert_eq!(parse_sha256_digest("sha256:short"), None);
-    assert_eq!(parse_sha256_digest(&format!("sha256:{}", "z".repeat(64))), None);
+    assert_eq!(
+        parse_sha256_digest(&format!("sha256:{}", "z".repeat(64))),
+        None
+    );
     assert_eq!(parse_sha256_digest(""), None);
 }
 
@@ -158,9 +161,15 @@ fn every_published_platform_has_a_target() {
     ] {
         let expected = format!("{os}-{arch}");
         assert!(
-            ["macos-aarch64", "macos-x86_64", "linux-aarch64", "linux-x86_64",
-             "windows-aarch64", "windows-x86_64"]
-                .contains(&expected.as_str()),
+            [
+                "macos-aarch64",
+                "macos-x86_64",
+                "linux-aarch64",
+                "linux-x86_64",
+                "windows-aarch64",
+                "windows-x86_64"
+            ]
+            .contains(&expected.as_str()),
             "{expected} should be a known target"
         );
     }
