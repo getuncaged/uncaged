@@ -23,6 +23,8 @@ use warpui::windowing::state::ApplicationStage;
 use warpui::windowing::{self, WindowManager};
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, ViewContext};
 
+use crate::settings::UpdateSettings;
+
 pub use self::changelog::get_current_changelog;
 use self::channel_versions::fetch_channel_versions;
 use crate::channel::Channel;
@@ -139,10 +141,13 @@ impl AutoupdateState {
         if self.polling_started {
             return;
         }
-        // Uncaged: never start the update poll loop on the Oss channel — it ships
-        // without an update server and must not contact app.warp.dev on launch or
-        // on activation.
-        if matches!(ChannelState::channel(), Channel::Oss) {
+        // Uncaged: the poll loop is consent-gated.
+        //
+        // Nothing here contacts the network until the user has answered the
+        // one-time "check for updates?" question and said yes. Both settings
+        // default to false, so a fresh install polls nothing at all. See
+        // app/src/settings/updates.rs.
+        if matches!(ChannelState::channel(), Channel::Oss) && !uncaged_updates_consented(ctx) {
             return;
         }
         if FeatureFlag::Autoupdate.is_enabled() && AppExecutionMode::as_ref(ctx).can_autoupdate() {
@@ -1144,6 +1149,17 @@ pub fn is_incoming_version_past_current(version: Option<&str>) -> bool {
     };
 
     installed_version.is_some_and(|curr_version| incoming_version > curr_version)
+}
+
+/// Uncaged: has the user opted in to update checks?
+///
+/// True only once they have been asked *and* said yes. "Not asked yet" and "said
+/// no" are deliberately different states (see `app/src/settings/updates.rs`) —
+/// collapsing them would mean either nagging someone who declined, or checking
+/// for updates on behalf of someone who was never asked.
+pub fn uncaged_updates_consented(ctx: &AppContext) -> bool {
+    let settings = UpdateSettings::as_ref(ctx);
+    *settings.auto_update_prompt_answered && *settings.auto_update_enabled
 }
 
 /// Returns the base URL that contains release assets for the given version
