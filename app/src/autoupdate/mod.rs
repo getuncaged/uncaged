@@ -1,5 +1,6 @@
 mod changelog;
 mod channel_versions;
+pub mod github_releases;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "macos")]
@@ -803,6 +804,26 @@ async fn fetch_version(
     update_id: &str,
     server_api: Arc<ServerApi>,
 ) -> Result<VersionInfo> {
+    // Uncaged reads GitHub Releases, not an update server.
+    //
+    // Reaching here at all means the user opted in — `start_polling` will not run
+    // the loop otherwise — so this is the first point where the app talks to the
+    // network about updates. The response carries each asset's URL and the
+    // SHA-256 GitHub computed over it; the installer verifies that hash instead
+    // of a code signature, which an ad-hoc-signed build cannot have.
+    if matches!(channel, Channel::Oss) {
+        let Some(target) = github_releases::current_target() else {
+            return Err(anyhow!(
+                "no Uncaged builds are published for {}-{}",
+                std::env::consts::OS,
+                std::env::consts::ARCH
+            ));
+        };
+        return github_releases::fetch_latest_release(target)
+            .await?
+            .ok_or_else(|| anyhow!("no published release with a verifiable asset for {target}"));
+    }
+
     let versions = fetch_channel_versions(update_id, server_api.clone(), false, is_daily).await?;
 
     let channel_version = match channel {
@@ -810,8 +831,9 @@ async fn fetch_version(
         Channel::Preview => versions.preview,
         Channel::Dev => versions.dev,
         Channel::Integration | Channel::Local | Channel::Oss => {
-            // These channels don't ship release artifacts, so there's no
-            // version to fetch. This branch is normally unreachable because
+            // Oss returns above, from GitHub. Integration and Local ship no
+            // release artifacts, so there's no version to fetch. This branch is
+            // normally unreachable because
             // `AutoupdateState::register` gates the poll loop on the
             // `Autoupdate` feature flag, but builds (e.g. local wasm bundles)
             // can end up with `Autoupdate` enabled while running on one of
