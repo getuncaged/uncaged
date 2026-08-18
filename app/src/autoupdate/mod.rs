@@ -1158,8 +1158,21 @@ fn release_assets_directory_url(channel: Channel, version: &str) -> String {
             format!("{releases_base_url}/preview/{version}")
         }
         Channel::Dev => format!("{releases_base_url}/dev/{version}"),
+        // Uncaged (Oss) does not derive asset URLs from a version: its releases
+        // live on GitHub, where the download URL and the SHA-256 to check it
+        // against both come from the release API. Those travel on the
+        // `VersionInfo` instead, so nothing on this channel should call here.
+        //
+        // This used to `unreachable!()`, i.e. panic the app. A wrong turn in the
+        // updater must not take the terminal down with it — return an empty base
+        // so the caller fails its request instead.
         Channel::Local | Channel::Integration | Channel::Oss => {
-            unreachable!("local/integration/oss autoupdate not supported");
+            log::error!(
+                "release_assets_directory_url called on {channel} — this channel has no \
+                 derivable release URL; the caller should be using the release assets \
+                 carried on VersionInfo"
+            );
+            String::new()
         }
     }
 }

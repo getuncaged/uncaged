@@ -143,6 +143,10 @@ pub(super) fn relaunch() -> Result<()> {
     // If we're testing with a local copy of channel_versions.json, have the
     // newly-started binary also reference that same file (so we can test
     // displaying an updated changelog after an autoupdate).
+    // Debug-only: see channel_versions.rs. Never propagate the manifest
+    // override into the relaunched process in a shipped build — that would
+    // make a one-shot env var survive the update it just controlled.
+    #[cfg(debug_assertions)]
     if let Ok(path) = env::var("WARP_CHANNEL_VERSIONS_PATH") {
         launch_command.push(format!(" --env WARP_CHANNEL_VERSIONS_PATH={path}"));
     }
