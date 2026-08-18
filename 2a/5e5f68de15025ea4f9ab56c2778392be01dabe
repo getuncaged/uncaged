@@ -1,0 +1,24 @@
+app/src/autoupdate/github_releases_tests.rs
+  s_6e5dc450e2113a::t_11197def2d6d22 168-178,180-200,202-221,223-227
+  s_6e5dc450e2113a::t_7896ef4586731b 179,201,222
+app/src/autoupdate/github_releases.rs
+  s_6e5dc450e2113a::t_5c20fd16dfd095 22,26-27,41-47,219-265,267-275,277-288,290-299,301-321
+  s_6e5dc450e2113a::t_bf370e0d144090 28,266,276,289,300
+  s_6e5dc450e2113a::t_a1e1e23a3b5f2c 322
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "2a5e5f68de15025ea4f9ab56c2778392be01dabe",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
