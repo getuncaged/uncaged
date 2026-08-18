@@ -1,0 +1,29 @@
+app/src/autoupdate/linux.rs
+  s_6e5dc450e2113a::t_0bed26444a7f96 28-45,66-71
+  s_6e5dc450e2113a::t_bdcb0aa4d9ee2f 176-179,328-331
+  s_6e5dc450e2113a::t_4af86c08a21687 72
+app/src/autoupdate/mod.rs
+  s_6e5dc450e2113a::t_eab88ec57cc444 1161-1168,1170-1175
+app/src/autoupdate/channel_versions.rs
+  s_6e5dc450e2113a::t_eab88ec57cc444 20-29
+app/src/autoupdate/mac.rs
+  s_6e5dc450e2113a::t_bdcb0aa4d9ee2f 146-149
+app/src/autoupdate/windows.rs
+  s_6e5dc450e2113a::t_79bcbbe9d2a582 42-52,54-55,57,59-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "cb522993964158ed8172ad2f299807e9cafc27db",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
