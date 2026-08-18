@@ -1,0 +1,26 @@
+app/src/autoupdate/mod.rs
+  s_6e5dc450e2113a::t_d482d1d32171da 393-410
+  s_6e5dc450e2113a::t_c5018121bdb464 14
+crates/channel_versions/src/lib.rs
+  s_6e5dc450e2113a::t_e54c519ae1a5f0 116-161,242,332-377
+  s_6e5dc450e2113a::t_447fce9b2687fa 162-189,214-221,234,238-241
+  s_6e5dc450e2113a::t_ecab9b7defa2f0 243
+crates/channel_versions/src/overrides_tests.rs
+  s_6e5dc450e2113a::t_9332c905b854ce 24,37,52,149,161,195,207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7ef88c9a58adaf8e2c465c130922f6cdab0b5d75",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
