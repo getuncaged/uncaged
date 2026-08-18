@@ -75,6 +75,15 @@ pub(super) fn manually_download_version(
     version_info: &VersionInfo,
     ctx: &mut AppContext,
 ) {
+    // Uncaged points at its own releases page rather than a derived asset URL:
+    // there is no Warp release server behind `update_url` on this channel, and
+    // the page is where a user picks the right file for their machine — or is
+    // reminded they installed with Homebrew and should just `brew upgrade`.
+    if matches!(ChannelState::channel(), Channel::Oss) {
+        ctx.open_url(crate::brand::LATEST_RELEASE_URL);
+        return;
+    }
+
     let url = update_url(*channel, version_info.version.as_str());
     ctx.open_url(&url);
 }

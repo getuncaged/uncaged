@@ -431,6 +431,30 @@ impl AutoupdateState {
         }
 
         let update_available = version.map(|version| self.should_update(version, update_id));
+
+        // Uncaged finds releases; it does not install them.
+        //
+        // Whatever the check concluded, land on the state that means "there is a
+        // newer version and you should go get it" — the same one upstream uses
+        // when it knows about an update it cannot apply. That already has a
+        // banner and a button; the button opens our releases page (see
+        // `manually_download_version`). Nothing is downloaded and the app never
+        // replaces its own bundle, which on an ad-hoc-signed build it could not
+        // do safely anyway.
+        if matches!(ChannelState::channel(), Channel::Oss) {
+            if let Ok(
+                UpdateReady::Yes { new_version, .. } | UpdateReady::CanDownload { new_version, .. },
+            ) = &update_available
+            {
+                log::info!("Uncaged {} is available", new_version.version);
+                self.stage = AutoupdateStage::UnableToUpdateToNewVersion {
+                    new_version: new_version.clone(),
+                };
+                ctx.notify();
+                return;
+            }
+        }
+
         match &update_available {
             Ok(UpdateReady::CanDownload {
                 new_version,
