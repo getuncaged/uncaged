@@ -1,6 +1,7 @@
 mod changelog;
 mod channel_versions;
 pub mod github_releases;
+pub mod install_source;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "macos")]
@@ -391,22 +392,21 @@ impl AutoupdateState {
         new_version: &VersionInfo,
         current_version: &str,
     ) -> Result<bool> {
-        // Uncaged tags releases `vX.Y.Z`, which ParsedVersion cannot read — its
+        // Two version formats reach this function.
+        //
+        // Uncaged tags releases `vX.Y.Z`, which ParsedVersion cannot read: its
         // regex wants Warp's `_NN` build-number suffix and a datetime in the
-        // middle. The caller uses `if let Ok(true)`, so a parse failure here is
-        // indistinguishable from "not a downgrade": on Uncaged this guard has
-        // been silently inert, and a moved tag or a re-published release would
-        // walk every client backwards. Compare our tags with the comparator that
-        // understands them.
-        if matches!(ChannelState::channel(), Channel::Oss) {
-            return UncagedVersion::is_newer(current_version, &new_version.version).with_context(
-                || {
-                    format!(
-                        "cannot order release tags: current {current_version:?}, offered {:?}",
-                        new_version.version
-                    )
-                },
-            );
+        // middle, so `try_from` returns Err — and the caller is `if let Ok(true)`,
+        // which swallows it. That made this guard silently inert on our tags,
+        // where a moved tag or a re-published release would have walked every
+        // client backwards.
+        //
+        // Try our format first and fall through to Warp's, rather than branching
+        // on the channel: the channel does not actually determine which format a
+        // version string is in, and assuming it does breaks the moment a build
+        // sees the other one.
+        if let Some(ahead) = UncagedVersion::is_newer(current_version, &new_version.version) {
+            return Ok(ahead);
         }
 
         let current_version = ParsedVersion::try_from(current_version)?;
