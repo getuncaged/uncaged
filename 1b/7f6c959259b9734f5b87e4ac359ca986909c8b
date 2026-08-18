@@ -1,0 +1,23 @@
+app/src/workspace/action.rs
+  s_6e5dc450e2113a::t_4d8ae142c6e78d 20,30,48
+  s_6e5dc450e2113a::t_979cc90d27f88f 284-286,1021
+app/src/workspace/view.rs
+  s_6e5dc450e2113a::t_00d2d862cfcc93 22544
+  s_6e5dc450e2113a::t_07444450e0a4df 343,717-719,736-738,1078-1080,3406,22048-22051,22123-22188,22538-22543,24313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1b7f6c959259b9734f5b87e4ac359ca986909c8b",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
