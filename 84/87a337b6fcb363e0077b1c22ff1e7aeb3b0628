@@ -1,0 +1,21 @@
+app/src/autoupdate/mac.rs
+  s_6e5dc450e2113a::t_d97a6ee3e6b6ba 78-86
+app/src/autoupdate/mod.rs
+  s_6e5dc450e2113a::t_d97a6ee3e6b6ba 434-457
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "8487a337b6fcb363e0077b1c22ff1e7aeb3b0628",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
