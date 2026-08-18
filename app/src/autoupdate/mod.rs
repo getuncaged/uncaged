@@ -1,5 +1,6 @@
 mod changelog;
 mod channel_versions;
+pub mod github_releases;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "macos")]
@@ -11,7 +12,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
-use ::channel_versions::{ParsedVersion, VersionInfo};
+use ::channel_versions::{ParsedVersion, UncagedVersion, VersionInfo};
 use anyhow::{anyhow, Context as _, Result};
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use rand::Rng as _;
@@ -22,6 +23,8 @@ use warpui::r#async::Timer;
 use warpui::windowing::state::ApplicationStage;
 use warpui::windowing::{self, WindowManager};
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, ViewContext};
+
+use crate::settings::UpdateSettings;
 
 pub use self::changelog::get_current_changelog;
 use self::channel_versions::fetch_channel_versions;
@@ -139,10 +142,13 @@ impl AutoupdateState {
         if self.polling_started {
             return;
         }
-        // Uncaged: never start the update poll loop on the Oss channel — it ships
-        // without an update server and must not contact app.warp.dev on launch or
-        // on activation.
-        if matches!(ChannelState::channel(), Channel::Oss) {
+        // Uncaged: the poll loop is consent-gated.
+        //
+        // Nothing here contacts the network until the user has answered the
+        // one-time "check for updates?" question and said yes. Both settings
+        // default to false, so a fresh install polls nothing at all. See
+        // app/src/settings/updates.rs.
+        if matches!(ChannelState::channel(), Channel::Oss) && !uncaged_updates_consented(ctx) {
             return;
         }
         if FeatureFlag::Autoupdate.is_enabled() && AppExecutionMode::as_ref(ctx).can_autoupdate() {
@@ -385,6 +391,23 @@ impl AutoupdateState {
         new_version: &VersionInfo,
         current_version: &str,
     ) -> Result<bool> {
+        // Two version formats reach this function.
+        //
+        // Uncaged tags releases `vX.Y.Z`, which ParsedVersion cannot read: its
+        // regex wants Warp's `_NN` build-number suffix and a datetime in the
+        // middle, so `try_from` returns Err — and the caller is `if let Ok(true)`,
+        // which swallows it. That made this guard silently inert on our tags,
+        // where a moved tag or a re-published release would have walked every
+        // client backwards.
+        //
+        // Try our format first and fall through to Warp's, rather than branching
+        // on the channel: the channel does not actually determine which format a
+        // version string is in, and assuming it does breaks the moment a build
+        // sees the other one.
+        if let Some(ahead) = UncagedVersion::is_newer(current_version, &new_version.version) {
+            return Ok(ahead);
+        }
+
         let current_version = ParsedVersion::try_from(current_version)?;
         let new_version = ParsedVersion::try_from(new_version.version.as_str())?;
         Ok(current_version > new_version)
@@ -408,6 +431,30 @@ impl AutoupdateState {
         }
 
         let update_available = version.map(|version| self.should_update(version, update_id));
+
+        // Uncaged finds releases; it does not install them.
+        //
+        // Whatever the check concluded, land on the state that means "there is a
+        // newer version and you should go get it" — the same one upstream uses
+        // when it knows about an update it cannot apply. That already has a
+        // banner and a button; the button opens our releases page (see
+        // `manually_download_version`). Nothing is downloaded and the app never
+        // replaces its own bundle, which on an ad-hoc-signed build it could not
+        // do safely anyway.
+        if matches!(ChannelState::channel(), Channel::Oss) {
+            if let Ok(
+                UpdateReady::Yes { new_version, .. } | UpdateReady::CanDownload { new_version, .. },
+            ) = &update_available
+            {
+                log::info!("Uncaged {} is available", new_version.version);
+                self.stage = AutoupdateStage::UnableToUpdateToNewVersion {
+                    new_version: new_version.clone(),
+                };
+                ctx.notify();
+                return;
+            }
+        }
+
         match &update_available {
             Ok(UpdateReady::CanDownload {
                 new_version,
@@ -780,6 +827,26 @@ async fn fetch_version(
     update_id: &str,
     server_api: Arc<ServerApi>,
 ) -> Result<VersionInfo> {
+    // Uncaged reads GitHub Releases, not an update server.
+    //
+    // Reaching here at all means the user opted in — `start_polling` will not run
+    // the loop otherwise — so this is the first point where the app talks to the
+    // network about updates. The response carries each asset's URL and the
+    // SHA-256 GitHub computed over it; the installer verifies that hash instead
+    // of a code signature, which an ad-hoc-signed build cannot have.
+    if matches!(channel, Channel::Oss) {
+        let Some(target) = github_releases::current_target() else {
+            return Err(anyhow!(
+                "no Uncaged builds are published for {}-{}",
+                std::env::consts::OS,
+                std::env::consts::ARCH
+            ));
+        };
+        return github_releases::fetch_latest_release(target)
+            .await?
+            .ok_or_else(|| anyhow!("no published release with a verifiable asset for {target}"));
+    }
+
     let versions = fetch_channel_versions(update_id, server_api.clone(), false, is_daily).await?;
 
     let channel_version = match channel {
@@ -787,8 +854,9 @@ async fn fetch_version(
         Channel::Preview => versions.preview,
         Channel::Dev => versions.dev,
         Channel::Integration | Channel::Local | Channel::Oss => {
-            // These channels don't ship release artifacts, so there's no
-            // version to fetch. This branch is normally unreachable because
+            // Oss returns above, from GitHub. Integration and Local ship no
+            // release artifacts, so there's no version to fetch. This branch is
+            // normally unreachable because
             // `AutoupdateState::register` gates the poll loop on the
             // `Autoupdate` feature flag, but builds (e.g. local wasm bundles)
             // can end up with `Autoupdate` enabled while running on one of
@@ -1146,6 +1214,17 @@ pub fn is_incoming_version_past_current(version: Option<&str>) -> bool {
     installed_version.is_some_and(|curr_version| incoming_version > curr_version)
 }
 
+/// Uncaged: has the user opted in to update checks?
+///
+/// True only once they have been asked *and* said yes. "Not asked yet" and "said
+/// no" are deliberately different states (see `app/src/settings/updates.rs`) —
+/// collapsing them would mean either nagging someone who declined, or checking
+/// for updates on behalf of someone who was never asked.
+pub fn uncaged_updates_consented(ctx: &AppContext) -> bool {
+    let settings = UpdateSettings::as_ref(ctx);
+    *settings.auto_update_prompt_answered && *settings.auto_update_enabled
+}
+
 /// Returns the base URL that contains release assets for the given version
 /// of this app bundle.
 fn release_assets_directory_url(channel: Channel, version: &str) -> String {
@@ -1158,8 +1237,21 @@ fn release_assets_directory_url(channel: Channel, version: &str) -> String {
             format!("{releases_base_url}/preview/{version}")
         }
         Channel::Dev => format!("{releases_base_url}/dev/{version}"),
+        // Uncaged (Oss) does not derive asset URLs from a version: its releases
+        // live on GitHub, where the download URL and the SHA-256 to check it
+        // against both come from the release API. Those travel on the
+        // `VersionInfo` instead, so nothing on this channel should call here.
+        //
+        // This used to `unreachable!()`, i.e. panic the app. A wrong turn in the
+        // updater must not take the terminal down with it — return an empty base
+        // so the caller fails its request instead.
         Channel::Local | Channel::Integration | Channel::Oss => {
-            unreachable!("local/integration/oss autoupdate not supported");
+            log::error!(
+                "release_assets_directory_url called on {channel} — this channel has no \
+                 derivable release URL; the caller should be using the release assets \
+                 carried on VersionInfo"
+            );
+            String::new()
         }
     }
 }

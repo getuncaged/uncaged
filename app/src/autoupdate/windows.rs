@@ -1,4 +1,3 @@
-use std::fs::File;
 use std::io::Write as _;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -40,34 +39,35 @@ pub(super) async fn download_update_and_cleanup(
     );
 
     // Create a temporary file that we'll write the download into.
-    let mut already_exists = false;
+    //
+    // SECURITY: this path must be unpredictable and must never be reused.
+    //
+    // This previously used `.rand_bytes(0)` with a suffix derived only from the
+    // version and file name, producing a fully predictable path in %TEMP%, and
+    // treated "a non-empty file is already here" as "we already downloaded it" —
+    // skipping the download and keeping whatever was on disk. The result is
+    // handed to `Command::new(..).spawn()` with `/SILENT /NOCANCEL` when the
+    // update is applied, so anyone able to write that path got their binary run
+    // by us as an unattended installer. Always download; never adopt a file we
+    // did not just fetch ourselves.
     let mut new_installer = tempfile::Builder::new()
-        .rand_bytes(0)
-        .suffix(&format!("{}-{}", version_info.version, installer_file_name))
-        .make(|path| {
-            // Treat a 0-byte file as missing.
-            let non_empty = path.metadata().map(|m| m.len() > 0).unwrap_or(false);
-            already_exists = non_empty;
-            if already_exists {
-                File::open(path)
-            } else {
-                File::create(path)
-            }
-        })?;
+        .suffix(&format!(
+            "-{}-{}",
+            version_info.version, installer_file_name
+        ))
+        .tempfile()?;
 
-    if !already_exists {
-        log::info!("Downloading {url} to {}...", new_installer.path().display());
+    log::info!("Downloading {url} to {}...", new_installer.path().display());
 
-        let response = client
-            .get(&url)
-            .timeout(DOWNLOAD_TIMEOUT)
-            .send()
-            .await?
-            .error_for_status()?;
-        new_installer
-            .as_file_mut()
-            .write_all(&response.bytes().await?)?;
-    }
+    let response = client
+        .get(&url)
+        .timeout(DOWNLOAD_TIMEOUT)
+        .send()
+        .await?
+        .error_for_status()?;
+    new_installer
+        .as_file_mut()
+        .write_all(&response.bytes().await?)?;
 
     *INSTALLER_PATH.lock() = Some(new_installer.into_temp_path());
 

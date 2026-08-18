@@ -113,6 +113,80 @@ impl ChannelVersion {
     }
 }
 
+/// A plain `vMAJOR.MINOR.PATCH` release tag, as Uncaged tags them.
+///
+/// [`ParsedVersion`] cannot help here: its regex is `v(\d+)\.(.+)\.(.+)_(\d+)`,
+/// which requires Warp's `_NN` build-number suffix and a `%Y.%m.%d.%H.%M`
+/// datetime in the middle, so `v0.2.9` simply does not match. The caller that
+/// guards against downgrades swallows the parse error (`if let Ok(true)`), which
+/// means that on Uncaged the guard silently never fires — and a release
+/// re-published, a moved tag, or a bad `make_latest` would walk every client
+/// backwards. This type is the comparison that actually works for our tags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct UncagedVersion {
+    major: u64,
+    minor: u64,
+    patch: u64,
+}
+
+impl UncagedVersion {
+    /// Parses `v1.2.3` or `1.2.3`. Anything else — a suffix, a missing
+    /// component, a non-numeric part — is rejected rather than guessed at.
+    pub fn parse(value: &str) -> Option<Self> {
+        let value = value.strip_prefix('v').unwrap_or(value);
+        let mut parts = value.split('.');
+        let major = parts.next()?.parse().ok()?;
+        let minor = parts.next()?.parse().ok()?;
+        let patch = parts.next()?.parse().ok()?;
+        // Reject trailing components so "1.2.3.4" is not silently read as 1.2.3.
+        if parts.next().is_some() {
+            return None;
+        }
+        Some(Self {
+            major,
+            minor,
+            patch,
+        })
+    }
+
+    /// Whether `candidate` is strictly newer than `current`.
+    ///
+    /// Returns `None` when either side is unparseable, so the caller can decide
+    /// what to do about an unknown version rather than being handed a `false`
+    /// that means "not newer" and "no idea" at the same time.
+    pub fn is_newer(candidate: &str, current: &str) -> Option<bool> {
+        Some(Self::parse(candidate)? > Self::parse(current)?)
+    }
+}
+
+/// One downloadable file from a release, paired with the hash to check it against.
+///
+/// Uncaged only. Warp's channels derive a download URL from the version string
+/// (`autoupdate::release_assets_directory_url`) and trust the result because the
+/// bundle is Developer-ID signed. Uncaged has neither: its releases live on
+/// GitHub, whose URLs are not derivable from a version alone, and it is ad-hoc
+/// signed, so `codesign -R <team>` can prove nothing. Instead the version source
+/// carries each file's URL and the SHA-256 GitHub computed over it, and the
+/// installer verifies the hash where Warp verifies the signature.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ReleaseAsset {
+    /// File name, e.g. `Uncaged-macos-aarch64.dmg`. This is how a platform picks
+    /// among the formats a release offers — a `.deb` and an `.AppImage` are the
+    /// same release installed two different ways.
+    pub name: String,
+    /// Direct HTTPS download URL.
+    pub url: String,
+    /// Size in bytes as the release recorded it, so a download can be bounded
+    /// before it is read into memory.
+    pub size: u64,
+    /// Lowercase hex SHA-256 of the file.
+    ///
+    /// Read from the release *API response*, never from anything served next to
+    /// the download itself — a hash published alongside an artifact by whoever
+    /// served that artifact proves nothing.
+    pub sha256: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct VersionInfo {
     pub version: String,
@@ -137,6 +211,14 @@ pub struct VersionInfo {
     /// The version to use for CLI downloads, falling back to `version` if not set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cli_version: Option<String>,
+    /// Downloadable files for this release, already narrowed to the platform the
+    /// running build targets.
+    ///
+    /// Empty on Warp's channels, which derive their URLs and trust a signature.
+    /// Populated on Uncaged, where the URL and hash have to travel with the
+    /// version. See [`ReleaseAsset`].
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<ReleaseAsset>,
 }
 
 impl VersionInfo {
@@ -149,7 +231,14 @@ impl VersionInfo {
             version_for_new_users: None,
             is_rollback: None,
             cli_version: None,
+            assets: Vec::new(),
         }
+    }
+
+    /// The release asset whose file name matches `predicate`, if this version
+    /// carries one. Used by the platform installers to pick their artifact.
+    pub fn asset_matching(&self, predicate: impl Fn(&str) -> bool) -> Option<&ReleaseAsset> {
+        self.assets.iter().find(|a| predicate(&a.name))
     }
 
     /// Returns the CLI version, falling back to the app version if not set.
@@ -240,3 +329,52 @@ impl std::fmt::Display for Section {
 #[cfg(test)]
 #[path = "channel_versions_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod uncaged_version_tests {
+    use super::UncagedVersion;
+
+    #[test]
+    fn parses_our_tag_format() {
+        assert!(UncagedVersion::parse("v0.2.9").is_some());
+        assert!(UncagedVersion::parse("0.2.9").is_some());
+        assert_eq!(
+            UncagedVersion::parse("v1.2.3"),
+            UncagedVersion::parse("1.2.3")
+        );
+    }
+
+    #[test]
+    fn rejects_what_it_cannot_order() {
+        // Warp's own format: parseable by ParsedVersion, not by this.
+        assert!(UncagedVersion::parse("v0.2023.05.15.08.04.stable_01").is_none());
+        assert!(UncagedVersion::parse("v0.2").is_none());
+        assert!(UncagedVersion::parse("v0.2.9.1").is_none());
+        assert!(UncagedVersion::parse("v0.2.9-rc1").is_none());
+        assert!(UncagedVersion::parse("").is_none());
+    }
+
+    #[test]
+    fn orders_numerically_not_lexically() {
+        // The bug a string compare would introduce: "0.2.10" < "0.2.9" as text.
+        assert_eq!(UncagedVersion::is_newer("v0.2.10", "v0.2.9"), Some(true));
+        assert_eq!(UncagedVersion::is_newer("v0.10.0", "v0.9.9"), Some(true));
+        assert_eq!(UncagedVersion::is_newer("v1.0.0", "v0.99.99"), Some(true));
+    }
+
+    #[test]
+    fn same_version_is_not_newer() {
+        assert_eq!(UncagedVersion::is_newer("v0.2.9", "v0.2.9"), Some(false));
+    }
+
+    #[test]
+    fn older_is_not_newer() {
+        assert_eq!(UncagedVersion::is_newer("v0.2.8", "v0.2.9"), Some(false));
+    }
+
+    #[test]
+    fn unparseable_is_none_not_false() {
+        assert_eq!(UncagedVersion::is_newer("nonsense", "v0.2.9"), None);
+        assert_eq!(UncagedVersion::is_newer("v0.3.0", "nonsense"), None);
+    }
+}

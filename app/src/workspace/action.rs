@@ -281,6 +281,9 @@ pub enum WorkspaceAction {
     LogOut,
     CopyVersion(&'static str),
     DownloadNewVersion,
+    /// Uncaged: the user answered the one-time "check for updates?" question.
+    /// `true` turns checks on, `false` records a decline so we stop asking.
+    AnswerUpdateCheckPrompt(bool),
     ConfigureKeybindingSettings {
         keybinding_name: Option<String>,
     },
@@ -1015,6 +1018,7 @@ impl WorkspaceAction {
             | ApplyUpdate
             | CopyVersion(_)
             | DownloadNewVersion
+            | AnswerUpdateCheckPrompt(_)
             | ConfigureKeybindingSettings { .. }
             | ExportAllWarpDriveObjects
             | ShowSettings

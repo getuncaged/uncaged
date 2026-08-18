@@ -75,6 +75,15 @@ pub(super) fn manually_download_version(
     version_info: &VersionInfo,
     ctx: &mut AppContext,
 ) {
+    // Uncaged points at its own releases page rather than a derived asset URL:
+    // there is no Warp release server behind `update_url` on this channel, and
+    // the page is where a user picks the right file for their machine — or is
+    // reminded they installed with Homebrew and should just `brew upgrade`.
+    if matches!(ChannelState::channel(), Channel::Oss) {
+        ctx.open_url(crate::brand::LATEST_RELEASE_URL);
+        return;
+    }
+
     let url = update_url(*channel, version_info.version.as_str());
     ctx.open_url(&url);
 }
@@ -143,6 +152,10 @@ pub(super) fn relaunch() -> Result<()> {
     // If we're testing with a local copy of channel_versions.json, have the
     // newly-started binary also reference that same file (so we can test
     // displaying an updated changelog after an autoupdate).
+    // Debug-only: see channel_versions.rs. Never propagate the manifest override
+    // into the relaunched process in a shipped build — that would make a one-shot
+    // env var survive the update it just controlled.
+    #[cfg(debug_assertions)]
     if let Ok(path) = env::var("WARP_CHANNEL_VERSIONS_PATH") {
         launch_command.push(format!(" --env WARP_CHANNEL_VERSIONS_PATH={path}"));
     }

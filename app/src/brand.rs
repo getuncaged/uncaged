@@ -66,6 +66,33 @@ pub const NEW_ISSUE_URL: &str = repo_url!("/issues/new");
 pub const DISCUSSIONS_URL: &str = repo_url!("/discussions");
 /// The privacy section of the README.
 pub const PRIVACY_URL: &str = repo_url!("#privacy");
+/// The releases page — where a user goes to download or upgrade by hand.
+pub const RELEASES_URL: &str = repo_url!("/releases");
+/// The newest release, for "what's new" links.
+pub const LATEST_RELEASE_URL: &str = repo_url!("/releases/latest");
+
+/// The release API the updater reads.
+///
+/// Uses the same `owner/repo` as every link above, so a fork that edits the
+/// `repo_url!` literal also repoints its updater — there is no second place to
+/// forget. The updater additionally requires that a download URL resolve to a
+/// GitHub host before it will fetch it; see `autoupdate::github_releases`.
+pub const LATEST_RELEASE_API_URL: &str = concat!(
+    "https://api.github.com/repos/",
+    "getuncaged/uncaged",
+    "/releases/latest"
+);
+
+/// Hosts the updater is willing to download a release asset from.
+///
+/// A release response names its own download URL, so that URL is untrusted
+/// input: without this check, whoever could alter the API response could point
+/// the download anywhere. Redirects are validated against the same list.
+pub const RELEASE_DOWNLOAD_HOSTS: &[&str] = &[
+    "github.com",
+    "objects.githubusercontent.com",
+    "release-assets.githubusercontent.com",
+];
 
 // ── Community themes repository ────────────────────────────────────────────────
 //
@@ -211,6 +238,31 @@ mod tests {
 
     /// The community-themes URLs must all derive from the one slug, so a fork that changes
     /// `THEMES_REPO_SLUG` (via the `themes_url!` macro) can trust every link to follow.
+    /// The updater must read the same repo every other link points at. A fork
+    /// that repoints `repo_url!` but not the release API would check upstream's
+    /// releases and offer its users someone else's build.
+    #[test]
+    fn release_api_url_tracks_the_repo() {
+        assert!(
+            LATEST_RELEASE_API_URL.ends_with("/releases/latest"),
+            "{LATEST_RELEASE_API_URL} should address the latest release"
+        );
+        let slug = HOME_URL.trim_start_matches("https://github.com/");
+        assert!(
+            LATEST_RELEASE_API_URL.contains(slug),
+            "{LATEST_RELEASE_API_URL} should target {slug}, the same repo as HOME_URL"
+        );
+        assert!(RELEASES_URL.starts_with(HOME_URL));
+        // Every download host must be GitHub's; this list gates what the updater
+        // will fetch, so a typo here is a security hole, not a broken link.
+        for host in RELEASE_DOWNLOAD_HOSTS {
+            assert!(
+                *host == "github.com" || host.ends_with(".githubusercontent.com"),
+                "{host} is not a GitHub host"
+            );
+        }
+    }
+
     #[test]
     fn theme_repo_urls_all_derive_from_one_slug() {
         assert_eq!(THEMES_REPO_SLUG, "getuncaged/uncaged-themes");

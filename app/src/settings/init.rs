@@ -17,7 +17,8 @@ use super::{
     BlockVisibilitySettings, ChangelogSettings, CodeSettings, DebugSettings, EmacsBindingsSettings,
     FontSettings, FontSettingsChangedEvent, GPUSettings, InputBoxType, InputModeSettings,
     InputSettings, LocalControlSettings, PaneSettings, SameLinePromptBlockSettings, ScrollSettings,
-    SelectionSettings, SshSettings, ThemeSettings, VimBannerSettings, WarpDrivePrivacySettings,
+    SelectionSettings, SshSettings, ThemeSettings, UpdateSettings, VimBannerSettings,
+    WarpDrivePrivacySettings,
 };
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
 use crate::banner::BannerState;
@@ -70,6 +71,7 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     LigatureSettings::register(ctx);
     GPUSettings::register(ctx);
     ChangelogSettings::register(ctx);
+    UpdateSettings::register(ctx);
     GeneralSettings::register(ctx);
     AISettings::register_and_subscribe_to_events(ctx);
     CloudAgentSettings::register(ctx);

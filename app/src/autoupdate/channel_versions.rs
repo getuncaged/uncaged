@@ -17,6 +17,16 @@ pub async fn fetch_channel_versions(
     include_changelogs: bool,
     is_daily: bool,
 ) -> Result<ChannelVersions> {
+    // SECURITY: debug builds only.
+    //
+    // This env var names a file whose contents become the update manifest. Once
+    // that manifest carries a download URL *and* the SHA-256 the download must
+    // match (which is how Uncaged verifies updates without a signing identity),
+    // anyone able to set one environment variable chooses both the payload and
+    // the hash it is checked against — defeating the integrity check outright,
+    // no network interception required. It is a test hook; keep it out of
+    // shipped builds.
+    #[cfg(debug_assertions)]
     if let Ok(path) = env::var("WARP_CHANNEL_VERSIONS_PATH") {
         // Load channel versions from local filesystem. Used for testing both
         // autoupdate and changelog behavior.
