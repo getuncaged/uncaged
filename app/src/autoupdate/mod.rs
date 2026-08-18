@@ -11,7 +11,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
-use ::channel_versions::{ParsedVersion, VersionInfo};
+use ::channel_versions::{ParsedVersion, UncagedVersion, VersionInfo};
 use anyhow::{anyhow, Context as _, Result};
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use rand::Rng as _;
@@ -390,6 +390,24 @@ impl AutoupdateState {
         new_version: &VersionInfo,
         current_version: &str,
     ) -> Result<bool> {
+        // Uncaged tags releases `vX.Y.Z`, which ParsedVersion cannot read — its
+        // regex wants Warp's `_NN` build-number suffix and a datetime in the
+        // middle. The caller uses `if let Ok(true)`, so a parse failure here is
+        // indistinguishable from "not a downgrade": on Uncaged this guard has
+        // been silently inert, and a moved tag or a re-published release would
+        // walk every client backwards. Compare our tags with the comparator that
+        // understands them.
+        if matches!(ChannelState::channel(), Channel::Oss) {
+            return UncagedVersion::is_newer(current_version, &new_version.version).with_context(
+                || {
+                    format!(
+                        "cannot order release tags: current {current_version:?}, offered {:?}",
+                        new_version.version
+                    )
+                },
+            );
+        }
+
         let current_version = ParsedVersion::try_from(current_version)?;
         let new_version = ParsedVersion::try_from(new_version.version.as_str())?;
         Ok(current_version > new_version)
