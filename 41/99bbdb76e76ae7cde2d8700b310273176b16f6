@@ -1,0 +1,60 @@
+app/src/terminal/input_tests.rs
+  s_6e5dc450e2113a::t_b73f4d03bbd805 9037-9086
+  s_6e5dc450e2113a::t_0fff3c57440631 1730,2073,2123,3901,3983,4034,6909
+crates/onboarding/src/callout/view.rs
+  s_6e5dc450e2113a::t_8cd1978696efbc 116-137
+app/src/ai/blocklist/input_model.rs
+  s_6e5dc450e2113a::t_2128824cebcfc7 508-522
+  s_6e5dc450e2113a::t_f9525f26124b05 524
+app/src/terminal/input.rs
+  s_6e5dc450e2113a::t_7f0dc2de763a65 14013-14021,14078-14083
+  s_6e5dc450e2113a::t_127b99e519530d 14272-14277
+  s_6e5dc450e2113a::t_163ce13c0b94eb 6677-6686
+  s_6e5dc450e2113a::t_60ba6f0e54c8b0 408-412,2008,6275-6279,11486,13523-13527,13529-13532,14278-14280
+app/src/settings/initializer.rs
+  s_6e5dc450e2113a::t_ee532ce3c9691f 89-125
+app/src/settings/ai.rs
+  s_6e5dc450e2113a::t_118909d49bba0b 798-801,803-811,813-819,827,841-857
+.github/workflows/uncaged-ci.yml
+  s_6e5dc450e2113a::t_3a5c26767e05c5 33-38,81-82,88-89
+app/src/settings_view/ai_page.rs
+  s_6e5dc450e2113a::t_37e8b9c3355645 6888-6894
+app/src/ai/blocklist/agent_view/controller.rs
+  s_6e5dc450e2113a::t_cd0bfaf4ee874d 106-112,227-230
+app/src/ai/agent_tips.rs
+  s_6e5dc450e2113a::t_b745803c57da82 97
+app/src/ai/blocklist/agent_view/zero_state_block.rs
+  s_6e5dc450e2113a::t_8bad2089a798f9 741
+app/src/pane_group/mod.rs
+  s_6e5dc450e2113a::t_0417e5d26ae335 1382,7666
+app/src/server/telemetry/events.rs
+  s_6e5dc450e2113a::t_7ecb0347a07a64 1125
+app/src/terminal/model/blocks_tests.rs
+  s_6e5dc450e2113a::t_5c59c526eb1a92 1587,1629,1728
+app/src/terminal/universal_developer_input.rs
+  s_6e5dc450e2113a::t_6fd46efed3df5e 1043-1045
+app/src/terminal/view.rs
+  s_6e5dc450e2113a::t_5ffdace60cd972 3468-3473,3477-3482,12068,20813,21325
+app/src/terminal/view/queued_prompts_tests.rs
+  s_6e5dc450e2113a::t_1d3861774d6d7e 774,822
+app/src/terminal/view/zero_state_block.rs
+  s_6e5dc450e2113a::t_8cbce04fc7ecaf 194
+app/src/terminal/view_tests.rs
+  s_6e5dc450e2113a::t_c478f631c3a304 665,1367,4965,5542,5588,5636,5695,7261,7339,7652,7720
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4199bbdb76e76ae7cde2d8700b310273176b16f6",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
