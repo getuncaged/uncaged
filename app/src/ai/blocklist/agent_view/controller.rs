@@ -103,6 +103,13 @@ pub enum AgentViewEntryOrigin {
     /// Entered agent view from user input (e.g. /agent or cmd-enter keypress).
     Input {
         was_prompt_autodetected: bool,
+        /// Uncaged: the user had deliberately put the input in Agent Mode before pressing Enter,
+        /// rather than the classifier having moved it there.
+        ///
+        /// Kept separate from `was_prompt_autodetected` so that field stays literally true --
+        /// it is also reported as telemetry, and "the user chose this" is not "we guessed this".
+        /// Both mean the submission is intentional, so both auto-send.
+        was_mode_explicitly_chosen: bool,
     },
     PromptChip,
     /// Entered agent view by selecting a conversation (e.g. selector).
@@ -217,7 +224,10 @@ impl AgentViewEntryOrigin {
         match self {
             AgentViewEntryOrigin::Input {
                 was_prompt_autodetected,
-            } if *was_prompt_autodetected => AutoTriggerBehavior::Always,
+                was_mode_explicitly_chosen,
+            } if *was_prompt_autodetected || *was_mode_explicitly_chosen => {
+                AutoTriggerBehavior::Always
+            }
             AgentViewEntryOrigin::SlashCommand { trigger } if !trigger.is_keybinding() => {
                 AutoTriggerBehavior::Always
             }
