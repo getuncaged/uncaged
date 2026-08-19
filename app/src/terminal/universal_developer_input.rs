@@ -615,6 +615,21 @@ impl UniversalDeveloperInputButtonBar {
         me
     }
 
+    /// The Terminal / Agent Mode segments on their own.
+    ///
+    /// Uncaged: the terminal input renders this without the rest of the button bar. With
+    /// `FeatureFlag::AgentView` on -- which is every shipped build -- `Input::render` dispatches to
+    /// `render_terminal_input`, and `render_universal_developer_input`, the only place that draws
+    /// this bar, is unreachable. So the control existed, responded to cmd+I, and was never on
+    /// screen. Exposing the segments alone keeps the input uncluttered while giving the mode a
+    /// visible, clickable home.
+    ///
+    /// The bar view itself stays alive and keeps its subscription to this control, so selecting a
+    /// segment still emits `InputTypeSelected` regardless of whether the bar is rendered.
+    pub fn segmented_control(&self) -> &ViewHandle<SegmentedControl<InputToggleMode>> {
+        &self.segmented_control
+    }
+
     pub fn set_voice_is_listening(&mut self, is_listening: bool, ctx: &mut ViewContext<Self>) {
         self.mic_button.update(ctx, |mic_button, ctx| {
             if is_listening {

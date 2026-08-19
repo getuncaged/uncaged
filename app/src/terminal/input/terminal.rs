@@ -68,6 +68,32 @@ impl Input {
                 .finish(),
         );
 
+        // Uncaged: the input mode toggle.
+        //
+        // Terminal on the left, Agent Mode on the right -- the two segments only, without the rest
+        // of the button bar, because the terminal input is meant to stay quiet. Upstream only ever
+        // draws this control from `render_universal_developer_input`, which `Input::render` cannot
+        // reach while `FeatureFlag::AgentView` is on; since `agent_view` is a default cargo
+        // feature, that is every shipped build. The mode was therefore real and keyboard-reachable
+        // (cmd+I) but had no visible home, which is the whole point of preferring a toggle to a
+        // classifier.
+        column.add_child(
+            Container::new(
+                Flex::row()
+                    .with_child(
+                        ChildView::new(
+                            self.universal_developer_input_button_bar
+                                .as_ref(app)
+                                .segmented_control(),
+                        )
+                        .finish(),
+                    )
+                    .finish(),
+            )
+            .with_margin_top(4.)
+            .finish(),
+        );
+
         if should_show_terminal_input_message_bar(&model, app) {
             column.add_child(
                 Clipped::new(ChildView::new(&self.terminal_input_message_bar).finish()).finish(),
