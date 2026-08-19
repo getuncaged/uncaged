@@ -1,0 +1,19 @@
+app/src/ai/blocklist/block/secret_redaction_tests.rs
+  s_6e5dc450e2113a::t_b6d106e0b1923f 309-316,318,320-325
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "acaaa87ffcba61b38506a97ad413ebbd6c3e3bfd",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "unknown"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
