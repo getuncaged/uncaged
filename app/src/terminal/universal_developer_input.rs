@@ -1040,7 +1040,9 @@ fn build_renderable_option_config(
 }
 
 const AGENT_MODE_TOOLTIP_PREFIX: &str = "* + space";
-const TERMINAL_MODE_TOOLTIP_PREFIX: &str = "! + space";
+// `TERMINAL_INPUT_PREFIX` is "!" with no trailing space, unlike `AI_INPUT_PREFIX` ("* "),
+// so the tooltip must not promise a space that the matcher does not want.
+const TERMINAL_MODE_TOOLTIP_PREFIX: &str = "!";
 
 fn agent_mode_tooltip_subtext(terminal_keybindings: &TerminalKeybindings) -> String {
     let keybinding = terminal_keybindings.set_input_mode_agent_keybinding();

@@ -405,6 +405,11 @@ pub const AI_COMMAND_SEARCH_HINT_TEXT: &str = "Type '#' for AI command suggestio
 
 const AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT: &str = "Run commands";
 
+/// Uncaged: the same resting state, but with AI available. The mode segments are icon-only
+/// and the agent trigger is invisible until you know about it, so the placeholder is the one
+/// place a new user reliably looks that can mention either.
+const TERMINAL_MODE_WITH_AGENT_HINT_TEXT: &str = "Run commands — > sends a line to the agent";
+
 // Rotating hint text options for new Agent Mode conversations
 const AGENT_MODE_HINT_OPTIONS: &[&str] = &[
     "Ask anything e.g. Deploy my React app to Vercel and set up environment variables",
@@ -2000,6 +2005,7 @@ pub fn init(app: &mut AppContext) {
             InputAction::StartNewAgentConversation {
                 origin: AgentViewEntryOrigin::Input {
                     was_prompt_autodetected: false,
+                    was_mode_explicitly_chosen: false,
                 },
             },
         )
@@ -6266,7 +6272,11 @@ impl Input {
             input_model.should_run_input_autodetection(app),
         ) {
             (InputType::Shell, false) => {
-                AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT.to_owned()
+                if AISettings::as_ref(app).is_any_ai_enabled(app) {
+                    TERMINAL_MODE_WITH_AGENT_HINT_TEXT.to_owned()
+                } else {
+                    AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT.to_owned()
+                }
             }
             (InputType::Shell, true) => {
                 // Ensure hint text is cached for new conversations
@@ -6664,11 +6674,16 @@ impl Input {
         let ai_input_model = self.ai_input_model.as_ref(ctx);
         let config = ai_input_model.input_config();
 
-        // Don't force agent mode if user has explicitly locked to Shell mode
-        if (!should_override_shell_lock || FeatureFlag::AgentView.is_enabled())
-            && config.is_locked
-            && !config.input_type.is_ai()
-        {
+        // Don't force agent mode if user has explicitly locked to Shell mode.
+        //
+        // Uncaged: honour `should_override_shell_lock` again. The `|| AgentView.is_enabled()`
+        // clause neutralised it, which was survivable while the terminal input spent most of its
+        // life unlocked -- but Uncaged locks to Shell as the resting state, so that clause turned
+        // "attach a file" and drag-and-drop into no-ops: the attachment landed while the input
+        // stayed in Terminal mode, and the attachment is only meaningful to the agent. Callers
+        // that pass `true` here (select_image, the attachment pattern) are acting on an explicit
+        // user gesture, which is exactly the case the flag exists to express.
+        if !should_override_shell_lock && config.is_locked && !config.input_type.is_ai() {
             return;
         }
         self.enter_ai_mode(decision_source, ctx);
@@ -10004,11 +10019,18 @@ impl Input {
                 });
 
                 // Force AI mode if buffer contains any attachment patterns (blocks, drive objects, diffs)
+                //
+                // Uncaged: overrides a Shell lock. `edit_origin.is_user()` above already
+                // establishes that a person put this in the buffer, and a `<plan:…>` reference or
+                // an attached diff is only meaningful to the agent -- leaving the input in Terminal
+                // sends it to the shell as literal text. This used to be reached with the input
+                // usually unlocked; locked Shell is now the resting state, so passing `false` here
+                // would mean attachments silently stopped switching modes.
                 if AISettings::as_ref(ctx).is_any_ai_enabled(ctx) && edit_origin.is_user() {
                     let buffer_text = self.buffer_text(ctx);
                     if Self::buffer_contains_attachment_patterns(&buffer_text) {
                         self.ensure_agent_mode_for_ai_features(
-                            false,
+                            true,
                             Some(InputTypeAutoDetectionSource::AttachmentForcedAi),
                             ctx,
                         );
@@ -11468,6 +11490,7 @@ impl Input {
                     // AgentView is enabled.
                     AgentViewEntryOrigin::Input {
                         was_prompt_autodetected: false,
+                        was_mode_explicitly_chosen: false,
                     },
                     ctx,
                 );
@@ -13504,8 +13527,16 @@ impl Input {
                 return;
             }
 
+            // Uncaged: gate on the context-correct predicate. `is_ai_autodetection_enabled` is the
+            // *agent view* setting; this is a terminal execution, which is governed by
+            // `nld_in_terminal_enabled`. Reading the wrong one meant a classification future
+            // spawned from the pre-submit buffer could outlive the execute and flip the input type
+            // afterwards.
             if FeatureFlag::AgentMode.is_enabled()
-                && AISettings::as_ref(ctx).is_ai_autodetection_enabled(ctx)
+                && self
+                    .ai_input_model
+                    .as_ref(ctx)
+                    .should_run_input_autodetection(ctx)
             {
                 self.ai_input_model.update(ctx, |input, ctx| {
                     input.abort_in_progress_detection();
@@ -13986,7 +14017,15 @@ impl Input {
 
         // A shell-mode submission queues as a command; an AI-mode submission queues as a prompt.
         // Command queueing is gated on the V2 surface.
-        let is_command = !self.ai_input_model.as_ref(ctx).is_ai_input_enabled();
+        //
+        // Uncaged: the agent trigger counts as an AI submission. This runs ahead of the trigger
+        // branch in `input_enter`, so without this check a `> why did that fail` typed while a
+        // conversation is in progress would be queued as a *shell command*, `>` and all --
+        // exactly the case the trigger exists to serve.
+        let agent_trigger =
+            self.agent_trigger_prompt(&self.editor.as_ref(ctx).buffer_text(ctx), ctx);
+        let is_command =
+            !self.ai_input_model.as_ref(ctx).is_ai_input_enabled() && agent_trigger.is_none();
         if is_command && !FeatureFlag::QueuedPromptsV2.is_enabled() {
             return false;
         }
@@ -14043,7 +14082,12 @@ impl Input {
             return false;
         }
 
-        let prompt = self.editor.as_ref(ctx).buffer_text(ctx);
+        // Uncaged: when the agent trigger fired, queue what the user meant to say, not the
+        // trigger character with it.
+        let prompt = match agent_trigger {
+            Some(stripped) => stripped,
+            None => self.editor.as_ref(ctx).buffer_text(ctx),
+        };
         if prompt.is_empty() {
             return false;
         }
@@ -14229,6 +14273,15 @@ impl Input {
                 conversation_id: None,
                 origin: AgentViewEntryOrigin::Input {
                     was_prompt_autodetected: !self
+                        .ai_input_model
+                        .as_ref(ctx)
+                        .is_input_type_locked(),
+                    // Uncaged: pressing Enter on an input the user deliberately put in Agent Mode
+                    // is as explicit as a submission gets, so it auto-sends rather than landing in
+                    // the agent view as a draft awaiting a second Enter. Without this, flipping the
+                    // toggle on and hitting Enter took two presses -- which is not "the toggle is
+                    // on, so this is a prompt".
+                    was_mode_explicitly_chosen: self
                         .ai_input_model
                         .as_ref(ctx)
                         .is_input_type_locked(),
