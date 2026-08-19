@@ -3465,10 +3465,21 @@ impl TerminalView {
             );
 
             // If NLD is disabled, restore any input config that was saved.
+            //
+            // Uncaged: force the restored config locked. A pane snapshotted while autodetection
+            // was still on can carry `is_locked: false`, and restoring that verbatim leaves the
+            // model in a state the two-segment control cannot represent -- `InputToggleMode::from`
+            // maps it to `AutoDetection`, which renders no segment at all, so the toggle would
+            // come back from a restart showing neither mode selected.
             if !model.is_autodetection_enabled_for_current_context(ctx) {
                 if let Some(input_config) = initial_input_config {
                     let is_input_buffer_empty = true;
-                    model.set_input_config(input_config, is_input_buffer_empty, None, ctx);
+                    model.set_input_config(
+                        input_config.locked(),
+                        is_input_buffer_empty,
+                        Some(InputTypeAutoDetectionSource::RestoreSavedConfig),
+                        ctx,
+                    );
                 }
             }
             model
@@ -12054,6 +12065,7 @@ impl TerminalView {
                                     None,
                                     AgentViewEntryOrigin::Input {
                                         was_prompt_autodetected: false,
+                                        was_mode_explicitly_chosen: false,
                                     },
                                     ctx,
                                 );
@@ -20798,6 +20810,11 @@ impl TerminalView {
                 Some(prompt),
                 AgentViewEntryOrigin::Input {
                     was_prompt_autodetected: false,
+                    // Uncaged: the user picked a menu item that reads "Ask agent to fix this".
+                    // Staging that behind a second Enter asks them to confirm a thing they just
+                    // asked for -- and it is now the main way to reach the agent about a failed
+                    // command with the input toggle sitting in Terminal.
+                    was_mode_explicitly_chosen: true,
                 },
                 ctx,
             );
@@ -21309,6 +21326,7 @@ impl TerminalView {
             InputEvent::ExitCloudModeAndStartLocalAgent { initial_prompt } => {
                 let origin = AgentViewEntryOrigin::Input {
                     was_prompt_autodetected: false,
+                    was_mode_explicitly_chosen: false,
                 };
                 let initial_prompt = initial_prompt.clone();
 

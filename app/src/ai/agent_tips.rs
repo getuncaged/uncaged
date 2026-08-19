@@ -94,7 +94,7 @@ static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
             kind: AgentTipKind::SlashCommands,
         },
         AgentTip {
-            description: "<keybinding> to toggle natural language detection and switch between agent and terminal input.".to_string(),
+            description: "<keybinding> to switch the input between Terminal and Agent Mode.".to_string(),
             link: Some(crate::brand::README_URL.to_string()),
             binding_name: Some(SET_INPUT_MODE_AGENT_ACTION_NAME),
             action: None,

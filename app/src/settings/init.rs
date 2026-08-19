@@ -120,6 +120,11 @@ pub fn init(
 
     register_all_settings(ctx);
 
+    // Uncaged: one-time reset of input autodetection. Must run here rather than beside the
+    // upstream migrations in `SettingsInitializer::handle_user_fetched`, which never executes in
+    // an account-free build. See the function's own docs.
+    super::initializer::apply_uncaged_autodetection_reset(ctx);
+
     // One-time migration: copy public settings from the platform-native store
     // into the TOML file so existing users don't lose their customizations
     // when the settings file feature is first enabled.
