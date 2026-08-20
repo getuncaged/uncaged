@@ -1,6 +1,7 @@
 mod changelog;
 mod channel_versions;
 pub mod github_releases;
+pub mod install_source;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "macos")]
@@ -431,30 +432,6 @@ impl AutoupdateState {
         }
 
         let update_available = version.map(|version| self.should_update(version, update_id));
-
-        // Uncaged finds releases; it does not install them.
-        //
-        // Whatever the check concluded, land on the state that means "there is a
-        // newer version and you should go get it" — the same one upstream uses
-        // when it knows about an update it cannot apply. That already has a
-        // banner and a button; the button opens our releases page (see
-        // `manually_download_version`). Nothing is downloaded and the app never
-        // replaces its own bundle, which on an ad-hoc-signed build it could not
-        // do safely anyway.
-        if matches!(ChannelState::channel(), Channel::Oss) {
-            if let Ok(
-                UpdateReady::Yes { new_version, .. } | UpdateReady::CanDownload { new_version, .. },
-            ) = &update_available
-            {
-                log::info!("Uncaged {} is available", new_version.version);
-                self.stage = AutoupdateStage::UnableToUpdateToNewVersion {
-                    new_version: new_version.clone(),
-                };
-                ctx.notify();
-                return;
-            }
-        }
-
         match &update_available {
             Ok(UpdateReady::CanDownload {
                 new_version,
@@ -555,6 +532,18 @@ impl AutoupdateState {
         ctx: &mut ModelContext<AutoupdateState>,
     ) {
         let was_update_available = match download_ready {
+            Ok(DownloadReady::AlreadyUpgradedPendingRestart) => {
+                log::info!("Package manager upgrade finished; awaiting relaunch");
+                self.stage = AutoupdateStage::UpdatedPendingRestart {
+                    new_version: new_version.clone(),
+                };
+                // `UpdateReady::No` rather than `Yes`: `Yes` carries an `update_id` naming a
+                // bundle we staged and are about to swap in, and there isn't one -- the
+                // package manager already put the new version on disk. Claiming otherwise
+                // would point the relaunch at a staging directory that was never created.
+                // The banner is driven by the stage above, which is already correct.
+                Ok(UpdateReady::No)
+            }
             Ok(DownloadReady::Yes) => {
                 self.clear_old_autoupdate_dirs(&update_id, ctx);
                 self.downloaded_update = Some(DownloadedUpdate {
@@ -741,6 +730,10 @@ pub enum UpdateReady {
 pub enum DownloadReady {
     /// The update was downloaded successfully.
     Yes,
+    /// Uncaged: a package manager owns this install and has already been asked to
+    /// upgrade it, successfully. The new bundle is on disk; all that is left is a
+    /// relaunch, which is exactly what `UpdatedPendingRestart` means.
+    AlreadyUpgradedPendingRestart,
     /// There were insufficient permissions to download the update.
     #[cfg_attr(windows, allow(dead_code))]
     NeedsAuthorization,
