@@ -177,15 +177,25 @@ impl Input {
         .with_margin_top(margin_top)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)));
 
-        // Apply styling based on focus state
-        if self.is_pane_focused(app) {
-            // Focused: show background
-            container = container
-                .with_background(internal_colors::fg_overlay_1(theme))
-                .with_border(Border::all(1.).with_border_fill(theme.outline()));
-        } else {
-            // Unfocused: no background
-            container = container.with_border(Border::all(1.).with_border_fill(theme.outline()));
+        // Uncaged: the composer box belongs to Agent Mode, not to the terminal.
+        //
+        // A bordered, inset, rounded panel reads as a chat composer -- which is right when
+        // you are writing a prompt, and wrong when you are typing a shell command. A
+        // terminal prompt should sit flush against the output above it, the way every other
+        // terminal does. The box therefore follows the mode, like everything else on this
+        // surface.
+        let is_ai_mode = matches!(self.ai_input_model.as_ref(app).input_type(), InputType::AI);
+        if is_ai_mode {
+            if self.is_pane_focused(app) {
+                // Focused: show background
+                container = container
+                    .with_background(internal_colors::fg_overlay_1(theme))
+                    .with_border(Border::all(1.).with_border_fill(theme.outline()));
+            } else {
+                // Unfocused: no background
+                container =
+                    container.with_border(Border::all(1.).with_border_fill(theme.outline()));
+            }
         }
 
         let drop_target = DropTarget::new(

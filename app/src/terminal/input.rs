@@ -3566,6 +3566,16 @@ impl Input {
             match event {
                 BlocklistAIInputEvent::InputTypeChanged { .. }
                 | BlocklistAIInputEvent::LockChanged { .. } => {
+                    // Uncaged: the button bar drops its agent tooling in Terminal mode, and
+                    // it cannot see the input model from `render`, so push the mode across
+                    // whenever it changes.
+                    let is_ai_mode =
+                        matches!(me.ai_input_model.as_ref(ctx).input_type(), InputType::AI);
+                    me.universal_developer_input_button_bar
+                        .update(ctx, |button_bar, ctx| {
+                            button_bar.set_is_ai_mode(is_ai_mode, ctx);
+                        });
+
                     // Close slash command menu if we're now in locked shell mode
                     if me.is_locked_in_shell_mode(ctx)
                         && me.suggestions_mode_model.as_ref(ctx).is_slash_commands()
