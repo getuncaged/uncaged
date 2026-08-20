@@ -1166,7 +1166,7 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> View for InlineMenuView<A, T
                         .with_border_fill(if self.agent_view_controller.as_ref(app).is_active() {
                             input::agent::styles::default_border_color(theme)
                         } else {
-                            input::terminal::styles::default_border_color(theme)
+                            input::agent::styles::default_border_color(theme)
                         }),
                 )
                 .finish(),
