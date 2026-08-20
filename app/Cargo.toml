@@ -595,8 +595,8 @@ default = [
     "mcp_grouped_server_context",
     "fork_from_command",
     "context_window_usage_v2",
-    "ambient_agents_command_line",
-    "ambient_agents_image_upload",
+    # "ambient_agents_command_line",  # Uncaged: needs Warp servers
+    # "ambient_agents_image_upload",  # Uncaged: needs Warp servers
     # "scheduled_ambient_agents",  # Uncaged: needs Warp servers
     # "warp_managed_secrets",  # Uncaged: needs Warp servers
     "v4a_file_diffs",
@@ -612,7 +612,7 @@ default = [
     "list_skills",
     "ask_user_question",
     "bundled_skills",
-    "ambient_agents_rtc",
+    # "ambient_agents_rtc",  # Uncaged: needs Warp servers
     # Uncaged: cloud-agent modes disabled (no account, no Warp cloud).
     # "cloud_mode",
     # "cloud_mode_from_local_session",
@@ -630,12 +630,12 @@ default = [
     "inline_model_selector",
     "oz_launch_modal",
     "open_warp_launch_modal",
-    "orchestration_launch_modal",
+    # "orchestration_launch_modal",  # Uncaged: needs Warp servers
     "new_tab_styling",
     "richtext_multiselect",
     "inline_profile_selector",
     "web_fetch_ui",
-    "oz_changelog_updates",
+    # "oz_changelog_updates",  # Uncaged: needs Warp servers
     "skill_arguments",
     "incremental_auto_reload",
     "active_conversation_requires_interaction",
@@ -682,8 +682,8 @@ default = [
     # "oz_handoff",
     # "handoff_local_cloud",
     "run_agents_tool",
-    "orchestration_viewer_streamer",
-    "owner_orchestration_ancestor_streamer",
+    # "orchestration_viewer_streamer",  # Uncaged: needs Warp servers
+    # "owner_orchestration_ancestor_streamer",  # Uncaged: needs Warp servers
     "pending_user_query_indicator",
     "queue_slash_command",
     "queued_prompts_v2",
