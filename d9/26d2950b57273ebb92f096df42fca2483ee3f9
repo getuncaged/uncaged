@@ -1,0 +1,23 @@
+app/src/lib.rs
+  s_6e5dc450e2113a::t_da0636a8f990fe 1724-1731
+app/src/settings/import/view.rs
+  s_6e5dc450e2113a::t_c4c410edd9e08b 124-134
+app/src/terminal/view/zero_state_block.rs
+  s_6e5dc450e2113a::t_2eccdf9da31e7e 126-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "d926d2950b57273ebb92f096df42fca2483ee3f9",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "unknown"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
