@@ -1,0 +1,26 @@
+app/src/terminal/input.rs
+  s_6e5dc450e2113a::t_3386f801a2d959 3569-3578
+app/src/terminal/input/universal.rs
+  s_6e5dc450e2113a::t_72dd3b0f55a192 180-198
+app/src/terminal/universal_developer_input.rs
+  s_6e5dc450e2113a::t_5117d33678ffb9 652-662
+  s_6e5dc450e2113a::t_2fe7842e6a4b0a 284-290
+  s_6e5dc450e2113a::t_1d256b553d46f9 461
+  s_6e5dc450e2113a::t_5a108b2a32eb36 860-870
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "293f031c4fdab94e254c4924d207105f07eee03e",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
