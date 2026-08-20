@@ -22165,9 +22165,14 @@ impl Workspace {
             // neither, but Warning is by far the softer of the two.
             severity: BannerSeverity::Warning,
             heading: None,
-            description: "Check GitHub for new Uncaged releases? Nothing is sent about you, \
-                          and Uncaged won't install anything — it will tell you when a version \
-                          is out and link you to it."
+            // This is the only place the user is asked, so it has to describe what actually
+            // happens. It previously promised Uncaged "won't install anything" -- true of
+            // the earlier detect-and-link design, and false the moment updates began
+            // installing. A consent prompt that misdescribes the thing being consented to
+            // is worse than none.
+            description: "Check GitHub for new Uncaged releases and install them? Nothing \
+                          is sent about you. Updates are verified against the checksum \
+                          GitHub publishes, and Uncaged asks before restarting."
                 .to_owned(),
             secondary_button: Some(WorkspaceBannerButtonDetails {
                 text: "No thanks".to_owned(),

@@ -14,7 +14,9 @@ We will acknowledge your report and work with you to understand and resolve the 
 
 ## Privacy & data handling
 
-Uncaged is designed so that your prompts and terminal data never leave your machine except to reach the model endpoint you configure yourself. There are no accounts, no login, no telemetry, no analytics, no cloud sync, and no autoupdate or phone-home. The only outbound network traffic is to the model provider or local runtime you connect in **Settings → AI Models**. Configuration is stored locally in `~/.uncaged/`.
+Uncaged is designed so that your prompts and terminal data never leave your machine except to reach the model endpoint you configure yourself. There are no accounts, no login, no telemetry, no analytics, and no cloud sync.
+
+Outbound traffic is limited to two things: the model provider or local runtime you connect in **Settings → AI Models**, and — only if you turn it on — update checks against GitHub, described in the next section. Nothing identifying you is sent in either case. Configuration is stored locally in `~/.uncaged/`.
 
 ## How updates are trusted (and what that does not cover)
 
