@@ -1,0 +1,23 @@
+crates/warp_files/src/lib.rs
+  s_6e5dc450e2113a::t_0f46c4326aa8b5 302-305
+app/src/warp_managed_paths_watcher.rs
+  s_6e5dc450e2113a::t_0f46c4326aa8b5 19-25
+crates/watcher/src/home_watcher.rs
+  s_6e5dc450e2113a::t_0f46c4326aa8b5 10-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "68fc0a8eb102a72fd842a734c57ffb4fa4cdb204",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
