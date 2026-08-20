@@ -55,7 +55,30 @@ impl Input {
             .prompt_render_helper
             .render_universal_developer_input_prompt(&model, appearance, app);
 
-        column.add_child(prompt_elements);
+        // Uncaged: the mode toggle sits on the prompt row, beside the directory chip.
+        //
+        // It was below the input, next to the "new /agent conversation" hint, which put it
+        // among things that describe what a key does rather than among things you click.
+        // Up here it is the first control on the line you already look at to see where you
+        // are, and it does not cost a row.
+        column.add_child(
+            Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(
+                    Container::new(
+                        ChildView::new(
+                            self.universal_developer_input_button_bar
+                                .as_ref(app)
+                                .segmented_control(),
+                        )
+                        .finish(),
+                    )
+                    .with_margin_right(spacing::UDI_CHIP_MARGIN)
+                    .finish(),
+                )
+                .with_child(prompt_elements)
+                .finish(),
+        );
 
         let terminal_spacing = TerminalSettings::as_ref(app)
             .terminal_input_spacing(appearance.line_height_ratio(), app);
@@ -77,51 +100,23 @@ impl Input {
         // feature, that is every shipped build. The mode was therefore real and keyboard-reachable
         // (cmd+I) but had no visible home, which is the whole point of preferring a toggle to a
         // classifier.
-        // One control row, not two stacked ones. The mode you are in and what the current
-        // key does are the same kind of information and belong on the same line; giving
-        // each its own row put three bands of chrome under an input that is supposed to
-        // stay quiet.
-        let show_message_bar = should_show_terminal_input_message_bar(&model, app);
-        let mut controls = Flex::row()
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(
-                ChildView::new(
-                    self.universal_developer_input_button_bar
-                        .as_ref(app)
-                        .segmented_control(),
-                )
-                .finish(),
+        // The toggle moved up to the prompt row, so this is the message bar alone again.
+        if should_show_terminal_input_message_bar(&model, app) {
+            column.add_child(
+                Clipped::new(ChildView::new(&self.terminal_input_message_bar).finish()).finish(),
             );
-
-        if show_message_bar {
-            controls = controls.with_child(
-                Container::new(
-                    Shrinkable::new(
-                        1.,
-                        Clipped::new(ChildView::new(&self.terminal_input_message_bar).finish())
-                            .finish(),
-                    )
-                    .finish(),
-                )
-                .with_margin_left(spacing::UDI_CHIP_MARGIN)
-                .finish(),
-            );
-        }
-
-        // The trailing gap belonged to the spacer this replaces. Skip it in the one case
-        // upstream did: an inline menu opening directly beneath a top-pinned input, where
-        // the extra space reads as a break between the input and its own menu.
-        let suppress_gap = matches!(input_mode, InputMode::PinnedToTop)
+        } else if !(matches!(input_mode, InputMode::PinnedToTop)
             && self
                 .suggestions_mode_model
                 .as_ref(app)
-                .is_inline_menu_open();
-
-        let mut controls_container = Container::new(controls.finish()).with_margin_top(4.);
-        if !suppress_gap {
-            controls_container = controls_container.with_margin_bottom(8.);
+                .is_inline_menu_open())
+        {
+            column.add_child(
+                Container::new(Flex::row().finish())
+                    .with_margin_bottom(8.)
+                    .finish(),
+            );
         }
-        column.add_child(controls_container.finish());
 
         if matches!(input_mode, InputMode::PinnedToTop) {
             if let Some(banner) = self.render_input_banner(appearance, app, input_mode, false) {

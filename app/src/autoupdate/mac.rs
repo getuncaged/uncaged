@@ -19,6 +19,7 @@ use nix::errno::Errno;
 use nix::unistd::{fchown, getgid, getuid};
 use warp_core::macos::get_bundle_path;
 use warp_core::safe_error;
+use warpui::platform::TerminationMode;
 use warpui::{AppContext, ModelContext, SingletonEntity};
 
 use super::github_releases;
@@ -135,6 +136,26 @@ where
                             AppearanceManager::as_ref(ctx).set_app_icon(ctx);
                         }
                         autoupdate_state.clear_downloaded_update(&update_id_clone, ctx);
+
+                        // Uncaged: actually quit, having spawned the updater.
+                        //
+                        // Without this the app spawned the script and carried on running.
+                        // The script's first act is to wait for this process to exit, so it
+                        // sat out its timeout and then replaced a bundle that was still in
+                        // use, while the app -- unchanged, still the old version -- went on
+                        // offering "Update and relaunch". Clicking it again spawned another
+                        // updater. That is the loop.
+                        //
+                        // ForceTerminate rather than Cancellable: the user has already
+                        // answered the question this would ask, by pressing the button that
+                        // says the app is about to restart. The script relaunches us, so
+                        // upstream's own relaunch machinery is deliberately not involved.
+                        if result.is_ok() && matches!(ChannelState::channel(), Channel::Oss) {
+                            log::info!("Updater spawned; terminating so it can swap the bundle");
+                            ctx.terminate_app(TerminationMode::ForceTerminate, None);
+                            return;
+                        }
+
                         callback(autoupdate_state, result, ctx);
                     },
                 );
