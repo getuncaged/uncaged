@@ -240,49 +240,9 @@ impl Input {
 
         let mut column = Flex::column();
 
-        if self
-            .suggestions_mode_model
-            .as_ref(app)
-            .is_inline_model_selector()
-        {
-            column.add_child(ChildView::new(&self.inline_model_selector_view).finish());
-        } else if FeatureFlag::InlineProfileSelector.is_enabled()
-            && self
-                .suggestions_mode_model
-                .as_ref(app)
-                .is_profile_selector()
-        {
-            column.add_child(ChildView::new(&self.inline_profile_selector_view).finish());
-        } else if self.suggestions_mode_model.as_ref(app).is_slash_commands()
-            && !self.is_cloud_mode_input_v2_composing(app)
-        {
-            column.add_child(ChildView::new(&self.inline_slash_commands_view).finish());
-        } else if self.suggestions_mode_model.as_ref(app).is_prompts_menu() {
-            column.add_child(ChildView::new(&self.inline_prompts_menu_view).finish());
-        } else if self
-            .suggestions_mode_model
-            .as_ref(app)
-            .is_conversation_menu()
-        {
-            column.add_child(ChildView::new(&self.inline_conversation_menu_view).finish());
-        } else if FeatureFlag::ListSkills.is_enabled()
-            && self.suggestions_mode_model.as_ref(app).is_skill_menu()
-        {
-            column.add_child(ChildView::new(&self.inline_skill_selector_view).finish());
-        } else if self.suggestions_mode_model.as_ref(app).is_user_query_menu() {
-            column.add_child(ChildView::new(&self.user_query_menu_view).finish());
-        } else if self.suggestions_mode_model.as_ref(app).is_rewind_menu() {
-            column.add_child(ChildView::new(&self.rewind_menu_view).finish());
-        } else if self
-            .suggestions_mode_model
-            .as_ref(app)
-            .is_inline_history_menu()
-        {
-            column.add_child(ChildView::new(&self.inline_history_menu_view).finish());
-        } else if self.suggestions_mode_model.as_ref(app).is_repos_menu() {
-            column.add_child(ChildView::new(&self.inline_repos_menu_view).finish());
-        } else if self.suggestions_mode_model.as_ref(app).is_plan_menu() {
-            column.add_child(ChildView::new(&self.inline_plan_menu_view).finish());
+        // Uncaged: shared with every other input surface -- see `render_active_inline_menu`.
+        if let Some(menu) = self.render_active_inline_menu(app) {
+            column.add_child(menu);
         }
 
         if self

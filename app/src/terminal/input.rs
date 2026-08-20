@@ -6233,6 +6233,42 @@ impl Input {
         &self.input_suggestions
     }
 
+    /// The inline menu the input's suggestion mode currently calls for, if any.
+    ///
+    /// Uncaged: one selector for every surface. This chain existed only inside
+    /// `render_agent_input`, so slash commands, prompts, rewind, plan and the rest rendered
+    /// their menus in the agent view and nowhere else -- the terminal surface set the mode
+    /// on "/" and then drew nothing, which reads as the key doing nothing. Each surface
+    /// decides where to place the menu; this decides what it is.
+    pub(super) fn render_active_inline_menu(&self, app: &AppContext) -> Option<Box<dyn Element>> {
+        let mode = self.suggestions_mode_model.as_ref(app);
+        if mode.is_inline_model_selector() {
+            Some(ChildView::new(&self.inline_model_selector_view).finish())
+        } else if FeatureFlag::InlineProfileSelector.is_enabled() && mode.is_profile_selector() {
+            Some(ChildView::new(&self.inline_profile_selector_view).finish())
+        } else if mode.is_slash_commands() && !self.is_cloud_mode_input_v2_composing(app) {
+            Some(ChildView::new(&self.inline_slash_commands_view).finish())
+        } else if mode.is_prompts_menu() {
+            Some(ChildView::new(&self.inline_prompts_menu_view).finish())
+        } else if mode.is_conversation_menu() {
+            Some(ChildView::new(&self.inline_conversation_menu_view).finish())
+        } else if FeatureFlag::ListSkills.is_enabled() && mode.is_skill_menu() {
+            Some(ChildView::new(&self.inline_skill_selector_view).finish())
+        } else if mode.is_user_query_menu() {
+            Some(ChildView::new(&self.user_query_menu_view).finish())
+        } else if mode.is_rewind_menu() {
+            Some(ChildView::new(&self.rewind_menu_view).finish())
+        } else if mode.is_inline_history_menu() {
+            Some(ChildView::new(&self.inline_history_menu_view).finish())
+        } else if mode.is_repos_menu() {
+            Some(ChildView::new(&self.inline_repos_menu_view).finish())
+        } else if mode.is_plan_menu() {
+            Some(ChildView::new(&self.inline_plan_menu_view).finish())
+        } else {
+            None
+        }
+    }
+
     pub fn suggestions_mode_model(&self) -> &ModelHandle<InputSuggestionsModeModel> {
         &self.suggestions_mode_model
     }

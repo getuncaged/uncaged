@@ -215,11 +215,31 @@ impl Input {
 
         let mut column = Flex::column();
 
+        // Uncaged: the inline menus (slash commands, prompts, rewind, plan, history, ...)
+        // render on this surface too. The selector chain lived only in `render_agent_input`,
+        // so on the terminal surface "/" set the suggestion mode and then nothing appeared.
+        // The menu sits between the input and the block list, whichever side that is.
+        let inline_menu = if self
+            .inline_terminal_menu_positioner
+            .as_ref(app)
+            .should_hide_inline_menu_for_pane_size(app)
+        {
+            None
+        } else {
+            self.render_active_inline_menu(app)
+        };
+
         if input_mode.is_pinned_to_top() {
             column.add_child(input);
+            if let Some(menu) = inline_menu {
+                column.add_child(menu);
+            }
             column.add_child(ChildView::new(&self.agent_status_view).finish());
         } else {
             column.add_child(ChildView::new(&self.agent_status_view).finish());
+            if let Some(menu) = inline_menu {
+                column.add_child(menu);
+            }
             column.add_child(input);
         }
 
