@@ -108,6 +108,20 @@ where
                 // Apply the update in a background thread.
                 ctx.spawn(
                     async move {
+                        // Uncaged: hand the install to the bundled CLI updater and quit.
+                        //
+                        // A running app cannot cleanly replace the bundle it is executing
+                        // from -- every approach is a workaround for holding the directory
+                        // open, and each one can leave a half-updated install behind. The
+                        // script outlives us: it waits for this process to exit, swaps the
+                        // bundle, and relaunches. It is also the same command a user can run
+                        // by hand, so the update path is inspectable rather than a black box
+                        // inside the app.
+                        if matches!(ChannelState::channel(), Channel::Oss) {
+                            spawn_cli_updater()?;
+                            return Ok(Some(new_version));
+                        }
+
                         let result =
                             apply_update(ChannelState::channel(), &new_version, &update_id)
                                 .await
@@ -559,6 +573,18 @@ async fn download_and_extract_binary(
     // arrived from GitHub has them; anything else is not an Uncaged self-update
     // and must not be intercepted here. Branching on the channel instead would
     // make this depend on the developer's own Homebrew state under test.
+    // Uncaged: nothing to download here -- the bundled CLI updater does the downloading,
+    // verifying and installing after we quit, so fetching the same dmg into a staging
+    // directory first would just be a second copy nobody reads. Report readiness and let
+    // the banner offer the restart that hands over to the script.
+    if matches!(channel, Channel::Oss) {
+        log::info!(
+            "Update {} available; the CLI updater will install it on restart",
+            version_info.version
+        );
+        return Ok(DownloadReady::Yes);
+    }
+
     if !version_info.assets.is_empty() {
         let source = install_source::detect();
         if !source.may_self_update() {
@@ -884,4 +910,38 @@ async fn run_package_manager_upgrade(command: &[String]) -> Result<DownloadReady
         String::from_utf8_lossy(&output.stderr).trim()
     );
     Ok(DownloadReady::NeedsAuthorization)
+}
+
+/// Path to the CLI updater shipped inside the bundle.
+fn cli_updater_path() -> Result<PathBuf> {
+    Ok(PathBuf::from(get_bundle_path()?).join("Contents/Resources/bin/uncaged-update"))
+}
+
+/// Starts the bundled updater detached and asks it to relaunch us when it is done.
+///
+/// Deliberately fire-and-forget: the script's first act is to wait for this process to
+/// exit, so anything that blocked on it would deadlock. `--restart` makes the relaunch the
+/// script's job rather than ours, for the same reason -- we will not be here.
+fn spawn_cli_updater() -> Result<()> {
+    let script = cli_updater_path()?;
+    anyhow::ensure!(
+        script.exists(),
+        "bundled updater missing at {}",
+        script.display()
+    );
+
+    blocking::Command::new("/bin/bash")
+        .arg(&script)
+        .arg("--restart")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .with_context(|| format!("spawning {}", script.display()))?;
+
+    log::info!(
+        "Spawned {} --restart; quitting so it can swap the bundle",
+        script.display()
+    );
+    Ok(())
 }

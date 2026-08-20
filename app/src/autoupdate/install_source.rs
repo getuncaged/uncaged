@@ -80,19 +80,30 @@ impl InstallSource {
     }
 }
 
-/// Detects how this copy was installed.
+/// Where a Homebrew cask's `app` stanza puts the bundle.
+const CASK_APP_PATH: &str = "/Applications/Uncaged.app";
+
+/// Detects how *this running copy* was installed.
 pub fn detect() -> InstallSource {
     detect_with(
         |name| std::env::var(name).ok(),
         BREW_PREFIXES.iter().map(Path::new),
+        warp_core::macos::get_bundle_path().ok().map(PathBuf::from),
     )
 }
 
 /// The testable core: `env` resolves an environment variable, `prefixes` are the
-/// Homebrew roots to look under.
+/// Homebrew roots to look under, `running_bundle` is the path of the bundle asking.
+///
+/// `running_bundle` matters. A receipt says Homebrew installed *a* copy of Uncaged; it
+/// says nothing about which copy is running. Without this check, a build run from a
+/// worktree, or a `.dmg` copy anywhere else on a machine that also has the cask, would
+/// conclude Homebrew owns it and run `brew upgrade` -- upgrading a different
+/// installation, leaving itself untouched, and then claiming a relaunch would help.
 fn detect_with<'a>(
     env: impl Fn(&str) -> Option<String>,
     prefixes: impl Iterator<Item = &'a Path>,
+    running_bundle: Option<PathBuf>,
 ) -> InstallSource {
     // An empty value is not an opt-out: `UNCAGED_DISABLE_SELF_UPDATE=` left in a
     // shell profile would otherwise disable updates forever with no way for the
@@ -100,6 +111,16 @@ fn detect_with<'a>(
     if env(DISABLE_ENV).is_some_and(|v| !v.trim().is_empty()) {
         return InstallSource::DisabledByUser;
     }
+    // Not the bundle Homebrew installed -> not Homebrew's to upgrade, whatever receipts
+    // exist elsewhere. When the path cannot be determined, fall through to self-managed:
+    // updating the copy that is actually running is the conservative failure.
+    let is_cask_bundle = running_bundle
+        .as_deref()
+        .is_some_and(|path| path == Path::new(CASK_APP_PATH));
+    if !is_cask_bundle {
+        return InstallSource::SelfManaged;
+    }
+
     for prefix in prefixes {
         if has_cask_receipt(prefix) {
             return InstallSource::Homebrew;
