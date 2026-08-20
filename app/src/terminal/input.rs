@@ -16338,7 +16338,26 @@ impl View for Input {
             && !self.agent_view_controller.as_ref(app).is_active()
             && !should_render_ps1_prompt(&self.model.lock(), app)
         {
-            self.render_terminal_input(app)
+            // Uncaged: one input surface, whose contents change with the mode.
+            //
+            // Upstream has six renderers for this one thing -- cli_agent, terminal,
+            // universal, classic, agent, and the cloud-mode variants -- and which you get
+            // depends on flags rather than on anything you chose. `render_terminal_input`
+            // and `render_universal_developer_input` draw the *same* input differently:
+            // the second one carries the whole button bar (mode toggle, slash, @, file
+            // attach, model selector) and shows attachment chips when the input is in AI
+            // mode, so it already does "agent tooling appears in agent mode" without a
+            // second layout.
+            //
+            // The first one carries none of that, and `AgentView` -- a default cargo
+            // feature -- routed every shipped build to it. The unified surface has been
+            // sitting complete and unreachable; this stops adding chrome to the reduced
+            // one and uses what is already there.
+            if is_universal_input {
+                self.render_universal_developer_input(app)
+            } else {
+                self.render_terminal_input(app)
+            }
         } else if !FeatureFlag::AgentView.is_enabled() && is_universal_input {
             self.render_universal_developer_input(app)
         } else {
