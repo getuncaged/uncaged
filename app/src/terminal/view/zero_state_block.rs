@@ -123,7 +123,13 @@ impl TerminalViewZeroStateBlock {
         let ai_settings = AISettings::as_ref(ctx);
         Self {
             should_hide: false,
-            should_render_nld_checkbox: ai_settings.is_any_ai_enabled(ctx),
+            // Uncaged: never. This checkbox re-enables the per-keystroke input classifier
+            // from the empty-state panel -- the exact feature this fork turns off by
+            // default and migrates existing installs away from. Advertising it on every
+            // new tab (where it was also one stray click away from being toggled) undoes
+            // that decision. The setting still exists in Settings -> AI for anyone who
+            // wants it; the zero state is not the place to sell it.
+            should_render_nld_checkbox: false,
             state_handles: Default::default(),
         }
     }

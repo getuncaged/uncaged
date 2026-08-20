@@ -1721,13 +1721,14 @@ pub(crate) fn initialize_app(
 
     #[cfg(feature = "local_fs")]
     {
-        let imported_config_model = ctx.add_singleton_model(ImportedConfigModel::new);
-
-        if ChannelState::channel() != warp_core::channel::Channel::Integration {
-            imported_config_model.update(ctx, |model, ctx| {
-                model.search_for_settings_to_import(ctx);
-            });
-        }
+        // Uncaged: registered, not searched. `search_for_settings_to_import` ran here on
+        // every launch, and its first act is `all_system_fonts` -- which makes CoreText map
+        // every font file on the machine. Measured with malloc_history: ~1.17 GB of
+        // font-file mmaps traced back to this call chain, the largest single source of
+        // file-backed memory in the process, paid at startup for an import-settings
+        // convenience almost nobody is about to use. The search now starts when the
+        // import UI is opened (`SettingsImportView::new`).
+        let _imported_config_model = ctx.add_singleton_model(ImportedConfigModel::new);
 
         let emit_incremental_updates = matches!(launch_mode, LaunchMode::RemoteServerDaemon { .. });
         ctx.add_singleton_model(|ctx| {
