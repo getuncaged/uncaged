@@ -1,0 +1,25 @@
+README.md
+  s_6e5dc450e2113a::t_37af0bf8aaa9c3 28-32
+FAQ.md
+  s_6e5dc450e2113a::t_cfe6899fcafcb7 13
+SECURITY.md
+  s_6e5dc450e2113a::t_b5b4f24783ab3a 17-19
+app/src/workspace/view.rs
+  s_6e5dc450e2113a::t_42313899b2e9ab 22168-22175
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "69104cd154943bd3a87ef61c834ac5f0fefd4f25",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
