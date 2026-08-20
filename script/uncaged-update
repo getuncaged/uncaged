@@ -2,15 +2,22 @@
 #
 # uncaged-update — update Uncaged to the latest release, then relaunch it.
 #
-# The app does not replace its own bundle. It spawns this script and quits, so by the time
-# anything is overwritten the process holding that bundle open is gone. That ordering is
-# the whole point: a running app swapping the directory it is executing from has to work
-# around itself, and every workaround is a way to leave a half-updated install behind.
+# This runs the same installer we publish on the site:
 #
-# It is also a plain script you can read and run yourself:
+#     curl -fsSL https://getuncaged.dev/install.sh | bash
+#
+# Deliberately not a second, private update path. curl never sets
+# com.apple.quarantine, so a bundle it writes opens without a Gatekeeper prompt --
+# which matters a great deal for a fork with no Apple Developer ID, where a
+# browser-downloaded copy is met with "unidentified developer" instead. Reusing
+# the promoted installer also means the update path is the install path: one
+# script to keep working, already exercised by everyone who installs.
+#
+# The app does not replace its own bundle. It spawns this and quits, so by the
+# time anything is overwritten the process holding that bundle open is gone.
 #
 #     uncaged-update              # update if a newer release exists
-#     uncaged-update --restart    # ...and relaunch the app afterwards
+#     uncaged-update --restart    # ...and wait for the app to exit first
 #     uncaged-update --check      # report what would happen, change nothing
 #
 # Part of the Uncaged fork of the open-source Warp client. AGPL-3.0-only.
@@ -19,6 +26,7 @@ set -euo pipefail
 
 REPO="getuncaged/uncaged"
 API="https://api.github.com/repos/${REPO}/releases/latest"
+INSTALLER_URL="https://getuncaged.dev/install.sh"
 CASK_TOKEN="uncaged"
 APP_PATH="/Applications/Uncaged.app"
 
@@ -28,10 +36,7 @@ for arg in "$@"; do
   case "$arg" in
     --restart) RESTART=1 ;;
     --check)   CHECK_ONLY=1 ;;
-    -h|--help)
-      sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'
-      exit 0
-      ;;
+    -h|--help) sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) printf 'unknown option: %s\n' "$arg" >&2; exit 2 ;;
   esac
 done
@@ -40,31 +45,17 @@ bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 dim()  { printf '\033[2m%s\033[0m\n' "$1"; }
 die()  { printf '\033[31m%s\033[0m\n' "$1" >&2; exit 1; }
 
-need() { command -v "$1" >/dev/null 2>&1 || die "required tool not found: $1"; }
-need curl
-need shasum
-
-# --- what is installed, and what is published ----------------------------------------
+command -v curl >/dev/null 2>&1 || die "curl is required"
 
 installed_version() {
   [[ -f "$APP_PATH/Contents/Info.plist" ]] || return 1
   /usr/bin/plutil -extract WarpVersion raw "$APP_PATH/Contents/Info.plist" 2>/dev/null || return 1
 }
 
-# One API call; the release JSON carries the tag, the asset URL, and the asset's digest.
-RELEASE_JSON="$(curl -fsSL -H 'Accept: application/vnd.github+json' "$API")" \
-  || die "could not reach the GitHub releases API"
-
-json_field() {
-  # json_field <python-expression-over-`r`>
-  printf '%s' "$RELEASE_JSON" | /usr/bin/python3 -c "
-import json,sys
-r = json.load(sys.stdin)
-$1
-"
-}
-
-LATEST_TAG="$(json_field 'print(r.get("tag_name",""))')"
+LATEST_TAG="$(
+  curl -fsSL -H 'Accept: application/vnd.github+json' "$API" \
+    | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))'
+)" || die "could not reach the GitHub releases API"
 [[ -n "$LATEST_TAG" ]] || die "no tag_name in the latest release"
 
 CURRENT="$(installed_version || echo "none")"
@@ -73,11 +64,10 @@ bold "Uncaged update"
 dim  "  installed: ${CURRENT}"
 dim  "  latest:    ${LATEST_TAG}"
 
-# Compare as dotted integers, ignoring a leading v. Anything unparseable is treated as
-# "not newer" rather than guessed at -- a bad guess here downgrades someone.
+# Dotted-integer compare, ignoring a leading v. Anything unparseable counts as
+# "not newer" rather than being guessed at -- a wrong guess here downgrades someone.
 is_newer() {
-  local a="${1#v}" b="${2#v}"
-  /usr/bin/python3 - "$a" "$b" <<'PY'
+  /usr/bin/python3 - "${1#v}" "${2#v}" <<'PY'
 import sys
 def parse(v):
     try:
@@ -99,119 +89,41 @@ if (( CHECK_ONLY )); then
   exit 0
 fi
 
-# --- let a package manager do it, if one owns this install ---------------------------
-
-brew_bin() {
-  local prefix
-  for prefix in /opt/homebrew /usr/local; do
-    [[ -x "$prefix/bin/brew" ]] && { printf '%s' "$prefix/bin/brew"; return 0; }
-  done
-  return 1
-}
-
-relaunch() {
-  (( RESTART )) || return 0
-  bold "Restarting Uncaged..."
-  # Wait for the old process to actually exit before relaunching, or macOS may just
-  # re-activate the copy that is on its way out.
-  local waited=0
+# The app spawns this and then quits. Overwriting the bundle while its process is
+# still alive is what produces half-updated installs, so wait for it to go.
+if (( RESTART )); then
+  waited=0
   while pgrep -f "$APP_PATH/Contents/MacOS/" >/dev/null 2>&1 && (( waited < 30 )); do
     sleep 1; waited=$((waited + 1))
   done
-  open -a "$APP_PATH"
-}
+fi
 
-if BREW="$(brew_bin)"; then
-  # A receipt says Homebrew installed *a* copy; it must also be the copy at the cask's
-  # location before we hand the upgrade to brew. Otherwise a stray download elsewhere
-  # would trigger an upgrade of something else entirely.
-  if "$BREW" list --cask "$CASK_TOKEN" >/dev/null 2>&1 && [[ -d "$APP_PATH" ]]; then
+# A package manager that owns this install should be the one to update it.
+# Replacing the bundle underneath Homebrew leaves its receipt naming a version
+# that is no longer on disk: a later `brew upgrade` reinstalls over the top and
+# `brew uninstall` removes something it no longer matches. Only when the running
+# bundle is the cask's own -- a receipt proves brew installed *a* copy, not this one.
+for prefix in /opt/homebrew /usr/local; do
+  brew="$prefix/bin/brew"
+  [[ -x "$brew" ]] || continue
+  if "$brew" list --cask "$CASK_TOKEN" >/dev/null 2>&1 && [[ -d "$APP_PATH" ]]; then
     bold "Homebrew manages this install — upgrading the cask."
-    dim  "  $BREW upgrade --cask $CASK_TOKEN"
-    # Replacing the bundle ourselves would leave brew's receipt naming a version that is
-    # no longer on disk, so a later `brew upgrade` reinstalls over the top and
-    # `brew uninstall` removes something it no longer matches.
-    "$BREW" upgrade --cask "$CASK_TOKEN" || die "brew upgrade failed"
+    dim  "  $brew upgrade --cask $CASK_TOKEN"
+    "$brew" upgrade --cask "$CASK_TOKEN" || die "brew upgrade failed"
     bold "Updated to ${LATEST_TAG}."
-    relaunch
+    open -a "$APP_PATH" 2>/dev/null || true
     exit 0
   fi
-fi
+  break
+done
 
-# --- otherwise: download, verify, swap ------------------------------------------------
+bold "Updating via the Uncaged installer..."
+dim  "  curl -fsSL ${INSTALLER_URL} | bash"
 
-case "$(uname -m)" in
-  arm64) WANT_ARCH="arm64" ;;
-  *)     WANT_ARCH="x86_64" ;;
-esac
+# `bash` rather than `sh`: install.sh is the published entry point and is invoked
+# that way everywhere we document it, so run it the same way here.
+curl -fsSL "$INSTALLER_URL" | bash || die "installer failed"
 
-read -r ASSET_URL ASSET_NAME ASSET_DIGEST <<<"$(json_field "
-assets = [a for a in r.get('assets', [])
-          if a.get('name','').endswith('.dmg') and a.get('state') == 'uploaded']
-# Prefer an arch-specific dmg; fall back to a universal one.
-pick = next((a for a in assets if '${WANT_ARCH}' in a['name']), None) or (assets[0] if assets else None)
-print(pick['browser_download_url'], pick['name'], pick.get('digest','')) if pick else print('', '', '')
-")"
-
-[[ -n "$ASSET_URL" ]] || die "the latest release has no uploaded .dmg asset"
-
-# No digest, no install. The download is the whole payload; without a hash from the API
-# there is nothing to check it against, and an ad-hoc-signed bundle cannot vouch for
-# itself.
-[[ "$ASSET_DIGEST" == sha256:* ]] \
-  || die "asset ${ASSET_NAME} has no sha256 digest in the release metadata; refusing"
-EXPECTED="${ASSET_DIGEST#sha256:}"
-
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/uncaged-update.XXXXXX")"
-cleanup() {
-  [[ -n "${MOUNTPOINT:-}" && -d "${MOUNTPOINT:-}" ]] && hdiutil detach "$MOUNTPOINT" -quiet 2>/dev/null || true
-  rm -rf "$WORK"
-}
-trap cleanup EXIT
-
-DMG="$WORK/$ASSET_NAME"
-bold "Downloading ${ASSET_NAME}..."
-curl -fL# -o "$DMG" "$ASSET_URL" || die "download failed"
-
-bold "Verifying checksum..."
-ACTUAL="$(shasum -a 256 "$DMG" | awk '{print $1}')"
-if [[ "$ACTUAL" != "$EXPECTED" ]]; then
-  die "checksum mismatch for ${ASSET_NAME}
-  expected ${EXPECTED}
-  got      ${ACTUAL}
-Refusing to install."
-fi
-dim "  sha256 ok"
-
-MOUNTPOINT="$WORK/mnt"
-mkdir -p "$MOUNTPOINT"
-hdiutil attach "$DMG" -mountpoint "$MOUNTPOINT" -nobrowse -quiet || die "could not mount ${ASSET_NAME}"
-
-SRC="$MOUNTPOINT/Uncaged.app"
-[[ -d "$SRC" ]] || die "no Uncaged.app inside ${ASSET_NAME}"
-
-bold "Installing to ${APP_PATH}..."
-if [[ -d "$APP_PATH" && ! -w "$(dirname "$APP_PATH")" ]]; then
-  die "no write permission for $(dirname "$APP_PATH"). Re-run with sudo, or move Uncaged somewhere you own."
-fi
-
-# Stage beside the target and swap, so an interrupted copy never leaves a partial bundle
-# where the app used to be.
-STAGED="$(dirname "$APP_PATH")/.uncaged-update-$$.app"
-rm -rf "$STAGED"
-/usr/bin/ditto "$SRC" "$STAGED" || die "copy failed"
-
-OLD="$(dirname "$APP_PATH")/.uncaged-old-$$.app"
-if [[ -d "$APP_PATH" ]]; then mv "$APP_PATH" "$OLD"; fi
-mv "$STAGED" "$APP_PATH" || {
-  [[ -d "$OLD" ]] && mv "$OLD" "$APP_PATH"
-  die "install failed; previous version restored"
-}
-rm -rf "$OLD"
-
-# Downloaded bundles carry the quarantine flag; without clearing it the first launch is a
-# Gatekeeper warning about an app the user just chose to update.
-xattr -dr com.apple.quarantine "$APP_PATH" 2>/dev/null || true
-
+# install.sh clears quarantine and opens the app itself, so there is nothing left
+# to do -- doing it again here would open a second instance.
 bold "Updated to ${LATEST_TAG}."
-relaunch
