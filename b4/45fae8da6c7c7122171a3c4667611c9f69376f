@@ -1,0 +1,21 @@
+app/src/terminal/input.rs
+  s_6e5dc450e2113a::t_5ee5dcf4851899 16341-16360
+app/src/terminal/input/terminal.rs
+  s_6e5dc450e2113a::t_f8c808f8b69403 3-4,58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "b445fae8da6c7c7122171a3c4667611c9f69376f",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
