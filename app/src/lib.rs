@@ -1222,6 +1222,9 @@ pub(crate) fn initialize_app(
             } else if #[cfg(target_os = "windows")] {
                 warpui_extras::secure_storage::register_with_dir(&data_domain, warp_core::paths::state_dir(), ctx)
             } else {
+                // Uncaged: on macOS this is file-backed rather than the login keychain --
+                // see `secure_storage/mac.rs` for why, and for what to restore if Uncaged
+                // ever gets a signing identity.
                 warpui_extras::secure_storage::register(&data_domain, ctx);
             }
         }

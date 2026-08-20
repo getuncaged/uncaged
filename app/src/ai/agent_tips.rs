@@ -397,7 +397,10 @@ impl WorkspaceAction {
     pub fn display_text(&self) -> Option<String> {
         match self {
             WorkspaceAction::OpenPalette { .. } => Some("Open palette".to_string()),
-            WorkspaceAction::OpenWarpDrive => Some("Warp Drive.".to_string()),
+            // Uncaged: the feature is inherited from Warp, but the tip is ours and this
+            // string is shown verbatim to users -- "Warp Drive." in an Uncaged tip reads
+            // as a leak, because it is one.
+            WorkspaceAction::OpenWarpDrive => Some("Drive.".to_string()),
             WorkspaceAction::ToggleRightPanel => Some("Show diff view".to_string()),
             _ => None,
         }
