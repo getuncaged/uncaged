@@ -1,0 +1,20 @@
+PLAN.md
+  s_6e5dc450e2113a::t_bd1d7d27fb35ea 6,12,22,26,44-442
+  s_6e5dc450e2113a::t_f279b51ac498ad 1-5,7-11,13-21,23-25,27-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "c7c80fd4c0bb7db20e5b0ff2c552179674dfd185",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
