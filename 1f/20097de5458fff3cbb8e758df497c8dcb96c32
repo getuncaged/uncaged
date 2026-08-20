@@ -1,0 +1,25 @@
+app/src/autoupdate/mac.rs
+  s_6e5dc450e2113a::t_abfda3fe6d4c05 22
+  s_6e5dc450e2113a::t_7fb589d050e03a 139-158
+app/src/terminal/input/terminal.rs
+  s_6e5dc450e2113a::t_2c74b2a7d04709 58-81
+  s_6e5dc450e2113a::t_a4dfc26c994600 103-106,108,112-118
+crates/warpui_extras/Cargo.toml
+  s_6e5dc450e2113a::t_5a14df15a132a2 11-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "1f20097de5458fff3cbb8e758df497c8dcb96c32",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
