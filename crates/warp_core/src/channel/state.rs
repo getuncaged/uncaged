@@ -361,6 +361,22 @@ impl ChannelState {
     }
 
     pub fn show_autoupdate_menu_items() -> bool {
+        // Uncaged: always on for the Oss channel.
+        //
+        // This gates every entry point to an applied update -- the "Update and relaunch"
+        // menu item, the update banner, and the resource centre row. It reads
+        // `autoupdate_config`, which describes *upstream's* update service and is `None`
+        // here, so `unwrap_or_default()` returned false and hid all three.
+        //
+        // The effect was an update that could be found but not applied: the check ran,
+        // the release was fetched, the stage reached `UpdateReady` -- and the only sign
+        // of it was a dot on the settings icon leading to a menu with no update item.
+        // Uncaged does not use upstream's updater, so the absence of its config says
+        // nothing about whether Uncaged has an update to offer.
+        if matches!(Self::channel(), Channel::Oss) {
+            return true;
+        }
+
         CHANNEL_STATE
             .lock()
             .config
