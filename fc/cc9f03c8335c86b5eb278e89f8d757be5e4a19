@@ -1,0 +1,31 @@
+script/uncaged-update
+  s_6e5dc450e2113a::t_2bcefe76479cef 1-217
+app/src/autoupdate/install_source_tests.rs
+  s_6e5dc450e2113a::t_199ea022bdb08a 9-14,27,37,55-57,59,70,84,95,98-115,117-156
+  s_6e5dc450e2113a::t_440358279deadc 58
+  s_6e5dc450e2113a::t_79909a8fa2a860 116
+script/macos/bundle
+  s_6e5dc450e2113a::t_b3507ae4fe2561 559-563,565,567-569
+  s_6e5dc450e2113a::t_aca73f9da150a3 564,566
+app/src/autoupdate/mac.rs
+  s_6e5dc450e2113a::t_0db8bb593068f4 576-587
+  s_6e5dc450e2113a::t_69a14e0b4072f6 111-124,914-947
+app/src/autoupdate/install_source.rs
+  s_6e5dc450e2113a::t_9f1933f400cdf6 83-86,91,96-102,106,114-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "fccc9f03c8335c86b5eb278e89f8d757be5e4a19",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
