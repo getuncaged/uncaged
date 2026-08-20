@@ -505,10 +505,10 @@ cross_repo_context = []
 codebase_index_persistence = ["full_source_code_embedding"]
 default = [
     "agent_mode",
-    "viewing_shared_sessions",
+    # "viewing_shared_sessions",  # Uncaged: needs Warp servers
     "render_continuous_block_selections_with_single_border",
-    "shared_with_me",
-    "session_sharing_acls",
+    # "shared_with_me",  # Uncaged: needs Warp servers
+    # "session_sharing_acls",  # Uncaged: needs Warp servers
     "external_agent_mode_context",
     "shell_selector",
     "minimalist_ui",
@@ -519,8 +519,8 @@ default = [
     "dynamic_workflow_enums",
     "rect_selection",
     "reload_stale_conversation_files",
-    "loginless_conversion",
-    "warp_packs",
+    # "loginless_conversion",  # Uncaged: needs Warp servers
+    # "warp_packs",  # Uncaged: needs Warp servers
     "ai_rules",
     "suggested_rules",
     "default_waterfall_mode",
@@ -541,7 +541,7 @@ default = [
     "fast_forward_autoexecute_button",
     "image_as_context",
     "command_palette_file_search",
-    "usage_based_pricing",
+    # "usage_based_pricing",  # Uncaged: needs Warp servers
     "ai_context_menu",
     "at_menu_outside_of_ai_mode",
     "agent_management_view",
@@ -566,7 +566,7 @@ default = [
     "revert_diff_hunk",
     "code_review_save_changes",
     "create_project_flow",
-    "get_started_tab",
+    # "get_started_tab",  # Uncaged: needs Warp servers
     "file_tree",
     "vim_code_editor",
     "code_launch_modal",
@@ -574,8 +574,8 @@ default = [
     "mcp_oauth",
     "expand_edit_to_pane",
     "fallback_model_load_output_messaging",
-    "api_key_authentication",
-    "api_key_management",
+    # "api_key_authentication",  # Uncaged: needs Warp servers
+    # "api_key_management",  # Uncaged: needs Warp servers
     "summarization_cancellation_confirmation",
     "ui_zoom",
     "discard_per_file_and_all_changes",
@@ -584,11 +584,11 @@ default = [
     "summarize_conversation_command",
     "inline_code_review",
     "web_search_ui",
-    "agent_shared_sessions",
+    # "agent_shared_sessions",  # Uncaged: needs Warp servers
     "integration_command",
     "artifact_command",
     "conversation_api",
-    "cloud_environments",
+    # "cloud_environments",  # Uncaged: needs Warp servers
     "create_environment_slash_command",
     "code_review_find",
     "shared_session_long_running_commands",
@@ -597,18 +597,18 @@ default = [
     "context_window_usage_v2",
     "ambient_agents_command_line",
     "ambient_agents_image_upload",
-    "scheduled_ambient_agents",
-    "warp_managed_secrets",
+    # "scheduled_ambient_agents",  # Uncaged: needs Warp servers
+    # "warp_managed_secrets",  # Uncaged: needs Warp servers
     "v4a_file_diffs",
     "classic_completions",
     "force_classic_completions",
-    "team_api_keys",
+    # "team_api_keys",  # Uncaged: needs Warp servers
     "named_agents",
     "agent_tips",
     "pluggable_notifications",
     "agent_onboarding",
     "global_search",
-    "cloud_conversations",
+    # "cloud_conversations",  # Uncaged: needs Warp servers
     "list_skills",
     "ask_user_question",
     "bundled_skills",
@@ -618,9 +618,9 @@ default = [
     # "cloud_mode_from_local_session",
     # "cloud_mode_image_context",
     "agent_mode_computer_use",
-    "oz_platform_skills",
-    "oz_identity_federation",
-    "sync_ambient_plans",
+    # "oz_platform_skills",  # Uncaged: needs Warp servers
+    # "oz_identity_federation",  # Uncaged: needs Warp servers
+    # "sync_ambient_plans",  # Uncaged: needs Warp servers
     "conversation_artifacts",
     "agent_view",
     "agent_view_block_context",
@@ -691,12 +691,12 @@ default = [
     # "cloud_mode_input_v2",
     # "cloud_mode_setup_v2",
     # "handoff_cloud_cloud",
-    "remote_codebase_indexing",
+    # "remote_codebase_indexing",  # Uncaged: needs Warp servers
     "solo_user_byok",
     "custom_inference_endpoints",
     "custom_model_routers",
     "supergrok",
-    "billing_and_usage_page_v2",
+    # "billing_and_usage_page_v2",  # Uncaged: needs Warp servers
     "remote_code_review",
     "git_operations_in_code_review",
     # Uncaged: the local engine now handles GeneratePassiveSuggestions and emits
