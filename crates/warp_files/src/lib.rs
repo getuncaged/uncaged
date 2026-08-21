@@ -299,7 +299,10 @@ pub struct FileModel {
 impl FileModel {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
         let watcher =
-            ctx.add_model(|ctx| BulkFilesystemWatcher::new(Duration::from_millis(200), ctx));
+            // Uncaged: was 200ms -- 5 idle wakeups/sec from this watcher alone, the single
+            // largest contributor to the app's idle tick rate. This feeds file completion;
+            // a file appearing 2s later in the @-menu is not perceptible.
+            ctx.add_model(|ctx| BulkFilesystemWatcher::new(Duration::from_secs(2), ctx));
 
         ctx.subscribe_to_model(&watcher, |me, _, event, ctx| {
             me.handle_watcher_event(event, ctx);

@@ -529,3 +529,87 @@ fn test_migration_preserves_custom_long_running_threshold() {
         });
     });
 }
+
+// ---------------------------------------------------------------------------
+// Uncaged: the one-time autodetection reset.
+//
+// This is the part of the input-mode change that reaches people who already run
+// Uncaged. Both keys are persisted explicitly on any install that has launched
+// once -- the old default wrote one, the first-run onboarding checkbox wrote the
+// other -- and defaults only apply to absent keys. Without this migration the
+// change is a no-op for every existing user.
+//
+// It also nearly shipped dead: it first lived beside the upstream migrations in
+// `SettingsInitializer::handle_user_fetched`, which only runs after a successful
+// server user fetch. Uncaged has no accounts, so that never happens.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_uncaged_autodetection_reset_clears_persisted_true_values() {
+    warpui::App::test((), |mut app| async move {
+        let _guard = FeatureFlag::SettingsFile.override_enabled(true);
+        app.update(init_test_app);
+        app.update(crate::settings::AISettings::register);
+
+        // An install that has already run: both keys explicitly true.
+        app.update(|ctx| {
+            crate::settings::AISettings::handle(ctx).update(ctx, |ai, ctx| {
+                ai.ai_autodetection_enabled_internal
+                    .set_value(true, ctx)
+                    .unwrap();
+                ai.nld_in_terminal_enabled_internal
+                    .set_value(true, ctx)
+                    .unwrap();
+            });
+        });
+
+        app.update(crate::settings::initializer::apply_uncaged_autodetection_reset);
+
+        app.read(|ctx| {
+            let ai = crate::settings::AISettings::as_ref(ctx);
+            assert!(
+                !*ai.ai_autodetection_enabled_internal,
+                "agent-view autodetection must be cleared"
+            );
+            assert!(
+                !*ai.nld_in_terminal_enabled_internal,
+                "terminal autodetection must be cleared -- this is the one that costs a \
+                 classifier pass per keystroke"
+            );
+            assert!(
+                *ai.uncaged_autodetection_reset_applied,
+                "marker must be set"
+            );
+        });
+    });
+}
+
+#[test]
+fn test_uncaged_autodetection_reset_does_not_override_a_later_choice() {
+    warpui::App::test((), |mut app| async move {
+        let _guard = FeatureFlag::SettingsFile.override_enabled(true);
+        app.update(init_test_app);
+        app.update(crate::settings::AISettings::register);
+
+        app.update(crate::settings::initializer::apply_uncaged_autodetection_reset);
+
+        // The user goes to Settings -> AI and turns the classifier back on.
+        app.update(|ctx| {
+            crate::settings::AISettings::handle(ctx).update(ctx, |ai, ctx| {
+                ai.nld_in_terminal_enabled_internal
+                    .set_value(true, ctx)
+                    .unwrap();
+            });
+        });
+
+        // Next launch. The marker is already set, so the reset must not fire again.
+        app.update(crate::settings::initializer::apply_uncaged_autodetection_reset);
+
+        app.read(|ctx| {
+            assert!(
+                *crate::settings::AISettings::as_ref(ctx).nld_in_terminal_enabled_internal,
+                "a one-time reset that keeps re-applying is not a migration, it is a veto"
+            );
+        });
+    });
+}

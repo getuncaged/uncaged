@@ -177,15 +177,25 @@ impl Input {
         .with_margin_top(margin_top)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)));
 
-        // Apply styling based on focus state
-        if self.is_pane_focused(app) {
-            // Focused: show background
-            container = container
-                .with_background(internal_colors::fg_overlay_1(theme))
-                .with_border(Border::all(1.).with_border_fill(theme.outline()));
-        } else {
-            // Unfocused: no background
-            container = container.with_border(Border::all(1.).with_border_fill(theme.outline()));
+        // Uncaged: the composer box belongs to Agent Mode, not to the terminal.
+        //
+        // A bordered, inset, rounded panel reads as a chat composer -- which is right when
+        // you are writing a prompt, and wrong when you are typing a shell command. A
+        // terminal prompt should sit flush against the output above it, the way every other
+        // terminal does. The box therefore follows the mode, like everything else on this
+        // surface.
+        let is_ai_mode = matches!(self.ai_input_model.as_ref(app).input_type(), InputType::AI);
+        if is_ai_mode {
+            if self.is_pane_focused(app) {
+                // Focused: show background
+                container = container
+                    .with_background(internal_colors::fg_overlay_1(theme))
+                    .with_border(Border::all(1.).with_border_fill(theme.outline()));
+            } else {
+                // Unfocused: no background
+                container =
+                    container.with_border(Border::all(1.).with_border_fill(theme.outline()));
+            }
         }
 
         let drop_target = DropTarget::new(
@@ -205,11 +215,31 @@ impl Input {
 
         let mut column = Flex::column();
 
+        // Uncaged: the inline menus (slash commands, prompts, rewind, plan, history, ...)
+        // render on this surface too. The selector chain lived only in `render_agent_input`,
+        // so on the terminal surface "/" set the suggestion mode and then nothing appeared.
+        // The menu sits between the input and the block list, whichever side that is.
+        let inline_menu = if self
+            .inline_terminal_menu_positioner
+            .as_ref(app)
+            .should_hide_inline_menu_for_pane_size(app)
+        {
+            None
+        } else {
+            self.render_active_inline_menu(app)
+        };
+
         if input_mode.is_pinned_to_top() {
             column.add_child(input);
+            if let Some(menu) = inline_menu {
+                column.add_child(menu);
+            }
             column.add_child(ChildView::new(&self.agent_status_view).finish());
         } else {
             column.add_child(ChildView::new(&self.agent_status_view).finish());
+            if let Some(menu) = inline_menu {
+                column.add_child(menu);
+            }
             column.add_child(input);
         }
 

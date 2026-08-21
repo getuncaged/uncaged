@@ -505,7 +505,23 @@ impl BlocklistAIInputModel {
         // autodetected AI input will trigger entering the agent view with that query. In the CLI
         // agent rich input case, the input must be in AI mode to suppress shell decorations
         // (syntax highlighting, error underlining).
+        //
+        // Uncaged: except when the user said so themselves.
+        //
+        // That carve-out assumes autodetection is the way AI mode is reached from the terminal.
+        // Uncaged routes on the Terminal / Agent Mode toggle instead, and with autodetection off
+        // this guard is the only thing standing between the user and Agent Mode: the button bar
+        // and cmd+I both ask for exactly `{ AI, is_locked: true }`, so both were silently
+        // returning `false` here and leaving the input in Shell while the segmented control drew
+        // itself as switched. Enter still enters the agent view with the query -- the difference
+        // is only whether the input is allowed to say so beforehand.
+        let is_deliberate_user_choice = matches!(
+            decision_source,
+            Some(InputTypeAutoDetectionSource::ManualToggle)
+                | Some(InputTypeAutoDetectionSource::AttachmentForcedAi)
+        );
         if FeatureFlag::AgentView.is_enabled()
+            && !is_deliberate_user_choice
             && !self.agent_view_controller.as_ref(ctx).is_active()
             && new_config.input_type.is_ai()
             && new_config.is_locked

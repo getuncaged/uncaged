@@ -281,6 +281,13 @@ struct CachedUIState {
     is_input_empty: bool,
     is_hovered: bool,
     is_in_active_terminal: bool,
+    /// Uncaged: whether the input is currently in Agent Mode.
+    ///
+    /// The bar renders one row for both modes, and everything on it except the toggle is
+    /// agent tooling -- slash commands, voice, @-context, file attach, model selector. In
+    /// Terminal mode none of it applies, so leaving it on screen advertises a mode the user
+    /// just switched away from.
+    is_ai_mode: bool,
 }
 
 impl CachedUIState {
@@ -451,6 +458,7 @@ impl UniversalDeveloperInputButtonBar {
             is_input_empty: true,
             is_hovered: false,
             is_in_active_terminal: false,
+            is_ai_mode: matches!(input_model.as_ref(ctx).input_type(), InputType::AI),
         }));
 
         let ui_state_clone = cached_ui_state.clone();
@@ -615,6 +623,21 @@ impl UniversalDeveloperInputButtonBar {
         me
     }
 
+    /// The Terminal / Agent Mode segments on their own.
+    ///
+    /// Uncaged: the terminal input renders this without the rest of the button bar. With
+    /// `FeatureFlag::AgentView` on -- which is every shipped build -- `Input::render` dispatches to
+    /// `render_terminal_input`, and `render_universal_developer_input`, the only place that draws
+    /// this bar, is unreachable. So the control existed, responded to cmd+I, and was never on
+    /// screen. Exposing the segments alone keeps the input uncluttered while giving the mode a
+    /// visible, clickable home.
+    ///
+    /// The bar view itself stays alive and keeps its subscription to this control, so selecting a
+    /// segment still emits `InputTypeSelected` regardless of whether the bar is rendered.
+    pub fn segmented_control(&self) -> &ViewHandle<SegmentedControl<InputToggleMode>> {
+        &self.segmented_control
+    }
+
     pub fn set_voice_is_listening(&mut self, is_listening: bool, ctx: &mut ViewContext<Self>) {
         self.mic_button.update(ctx, |mic_button, ctx| {
             if is_listening {
@@ -626,6 +649,17 @@ impl UniversalDeveloperInputButtonBar {
     }
 
     /// Update the input empty state and refresh the autodetection label
+    /// Uncaged: tells the bar which mode the input is in, so it can drop the agent tooling
+    /// in Terminal mode. Pushed in rather than read out, matching how the rest of
+    /// `CachedUIState` is maintained -- the bar cannot reach the input model from `render`.
+    pub fn set_is_ai_mode(&mut self, is_ai_mode: bool, ctx: &mut ViewContext<Self>) {
+        if self.cached_ui_state.borrow().is_ai_mode == is_ai_mode {
+            return;
+        }
+        self.cached_ui_state.borrow_mut().is_ai_mode = is_ai_mode;
+        self.notify_and_notify_children(ctx);
+    }
+
     pub fn update_input_empty_state(&mut self, is_empty: bool, ctx: &mut ViewContext<Self>) {
         if self.cached_ui_state.borrow().is_input_empty == is_empty {
             return;
@@ -823,6 +857,17 @@ impl View for UniversalDeveloperInputButtonBar {
                         .with_padding_right(4.0)
                         .finish(),
                 );
+            // Uncaged: in Terminal mode the row is the toggle and nothing else.
+            //
+            // Everything below is agent tooling -- slash commands, voice, @-context, file
+            // attach, the model selector. None of it does anything to a shell command, so
+            // showing it in Terminal mode is chrome for a mode the user just left. Switching
+            // to Agent Mode brings it back; that is what the switch is for.
+            let is_ai_mode = self.cached_ui_state.borrow().is_ai_mode;
+            if !is_ai_mode {
+                return buttons.finish();
+            }
+
             buttons = buttons.with_child(create_divider());
 
             buttons = buttons.with_child(ChildView::new(&self.slash_command_button).finish());
@@ -1040,7 +1085,9 @@ fn build_renderable_option_config(
 }
 
 const AGENT_MODE_TOOLTIP_PREFIX: &str = "* + space";
-const TERMINAL_MODE_TOOLTIP_PREFIX: &str = "! + space";
+// `TERMINAL_INPUT_PREFIX` is "!" with no trailing space, unlike `AI_INPUT_PREFIX` ("* "),
+// so the tooltip must not promise a space that the matcher does not want.
+const TERMINAL_MODE_TOOLTIP_PREFIX: &str = "!";
 
 fn agent_mode_tooltip_subtext(terminal_keybindings: &TerminalKeybindings) -> String {
     let keybinding = terminal_keybindings.set_input_mode_agent_keybinding();

@@ -16,7 +16,13 @@ use watcher::{BulkFilesystemWatcher, BulkFilesystemWatcherEvent};
 
 /// Duration between filesystem watch events for the Warp managed paths watcher, in milliseconds.
 #[cfg(not(target_family = "wasm"))]
-const WARP_MANAGED_PATHS_WATCHER_DEBOUNCE_MILLI_SECS: u64 = 500;
+// Uncaged: notify-debouncer-full runs a tick thread that polls at this interval
+// whether or not events are pending, so this value is an idle wakeup rate, not just a
+// coalescing window. Longer is strictly better for a background index: it coalesces
+// more, wakes less, and the only cost is how stale the index can be, which nothing
+// user-visible depends on.
+// Was 500ms. Themes and workflows reloading 2s after an edit is fine.
+const WARP_MANAGED_PATHS_WATCHER_DEBOUNCE_MILLI_SECS: u64 = 2000;
 
 pub(crate) fn warp_data_dir() -> PathBuf {
     warp_core::paths::data_dir()

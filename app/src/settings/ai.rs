@@ -792,14 +792,39 @@ define_settings_group!(AISettings, settings: [
     },
     // This field should not be referenced directly to lookup autodetection enablement -- use the
     // `is_ai_autodetection_enabled()` getter.
+    //
+    // Uncaged: defaults to `false`, where upstream defaults to `true`.
+    //
+    // `FeatureFlag::AgentView` is on in Uncaged (`agent_view` is a default cargo feature), so this
+    // setting governs autodetection *inside the fullscreen agent view*; the terminal input is
+    // governed by `nld_in_terminal_enabled_internal` below, which already defaulted to false. Both
+    // are off, so neither surface classifies as you type.
+    //
+    // What that buys: with autodetection on, an input change spawns a classification future that
+    // deep-clones the shell history, fuzzy-matches the buffer against every entry, and then runs
+    // the classifier -- which in a *shipped* build is a BERT-tiny ONNX forward pass, because
+    // script/{macos,linux,windows}/bundle all append `nld_classifier_v3` to the feature list. (A
+    // `cargo run` dev build gets the cheap HeuristicClassifier and will not reproduce the lag.)
+    // The inference has no await points, so aborting it when the next keystroke arrives does not
+    // stop it. On the way back it can also move the input between Shell and AI underneath whatever
+    // the user selected, and each such flip costs a settings write, a second completer pass, and a
+    // full-buffer restyle.
+    //
+    // Off, the mode is whatever the Terminal / Agent Mode toggle in the input button bar says, and
+    // nothing else moves it. Two escape hatches remain, neither gated on this setting: the
+    // `agent_trigger` prefix (default `>`) sends one line to the agent without touching the toggle,
+    // and a failed block still offers to hand itself to the agent.
+    //
+    // Existing installs have this persisted as `true`, so a default change alone would not reach
+    // them -- see `uncaged_autodetection_reset_applied` and the migration in settings/initializer.rs.
     ai_autodetection_enabled_internal: AIAutoDetectionEnabled {
         type: bool,
-        default: true,
+        default: false,
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "agents.warp_agent.input.ai_auto_detection_enabled",
-        description: "Controls whether AI automatically detects natural language input.",
+        description: "Off by default in Uncaged. When on, input typed in agent mode that looks like a shell command is switched back to Terminal. Terminal-side detection is separate: agents.warp_agent.input.nld_in_terminal_enabled.",
     },
     // This field should not be referenced directly -- use the
     // `is_nld_in_terminal_enabled()` getter.
@@ -813,7 +838,23 @@ define_settings_group!(AISettings, settings: [
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "agents.warp_agent.input.nld_in_terminal_enabled",
-        description: "Controls whether natural language detection is enabled in the terminal input.",
+        description: "Off by default in Uncaged. When on, natural language typed in the terminal input is switched to Agent Mode instead of being run as a command.",
+    },
+    // Uncaged: marks that the one-time "autodetection is not how Uncaged routes input" migration
+    // in settings/initializer.rs has run. Without it, the two settings above stay `true` for every
+    // install that already wrote them -- which is every install, because the old default was true
+    // and the onboarding callout offered a checkbox that set the terminal one.
+    //
+    // Never synced: it describes a migration applied to this machine's settings file, not a user
+    // preference worth carrying to another machine.
+    uncaged_autodetection_reset_applied: UncagedAutodetectionResetApplied {
+        type: bool,
+        default: false,
+        supported_platforms: SupportedPlatforms::ALL,
+        sync_to_cloud: SyncToCloud::Never,
+        private: false,
+        toml_path: "agents.warp_agent.input.uncaged_autodetection_reset_applied",
+        description: "Internal: whether the one-time reset of input autodetection has been applied.",
     },
     autodetection_command_denylist: AICommandDenylist {
         type: String,

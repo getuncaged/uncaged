@@ -21,7 +21,6 @@ pub mod slash_command_model;
 pub mod slash_commands;
 mod suggestions_mode_menu;
 pub mod suggestions_mode_model;
-mod terminal;
 mod terminal_message_bar;
 mod universal;
 pub mod user_query;
@@ -404,6 +403,11 @@ pub const INPUT_A11Y_HELPER: &str = "Input your shell command, press enter to ex
 pub const AI_COMMAND_SEARCH_HINT_TEXT: &str = "Type '#' for AI command suggestions";
 
 const AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT: &str = "Run commands";
+
+/// Uncaged: the same resting state, but with AI available. The mode segments are icon-only
+/// and the agent trigger is invisible until you know about it, so the placeholder is the one
+/// place a new user reliably looks that can mention either.
+const TERMINAL_MODE_WITH_AGENT_HINT_TEXT: &str = "Run commands — > sends a line to the agent";
 
 // Rotating hint text options for new Agent Mode conversations
 const AGENT_MODE_HINT_OPTIONS: &[&str] = &[
@@ -2000,6 +2004,7 @@ pub fn init(app: &mut AppContext) {
             InputAction::StartNewAgentConversation {
                 origin: AgentViewEntryOrigin::Input {
                     was_prompt_autodetected: false,
+                    was_mode_explicitly_chosen: false,
                 },
             },
         )
@@ -3560,6 +3565,16 @@ impl Input {
             match event {
                 BlocklistAIInputEvent::InputTypeChanged { .. }
                 | BlocklistAIInputEvent::LockChanged { .. } => {
+                    // Uncaged: the button bar drops its agent tooling in Terminal mode, and
+                    // it cannot see the input model from `render`, so push the mode across
+                    // whenever it changes.
+                    let is_ai_mode =
+                        matches!(me.ai_input_model.as_ref(ctx).input_type(), InputType::AI);
+                    me.universal_developer_input_button_bar
+                        .update(ctx, |button_bar, ctx| {
+                            button_bar.set_is_ai_mode(is_ai_mode, ctx);
+                        });
+
                     // Close slash command menu if we're now in locked shell mode
                     if me.is_locked_in_shell_mode(ctx)
                         && me.suggestions_mode_model.as_ref(ctx).is_slash_commands()
@@ -6218,6 +6233,42 @@ impl Input {
         &self.input_suggestions
     }
 
+    /// The inline menu the input's suggestion mode currently calls for, if any.
+    ///
+    /// Uncaged: one selector for every surface. This chain existed only inside
+    /// `render_agent_input`, so slash commands, prompts, rewind, plan and the rest rendered
+    /// their menus in the agent view and nowhere else -- the terminal surface set the mode
+    /// on "/" and then drew nothing, which reads as the key doing nothing. Each surface
+    /// decides where to place the menu; this decides what it is.
+    pub(super) fn render_active_inline_menu(&self, app: &AppContext) -> Option<Box<dyn Element>> {
+        let mode = self.suggestions_mode_model.as_ref(app);
+        if mode.is_inline_model_selector() {
+            Some(ChildView::new(&self.inline_model_selector_view).finish())
+        } else if FeatureFlag::InlineProfileSelector.is_enabled() && mode.is_profile_selector() {
+            Some(ChildView::new(&self.inline_profile_selector_view).finish())
+        } else if mode.is_slash_commands() && !self.is_cloud_mode_input_v2_composing(app) {
+            Some(ChildView::new(&self.inline_slash_commands_view).finish())
+        } else if mode.is_prompts_menu() {
+            Some(ChildView::new(&self.inline_prompts_menu_view).finish())
+        } else if mode.is_conversation_menu() {
+            Some(ChildView::new(&self.inline_conversation_menu_view).finish())
+        } else if FeatureFlag::ListSkills.is_enabled() && mode.is_skill_menu() {
+            Some(ChildView::new(&self.inline_skill_selector_view).finish())
+        } else if mode.is_user_query_menu() {
+            Some(ChildView::new(&self.user_query_menu_view).finish())
+        } else if mode.is_rewind_menu() {
+            Some(ChildView::new(&self.rewind_menu_view).finish())
+        } else if mode.is_inline_history_menu() {
+            Some(ChildView::new(&self.inline_history_menu_view).finish())
+        } else if mode.is_repos_menu() {
+            Some(ChildView::new(&self.inline_repos_menu_view).finish())
+        } else if mode.is_plan_menu() {
+            Some(ChildView::new(&self.inline_plan_menu_view).finish())
+        } else {
+            None
+        }
+    }
+
     pub fn suggestions_mode_model(&self) -> &ModelHandle<InputSuggestionsModeModel> {
         &self.suggestions_mode_model
     }
@@ -6266,7 +6317,11 @@ impl Input {
             input_model.should_run_input_autodetection(app),
         ) {
             (InputType::Shell, false) => {
-                AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT.to_owned()
+                if AISettings::as_ref(app).is_any_ai_enabled(app) {
+                    TERMINAL_MODE_WITH_AGENT_HINT_TEXT.to_owned()
+                } else {
+                    AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT.to_owned()
+                }
             }
             (InputType::Shell, true) => {
                 // Ensure hint text is cached for new conversations
@@ -6664,11 +6719,16 @@ impl Input {
         let ai_input_model = self.ai_input_model.as_ref(ctx);
         let config = ai_input_model.input_config();
 
-        // Don't force agent mode if user has explicitly locked to Shell mode
-        if (!should_override_shell_lock || FeatureFlag::AgentView.is_enabled())
-            && config.is_locked
-            && !config.input_type.is_ai()
-        {
+        // Don't force agent mode if user has explicitly locked to Shell mode.
+        //
+        // Uncaged: honour `should_override_shell_lock` again. The `|| AgentView.is_enabled()`
+        // clause neutralised it, which was survivable while the terminal input spent most of its
+        // life unlocked -- but Uncaged locks to Shell as the resting state, so that clause turned
+        // "attach a file" and drag-and-drop into no-ops: the attachment landed while the input
+        // stayed in Terminal mode, and the attachment is only meaningful to the agent. Callers
+        // that pass `true` here (select_image, the attachment pattern) are acting on an explicit
+        // user gesture, which is exactly the case the flag exists to express.
+        if !should_override_shell_lock && config.is_locked && !config.input_type.is_ai() {
             return;
         }
         self.enter_ai_mode(decision_source, ctx);
@@ -10004,11 +10064,18 @@ impl Input {
                 });
 
                 // Force AI mode if buffer contains any attachment patterns (blocks, drive objects, diffs)
+                //
+                // Uncaged: overrides a Shell lock. `edit_origin.is_user()` above already
+                // establishes that a person put this in the buffer, and a `<plan:…>` reference or
+                // an attached diff is only meaningful to the agent -- leaving the input in Terminal
+                // sends it to the shell as literal text. This used to be reached with the input
+                // usually unlocked; locked Shell is now the resting state, so passing `false` here
+                // would mean attachments silently stopped switching modes.
                 if AISettings::as_ref(ctx).is_any_ai_enabled(ctx) && edit_origin.is_user() {
                     let buffer_text = self.buffer_text(ctx);
                     if Self::buffer_contains_attachment_patterns(&buffer_text) {
                         self.ensure_agent_mode_for_ai_features(
-                            false,
+                            true,
                             Some(InputTypeAutoDetectionSource::AttachmentForcedAi),
                             ctx,
                         );
@@ -11468,6 +11535,7 @@ impl Input {
                     // AgentView is enabled.
                     AgentViewEntryOrigin::Input {
                         was_prompt_autodetected: false,
+                        was_mode_explicitly_chosen: false,
                     },
                     ctx,
                 );
@@ -13504,8 +13572,16 @@ impl Input {
                 return;
             }
 
+            // Uncaged: gate on the context-correct predicate. `is_ai_autodetection_enabled` is the
+            // *agent view* setting; this is a terminal execution, which is governed by
+            // `nld_in_terminal_enabled`. Reading the wrong one meant a classification future
+            // spawned from the pre-submit buffer could outlive the execute and flip the input type
+            // afterwards.
             if FeatureFlag::AgentMode.is_enabled()
-                && AISettings::as_ref(ctx).is_ai_autodetection_enabled(ctx)
+                && self
+                    .ai_input_model
+                    .as_ref(ctx)
+                    .should_run_input_autodetection(ctx)
             {
                 self.ai_input_model.update(ctx, |input, ctx| {
                     input.abort_in_progress_detection();
@@ -13986,7 +14062,15 @@ impl Input {
 
         // A shell-mode submission queues as a command; an AI-mode submission queues as a prompt.
         // Command queueing is gated on the V2 surface.
-        let is_command = !self.ai_input_model.as_ref(ctx).is_ai_input_enabled();
+        //
+        // Uncaged: the agent trigger counts as an AI submission. This runs ahead of the trigger
+        // branch in `input_enter`, so without this check a `> why did that fail` typed while a
+        // conversation is in progress would be queued as a *shell command*, `>` and all --
+        // exactly the case the trigger exists to serve.
+        let agent_trigger =
+            self.agent_trigger_prompt(&self.editor.as_ref(ctx).buffer_text(ctx), ctx);
+        let is_command =
+            !self.ai_input_model.as_ref(ctx).is_ai_input_enabled() && agent_trigger.is_none();
         if is_command && !FeatureFlag::QueuedPromptsV2.is_enabled() {
             return false;
         }
@@ -14043,7 +14127,12 @@ impl Input {
             return false;
         }
 
-        let prompt = self.editor.as_ref(ctx).buffer_text(ctx);
+        // Uncaged: when the agent trigger fired, queue what the user meant to say, not the
+        // trigger character with it.
+        let prompt = match agent_trigger {
+            Some(stripped) => stripped,
+            None => self.editor.as_ref(ctx).buffer_text(ctx),
+        };
         if prompt.is_empty() {
             return false;
         }
@@ -14229,6 +14318,15 @@ impl Input {
                 conversation_id: None,
                 origin: AgentViewEntryOrigin::Input {
                     was_prompt_autodetected: !self
+                        .ai_input_model
+                        .as_ref(ctx)
+                        .is_input_type_locked(),
+                    // Uncaged: pressing Enter on an input the user deliberately put in Agent Mode
+                    // is as explicit as a submission gets, so it auto-sends rather than landing in
+                    // the agent view as a draft awaiting a second Enter. Without this, flipping the
+                    // toggle on and hitting Enter took two presses -- which is not "the toggle is
+                    // on, so this is a prompt".
+                    was_mode_explicitly_chosen: self
                         .ai_input_model
                         .as_ref(ctx)
                         .is_input_type_locked(),
@@ -16269,26 +16367,32 @@ impl View for Input {
             return self.render_cli_agent_input(app);
         }
         let is_universal_input = self.should_show_universal_developer_input(app);
-        let should_show_status_footer =
-            self.ambient_agent_view_model()
-                .is_some_and(|ambient_agent_model| {
-                    ambient_agent_model.as_ref(app).should_show_status_footer()
-                });
 
-        if FeatureFlag::CloudMode.is_enabled() && should_show_status_footer {
-            self.render_ambient_agent_status_footer(app)
-        } else if FeatureFlag::AgentView.is_enabled()
-            && self.agent_view_controller.as_ref(app).is_active()
+        // Uncaged: the ambient-agent status footer arm is gone with its renderer --
+        // `cloud_mode` is not a default feature, so the flag test could never pass.
+        if FeatureFlag::AgentView.is_enabled() && self.agent_view_controller.as_ref(app).is_active()
         {
             self.render_agent_input(app)
-        } else if FeatureFlag::AgentView.is_enabled()
-            && !self.agent_view_controller.as_ref(app).is_active()
-            && !should_render_ps1_prompt(&self.model.lock(), app)
-        {
-            self.render_terminal_input(app)
-        } else if !FeatureFlag::AgentView.is_enabled() && is_universal_input {
+        } else if is_universal_input {
+            // Uncaged: one input surface, whose contents change with the mode.
+            //
+            // `render_universal_developer_input` carries the mode toggle, the agent tooling
+            // and the attachment chips, and already drops the tooling in Terminal mode --
+            // "one screen with changeable properties" without a second layout.
+            //
+            // `render_terminal_input` used to sit here and is now deleted: its guard was
+            // `!should_render_ps1_prompt`, which reduces to exactly `is_universal_input`.
+            // `should_render_ps1_prompt` is `is_classic_input_enabled && (honor_ps1 || ...)`
+            // (prompt_render_helper.rs:59), and `is_classic_input_enabled` can only be true
+            // when `honor_ps1` is (settings/input.rs:214-220), so the parenthesised half is
+            // always true and the whole expression equals `is_classic_input_enabled` --
+            // the negation of this arm's condition. It could never be reached.
+            //
+            // The `AgentView` checks that used to wrap this are gone too: `agent_view` is a
+            // default cargo feature, so the flag is always on and the `else` arms were dead.
             self.render_universal_developer_input(app)
         } else {
+            // PS1 mode: the shell draws its own prompt, so the input renders inline with it.
             self.render_classic_input(app)
         }
     }

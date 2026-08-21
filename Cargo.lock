@@ -16102,7 +16102,6 @@ dependencies = [
  "rand 0.8.6",
  "ring",
  "secret-service",
- "security-framework 2.9.2",
  "serde",
  "serde_json",
  "sha2 0.10.9",

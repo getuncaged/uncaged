@@ -343,7 +343,7 @@ use crate::settings::{
     ChangelogSettings, CodeSettings, CodeSettingsChangedEvent, CtrlTabBehavior, CursorBlink,
     DebugSettings, DefaultSessionMode, FontSettings, GPUSettings, InputModeSettings, InputSettings,
     MonospaceFontSize, PaneSettings, PrivacySettings, SelectionSettings, Settings, SshSettings,
-    ThemeSettings,
+    ThemeSettings, UpdateSettings,
 };
 use crate::settings_view::environments_page::EnvironmentsPage;
 use crate::settings_view::handoff_environment_creation_modal::{
@@ -714,6 +714,9 @@ pub enum WorkspaceBanner {
     WaylandCrashRecovery,
     /// to display when settings.toml has errors (parse failure or invalid values)
     InvalidSettings,
+    /// Uncaged: the one-time "should we check GitHub for new releases?" question.
+    /// Shown until the user answers, because until they do we make no request.
+    UpdateCheckConsent,
 }
 
 impl WorkspaceBanner {
@@ -730,6 +733,9 @@ impl WorkspaceBanner {
             #[cfg(target_os = "linux")]
             Self::WaylandCrashRecovery => true,
             Self::InvalidSettings => true,
+            // Closeable: a question the user has not answered should never trap
+            // them. Closing it means "not now" and it returns next launch.
+            Self::UpdateCheckConsent => true,
         }
     }
 }
@@ -1069,6 +1075,9 @@ pub struct Workspace {
     resource_center_view: ViewHandle<ResourceCenterView>,
     command_search_view: ViewHandle<CommandSearchView>,
     autoupdate_unable_to_update_banner_dismissed: bool,
+    /// Uncaged: the update-check question was closed without answering. Resets
+    /// next launch, so dismissing is "not now" rather than a silent "never".
+    update_consent_banner_dismissed: bool,
     autoupdate_unable_to_launch_new_version: bool,
     reauth_banner_dismissed: bool,
     settings_file_error: Option<crate::settings::SettingsFileError>,
@@ -3394,6 +3403,7 @@ impl Workspace {
             resource_center_view,
             command_search_view,
             autoupdate_unable_to_update_banner_dismissed: false,
+            update_consent_banner_dismissed: false,
             autoupdate_unable_to_launch_new_version: false,
             reauth_banner_dismissed: false,
             settings_file_error,
@@ -22035,7 +22045,10 @@ impl Workspace {
         let banner_fields = self
             .render_reauth_banner_element()
             .or_else(|| self.render_settings_error_banner(app))
-            .or_else(|| self.render_autoupdate_banner_element(app));
+            .or_else(|| self.render_autoupdate_banner_element(app))
+            // Lowest priority: a question about updates can wait behind anything
+            // actually wrong.
+            .or_else(|| self.render_update_consent_banner(app));
 
         #[cfg(enable_crash_recovery)]
         let banner_fields = banner_fields.or_else(|| crash_recovery::banner_metadata(app));
@@ -22100,6 +22113,77 @@ impl Workspace {
             button: Some(WorkspaceBannerButtonDetails {
                 text: "Sign in".into(),
                 action: WorkspaceAction::Reauth,
+                variant: BannerButtonVariant::Outlined,
+                icon: None,
+                more_info_button_action: None,
+            }),
+        })
+    }
+
+    /// Records the answer to the one-time update-check question.
+    ///
+    /// Writes both settings together: `auto_update_prompt_answered` so we stop
+    /// asking, and `auto_update_enabled` with what they chose. They are separate
+    /// because "declined" and "not asked yet" must not be the same state — a
+    /// single flag could not tell them apart, and the app's promise to make no
+    /// request before being asked depends on that difference.
+    fn answer_update_check_prompt(&mut self, enable: bool, ctx: &mut ViewContext<Self>) {
+        UpdateSettings::handle(ctx).update(ctx, |settings, ctx| {
+            report_if_error!(settings.auto_update_enabled.set_value(enable, ctx));
+            report_if_error!(settings.auto_update_prompt_answered.set_value(true, ctx));
+        });
+        log::info!(
+            "Update checks {}",
+            if enable { "enabled" } else { "declined" }
+        );
+        if enable {
+            AutoupdateState::handle(ctx).update(ctx, |state, ctx| state.start_polling(ctx));
+        }
+        ctx.notify();
+    }
+
+    /// Uncaged: asks once whether to check GitHub for new releases.
+    ///
+    /// Until this is answered the app makes no update request at all, so the
+    /// question is the only thing standing between "checks for updates" and
+    /// "never phones home". It is a banner rather than a modal because it is not
+    /// urgent and must not block the terminal on first launch.
+    fn render_update_consent_banner(&self, app: &AppContext) -> Option<WorkspaceBannerFields> {
+        if !matches!(ChannelState::channel(), Channel::Oss) {
+            return None;
+        }
+        if self.update_consent_banner_dismissed {
+            return None;
+        }
+        if *UpdateSettings::as_ref(app).auto_update_prompt_answered {
+            return None;
+        }
+
+        Some(WorkspaceBannerFields {
+            banner_type: WorkspaceBanner::UpdateCheckConsent,
+            // The design system offers only Warning and Error. A question is
+            // neither, but Warning is by far the softer of the two.
+            severity: BannerSeverity::Warning,
+            heading: None,
+            // This is the only place the user is asked, so it has to describe what actually
+            // happens. It previously promised Uncaged "won't install anything" -- true of
+            // the earlier detect-and-link design, and false the moment updates began
+            // installing. A consent prompt that misdescribes the thing being consented to
+            // is worse than none.
+            description: "Check GitHub for new Uncaged releases and install them? Nothing \
+                          is sent about you. Updates are verified against the checksum \
+                          GitHub publishes, and Uncaged asks before restarting."
+                .to_owned(),
+            secondary_button: Some(WorkspaceBannerButtonDetails {
+                text: "No thanks".to_owned(),
+                action: WorkspaceAction::AnswerUpdateCheckPrompt(false),
+                variant: BannerButtonVariant::Naked,
+                icon: None,
+                more_info_button_action: None,
+            }),
+            button: Some(WorkspaceBannerButtonDetails {
+                text: "Check for updates".to_owned(),
+                action: WorkspaceAction::AnswerUpdateCheckPrompt(true),
                 variant: BannerButtonVariant::Outlined,
                 icon: None,
                 more_info_button_action: None,
@@ -22455,6 +22539,13 @@ impl Workspace {
             WorkspaceBanner::InvalidSettings => {
                 self.settings_error_banner_dismissed = true;
                 self.sync_settings_error_state_into_settings_pane(ctx);
+            }
+            // Deliberately does not record an answer. Closing a question is not
+            // answering it, and a reflexive dismissal must not silently turn
+            // updates off forever — the banner comes back next launch, and
+            // "No thanks" is there for anyone who wants it gone.
+            WorkspaceBanner::UpdateCheckConsent => {
+                self.update_consent_banner_dismissed = true;
             }
         }
         ctx.notify();
@@ -24224,6 +24315,7 @@ impl TypedActionView for Workspace {
             }
             CopyVersion(version) => self.copy_version(version, ctx),
             DownloadNewVersion => self.download_new_version(ctx),
+            AnswerUpdateCheckPrompt(enable) => self.answer_update_check_prompt(*enable, ctx),
             ConfigureKeybindingSettings { keybinding_name } => {
                 self.show_keyboard_settings(keybinding_name.as_deref(), ctx)
             }

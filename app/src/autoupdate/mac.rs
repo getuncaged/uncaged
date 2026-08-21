@@ -19,8 +19,11 @@ use nix::errno::Errno;
 use nix::unistd::{fchown, getgid, getuid};
 use warp_core::macos::get_bundle_path;
 use warp_core::safe_error;
+use warpui::platform::TerminationMode;
 use warpui::{AppContext, ModelContext, SingletonEntity};
 
+use super::github_releases;
+use super::install_source;
 use super::{release_assets_directory_url, DownloadReady};
 use crate::appearance::AppearanceManager;
 use crate::autoupdate::{AutoupdateStage, AutoupdateState};
@@ -106,6 +109,20 @@ where
                 // Apply the update in a background thread.
                 ctx.spawn(
                     async move {
+                        // Uncaged: hand the install to the bundled CLI updater and quit.
+                        //
+                        // A running app cannot cleanly replace the bundle it is executing
+                        // from -- every approach is a workaround for holding the directory
+                        // open, and each one can leave a half-updated install behind. The
+                        // script outlives us: it waits for this process to exit, swaps the
+                        // bundle, and relaunches. It is also the same command a user can run
+                        // by hand, so the update path is inspectable rather than a black box
+                        // inside the app.
+                        if matches!(ChannelState::channel(), Channel::Oss) {
+                            spawn_cli_updater()?;
+                            return Ok(Some(new_version));
+                        }
+
                         let result =
                             apply_update(ChannelState::channel(), &new_version, &update_id)
                                 .await
@@ -119,6 +136,26 @@ where
                             AppearanceManager::as_ref(ctx).set_app_icon(ctx);
                         }
                         autoupdate_state.clear_downloaded_update(&update_id_clone, ctx);
+
+                        // Uncaged: actually quit, having spawned the updater.
+                        //
+                        // Without this the app spawned the script and carried on running.
+                        // The script's first act is to wait for this process to exit, so it
+                        // sat out its timeout and then replaced a bundle that was still in
+                        // use, while the app -- unchanged, still the old version -- went on
+                        // offering "Update and relaunch". Clicking it again spawned another
+                        // updater. That is the loop.
+                        //
+                        // ForceTerminate rather than Cancellable: the user has already
+                        // answered the question this would ask, by pressing the button that
+                        // says the app is about to restart. The script relaunches us, so
+                        // upstream's own relaunch machinery is deliberately not involved.
+                        if result.is_ok() && matches!(ChannelState::channel(), Channel::Oss) {
+                            log::info!("Updater spawned; terminating so it can swap the bundle");
+                            ctx.terminate_app(TerminationMode::ForceTerminate, None);
+                            return;
+                        }
+
                         callback(autoupdate_state, result, ctx);
                     },
                 );
@@ -143,6 +180,10 @@ pub(super) fn relaunch() -> Result<()> {
     // If we're testing with a local copy of channel_versions.json, have the
     // newly-started binary also reference that same file (so we can test
     // displaying an updated changelog after an autoupdate).
+    // Debug-only: see channel_versions.rs. Never propagate the manifest
+    // override into the relaunched process in a shipped build — that would
+    // make a one-shot env var survive the update it just controlled.
+    #[cfg(debug_assertions)]
     if let Ok(path) = env::var("WARP_CHANNEL_VERSIONS_PATH") {
         launch_command.push(format!(" --env WARP_CHANNEL_VERSIONS_PATH={path}"));
     }
@@ -301,6 +342,31 @@ async fn is_directory_writable(directory: &Path) -> Result<bool> {
     };
 
     Ok(needs_authorization)
+}
+
+/// `codesign --verify` on the extracted bundle, with no team requirement.
+///
+/// This asks only "are these bytes self-consistent with the signature they
+/// carry", which for an ad-hoc signature means "was anything corrupted after it
+/// was signed". It deliberately does NOT establish who built it — nothing about
+/// an ad-hoc signature can. Origin is settled by the release digest, before the
+/// disk image is mounted.
+async fn verify_bundle_integrity(path: &Path) -> Result<()> {
+    let output = Command::new("/usr/bin/codesign")
+        .arg("--verify")
+        .arg("--deep")
+        .arg("--strict")
+        .arg(path)
+        .output()
+        .await
+        .context("running codesign --verify")?;
+    anyhow::ensure!(
+        output.status.success(),
+        "codesign --verify failed for {}: {}",
+        path.display(),
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+    Ok(())
 }
 
 /// Verifies that the staged bundle path has a valid macOS code signature, and that its
@@ -515,6 +581,56 @@ async fn download_and_extract_binary(
     client: &http_client::Client,
 ) -> Result<DownloadReady> {
     let bundle_path = PathBuf::from(get_bundle_path()?);
+
+    // Uncaged: never replace a bundle something else owns.
+    //
+    // A Homebrew cask copies the app into /Applications and keeps a receipt that
+    // says which version is there. Swapping the bundle underneath that leaves
+    // brew describing a version that no longer exists — a later `brew upgrade`
+    // reinstalls over the top, `brew uninstall` removes something it no longer
+    // matches, and the user's own tooling stops telling them the truth. Report
+    // the update; let the thing that installed it install it.
+    // Keyed on the release carrying assets, not on the channel. A version that
+    // arrived from GitHub has them; anything else is not an Uncaged self-update
+    // and must not be intercepted here. Branching on the channel instead would
+    // make this depend on the developer's own Homebrew state under test.
+    // Uncaged: nothing to download here -- the bundled CLI updater does the downloading,
+    // verifying and installing after we quit, so fetching the same dmg into a staging
+    // directory first would just be a second copy nobody reads. Report readiness and let
+    // the banner offer the restart that hands over to the script.
+    if matches!(channel, Channel::Oss) {
+        log::info!(
+            "Update {} available; the CLI updater will install it on restart",
+            version_info.version
+        );
+        return Ok(DownloadReady::Yes);
+    }
+
+    if !version_info.assets.is_empty() {
+        let source = install_source::detect();
+        if !source.may_self_update() {
+            // Uncaged: a managed install still updates on one click -- we just ask the
+            // manager to do it rather than replacing the bundle behind its back.
+            //
+            // Swapping the bundle ourselves would leave Homebrew's records pointing at a
+            // version that is no longer on disk, so `brew upgrade` would later reinstall
+            // over the top and `brew uninstall` would remove something it no longer
+            // matches. Running the upgrade *through* brew keeps its receipt truthful and
+            // still costs the user exactly one click. Afterwards the new bundle is already
+            // in place, so the only thing left is a relaunch.
+            if let Some(command) = source.upgrade_command() {
+                log::info!(
+                    "Managed install ({source:?}); running `{}`",
+                    command.join(" ")
+                );
+                return run_package_manager_upgrade(&command).await;
+            }
+
+            log::info!("Not self-updating: this install is managed ({source:?})");
+            return Ok(DownloadReady::NeedsAuthorization);
+        }
+    }
+
     let needs_authorization = needs_authorization(bundle_path.as_path())
         .await
         .unwrap_or(true);
@@ -531,7 +647,18 @@ async fn download_and_extract_binary(
     log::info!("Creating download dir {:?}", &download_dir);
     async_fs::create_dir_all(&download_dir).await?;
 
-    let dmg_path = download_dmg(&channel, version_info, update_id, client).await?;
+    // On Uncaged the release carries the asset: its URL is not derivable from
+    // the version, and the SHA-256 that stands in for a code signature certainly
+    // is not. `download_and_verify` hashes the file on disk and refuses to leave
+    // a mismatched one behind, so past this line the bytes are the bytes the
+    // release API vouched for.
+    let dmg_path = if let Some(asset) = version_info.asset_matching(|name| name.ends_with(".dmg")) {
+        let dmg_file = dmg_path(&channel, version_info, update_id);
+        github_releases::download_and_verify(asset, &dmg_file).await?;
+        dmg_file
+    } else {
+        download_dmg(&channel, version_info, update_id, client).await?
+    };
 
     // Mount the downloaded dmg so we can copy out the binary.
     let mountpoint = mount_dmg(&dmg_path, update_id).await?;
@@ -552,11 +679,28 @@ async fn download_and_extract_binary(
     // Store the executable path in a variable to prevent temporary value issues.
     let executable_path_buf = target.join(executable_path(channel));
     let verification_start = Instant::now();
-    future::try_zip(
-        verify_code_signature("bundle", &target),
-        verify_code_signature("executable", executable_path_buf.as_path()),
-    )
-    .await?;
+    if !version_info.assets.is_empty() {
+        // Uncaged is ad-hoc signed: `codesign -R "certificate leaf[subject.OU] =
+        // <team>"` has no team to pin and cannot distinguish a real build from a
+        // substituted one, so running it here would be theatre. Authenticity was
+        // established before the image was ever mounted, by hashing the download
+        // against the digest the release API published over a separate TLS
+        // response.
+        //
+        // What is still worth doing is asking whether the extracted bundle is
+        // internally consistent — that catches a truncated copy or a bad write,
+        // which the download hash cannot see. Its failure is not fatal for the
+        // same reason: an ad-hoc signature proves integrity, not origin.
+        if let Err(err) = verify_bundle_integrity(&target).await {
+            log::warn!("Extracted bundle failed its integrity check: {err:#}");
+        }
+    } else {
+        future::try_zip(
+            verify_code_signature("bundle", &target),
+            verify_code_signature("executable", executable_path_buf.as_path()),
+        )
+        .await?;
+    }
 
     log::info!(
         "Verified new app code signature in {:?}",
@@ -754,4 +898,71 @@ fn executable_path(channel: Channel) -> String {
     } else {
         executable_name(channel).to_owned()
     }
+}
+
+/// Runs a package manager's own upgrade command and reports whether it worked.
+///
+/// Uncaged: this is the managed-install half of "one button updates the app". Output is
+/// logged rather than surfaced, because the interesting outcome is binary -- either the
+/// manager upgraded the cask and the next relaunch picks it up, or it did not and we fall
+/// back to telling the user a version exists.
+async fn run_package_manager_upgrade(command: &[String]) -> Result<DownloadReady> {
+    let Some((program, args)) = command.split_first() else {
+        anyhow::bail!("empty upgrade command");
+    };
+
+    let output = Command::new(program)
+        .args(args)
+        .output()
+        .await
+        .with_context(|| format!("running `{}`", command.join(" ")))?;
+
+    if output.status.success() {
+        log::info!("`{}` succeeded", command.join(" "));
+        return Ok(DownloadReady::AlreadyUpgradedPendingRestart);
+    }
+
+    // Not fatal: report the update instead of claiming it was applied. A failed upgrade
+    // that reported success would send the user into a relaunch that changes nothing.
+    log::error!(
+        "`{}` failed ({}): {}",
+        command.join(" "),
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+    Ok(DownloadReady::NeedsAuthorization)
+}
+
+/// Path to the CLI updater shipped inside the bundle.
+fn cli_updater_path() -> Result<PathBuf> {
+    Ok(PathBuf::from(get_bundle_path()?).join("Contents/Resources/bin/uncaged-update"))
+}
+
+/// Starts the bundled updater detached and asks it to relaunch us when it is done.
+///
+/// Deliberately fire-and-forget: the script's first act is to wait for this process to
+/// exit, so anything that blocked on it would deadlock. `--restart` makes the relaunch the
+/// script's job rather than ours, for the same reason -- we will not be here.
+fn spawn_cli_updater() -> Result<()> {
+    let script = cli_updater_path()?;
+    anyhow::ensure!(
+        script.exists(),
+        "bundled updater missing at {}",
+        script.display()
+    );
+
+    blocking::Command::new("/bin/bash")
+        .arg(&script)
+        .arg("--restart")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .with_context(|| format!("spawning {}", script.display()))?;
+
+    log::info!(
+        "Spawned {} --restart; quitting so it can swap the bundle",
+        script.display()
+    );
+    Ok(())
 }
