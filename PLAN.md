@@ -31,6 +31,16 @@ parsed skills 3.2 MB, then a long tail of 1–2 MB entries. **No single dominant
 micro-optimisation is diminishing returns; the remaining structural lever is compiled-code
 residency (drive/cloud_object gating, in progress on this branch).
 
+### drive/cloud_object gating: attempted, measured, withdrawn
+
+Gating `mod drive;` produced 169 first-wave errors (unresolved imports only — the usage wave
+behind them is larger). Before paying that, the payoff check: vmmap shows only 72.5 MB of the
+274 MB `__TEXT` resident — **pages that never execute are never paged in**, so dead cloud code
+costs disk, not RAM. Gating buys a few MB of binary and ~zero footprint, against 169+ risky
+edits through live UI files. Withdrawn. The survey's "terminal is a rounding error next to the
+cloud client" was about compiled size; compiled-dead is runtime-free. If binary size ever
+matters (download weight), revisit with the stub-module approach and budget a full day.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.
