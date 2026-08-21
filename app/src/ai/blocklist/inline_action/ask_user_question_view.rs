@@ -1910,7 +1910,7 @@ pub(crate) fn render_text_with_markdown_support(
     text_color: pathfinder_color::ColorU,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
-    if let Ok(formatted_text) = markdown_parser::parse_markdown(text) {
+    if let Ok(formatted_text) = markdown_parser::parse_markdown_cached(text) {
         FormattedTextElement::new(
             formatted_text,
             font_size,

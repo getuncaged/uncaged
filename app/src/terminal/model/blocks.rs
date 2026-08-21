@@ -303,6 +303,13 @@ pub struct BlockList {
     /// boolean `false`.
     in_flight_in_band_command_count: usize,
 
+    /// Uncaged: whether any block *may* currently have an active output filter.
+    /// An over-approximation used to skip the per-render scan of every block in
+    /// [`Self::filtered_blocks`]; set when a filter is applied, self-heals to
+    /// `false` the first time a scan comes back empty. Filters are rare, so in
+    /// practice this turns an O(blocks)-per-frame walk into a bool check.
+    may_have_filtered_blocks: std::cell::Cell<bool>,
+
     /// The most recently received populated Precmd payload.
     ///
     /// This may be used to initialize the active block if we receive an unpopulated Precmd payload,
@@ -654,6 +661,7 @@ impl BlockList {
             latest_block_finished_time: None,
             early_output: EarlyOutput::new(event_proxy),
             in_flight_in_band_command_count: 0,
+            may_have_filtered_blocks: std::cell::Cell::new(false),
             last_populated_precmd_payload: None,
             cached_prompt_data: None,
             obfuscate_secrets,
@@ -2342,6 +2350,15 @@ impl BlockList {
     }
 
     pub fn update_rich_content_heights(&mut self, updated_heights: &HashMap<EntityId, f64>) {
+        // Uncaged: nothing changed, do nothing. This is called unconditionally twice per
+        // layout pass (block_list_element.rs), and `update_blocks_and_sumtree` rebuilds the
+        // entire height SumTree by walking every blocklist item -- so with the cursor
+        // blinking at 500 ms, an idle focused window was rebuilding the tree four times a
+        // second over an empty update map. The map is empty on every pass except the ones
+        // where an AI turn actually resized.
+        if updated_heights.is_empty() {
+            return;
+        }
         self.update_blocks_and_sumtree(None, Some(updated_heights), |_| {}, |_| {});
     }
 
@@ -3182,11 +3199,19 @@ impl BlockList {
     }
 
     pub fn filtered_blocks(&self) -> HashSet<BlockIndex> {
-        self.blocks
+        if !self.may_have_filtered_blocks.get() {
+            return HashSet::new();
+        }
+        let filtered = self
+            .blocks
             .iter()
             .filter(|&block| block.current_filter().is_some_and(|query| query.is_active))
             .map(|block| block.index())
-            .collect::<HashSet<BlockIndex>>()
+            .collect::<HashSet<BlockIndex>>();
+        if filtered.is_empty() {
+            self.may_have_filtered_blocks.set(false);
+        }
+        filtered
     }
 
     /// Filters the output grid of the block at the given index. Any logical lines
@@ -3198,6 +3223,7 @@ impl BlockList {
             .filter(|block| !block.is_empty(&self.agent_view_state));
         if let Some(block) = block_to_filter {
             block.filter_output(filter_query);
+            self.may_have_filtered_blocks.set(true);
             self.update_block_height_at_idx(block_index);
         }
         self.clear_selection();

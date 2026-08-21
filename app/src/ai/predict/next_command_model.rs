@@ -315,7 +315,7 @@ impl NextCommandModel {
         prefix: &str,
         completer_data: &CompleterData,
         app: &AppContext,
-    ) -> Option<Vec<HistoryEntry>> {
+    ) -> Option<Vec<String>> {
         let session_id = completer_data.active_block_session_id()?;
         let history_entries = History::as_ref(app).commands(session_id)?;
         let working_dir = completer_data
@@ -480,12 +480,12 @@ impl NextCommandModel {
                     // First, return the most recent command with a matching prefix run in the same pwd
                     // (if exists, otherwise just most recent command anywhere with matching prefix).
                     for reverse_chronological_command in reverse_chronological_potential_autosuggestions.unwrap_or_default() {
-                        if is_command_valid(&reverse_chronological_command.command, completion_context.as_ref(), session_env_vars.as_ref()).await {
+                        if is_command_valid(&reverse_chronological_command, completion_context.as_ref(), session_env_vars.as_ref()).await {
                             return (
                                 Ok(GenerateAIInputSuggestionsResponseV2 {
-                                    commands: vec![reverse_chronological_command.command.clone()],
+                                    commands: vec![reverse_chronological_command.clone()],
                                 ai_queries: vec![],
-                                most_likely_action: reverse_chronological_command.command,
+                                most_likely_action: reverse_chronological_command,
                             }),
                             request,
                             false,
@@ -803,15 +803,27 @@ pub async fn is_command_valid(
 /// with the buffer text to return as a potential autosuggestion. Prioritizes commands
 /// in history that were executed in the user's current working directory,
 /// with any command executed in other directories at the end.
+///
+/// Uncaged: returns the command strings, deduplicated, rather than cloned entries.
+/// This runs on the UI thread from the input's `Edited` handler -- every keystroke --
+/// and used to `entry.clone()` (eight owned Strings) for *every* matching entry in a
+/// history that HISTSIZE can put at 100k, when both consumers read only `.command` and
+/// stop at the first candidate that validates. Deduplication matters as much as the
+/// clone: a history full of repeated `git status` previously produced hundreds of
+/// identical candidates, and the consumer re-ran async validity on each one in turn.
 fn find_potential_autosuggestions_from_history<'a>(
     history_entries: impl DoubleEndedIterator<Item = &'a HistoryEntry>,
     buffer_text: &str,
     working_dir: Option<&str>,
-) -> Vec<HistoryEntry> {
+) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
     let mut commands_in_same_dir = vec![];
     let mut commands_in_other_dirs = vec![];
     for entry in history_entries.rev() {
         if !entry.command.starts_with(buffer_text) {
+            continue;
+        }
+        if !seen.insert(entry.command.as_str()) {
             continue;
         }
         let same_dir = entry
@@ -821,9 +833,9 @@ fn find_potential_autosuggestions_from_history<'a>(
             .is_some_and(|(pwd, working_dir)| pwd == working_dir);
 
         if same_dir {
-            commands_in_same_dir.push(entry.clone());
+            commands_in_same_dir.push(entry.command.clone());
         } else {
-            commands_in_other_dirs.push(entry.clone());
+            commands_in_other_dirs.push(entry.command.clone());
         }
     }
     commands_in_same_dir.extend(commands_in_other_dirs);

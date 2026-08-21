@@ -26,7 +26,6 @@ fn test_find_autosuggestion_from_history_same_directory() {
         Some("/Users/tadej"),
     )
     .into_iter()
-    .map(|history_entry| history_entry.command)
     .collect_vec();
 
     assert_eq!(
@@ -55,7 +54,6 @@ fn test_find_autosuggestion_from_history_error_exit_code() {
         Some("/Users/tadej"),
     )
     .into_iter()
-    .map(|history_entry| history_entry.command)
     .collect_vec();
 
     assert_eq!(
@@ -80,7 +78,6 @@ fn test_find_autosuggestion_from_history_no_working_dir() {
     let autosuggestions =
         find_potential_autosuggestions_from_history(history_entries.iter(), "cd D", None)
             .into_iter()
-            .map(|history_entry| history_entry.command)
             .collect_vec();
 
     assert_eq!(
@@ -106,7 +103,6 @@ fn test_find_autosuggestion_from_history_different_directory() {
         Some("/Users/jonas"),
     )
     .into_iter()
-    .map(|history_entry| history_entry.command)
     .collect_vec();
 
     assert_eq!(
@@ -123,7 +119,6 @@ fn test_find_autosuggestion_from_history_different_directory() {
     let autosuggestions =
         find_potential_autosuggestions_from_history(history_entries.iter(), "cd D", None)
             .into_iter()
-            .map(|history_entry| history_entry.command)
             .collect_vec();
 
     assert_eq!(
@@ -151,7 +146,7 @@ fn test_find_autosuggestion_from_history_no_matching_commands() {
         Some("/Users/jonas"),
     );
 
-    assert_eq!(autosuggestions, vec![]);
+    assert_eq!(autosuggestions, Vec::<String>::new());
 }
 
 #[test]
@@ -169,7 +164,6 @@ fn test_find_autosuggestion_from_history_matches_command_with_no_pwd() {
         Some("/Users/tadej"),
     )
     .into_iter()
-    .map(|history_entry| history_entry.command)
     .collect_vec();
 
     assert_eq!(autosuggestions, vec!["cd Pictures".to_owned()]);
@@ -188,7 +182,6 @@ fn test_find_autosuggestion_from_history_with_no_pwd_and_no_working_directory() 
     let autosuggestions =
         find_potential_autosuggestions_from_history(history_entries.iter(), "cd D", None)
             .into_iter()
-            .map(|history_entry| history_entry.command)
             .collect_vec();
 
     assert_eq!(

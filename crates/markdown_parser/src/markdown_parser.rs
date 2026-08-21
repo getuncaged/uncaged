@@ -107,6 +107,39 @@ pub fn parse_markdown_with_gfm_tables(markdown: &str) -> Result<FormattedText> {
     parse_markdown_impl(markdown, true)
 }
 
+/// Uncaged: memoized [`parse_markdown`] for render-path callers.
+///
+/// Several elements (the agent-view zero state, inline action headers, ask-user
+/// question text) parse the same short, mostly-static strings on every frame,
+/// which made an *idle* window pay a nom parse per string per frame. The cache
+/// is thread-local because those callers all live on the UI thread; it is
+/// bounded and simply cleared when full, since the working set is a handful of
+/// strings. Parse failures are not cached — callers treat them as a rare
+/// fallback path.
+pub fn parse_markdown_cached(markdown: &str) -> Result<FormattedText> {
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+
+    const CACHE_CAP: usize = 64;
+    thread_local! {
+        static CACHE: RefCell<HashMap<String, FormattedText>> =
+            RefCell::new(HashMap::with_capacity(CACHE_CAP));
+    }
+
+    if let Some(hit) = CACHE.with(|cache| cache.borrow().get(markdown).cloned()) {
+        return Ok(hit);
+    }
+    let parsed = parse_markdown(markdown)?;
+    CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if cache.len() >= CACHE_CAP {
+            cache.clear();
+        }
+        cache.insert(markdown.to_owned(), parsed.clone());
+    });
+    Ok(parsed)
+}
+
 fn parse_markdown_impl(markdown: &str, parse_gfm_tables: bool) -> Result<FormattedText> {
     parse_markdown_internal::<'_, nom::error::Error<_>>(markdown, parse_gfm_tables)
         .map(|(_, mut res)| {

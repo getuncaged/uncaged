@@ -4,7 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use itertools::Itertools as _;
-use markdown_parser::{parse_markdown, FormattedText, FormattedTextFragment, FormattedTextLine};
+use markdown_parser::{parse_markdown_cached, FormattedText, FormattedTextFragment, FormattedTextLine};
 use parking_lot::FairMutex;
 use settings::Setting;
 use warp_core::features::FeatureFlag;
@@ -625,7 +625,7 @@ fn render_title_and_description(props: HeaderProps, app: &AppContext) -> Vec<Box
         AgentViewDescription::PlainText(text_items) => {
             let description_items = text_items.into_iter().map(|description_item| {
                 FormattedTextElement::new(
-                    parse_markdown(&description_item).expect("is valid markdown"),
+                    parse_markdown_cached(&description_item).expect("is valid markdown"),
                     appearance.monospace_font_size(),
                     appearance.ui_font_family(),
                     appearance.ui_font_family(),

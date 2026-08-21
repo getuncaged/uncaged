@@ -229,7 +229,7 @@ impl HeaderConfig {
         .finish();
 
         if self.use_markdown {
-            if let Ok(formatted_text) = markdown_parser::parse_markdown(&self.title) {
+            if let Ok(formatted_text) = markdown_parser::parse_markdown_cached(&self.title) {
                 let mut element = FormattedTextElement::new(
                     formatted_text,
                     appearance.monospace_font_size(),

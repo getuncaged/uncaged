@@ -52,6 +52,43 @@ edits through live UI files. Withdrawn. The survey's "terminal is a rounding err
 cloud client" was about compiled size; compiled-dead is runtime-free. If binary size ever
 matters (download weight), revisit with the stub-module approach and budget a full day.
 
+### Step 9 slice 1 (this session): per-keystroke and per-frame constants
+
+Landed together, compile- and test-verified:
+
+- **A1** `update_rich_content_heights` returns early on an empty map (`blocks.rs`) — kills the
+  ≥2 full SumTree rebuilds per layout at idle (§4.4 item 1, "cheapest large frame-cost win").
+- **A2** `find_potential_autosuggestions_from_history` returns **deduplicated command Strings**
+  instead of cloning whole 8-String `HistoryEntry`s per match (§4.3 item 1). Dedup matters as
+  much as the clone: repeated history commands were re-validated one by one by the consumer.
+  Both consumers (input.rs, next_command_model.rs) take the first `.command` that validates.
+- **A3 (reshaped)** the plan said "use `last_buffer_text()` at the comparison sites" — **wrong,
+  do not do this**: `last_buffer_text` is the *pre-edit* text (set in `start_batch` before the
+  edit applies; see `test_last_buffer_text`). Instead `run_input_background_jobs` now builds
+  the buffer String **once** per tick instead of three times (decorations.rs). The rebuild
+  inside `apply_decorations` stays — it is the race-guard against the async parse snapshot.
+- **A4** `filtered_blocks()` skips the per-render scan of every block via a self-healing
+  `may_have_filtered_blocks: Cell<bool>` over-approximation (§4.4 item 3). `bookmarked_blocks`
+  was already a keys-copy of a maintained map — left alone.
+- **A6** `parse_markdown_cached` (new, in `markdown_parser`) — bounded thread-local memo;
+  the three per-render parse sites (zero-state, inline action header, ask-user question) now
+  hit it (§4.4 item 8).
+- **A8** first-ever SQLite indexes: `commands(session_id, id)`, `commands(command, pwd)`,
+  `blocks(pane_leaf_uuid)` (migration `2026-08-22-000000_add_hot_path_indexes`, §3.2/§4.3 item 3).
+- **A9** `set_zero_state_hint_text` static-command hint placeholders precomputed in a
+  `LazyLock` instead of re-walking `COMMAND_REGISTRY` with fresh `format!`s ×16 call sites (§4.3 item 5).
+
+Deliberately **not** done, with reasons:
+
+- **WarpTheme per-element clone (§4.4 item 7): skipped.** Measured the type: `AssetSource` is
+  path/`Arc`-based, so a clone is ~2 small heap allocs, and both sites run once per render
+  pass, not per block. Not worth an `Arc<WarpTheme>` churn through `GridRenderParams`.
+- **Overhang pass dirty-set (§4.4 item 2): deferred.** `rich_content_elements` are rebuilt
+  fresh each frame (`with_rich_content` inserts new `Box<dyn Element>`s), so there is no
+  cached size to reuse; skipping non-dirty items needs a real dirty signal from the view
+  layer. Wrong-height regressions (clipping/scroll) are worse than the cost. Revisit with §3's
+  model-known heights, which deletes this pass entirely.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.

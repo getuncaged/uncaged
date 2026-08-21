@@ -185,9 +185,6 @@ impl Input {
 
         match self.completion_session_context_or_empty_context(ctx) {
             CompletionSessionContext::Session(completion_context) => {
-                let editor = self.editor.as_ref(ctx);
-                let buffer_text = editor.buffer_text(ctx);
-
                 if matches!(&self.last_parsed_tokens, Some(last_parsed_tokens) if buffer_text == last_parsed_tokens.buffer_text)
                 {
                     if mode.ai_input_detection {
@@ -235,7 +232,6 @@ impl Input {
                 if mode.ai_input_detection {
                     // No session context available (e.g., shared session viewer).
                     // Use a dedicated detection context that does not expose top-level commands.
-                    let buffer_text = self.editor.as_ref(ctx).buffer_text(ctx);
                     let ai_input_model = self.ai_input_model.clone();
                     ctx.spawn(
                         async move {

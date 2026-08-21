@@ -6874,20 +6874,24 @@ impl Input {
 
         let toggled_on = *InputSettings::as_ref(ctx).show_hint_text;
 
-        // Loop through all static commands and set placeholders for those with hint text
+        // Set placeholders for the static commands that have hint text.
+        // Uncaged: the registry and its hint texts are compile-time constants, and
+        // this function runs on mode/settings changes from sixteen call sites, so
+        // the (prefix, hint) pairs are computed once instead of walking the
+        // registry and re-formatting every prefix on each call.
+        static COMMAND_HINT_PLACEHOLDERS: std::sync::LazyLock<Vec<(String, &'static str)>> =
+            std::sync::LazyLock::new(|| {
+                COMMAND_REGISTRY
+                    .all_commands()
+                    .filter_map(|command| {
+                        let hint_text = command.argument.as_ref()?.hint_text?;
+                        Some((format!("{} ", command.name), hint_text))
+                    })
+                    .collect()
+            });
         self.editor.update(ctx, |editor, ctx| {
-            for command in COMMAND_REGISTRY.all_commands() {
-                if let Some(hint_text) = command
-                    .argument
-                    .as_ref()
-                    .and_then(|argument| argument.hint_text)
-                {
-                    editor.set_placeholder_text_with_prefix(
-                        format!("{} ", command.name),
-                        hint_text,
-                        ctx,
-                    );
-                }
+            for (prefix, hint_text) in COMMAND_HINT_PLACEHOLDERS.iter() {
+                editor.set_placeholder_text_with_prefix(prefix.clone(), *hint_text, ctx);
             }
         });
 
@@ -9569,9 +9573,9 @@ impl Input {
                     for reverse_chronological_command in
                         reverse_chronological_potential_autosuggestions.unwrap_or_default()
                     {
-                        if !ignored_suggestions.contains(&reverse_chronological_command.command)
+                        if !ignored_suggestions.contains(&reverse_chronological_command)
                             && is_command_valid(
-                                &reverse_chronological_command.command,
+                                &reverse_chronological_command,
                                 completion_context.as_ref(),
                                 session_env_vars.as_ref(),
                             )
@@ -9579,7 +9583,7 @@ impl Input {
                         {
                             return AutoSuggestionResult {
                                 buffer_text,
-                                autosuggestion_result: Some(reverse_chronological_command.command),
+                                autosuggestion_result: Some(reverse_chronological_command),
                             };
                         }
                     }
