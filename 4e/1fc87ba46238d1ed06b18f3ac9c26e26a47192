@@ -1,0 +1,19 @@
+app/src/settings_view/environments_page_tests.rs
+  s_6e5dc450e2113a::t_5b2becf50b67e5 686-692
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "4e1fc87ba46238d1ed06b18f3ac9c26e26a47192",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
