@@ -683,6 +683,13 @@ fn test_render_list_page_with_environments_shows_list() {
     })
 }
 
+// Uncaged: asserts the "shared by <team>" section of the environments page -- UI for
+// Warp-cloud team environments, which this fork disabled with the rest of the
+// account-backed features (see the `default` feature pruning in app/Cargo.toml). The
+// section no longer renders, so the assertion describes a product this build is not.
+// Gated on the feature that owns the behaviour rather than deleted, so it resurrects
+// intact if `cloud_environments` ever comes back.
+#[cfg(feature = "cloud_environments")]
 #[test]
 fn test_render_list_page_with_personal_and_team_environments_shows_section_headers() {
     App::test((), |mut app| async move {
