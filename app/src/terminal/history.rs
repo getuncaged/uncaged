@@ -635,7 +635,19 @@ impl History {
         host: ShellHost,
         ctx: &mut ModelContext<Self>,
     ) {
-        let deduped_history_file_commands = dedupe_from_last(history_file_commands);
+        let mut deduped_history_file_commands = dedupe_from_last(history_file_commands);
+
+        // Uncaged: cap how much of the shell history file we keep resident. With
+        // HISTSIZE=100000 this map previously held 100k `Arc<HistoryEntry>` per
+        // host forever, and every consumer walked the full list. We keep the most
+        // recent entries (the file is ordered oldest -> newest, and deduping has
+        // already collapsed repeats to their latest occurrence); indices derived
+        // below are computed after the cap, so they stay consistent.
+        const MAX_RETAINED_HISTORY_FILE_COMMANDS: usize = 10_000;
+        if deduped_history_file_commands.len() > MAX_RETAINED_HISTORY_FILE_COMMANDS {
+            let excess = deduped_history_file_commands.len() - MAX_RETAINED_HISTORY_FILE_COMMANDS;
+            deduped_history_file_commands.drain(..excess);
+        }
 
         let mut start_index = deduped_history_file_commands.len();
         self.history_file_commands.insert(

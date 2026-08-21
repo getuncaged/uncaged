@@ -89,6 +89,29 @@ Deliberately **not** done, with reasons:
   layer. Wrong-height regressions (clipping/scroll) are worse than the cost. Revisit with §3's
   model-known heights, which deletes this pass entirely.
 
+### §5 "Explicitly dropped" — landed (this session)
+
+- **Share-block permalink: removed.** The context-menu "Share..." item, the cmd-shift-S
+  binding (`CustomAction::CreateBlockPermalink`), the app-menu entry, `ShareBlockModal`
+  (1,566 lines, deleted), the pane-group modal plumbing, and the three telemetry variants
+  that could only fire from it. This was the last UI path that uploaded terminal content
+  (command + output) to Warp's servers — the README/FAQ claim "never sends your prompts or
+  terminal data to a central service" is now true rather than aspirational. The GraphQL
+  client (`server_api/block.rs`, `server/block.rs`) stays as dead code: the hidden
+  Shared-blocks settings page still constructs against it (constructed-but-unnavigable
+  pattern), and dead code costs disk, not RAM.
+- **Voice input: removed from shipped builds.** `gui = []` in `app/Cargo.toml` (was
+  `["voice_input"]`) — dictation recorded audio and POSTed it to
+  `{server_root_url}/ai/transcribe` / Wispr. Every render site already had a
+  `#[cfg(not(feature = "voice_input"))]` arm (headless builds prove the config), so this
+  compiles the mic out of both footers and the settings section; the toolbar-configurator
+  lists needed four small `cfg!` gates so "Voice Input" is no longer offered as an addable
+  item that renders nothing. The feature still exists behind an explicit flag if a *local*
+  transcriber ever backs it.
+- **Warp Drive: kept, deliberately.** It holds local workflows/notebooks (real CLI sugar,
+  "features we like"), its cloud sync is already gone, and its dead cloud code is
+  disk-weight only. Revisit only if the user asks for it to go.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.

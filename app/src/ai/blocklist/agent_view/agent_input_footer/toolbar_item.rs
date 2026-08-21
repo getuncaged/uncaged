@@ -224,7 +224,9 @@ impl AgentToolbarItemKind {
         {
             items.push(Self::HandoffToCloud);
         }
-        items.push(Self::VoiceInput);
+        if cfg!(feature = "voice_input") {
+            items.push(Self::VoiceInput);
+        }
         items.push(Self::FileAttach);
         items
     }
@@ -238,10 +240,12 @@ impl AgentToolbarItemKind {
         items.extend([
             Self::ModelSelector,
             Self::NLDToggle,
-            Self::VoiceInput,
             Self::FileAttach,
             Self::ContextWindowUsage,
         ]);
+        if cfg!(feature = "voice_input") {
+            items.push(Self::VoiceInput);
+        }
         if FeatureFlag::FastForwardAutoexecuteButton.is_enabled() {
             items.push(Self::FastForwardToggle);
         }
@@ -263,9 +267,11 @@ impl AgentToolbarItemKind {
     pub fn cli_default_left() -> Vec<Self> {
         let mut items = vec![
             Self::FileAttach,
-            Self::VoiceInput,
             Self::ContextChip(ContextChipKind::GitDiffStats),
         ];
+        if cfg!(feature = "voice_input") {
+            items.insert(1, Self::VoiceInput);
+        }
         if FeatureFlag::CreatingSharedSessions.is_enabled()
             && FeatureFlag::HOARemoteControl.is_enabled()
         {
@@ -297,9 +303,11 @@ impl AgentToolbarItemKind {
             Self::FileExplorer,
             Self::RichInput,
             Self::FileAttach,
-            Self::VoiceInput,
             Self::Settings,
         ]);
+        if cfg!(feature = "voice_input") {
+            items.push(Self::VoiceInput);
+        }
         if FeatureFlag::CreatingSharedSessions.is_enabled()
             && FeatureFlag::HOARemoteControl.is_enabled()
         {
