@@ -14,6 +14,15 @@
 Baseline (before tonight): binary 401 MB · `ps` RSS 376 MB · physical footprint 196.8 MB · 61 threads · ~5 wakeups/s.
 After the watcher+ONNX build: binary 359 MB · footprint 196.7 MB · wakeups 0.3/s. Font-deferral build: measurement pending.
 
+### Final-build memory readings (for the next session's baseline)
+
+Last build of the night, restored session incl. Settings tab: peak footprint **383.8 MB**
+(was 399.9 before the font fix — the startup spike shrank), 303.5 MB at T+7 min and still
+decaying; the earlier 196.7 MB reading was the same session at T+34 min. Compare at equal
+uptime only. Heap attribution (99.6 MB `MALLOC_SMALL` vs Terminal.app 7.8 MB) is the next
+target; the font mappings no longer pollute the profile, so a fresh `MallocStackLogging=lite`
+run will now show the real heap owners directly.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.
