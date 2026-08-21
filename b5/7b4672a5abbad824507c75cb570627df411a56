@@ -1,0 +1,38 @@
+script/Entitlements.plist
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 19-31
+packaging/winget/Uncaged.Uncaged.locale.en-US.yaml
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 14
+FAQ.md
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 32-34
+crates/warp_core/src/macos.rs
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 5-19
+.github/workflows/uncaged-release.yml
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 529-548
+app/src/bin/oss.rs
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 16-23
+UNCAGED.md
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 153-161
+README.md
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 15-24,41-44,75-98,101-102
+  s_6e5dc450e2113a::t_a1452efd29a720 103
+.github/workflows/uncaged-winget.yml
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 1-181
+DIRECTION.md
+  s_6e5dc450e2113a::t_22b3e39c7b71d7 95-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "b57b4672a5abbad824507c75cb570627df411a56",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
