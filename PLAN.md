@@ -1,3 +1,12 @@
+# Branch strategy (decided 2026-08-21)
+
+**This branch is the split.** `test-combined` is the divergence line from the Warp codebase:
+nothing on it merges to `main` and nothing releases until the split is deliberate and named.
+`main` stays a clean mirror-plus-minimal-patches of upstream for as long as that is useful.
+All open PRs against `main` (#22, #27, #29–#33) are converted to draft so nothing lands by
+reflex; they now serve as CI vehicles and documentation of the work, not as merge requests.
+When the split gets its real name, rename this branch once and retarget the PRs or close them.
+
 # Progress ledger (updated as work lands — measurements, not intentions)
 
 ## Landed, with measurements
