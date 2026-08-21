@@ -23,6 +23,14 @@ uptime only. Heap attribution (99.6 MB `MALLOC_SMALL` vs Terminal.app 7.8 MB) is
 target; the font mappings no longer pollute the profile, so a fresh `MallocStackLogging=lite`
 run will now show the real heap owners directly.
 
+### Heap attribution (MSL run, post-font-fix — question closed)
+
+Top live owners: GridStorage 10.0 MB (scrollback, 7 panes — legitimate), sqlite cache 5.2 MB,
+ANSI parser states 3.4 MB (167 × 20 KB — count worth a look someday), compiled regexes 3.4 MB,
+parsed skills 3.2 MB, then a long tail of 1–2 MB entries. **No single dominant owner.** Heap
+micro-optimisation is diminishing returns; the remaining structural lever is compiled-code
+residency (drive/cloud_object gating, in progress on this branch).
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.
