@@ -1,0 +1,21 @@
+PLAN.md
+  s_6e5dc450e2113a::t_37499266bbacb0 3-5
+app/Cargo.toml
+  s_6e5dc450e2113a::t_dbecbb8a8d160c 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "f06f44caaec3664bb3e11bbf90870325101ba212",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
