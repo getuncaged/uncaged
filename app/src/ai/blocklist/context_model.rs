@@ -270,7 +270,6 @@ impl BlocklistAIContextModel {
                 | AgentViewControllerEvent::EnteredAgentView { .. } => {
                     me.auto_attached_agent_view_user_block_ids.clear();
                 }
-                AgentViewControllerEvent::ExitConfirmed { .. } => {}
             }
         });
 

@@ -764,26 +764,6 @@ fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn E
             ),
         ];
 
-        // Only show "escape to go back" if there's a parent terminal
-        if has_parent_terminal {
-            body_items.push(render_standard_message(
-                Message::new(vec![MessageItem::clickable(
-                    vec![
-                        MessageItem::keystroke(Keystroke {
-                            key: "escape".to_owned(),
-                            ..Default::default()
-                        }),
-                        MessageItem::text("go back to terminal"),
-                    ],
-                    |ctx| {
-                        ctx.dispatch_typed_action(TerminalAction::ExitAgentView);
-                    },
-                    state_handles.exit.clone(),
-                )]),
-                app,
-            ));
-        }
-
         body_items
     };
 

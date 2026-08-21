@@ -5570,7 +5570,7 @@ fn exiting_agent_view_removes_empty_conversations() {
 }
 
 #[test]
-fn ctrl_c_exit_agent_view_requires_confirmation() {
+fn ctrl_c_never_exits_agent_view() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         FeatureFlag::AgentView.set_enabled(true);
@@ -5593,33 +5593,25 @@ fn ctrl_c_exit_agent_view_requires_confirmation() {
             })
         });
 
-        // First ctrl-c should arm confirmation but not exit.
-        terminal.update(&mut app, |view, ctx| {
-            assert!(view.agent_view_controller().as_ref(ctx).is_active());
-            view.handle_input_event(
-                &InputEvent::CtrlC {
-                    cleared_buffer_len: 0,
-                },
-                ctx,
-            );
-            assert!(view.agent_view_controller().as_ref(ctx).is_active());
-        });
-
-        // Second ctrl-c should confirm and exit.
-        terminal.update(&mut app, |view, ctx| {
-            view.handle_input_event(
-                &InputEvent::CtrlC {
-                    cleared_buffer_len: 0,
-                },
-                ctx,
-            );
-            assert!(!view.agent_view_controller().as_ref(ctx).is_active());
-        });
+        // Uncaged: AI vs terminal is a mode, not a place. No number of ctrl-c
+        // presses exits the agent view; the mode toggle is the only way out.
+        for _ in 0..3 {
+            terminal.update(&mut app, |view, ctx| {
+                assert!(view.agent_view_controller().as_ref(ctx).is_active());
+                view.handle_input_event(
+                    &InputEvent::CtrlC {
+                        cleared_buffer_len: 0,
+                    },
+                    ctx,
+                );
+                assert!(view.agent_view_controller().as_ref(ctx).is_active());
+            });
+        }
     })
 }
 
 #[test]
-fn ctrl_c_buffer_clear_then_exit_requires_three_presses_in_agent_view() {
+fn ctrl_c_clears_buffer_without_exiting_agent_view() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         FeatureFlag::AgentView.set_enabled(true);
@@ -5641,7 +5633,7 @@ fn ctrl_c_buffer_clear_then_exit_requires_three_presses_in_agent_view() {
             })
         });
 
-        // 1st ctrl-c clears input buffer (simulated) and should not trigger cancel/exit.
+        // A ctrl-c that clears the input buffer is swallowed in agent view...
         terminal.update(&mut app, |view, ctx| {
             assert!(view.agent_view_controller().as_ref(ctx).is_active());
             view.handle_input_event(
@@ -5653,32 +5645,23 @@ fn ctrl_c_buffer_clear_then_exit_requires_three_presses_in_agent_view() {
             assert!(view.agent_view_controller().as_ref(ctx).is_active());
         });
 
-        // 2nd ctrl-c arms exit confirmation.
-        terminal.update(&mut app, |view, ctx| {
-            view.handle_input_event(
-                &InputEvent::CtrlC {
-                    cleared_buffer_len: 0,
-                },
-                ctx,
-            );
-            assert!(view.agent_view_controller().as_ref(ctx).is_active());
-        });
-
-        // 3rd ctrl-c confirms and exits.
-        terminal.update(&mut app, |view, ctx| {
-            view.handle_input_event(
-                &InputEvent::CtrlC {
-                    cleared_buffer_len: 0,
-                },
-                ctx,
-            );
-            assert!(!view.agent_view_controller().as_ref(ctx).is_active());
-        });
+        // ...and no further presses exit the view either (modes, not places).
+        for _ in 0..2 {
+            terminal.update(&mut app, |view, ctx| {
+                view.handle_input_event(
+                    &InputEvent::CtrlC {
+                        cleared_buffer_len: 0,
+                    },
+                    ctx,
+                );
+                assert!(view.agent_view_controller().as_ref(ctx).is_active());
+            });
+        }
     })
 }
 
 #[test]
-fn terminal_action_ctrl_c_exit_agent_view_requires_confirmation() {
+fn terminal_action_ctrl_c_never_exits_agent_view() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         FeatureFlag::AgentView.set_enabled(true);
@@ -5700,16 +5683,13 @@ fn terminal_action_ctrl_c_exit_agent_view_requires_confirmation() {
             })
         });
 
-        terminal.update(&mut app, |view, ctx| {
-            assert!(view.agent_view_controller().as_ref(ctx).is_active());
-            view.handle_action(&TerminalAction::CtrlC, ctx);
-            assert!(view.agent_view_controller().as_ref(ctx).is_active());
-        });
-
-        terminal.update(&mut app, |view, ctx| {
-            view.handle_action(&TerminalAction::CtrlC, ctx);
-            assert!(!view.agent_view_controller().as_ref(ctx).is_active());
-        });
+        for _ in 0..2 {
+            terminal.update(&mut app, |view, ctx| {
+                assert!(view.agent_view_controller().as_ref(ctx).is_active());
+                view.handle_action(&TerminalAction::CtrlC, ctx);
+                assert!(view.agent_view_controller().as_ref(ctx).is_active());
+            });
+        }
     })
 }
 

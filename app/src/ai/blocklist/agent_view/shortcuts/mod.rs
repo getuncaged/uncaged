@@ -236,18 +236,6 @@ pub fn render_agent_shortcuts_view(
         app,
     ));
 
-    shortcuts.push(render_shortcut(
-        ShortcutProps {
-            keystroke: Keystroke {
-                key: "escape".to_owned(),
-                ..Default::default()
-            },
-            text: "go back to terminal".into(),
-            ..Default::default()
-        },
-        app,
-    ));
-
     Container::new(
         Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)

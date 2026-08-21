@@ -357,7 +357,6 @@ impl InlineHistoryMenuView {
                     }
                     me.menu_view.update(ctx, |_, ctx| ctx.notify());
                 }
-                AgentViewControllerEvent::ExitConfirmed { .. } => {}
             },
         );
 

@@ -424,7 +424,6 @@ fn wire_up_terminal_view_session_sharing(
                         ctx
                     );
                 }
-                AgentViewControllerEvent::ExitConfirmed { .. } => {}
             },
         );
     } else {

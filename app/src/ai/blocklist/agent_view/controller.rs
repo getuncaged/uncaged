@@ -64,18 +64,8 @@ impl AgentViewDisplayMode {
 /// users only learn one confirmation cadence.
 pub const ENTER_OR_EXIT_CONFIRMATION_WINDOW: Duration = Duration::from_secs(1);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ExitConfirmationTrigger {
-    Escape,
-    CtrlC,
-}
-
 #[derive(Debug, Clone)]
 enum PendingConfirmation {
-    Exit {
-        conversation_id: AIConversationId,
-        expires_at: Instant,
-    },
     NewConversationKeybinding {
         conversation_id: AIConversationId,
         normalized_keystroke: String,
@@ -86,7 +76,6 @@ enum PendingConfirmation {
 impl PendingConfirmation {
     fn message_id(&self) -> &'static str {
         match self {
-            PendingConfirmation::Exit { .. } => EXIT_CONFIRMATION_MESSAGE_ID,
             PendingConfirmation::NewConversationKeybinding { .. } => {
                 NEW_CONVERSATION_KEYBINDING_CONFIRMATION_MESSAGE_ID
             }
@@ -351,7 +340,6 @@ impl AgentViewState {
     }
 }
 
-const EXIT_CONFIRMATION_MESSAGE_ID: &str = "exit_confirmation_message";
 const NEW_CONVERSATION_KEYBINDING_CONFIRMATION_MESSAGE_ID: &str =
     "new_conversation_keybinding_confirmation_message";
 
@@ -370,21 +358,6 @@ pub struct AgentViewController {
     ephemeral_message_model: ModelHandle<EphemeralMessageModel>,
     pending_confirmation: Option<PendingConfirmation>,
     pending_confirmation_abort_handle: Option<SpawnedFutureHandle>,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum ExitConfirmationRequirement {
-    /// Unconditionally require confirmation.
-    Required,
-    /// Require exit confirmation if the conversation is currently in progress (this is the default).
-    IfInProgress,
-    /// No exit confirmation required.
-    None,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ExitAgentViewOptions {
-    should_confirm: ExitConfirmationRequirement,
 }
 
 impl AgentViewController {
@@ -476,21 +449,6 @@ impl AgentViewController {
         Ok(())
     }
 
-    /// If set, indicates the user attempted to exit an in-progress conversation and we are
-    /// waiting for a second exit attempt to confirm cancelling/exiting.
-    pub fn pending_exit_confirmation_conversation_id(&self) -> Option<AIConversationId> {
-        match self.pending_confirmation.as_ref() {
-            Some(PendingConfirmation::Exit {
-                conversation_id,
-                expires_at,
-            }) if *expires_at > Instant::now() => Some(*conversation_id),
-            _ => None,
-        }
-    }
-
-    pub fn clear_pending_exit_confirmation(&mut self, ctx: &mut ModelContext<Self>) {
-        self.clear_exit_confirmation(ctx);
-    }
     fn clear_pending_confirmation(&mut self, ctx: &mut ModelContext<Self>) {
         if let Some(handle) = self.pending_confirmation_abort_handle.take() {
             handle.abort();
@@ -541,50 +499,6 @@ impl AgentViewController {
                 ctx,
             )
         });
-    }
-
-    fn clear_exit_confirmation(&mut self, ctx: &mut ModelContext<Self>) {
-        if self
-            .pending_confirmation
-            .as_ref()
-            .is_some_and(|confirmation| matches!(confirmation, PendingConfirmation::Exit { .. }))
-        {
-            self.clear_pending_confirmation(ctx);
-        }
-    }
-
-    fn set_exit_confirmation(
-        &mut self,
-        conversation_id: AIConversationId,
-        trigger: ExitConfirmationTrigger,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.clear_exit_confirmation(ctx);
-
-        let should_stop_and_exit = BlocklistAIHistoryModel::handle(ctx)
-            .as_ref(ctx)
-            .conversation(&conversation_id)
-            .is_some_and(|conversation| {
-                conversation.status().is_in_progress() && !conversation.is_empty()
-            });
-        self.set_pending_confirmation(
-            PendingConfirmation::Exit {
-                conversation_id,
-                expires_at: Instant::now() + ENTER_OR_EXIT_CONFIRMATION_WINDOW,
-            },
-            exit_confirmation_message(trigger, should_stop_and_exit, ctx),
-            ctx,
-        );
-    }
-
-    fn is_exit_confirmation_active_for(&self, conversation_id: AIConversationId) -> bool {
-        matches!(
-            self.pending_confirmation.as_ref(),
-            Some(PendingConfirmation::Exit {
-                conversation_id: pending_conversation_id,
-                expires_at,
-            }) if *pending_conversation_id == conversation_id && *expires_at > Instant::now()
-        )
     }
 
     /// Decides whether a keybinding-triggered `/agent` or `/new` should proceed immediately.
@@ -798,14 +712,7 @@ impl AgentViewController {
                 if conversation_id.is_some_and(|id| id == *active_id) {
                     return Ok(*active_id);
                 } else {
-                    self.exit_agent_view_internal(
-                        ExitAgentViewOptions {
-                            should_confirm: ExitConfirmationRequirement::None,
-                        },
-                        ExitConfirmationTrigger::Escape,
-                        true,
-                        ctx,
-                    );
+                    self.exit_agent_view_internal(true, ctx);
                 }
             }
             AgentViewState::Inactive => {}
@@ -853,56 +760,25 @@ impl AgentViewController {
         Ok(conversation_id)
     }
 
-    /// Exits the agent view with required confirmation.
-    ///
-    /// If there is an active confirmation 'window', exits the view, else starts a confirmation
-    /// 'window' for exit to be attempted again, in which case exit will occur.
-    pub(crate) fn exit_agent_view_with_required_confirmation(
-        &mut self,
-        trigger: ExitConfirmationTrigger,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.exit_agent_view_internal(
-            ExitAgentViewOptions {
-                should_confirm: ExitConfirmationRequirement::Required,
-            },
-            trigger,
-            false,
-            ctx,
-        );
-    }
-
     /// Exits the active agent view without any confirmation.
+    ///
+    /// Uncaged: identical to [`Self::exit_agent_view`]; kept for call-site
+    /// clarity now that no exit path asks for confirmation.
     pub(crate) fn exit_agent_view_without_confirmation(&mut self, ctx: &mut ModelContext<Self>) {
-        self.exit_agent_view_internal(
-            ExitAgentViewOptions {
-                should_confirm: ExitConfirmationRequirement::None,
-            },
-            ExitConfirmationTrigger::Escape,
-            false,
-            ctx,
-        );
+        self.exit_agent_view_internal(false, ctx);
     }
 
     /// Exits the active agent view, if there is one.
+    ///
+    /// Uncaged: exiting is a mode switch, not a navigation -- it never asks for
+    /// a second press and never stops the conversation, which keeps running in
+    /// the history model.
     pub fn exit_agent_view(&mut self, ctx: &mut ModelContext<Self>) {
-        let should_confirm = if self.agent_view_state.is_inline() {
-            ExitConfirmationRequirement::None
-        } else {
-            ExitConfirmationRequirement::IfInProgress
-        };
-        self.exit_agent_view_internal(
-            ExitAgentViewOptions { should_confirm },
-            ExitConfirmationTrigger::Escape,
-            false,
-            ctx,
-        );
+        self.exit_agent_view_internal(false, ctx);
     }
 
     fn exit_agent_view_internal(
         &mut self,
-        options: ExitAgentViewOptions,
-        trigger: ExitConfirmationTrigger,
         is_exit_before_new_entrance: bool,
         ctx: &mut ModelContext<Self>,
     ) {
@@ -920,37 +796,6 @@ impl AgentViewController {
         else {
             return;
         };
-        let was_new = original_conversation_length == 0;
-
-        let should_confirm = match options.should_confirm {
-            ExitConfirmationRequirement::Required => true,
-            ExitConfirmationRequirement::IfInProgress => {
-                // If the conversation is still in progress, require a second exit attempt within a short
-                // window, unless this is a brand new empty conversation.
-                let history_model = BlocklistAIHistoryModel::handle(ctx);
-                history_model
-                    .as_ref(ctx)
-                    .conversation(&conversation_id)
-                    .is_some_and(|conversation| {
-                        conversation.status().is_in_progress()
-                            && !(was_new && conversation.exchange_count() == 0)
-                    })
-            }
-            ExitConfirmationRequirement::None => false,
-        };
-
-        if should_confirm {
-            if self.is_exit_confirmation_active_for(conversation_id) {
-                self.clear_exit_confirmation(ctx);
-                ctx.emit(AgentViewControllerEvent::ExitConfirmed { conversation_id });
-            } else {
-                self.set_exit_confirmation(conversation_id, trigger, ctx);
-                return;
-            }
-        } else {
-            self.clear_exit_confirmation(ctx);
-        }
-
         let mut old_state = AgentViewState::Inactive;
         std::mem::swap(&mut self.agent_view_state, &mut old_state);
         let AgentViewState::Active {
@@ -1013,53 +858,10 @@ pub enum AgentViewControllerEvent {
         /// (e.g. Cmd+K while already in agent view to start a new conversation).
         is_exit_before_new_entrance: bool,
     },
-    ExitConfirmed {
-        conversation_id: AIConversationId,
-    },
 }
 
 impl Entity for AgentViewController {
     type Event = AgentViewControllerEvent;
-}
-
-fn exit_confirmation_message(
-    trigger: ExitConfirmationTrigger,
-    should_stop_and_exit: bool,
-    app: &AppContext,
-) -> Message {
-    use warpui::SingletonEntity;
-
-    use crate::terminal::input::message_bar::{Message, MessageItem};
-
-    let appearance = Appearance::handle(app).as_ref(app);
-
-    let (keystroke, text) = match trigger {
-        ExitConfirmationTrigger::Escape => (
-            Keystroke {
-                key: "escape".to_owned(),
-                ..Default::default()
-            },
-            if should_stop_and_exit {
-                "again to stop and exit"
-            } else {
-                "again to exit"
-            },
-        ),
-        ExitConfirmationTrigger::CtrlC => (
-            Keystroke {
-                key: "c".to_owned(),
-                ctrl: true,
-                ..Default::default()
-            },
-            "again to exit",
-        ),
-    };
-
-    Message::new(vec![
-        MessageItem::keystroke(keystroke),
-        MessageItem::text(text),
-    ])
-    .with_text_color(appearance.theme().ansi_fg_red())
 }
 
 fn new_conversation_keybinding_confirmation_message(

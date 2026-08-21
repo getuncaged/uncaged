@@ -245,19 +245,17 @@ impl TerminalView {
             return Flex::row().finish();
         }
 
+        // Uncaged: the "for terminal" persona of this button is gone -- leaving
+        // AI mode is the mode toggle's job, not a navigation. The button still
+        // renders for panes pushed onto the nav stack (child agents show it as
+        // "for Orchestrator", which is their swap-back affordance).
         let in_nav_stack = self
             .pane_stack
             .as_ref()
             .and_then(|h| h.upgrade(app))
             .is_some_and(|stack| stack.as_ref(app).depth() > 1);
 
-        let is_transcript_viewer = self.model.lock().is_conversation_transcript_viewer();
-        let is_ambient_agent = self.is_ambient_agent_session(app);
-        let has_parent_terminal = (is_ambient_agent && self.is_nested_cloud_mode(app))
-            || (!is_ambient_agent && !is_transcript_viewer);
-        let is_fullscreen_agent_view = self.agent_view_controller.as_ref(app).is_fullscreen();
-
-        if in_nav_stack || (is_fullscreen_agent_view && has_parent_terminal) {
+        if in_nav_stack {
             Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_child(ChildView::new(&self.agent_view_back_button).finish())

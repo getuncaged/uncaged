@@ -112,6 +112,34 @@ Deliberately **not** done, with reasons:
   "features we like"), its cloud sync is already gone, and its dead cloud code is
   disk-weight only. Revisit only if the user asks for it to go.
 
+### §1.6 — ESC/Ctrl-C stop being mode exits (this session)
+
+"Modes, not places" is now enforced at every exit path:
+
+- **ESC never exits the agent view.** The 9-branch exit ladder in the view's Escape
+  handler is gone. ESC keeps only its genuine navigations: child agent → parent
+  (same affordance as the header's "for Orchestrator" button) and popping a nested
+  cloud-mode pane — a real pane pushed onto the nav stack — back to its parent
+  terminal. Tag-out of a long-running command survives, minus its follow-on exit.
+- **Ctrl-C never exits the agent view.** A press that clears the prompt buffer is
+  still swallowed; nothing arms an exit.
+- **The double-press exit confirmation is deleted** (`PendingConfirmation::Exit`,
+  `ExitConfirmationTrigger`, `exit_agent_view_with_required_confirmation`,
+  `exit_confirmation_message`, the `ExitConfirmed` event). Exiting = mode switch:
+  instant, and it never stops the conversation (which keeps running in the history
+  model — verified: no `ExitConfirmed` handler ever cancelled anything; they were
+  all `=> {}`). The *enter*/new-conversation confirmation (Cmd-Enter over a
+  non-empty conversation) is intentionally kept.
+- **The "for terminal" back-button persona is gone** — the header button renders
+  only for nav-stack pushes (child agents see "for Orchestrator"). The zero-state
+  "go back to terminal" row and the shortcuts-panel row are deleted.
+- Tests updated to guard the new invariant (`ctrl_c_never_exits_agent_view` etc.);
+  the nested-cloud ESC-pop test passes unchanged.
+
+§1.7 (fullscreen stops being automatic; display modes → explicit view scope;
+`AgentViewEntryBlock` deletion; pill bar out of fullscreen-only) is the next slice —
+bigger redesign, not started here.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.

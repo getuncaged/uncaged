@@ -628,7 +628,6 @@ impl TerminalManager {
                                 ctx,
                             );
                         }
-                        AgentViewControllerEvent::ExitConfirmed { .. } => {}
                     },
                 );
             } else {
