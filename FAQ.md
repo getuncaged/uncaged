@@ -29,7 +29,9 @@ You only need one connection to start using Agent Mode. A setup helper is also a
 
 ### Does Uncaged send my data anywhere?
 
-No — not to any Uncaged or Warp servers. Uncaged never sends your prompts or terminal data to a central service. The only outbound network traffic is to the model endpoint you configure yourself in **Settings → AI Models**. There are no accounts, no telemetry, no analytics, and no cloud sync.
+No — not to any Uncaged or Warp servers. Uncaged never sends your prompts or terminal data to a central service, and never phones home about you. Its only self-initiated request is to the model endpoint you configure in **Settings → AI Models** — unless you turn on update checks, which read GitHub's public releases API and send nothing that identifies you. There are no accounts, no telemetry, no analytics, and no cloud sync.
+
+Other traffic happens only when you ask for it, and never carries anything about you: installing a language server fetches from `nodejs.org` and the npm registry, and browsing or sharing themes talks to GitHub. If you want to confirm all of this rather than take our word for it, run the app behind Little Snitch or `tcpdump` — everything above is observable.
 
 ### Where is my configuration stored?
 

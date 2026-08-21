@@ -1,0 +1,181 @@
+# Uncaged → winget-pkgs. Keeps the `Uncaged.Uncaged` manifest in
+# microsoft/winget-pkgs in step with the GitHub Release, so `winget upgrade`
+# users stop sitting several releases behind the download page.
+#
+# WHY THIS IS NOT `on: release: [published]`
+#   1. uncaged-release.yml creates the GitHub Release UP FRONT (the
+#      create_release job) and the Windows installers are only uploaded hours
+#      later, so a release-published hook would fire against an empty release.
+#   2. That release is created with `secrets.GITHUB_TOKEN`, and events raised by
+#      GITHUB_TOKEN deliberately do not trigger further workflow runs — so
+#      `on: release:` would never fire for our own releases anyway.
+# Instead uncaged-release.yml calls this workflow as a job that `needs` both
+# Windows build jobs (see the `winget:` job added there), and `workflow_dispatch`
+# is kept for backfills and retries — re-submitting a version that winget-pkgs
+# bounced costs one runner-minute instead of a three-hour rebuild.
+#
+# TOOLING: microsoft/winget-create ("wingetcreate"), the tool Microsoft ships
+# for exactly this and the one used by microsoft/terminal, microsoft/edit and
+# github/copilot-cli. It reads the current Uncaged.Uncaged manifest out of
+# winget-pkgs, swaps in the new version, installer URLs and SHA256s, forks
+# winget-pkgs under the PAT owner's account if no fork exists yet, syncs that
+# fork with upstream, and opens the PR.
+#
+# ONE-TIME SETUP (see RELEASING.md → "winget (Windows)"):
+#   * Repository secret `WINGET_TOKEN` = a CLASSIC GitHub PAT with the
+#     `public_repo` scope. Fine-grained tokens are NOT supported by wingetcreate
+#     (microsoft/winget-create#595) — they cannot open the cross-fork PR.
+#   * Nothing else. The winget-pkgs fork is created automatically.
+
+name: Uncaged winget
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to publish to winget, e.g. v0.2.9.
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish to winget, e.g. v0.2.9.
+        required: true
+        type: string
+
+# Read-only: the PR is opened against winget-pkgs with WINGET_TOKEN, not with
+# the workflow's own GITHUB_TOKEN.
+permissions:
+  contents: read
+
+concurrency:
+  group: uncaged-winget-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    name: Submit ${{ inputs.tag }} to winget-pkgs
+    # wingetcreate ships as a Windows-only self-contained .exe. This job builds
+    # nothing; it downloads the two installers (~260 MB total) so wingetcreate
+    # can hash and inspect them, then opens the PR. ~5 minutes.
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      # wingetcreate reads the PAT from this variable rather than from `--token`,
+      # so the secret never lands in a process command line (and therefore never
+      # in a run log). https://aka.ms/winget-create-token
+      WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.tag }}
+      REPO: ${{ github.repository }}
+      PACKAGE_ID: Uncaged.Uncaged
+    steps:
+      # Opt-in gate. Without WINGET_TOKEN this workflow does nothing at all —
+      # it cannot open a PR against Microsoft's repo until someone deliberately
+      # adds the secret. A missing secret is a NOTICE, not an error, because
+      # this job runs on every release and must never turn a good release red.
+      - name: Check the winget PAT is configured
+        id: pat
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINGET_CREATE_GITHUB_TOKEN)) {
+            Write-Output '::notice::Repository secret WINGET_TOKEN is not set, so nothing was submitted to winget-pkgs. To enable it, create a CLASSIC personal access token with the public_repo scope at https://github.com/settings/tokens and add it under Settings -> Secrets and variables -> Actions -> New repository secret.'
+            Write-Output 'configured=false' >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Output 'configured=true' >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Resolve release and installer URLs
+        id: release
+        if: ${{ steps.pat.outputs.configured == 'true' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Handle native exit codes ourselves so the messages below are the ones
+          # that reach the log, instead of a bare PowerShell native-command error.
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          # The asset names are the contract documented in DOWNLOADS.md. Do not
+          # rename them without updating this workflow.
+          $x64Asset   = 'Uncaged-windows-x86_64-setup.exe'
+          $arm64Asset = 'Uncaged-windows-aarch64-setup.exe'
+
+          $json = gh release view $env:TAG --repo $env:REPO --json isDraft,isPrerelease,assets
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::error::No GitHub release found for tag $env:TAG in $env:REPO."
+            exit 1
+          }
+          $release = $json | ConvertFrom-Json
+
+          $version = $env:TAG -replace '^v', ''
+
+          # Never push a draft or a pre-release to the community repo. Skip
+          # cleanly rather than failing: a `-rc` tag is a legitimate reason for
+          # this job to do nothing.
+          if ($release.isDraft -or $release.isPrerelease -or $version -match '-') {
+            Write-Output "::notice::$env:TAG is a draft or pre-release; not submitting to winget-pkgs."
+            Write-Output 'skip=true' >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+
+          # Both installers must exist. The manifest in winget-pkgs declares two
+          # installer nodes (x64 + arm64) and wingetcreate requires exactly as
+          # many URLs as there are existing nodes — submitting one would fail
+          # mid-flight. Both Windows build jobs are continue-on-error, so a
+          # missing asset here means a Windows build failed: surface that loudly.
+          $names = @($release.assets.name)
+          $missing = @($x64Asset, $arm64Asset) | Where-Object { $names -notcontains $_ }
+          if ($missing) {
+            Write-Output "::error::Release $env:TAG is missing $($missing -join ', '). The Windows build job(s) failed, so there is nothing to submit to winget. Fix the build, re-upload the asset, then re-run this workflow with: gh workflow run uncaged-winget.yml -R $env:REPO -f tag=$env:TAG"
+            exit 1
+          }
+
+          # Installer URLs are templated straight off the tag — these are the
+          # stable public asset URLs, and are exactly what goes into the
+          # manifest's InstallerUrl fields.
+          $base = "https://github.com/$env:REPO/releases/download/$env:TAG"
+
+          Write-Output "skip=false"                       >> $env:GITHUB_OUTPUT
+          Write-Output "version=$version"                 >> $env:GITHUB_OUTPUT
+          Write-Output "x64_url=$base/$x64Asset"          >> $env:GITHUB_OUTPUT
+          Write-Output "arm64_url=$base/$arm64Asset"      >> $env:GITHUB_OUTPUT
+
+          Write-Output "Submitting $env:PACKAGE_ID $version"
+          Write-Output "  x64   -> $base/$x64Asset"
+          Write-Output "  arm64 -> $base/$arm64Asset"
+
+      - name: Submit the manifest to winget-pkgs
+        if: ${{ steps.pat.outputs.configured == 'true' && steps.release.outputs.skip != 'true' }}
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          X64_URL: ${{ steps.release.outputs.x64_url }}
+          ARM64_URL: ${{ steps.release.outputs.arm64_url }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          # aka.ms/wingetcreate/latest is the self-contained single-file exe
+          # (net9.0-windows); it needs no .NET install on the runner.
+          curl.exe -sSLo wingetcreate.exe https://aka.ms/wingetcreate/latest
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output '::error::Failed to download wingetcreate from https://aka.ms/wingetcreate/latest.'
+            exit 1
+          }
+
+          # The `|x64` / `|arm64` suffixes are wingetcreate's architecture
+          # override. Without them wingetcreate guesses from the URL and then
+          # from the binary — and the outer Inno Setup stub is not a reliable
+          # signal. Being explicit means the two installer nodes in the existing
+          # manifest are matched deterministically instead of by inference.
+          .\wingetcreate.exe update $env:PACKAGE_ID `
+            --version $env:VERSION `
+            --urls "$($env:X64_URL)|x64" "$($env:ARM64_URL)|arm64" `
+            --submit `
+            --no-open
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::error::wingetcreate failed to submit $env:PACKAGE_ID $env:VERSION (exit $LASTEXITCODE)."
+            exit $LASTEXITCODE
+          }
+
+          Write-Output "::notice::Opened a winget-pkgs PR for $env:PACKAGE_ID $env:VERSION. Track it at https://github.com/microsoft/winget-pkgs/pulls?q=is%3Apr+$env:PACKAGE_ID"
