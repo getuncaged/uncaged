@@ -1,0 +1,45 @@
+app/src/ai/blocklist/inline_action/inline_action_header.rs
+  s_6e5dc450e2113a::t_c8fb366af4e574 232
+crates/persistence/migrations/2026-08-22-000000_add_hot_path_indexes/down.sql
+  s_6e5dc450e2113a::t_bc1fb25ff8a1b5 1-3
+app/src/ai/predict/next_command_model_tests.rs
+  s_6e5dc450e2113a::t_edc69985022fb8 149
+crates/markdown_parser/src/lib.rs
+  s_6e5dc450e2113a::t_c8fb366af4e574 15
+crates/persistence/migrations/2026-08-22-000000_add_hot_path_indexes/up.sql
+  s_6e5dc450e2113a::t_f225156607d2cb 1-14
+app/src/ai/predict/next_command_model.rs
+  s_6e5dc450e2113a::t_bf5fedf2963244 318,483,486,488,806-813,818-819,826-828,836,838
+app/src/terminal/model/blocks.rs
+  s_6e5dc450e2113a::t_432306a0225a74 306-312,664,3202-3206,3210-3214,3226
+  s_6e5dc450e2113a::t_39315fb2823db4 2353-2361
+app/src/terminal/input.rs
+  s_6e5dc450e2113a::t_bf5fedf2963244 9576,9578,9586
+  s_6e5dc450e2113a::t_a77d597349e065 6877-6891,6893-6894
+app/src/ai/blocklist/inline_action/ask_user_question_view.rs
+  s_6e5dc450e2113a::t_c8fb366af4e574 1913
+crates/markdown_parser/src/markdown_parser.rs
+  s_6e5dc450e2113a::t_f689779ba5a321 110-142
+PLAN.md
+  s_6e5dc450e2113a::t_0f5c08b28a5a42 55-91
+app/src/ai/blocklist/agent_view/zero_state_block.rs
+  s_6e5dc450e2113a::t_c8fb366af4e574 7,628
+Cargo.lock
+  s_6e5dc450e2113a::t_ff37decc83ffe9 14991
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "d05d9c9aa30b2e42da5302974184c74a1dad8319",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
