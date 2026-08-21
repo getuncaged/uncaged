@@ -1,6 +1,8 @@
 # Branch strategy (decided 2026-08-21)
 
-**This branch is the split.** `test-combined` is the divergence line from the Warp codebase:
+**This branch is the split.** `uncaged-0.3` is the divergence line from the Warp codebase
+(it absorbs `test-combined` plus the theme-editor guard, the CI fix, and the Warp-identity
+removal; versioned 0.3.0, unreleased):
 nothing on it merges to `main` and nothing releases until the split is deliberate and named.
 `main` stays a clean mirror-plus-minimal-patches of upstream for as long as that is useful.
 All open PRs against `main` (#22, #27, #29–#33) are converted to draft so nothing lands by
