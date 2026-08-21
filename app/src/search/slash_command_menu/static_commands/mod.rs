@@ -18,11 +18,13 @@ bitflags! {
     pub struct Availability: u16 {
         /// No requirements — always available.
         const ALWAYS = 0;
-        /// Uncaged: never available. Requires the agent view and the terminal view at
-        /// once, which the doc above notes is unsatisfiable — used to keep a command's
-        /// definition (other code references names for highlighting) while removing it
-        /// from every menu.
-        const NEVER = Self::AGENT_VIEW.bits() | Self::TERMINAL_VIEW.bits();
+        /// Uncaged: never available. This bit is never set in any session context,
+        /// so a command requiring it keeps its definition (other code references
+        /// command names for highlighting) while appearing in no menu. It has its
+        /// own bit rather than combining AGENT_VIEW | TERMINAL_VIEW: the registry's
+        /// debug_assert rejects that combination as an accident, and a debug build
+        /// panicked at startup when NEVER overloaded it.
+        const NEVER = 1 << 15;
         /// Requires the agent view.
         const AGENT_VIEW = 1 << 0;
         /// Requires the terminal view.
