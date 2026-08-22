@@ -22,9 +22,7 @@ use crate::ai::agent::{
     CreateDocumentsResult, EditDocumentsResult,
 };
 use crate::ai::ai_document_view::DEFAULT_PLANNING_DOCUMENT_TITLE;
-use crate::ai::blocklist::agent_view::{
-    AgentViewEntryBlockParams, AgentViewEntryOrigin, DismissalStrategy, EphemeralMessage,
-};
+use crate::ai::blocklist::agent_view::{AgentViewEntryOrigin, DismissalStrategy, EphemeralMessage};
 use crate::ai::blocklist::block::cli_controller::CLISubagentController;
 use crate::ai::blocklist::history_model::{
     BlocklistAIHistoryModel, CLIAgentConversation, CloudConversationData,
@@ -495,45 +493,13 @@ impl TerminalView {
             }
         }
 
-        // Track which conversations have had their agent view blocks inserted
-        let mut conversations_with_agent_view_block = std::collections::HashSet::new();
-
         // Create AI blocks. Note this must happen after restoring action results in the action model,
         // because AI block creation relies on the action result for an action existing in order to determine
         // what the state should be.
+        // Uncaged: no per-conversation entry card is inserted -- restored turns
+        // render directly in the chronological list.
         let blocks_created = ai_block_params.len();
         for params in ai_block_params {
-            let conversation_id = params.conversation_id;
-            let command_block_index = params.command_block_index;
-
-            if FeatureFlag::AgentView.is_enabled()
-                && params.is_restoring_on_startup
-                && !conversations_with_agent_view_block.contains(&conversation_id)
-            {
-                // Insert an agent view block before the first AI block of each conversation.
-                // Use the same insertion position as the AI block (based on command_block_index)
-                // so they stay together.
-                conversations_with_agent_view_block.insert(conversation_id);
-
-                let position = match command_block_index {
-                    Some(idx) => RichContentInsertionPosition::BeforeBlockIndex(idx),
-                    None => RichContentInsertionPosition::Append {
-                        insert_below_long_running_block: false,
-                    },
-                };
-                self.insert_agent_view_entry_block(
-                    AgentViewEntryBlockParams {
-                        conversation_id,
-                        is_new: false,
-                        is_restored: true,
-                        origin: AgentViewEntryOrigin::RestoreExistingConversation,
-                        agent_view_controller: self.agent_view_controller.clone(),
-                    },
-                    position,
-                    ctx,
-                );
-            }
-
             self.create_and_insert_ai_block(params, ctx);
         }
 
@@ -1034,19 +1000,20 @@ impl TerminalView {
         });
 
         // Insert into block list if command_block_index is provided
-        let item = RichContentItem::new(
+        // Uncaged: the initial visibility is computed with the same predicate the
+        // steady state uses, so restored turns neither flash in nor pop out on the
+        // next sumtree recompute (the previous ad-hoc initial hid the active
+        // conversation's own restored turns until the next state change).
+        let mut item = RichContentItem::new(
             Some(RichContentType::AIBlock),
             restored_block_view_handle.id(),
             FeatureFlag::AgentView
                 .is_enabled()
                 .then_some(conversation_id),
-            FeatureFlag::AgentView.is_enabled()
-                && self
-                    .agent_view_controller
-                    .as_ref(ctx)
-                    .agent_view_state()
-                    .active_conversation_id()
-                    .is_some_and(|id| id == conversation_id),
+            false,
+        );
+        item.should_hide = item.should_hide_for_agent_view_state(
+            &self.agent_view_controller.as_ref(ctx).agent_view_state(),
         );
         if let Some(cmd_block_index) = command_block_index {
             self.model

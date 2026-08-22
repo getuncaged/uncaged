@@ -121,7 +121,6 @@ impl View for TerminalInputMessageBar {
             .produce_message(args)
             .or_else(|| AgentMessageProducer.produce_message(args))
             .or_else(|| PlanMessageProducer.produce_message(args))
-            .or_else(|| ContinueConversationMessageProducer.produce_message(args))
             .or_else(|| DefaultMessageProducer.produce_message(args))
             .unwrap_or_default();
 
@@ -237,88 +236,6 @@ impl MessageProvider<TerminalMessageArgs<'_>> for PlanMessageProducer {
             ])
             .with_color(message_magenta(theme)),
         )
-    }
-}
-
-struct ContinueConversationMessageProducer;
-impl MessageProvider<TerminalMessageArgs<'_>> for ContinueConversationMessageProducer {
-    fn produce_message(&self, args: TerminalMessageArgs<'_>) -> Option<Message> {
-        let TerminalMessageArgs {
-            current_input,
-            terminal_model,
-            ..
-        } = args;
-        if !current_input.is_empty() || !terminal_model.is_last_visible_item_agent_view_block() {
-            return None;
-        }
-
-        let keystroke = keybinding_name_to_keystroke(commands::CONVERSATIONS.name, args.app)?;
-        Some(Message::new(vec![
-            MessageItem::keystroke(keystroke),
-            MessageItem::text(" to continue conversation"),
-        ]))
-    }
-}
-
-mod internal {
-    use crate::terminal::model::blocks::{
-        BlockHeight, BlockHeightItem, BlockHeightSummary, RichContentItem,
-    };
-    use crate::terminal::TerminalModel;
-
-    impl TerminalModel {
-        pub(super) fn is_last_visible_item_agent_view_block(&self) -> bool {
-            let block_list = self.block_list();
-
-            // When we insert rich content (including agent view blocks) we insert it immediately before
-            // the active block (unless explicitly inserting below a long-running block). The active
-            // block is a special "warp input" block that often exists even when it isn't user-visible.
-            //
-            // So, for dedupe we check the first visible (non-zero height) item *immediately before the
-            // active block*. This avoids false negatives caused by the active block itself.
-            let active_block_index = block_list.active_block_index();
-
-            let mut cursor = block_list
-                .block_heights()
-                .cursor::<BlockHeight, BlockHeightSummary>();
-            cursor.descend_to_last_item(block_list.block_heights());
-
-            // Seek backwards until we're at the active block's height item.
-            while let Some(item) = cursor.item() {
-                match item {
-                    BlockHeightItem::Block(_)
-                        if cursor.start().block_count == active_block_index.0 =>
-                    {
-                        break;
-                    }
-                    _ => cursor.prev(),
-                }
-            }
-
-            // Now walk backwards to find the first visible item before the active block.
-            cursor.prev();
-            while let Some(item) = cursor.item() {
-                let is_hidden = item.height() == BlockHeight::zero();
-                match item {
-                    BlockHeightItem::RichContent(RichContentItem { content_type, .. })
-                        if !is_hidden
-                            && content_type
-                                .is_some_and(|content| content.is_agent_view_block()) =>
-                    {
-                        return true;
-                    }
-                    _ => {
-                        if is_hidden {
-                            cursor.prev();
-                        } else {
-                            return false;
-                        }
-                    }
-                }
-            }
-
-            false
-        }
     }
 }
 

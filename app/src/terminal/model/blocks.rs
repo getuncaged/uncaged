@@ -111,8 +111,17 @@ impl RichContentItem {
             AgentViewState::Active {
                 display_mode: AgentViewDisplayMode::Inline,
                 ..
+            } => self.agent_view_conversation_id.is_some(),
+            // Uncaged: conversation turns are part of the one chronological list --
+            // visible while a chronological conversation is active and after any
+            // conversation exits. Inline (LRC tag-in) above keeps hiding
+            // conversation-tagged content so the tag-in monitoring UI is not
+            // duplicated by the conversation's own cards.
+            AgentViewState::Active {
+                display_mode: AgentViewDisplayMode::Chronological,
+                ..
             }
-            | AgentViewState::Inactive => self.agent_view_conversation_id.is_some(),
+            | AgentViewState::Inactive => false,
         }
     }
 }
@@ -1644,10 +1653,13 @@ impl BlockList {
         if !self.active_block().finished() {
             if let Some(id) = self.agent_view_state.active_conversation_id() {
                 // For inline agent views, add the conversation ID to Terminal variant
-                // instead of replacing with Agent variant
+                // instead of replacing with Agent variant.
+                // Uncaged: a chronological entry does not claim the running block at
+                // all -- a command already running when the user opens a conversation
+                // is not part of it.
                 if self.agent_view_state.is_inline() {
                     self.active_block_mut().add_attached_conversation_id(id);
-                } else {
+                } else if self.agent_view_state.is_fullscreen() {
                     self.active_block_mut().set_conversation_id(id);
                 }
             } else {
@@ -1680,9 +1692,7 @@ impl BlockList {
                     if rich_content.content_type.is_some_and(|content_type| {
                         matches!(
                             content_type,
-                            RichContentType::AIBlock
-                                | RichContentType::EnterAgentView
-                                | RichContentType::InlineAgentViewHeader
+                            RichContentType::AIBlock | RichContentType::InlineAgentViewHeader
                         )
                     }) {
                         self.dirty_rich_content_items.insert(*view_id);
@@ -2660,7 +2670,10 @@ impl BlockList {
             honor_ps1,
             self.obfuscate_secrets,
             self.is_ai_ugc_telemetry_enabled,
-            self.agent_view_state.active_conversation_id(),
+            // Uncaged: only a fullscreen conversation claims new blocks as
+            // Agent-visibility; commands typed during a chronological conversation
+            // are ordinary terminal blocks in the one list.
+            self.agent_view_state.fullscreen_conversation_id(),
         );
         if let Some(is_local) = restored_block_was_local {
             block.set_restored_block_was_local(is_local);

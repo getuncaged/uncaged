@@ -218,12 +218,11 @@ use crate::ai::ambient_agents::{
 };
 use crate::ai::blocklist::agent_view::agent_input_footer::toolbar_item::AgentToolbarItemKind;
 use crate::ai::blocklist::agent_view::{
-    agent_view_bg_fill, fork_from_last_known_good_state_exchange_id,
-    get_agent_view_entry_block_position_id, is_in_cloud_context, AgentViewController,
-    AgentViewControllerEvent, AgentViewDisplayMode, AgentViewEntryBlockParams,
-    AgentViewEntryOrigin, AgentViewHeaderDisabledTheme, AgentViewHeaderTheme,
-    AgentViewZeroStateBlock, AgentViewZeroStateEvent, EphemeralMessageModel,
-    InlineAgentViewHeader, OrchestrationPillBar, ENTER_OR_EXIT_CONFIRMATION_WINDOW,
+    agent_view_bg_fill, fork_from_last_known_good_state_exchange_id, is_in_cloud_context,
+    AgentViewController, AgentViewControllerEvent, AgentViewDisplayMode, AgentViewEntryOrigin,
+    AgentViewHeaderDisabledTheme, AgentViewHeaderTheme, AgentViewZeroStateBlock,
+    AgentViewZeroStateEvent, EphemeralMessageModel, InlineAgentViewHeader, OrchestrationPillBar,
+    ENTER_OR_EXIT_CONFIRMATION_WINDOW,
 };
 use crate::ai::blocklist::block::cli::{CLISubagentView, CLISubagentViewEvent};
 use crate::ai::blocklist::block::cli_controller::{
@@ -468,8 +467,7 @@ use crate::terminal::view::inline_banner::{
 };
 use crate::terminal::view::passive_suggestions::PromptSuggestionResolution;
 pub use crate::terminal::view::rich_content::{
-    AIBlockMetadata, AgentViewEntryMetadata, RichContent, RichContentInsertionPosition,
-    RichContentMetadata,
+    AIBlockMetadata, RichContent, RichContentInsertionPosition, RichContentMetadata,
 };
 use crate::terminal::view::ssh_file_upload::FileUploadId;
 use crate::terminal::view::ssh_remote_server_choice_view::{
@@ -2075,11 +2073,6 @@ pub enum ContextMenuType {
     /// Shows the overflow menu with copy options for an AI block. The menu is opened by clicking
     /// on the overflow (three dots) button inside the AI block header.
     AIBlockOverflowMenu { ai_block_view_id: EntityId },
-    /// Shows the conversation actions menu for an Agent View entry block.
-    AgentViewEntryConversation {
-        agent_view_entry_block_id: EntityId,
-        position: Vector2F,
-    },
 }
 
 impl ContextMenuType {
@@ -2111,7 +2104,6 @@ impl ContextMenuType {
             ContextMenuType::Input { position } => Some(*position),
             ContextMenuType::AIBlockAttachedContext { .. } => None,
             ContextMenuType::AIBlockOverflowMenu { .. } => None,
-            ContextMenuType::AgentViewEntryConversation { .. } => None,
         }
     }
 }
@@ -2131,7 +2123,6 @@ impl ContextMenuInfo {
             ContextMenuType::AltScreen { .. } => "AltScreen",
             ContextMenuType::AIBlockAttachedContext { .. } => "AIBlockContextList",
             ContextMenuType::AIBlockOverflowMenu { .. } => "AIBlockOverflowMenu",
-            ContextMenuType::AgentViewEntryConversation { .. } => "AgentViewEntryConversation",
         }
     }
 
@@ -2152,7 +2143,6 @@ impl ContextMenuInfo {
             ContextMenuType::AltScreen { .. } => "AltScreen",
             ContextMenuType::AIBlockAttachedContext { .. } => "AIBlockAttachedBlockChipLeftClick",
             ContextMenuType::AIBlockOverflowMenu { .. } => "AIBlockOverflowMenuClick",
-            ContextMenuType::AgentViewEntryConversation { .. } => "RightClick",
         }
     }
 }
@@ -3138,6 +3128,13 @@ impl TerminalView {
                     // Clear prompt suggestions shown in the context of the terminal mode or prior agent view.
                     me.clear_prompt_suggestions(ctx);
                     match display_mode {
+                        // Uncaged: entering a chronological conversation is not a
+                        // place change -- no header, no zero-state insertion, no
+                        // scroll jump. The conversation simply starts appending to
+                        // the one visible list.
+                        AgentViewDisplayMode::Chronological => {
+                            ctx.notify();
+                        }
                         AgentViewDisplayMode::Inline => {
                             // Insert the inline agent view header as rich content
                             let header_view = ctx.add_view(|ctx| {
@@ -3358,42 +3355,9 @@ impl TerminalView {
                         );
                     }
 
-                    // This handles the case where the user has taken over control but the command is still in progress.
-                    // We only want to insert an agent view block for long running commands that are completed.
-                    let is_exit_due_to_user_takeover_of_lrc =
-                        matches!(origin, AgentViewEntryOrigin::LongRunningCommand) && {
-                            let model = me.model.lock();
-                            let active_block = model.block_list().active_block();
-                            active_block.is_active_and_long_running()
-                        };
-
-                    // LRC conversations should only have one entry point (the original LRC block).
-                    let has_existing_lrc_block =
-                        me.has_existing_lrc_agent_view_block(*conversation_id);
-
-                    let should_insert = (!me
-                        .last_visible_item_is_agent_view_block_for_conversation(*conversation_id)
-                        && (has_init_steps || was_modified)
-                        && !is_exit_due_to_user_takeover_of_lrc
-                        && !has_existing_lrc_block)
-                        // If the agent view was entered via accepting a 'new conversation
-                        // speedbump', an entry block should always be inserted.
-                        || matches!(origin, AgentViewEntryOrigin::AgentRequestedNewConversation);
-                    if should_insert {
-                        me.insert_agent_view_entry_block(
-                            AgentViewEntryBlockParams {
-                                conversation_id: *conversation_id,
-                                is_new: was_new,
-                                is_restored: false, /* is_restored */
-                                origin: origin.clone(),
-                                agent_view_controller: me.agent_view_controller.clone(),
-                            },
-                            RichContentInsertionPosition::Append {
-                                insert_below_long_running_block: true,
-                            },
-                            ctx,
-                        );
-                    }
+                    // Uncaged: no "you had a conversation here" entry card. The
+                    // conversation's own turns stay visible in the chronological
+                    // list after exit, so a card would render the history twice.
 
                     let active_conversation_id = me
                         .agent_view_controller
@@ -3421,17 +3385,14 @@ impl TerminalView {
             me.update_pane_configuration(ctx);
             me.update_agent_view_pane_header(ctx);
 
-            // Mark all AgentViewEntry and AIBlock rich content as dirty so their heights get
-            // re-measured. When the agent view is active, AgentViewEntryBlock renders as Empty
-            // (0 height). When exiting, we need to force a re-layout so the block's actual
-            // height is restored. The dirty item processing happens before viewport iteration,
-            // so this works even for 0-height items at the prefix of the blocklist.
+            // Mark all AIBlock rich content as dirty so their heights get re-measured
+            // when the display mode changes (fullscreen panes hide non-conversation
+            // content at 0 height). The dirty item processing happens before viewport
+            // iteration, so this works even for 0-height items at the prefix of the
+            // blocklist.
             let mut model = me.model.lock();
             me.mark_all_rich_content_items_dirty_where(&mut model, |metadata| {
-                matches!(
-                    metadata,
-                    RichContentMetadata::AgentViewEntry(_) | RichContentMetadata::AIBlock(_)
-                )
+                matches!(metadata, RichContentMetadata::AIBlock(_))
             });
             ctx.notify();
         });
@@ -6681,38 +6642,8 @@ impl TerminalView {
                     self.send_lrc_queued_prompts(*conversation_id, ctx);
                 }
 
-                if FeatureFlag::AgentView.is_enabled() {
-                    let Some(conversation_id) = conversation_id else {
-                        return;
-                    };
-
-                    if self.has_existing_lrc_agent_view_block(*conversation_id)
-                        || self
-                            .agent_view_controller
-                            .as_ref(ctx)
-                            .agent_view_state()
-                            .is_active()
-                    {
-                        return;
-                    }
-
-                    // In the case that the user has taken control and already exited the agent view,
-                    // we insert the corresponding agent view block on command finish instead.
-                    self.insert_agent_view_entry_block(
-                        AgentViewEntryBlockParams {
-                            conversation_id: *conversation_id,
-                            is_new: true,
-                            is_restored: false,
-                            origin: AgentViewEntryOrigin::LongRunningCommand,
-                            agent_view_controller: self.agent_view_controller.clone(),
-                        },
-                        RichContentInsertionPosition::Append {
-                            insert_below_long_running_block: true,
-                        },
-                        ctx,
-                    );
-                    ctx.notify();
-                }
+                // Uncaged: entry cards are gone -- the conversation's turns are
+                // already visible in the chronological list.
             }
             CLISubagentEvent::ToggledHideResponses => {}
             CLISubagentEvent::UpdatedLastSnapshot => {}
@@ -21544,88 +21475,6 @@ impl TerminalView {
         self.focus_input_box(ctx);
     }
 
-    fn last_visible_item_is_agent_view_block_for_conversation(
-        &self,
-        conversation_id: AIConversationId,
-    ) -> bool {
-        let model = self.model.lock();
-        let block_list = model.block_list();
-
-        // When we insert rich content (including agent view blocks) we insert it immediately before
-        // the active block (unless explicitly inserting below a long-running block). The active
-        // block is a special "warp input" block that often exists even when it isn't user-visible.
-        //
-        // So, for dedupe we check the first visible (non-zero height) item *immediately before the
-        // active block*. This avoids false negatives caused by the active block itself.
-        let active_block_index = block_list.active_block_index();
-
-        let mut cursor = block_list
-            .block_heights()
-            .cursor::<BlockHeight, BlockHeightSummary>();
-        cursor.descend_to_last_item(block_list.block_heights());
-
-        // Seek backwards until we're at the active block's height item.
-        while let Some(item) = cursor.item() {
-            match item {
-                BlockHeightItem::Block(_) if cursor.start().block_count == active_block_index.0 => {
-                    break;
-                }
-                _ => cursor.prev(),
-            }
-        }
-
-        // Now walk backwards to find the first non-hidden item before the active block.
-        cursor.prev();
-        while let Some(item) = cursor.item() {
-            let is_hidden = item.height() == BlockHeight::zero();
-            match item {
-                // We use `should_hide` rather than height to determine visibility because agent view
-                // entry blocks render as 0 height while agent view is active, and when we call this
-                // on-agent-view-exit the sumtree hasn't been updated yet.
-                BlockHeightItem::RichContent(RichContentItem {
-                    view_id,
-                    should_hide,
-                    ..
-                }) if !should_hide => {
-                    if let Some(rich_content) = self
-                        .rich_content_views
-                        .iter()
-                        .find(|content| content.view_id() == *view_id)
-                    {
-                        if let Some(agent_view_metadata) = rich_content.agent_view_entry_metadata()
-                        {
-                            if agent_view_metadata.conversation_id == conversation_id {
-                                return true;
-                            }
-                        }
-                    };
-                    return false;
-                }
-                _ => {
-                    if FeatureFlag::AgentView.is_enabled() && is_hidden {
-                        cursor.prev();
-                        continue;
-                    } else {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        false
-    }
-
-    /// Returns true when there exists an AgentViewBlock with origin LongRunningCommand that matches
-    /// the given conversation id.
-    fn has_existing_lrc_agent_view_block(&self, conversation_id: AIConversationId) -> bool {
-        self.rich_content_views.iter().any(|content| {
-            content.agent_view_entry_metadata().is_some_and(|metadata| {
-                metadata.conversation_id == conversation_id
-                    && matches!(metadata.origin, AgentViewEntryOrigin::LongRunningCommand)
-            })
-        })
-    }
-
     fn update_block_filter_for_block_with_active_editor(
         &mut self,
         block_filter_query: &BlockFilterQuery,
@@ -27583,19 +27432,6 @@ impl View for TerminalView {
                         ChildAnchor::TopRight,
                     ),
                 ),
-            Some(ContextMenuType::AgentViewEntryConversation {
-                agent_view_entry_block_id,
-                position,
-            }) => stack.add_positioned_overlay_child(
-                ChildView::new(&self.context_menu).finish(),
-                OffsetPositioning::offset_from_save_position_element(
-                    get_agent_view_entry_block_position_id(*agent_view_entry_block_id),
-                    *position,
-                    PositionedElementOffsetBounds::WindowByPosition,
-                    PositionedElementAnchor::TopLeft,
-                    ChildAnchor::TopLeft,
-                ),
-            ),
             None => {}
         }
 
@@ -27922,7 +27758,9 @@ impl View for TerminalView {
         if FeatureFlag::AgentView.is_enabled() {
             context.set.insert(flags::AGENT_VIEW_ENABLED);
             let agent_view_state = self.agent_view_controller.as_ref(app).agent_view_state();
-            if agent_view_state.is_fullscreen() {
+            // Chronological conversations use the regular agent-view binding
+            // set; only LRC tag-in gets the inline set.
+            if agent_view_state.is_fullscreen() || agent_view_state.is_chronological() {
                 context.set.insert(flags::ACTIVE_AGENT_VIEW);
             } else if agent_view_state.is_inline() {
                 context.set.insert(flags::ACTIVE_INLINE_AGENT_VIEW);

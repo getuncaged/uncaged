@@ -1568,7 +1568,7 @@ fn test_remove_rich_content_block() {
 }
 
 #[test]
-fn test_conversation_scoped_rich_content_hidden_outside_fullscreen_agent_view() {
+fn test_conversation_scoped_rich_content_three_state_visibility() {
     FeatureFlag::AgentView.set_enabled(true);
     let mut block_list =
         new_bootstrapped_block_list(None, None, ChannelEventListener::new_for_test());
@@ -1608,7 +1608,8 @@ fn test_conversation_scoped_rich_content_hidden_outside_fullscreen_agent_view() 
 
     block_list.set_agent_view_state(AgentViewState::Inactive);
 
-    let item_hidden_in_terminal_mode =
+    // Uncaged: exited conversations stay visible in the one chronological list.
+    let item_visible_in_terminal_mode =
         block_list
             .block_heights()
             .items()
@@ -1619,8 +1620,31 @@ fn test_conversation_scoped_rich_content_hidden_outside_fullscreen_agent_view() 
                 }
                 _ => None,
             });
-    assert!(item_hidden_in_terminal_mode.is_some());
-    assert!(item_hidden_in_terminal_mode.is_some_and(|item| item.should_hide));
+    assert!(item_visible_in_terminal_mode.is_some());
+    assert!(item_visible_in_terminal_mode.is_some_and(|item| !item.should_hide));
+
+    // Uncaged: chronological conversations show everything too.
+    block_list.set_agent_view_state(AgentViewState::Active {
+        conversation_id,
+        origin: AgentViewEntryOrigin::Input {
+            was_prompt_autodetected: false,
+            was_mode_explicitly_chosen: false,
+        },
+        display_mode: AgentViewDisplayMode::Chronological,
+        original_conversation_length: 0,
+    });
+    let item_visible_in_chronological =
+        block_list
+            .block_heights()
+            .items()
+            .iter()
+            .find_map(|item| match item {
+                BlockHeightItem::RichContent(rich_content) if rich_content.view_id == view_id => {
+                    Some(*rich_content)
+                }
+                _ => None,
+            });
+    assert!(item_visible_in_chronological.is_some_and(|item| !item.should_hide));
 
     block_list.set_agent_view_state(AgentViewState::Active {
         conversation_id,
@@ -1632,6 +1656,8 @@ fn test_conversation_scoped_rich_content_hidden_outside_fullscreen_agent_view() 
         original_conversation_length: 0,
     });
 
+    // Inline (LRC tag-in) keeps hiding conversation-tagged rich content so the
+    // tag-in monitoring UI is not duplicated by the conversation's own cards.
     let item_hidden_in_inline =
         block_list
             .block_heights()
@@ -1784,7 +1810,9 @@ fn test_agent_origin_block_can_be_attached_to_other_conversation() {
     block_list.set_agent_view_state(AgentViewState::Inactive);
     let user_block_index = block_list.block_index_for_id(&user_block_id).unwrap();
     let user_block = block_list.block_at(user_block_index).unwrap();
-    assert!(user_block.is_empty(block_list.agent_view_state()));
+    // Uncaged: Agent-origin blocks stay visible in the one chronological list
+    // after the conversation closes -- the block keeps its height.
+    assert!(!user_block.is_empty(block_list.agent_view_state()));
 }
 
 #[test]

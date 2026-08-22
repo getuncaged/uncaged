@@ -1408,17 +1408,15 @@ impl Block {
                     }
                 }
                 AgentViewState::Active {
-                    display_mode: AgentViewDisplayMode::Inline,
+                    display_mode: AgentViewDisplayMode::Inline | AgentViewDisplayMode::Chronological,
                     ..
                 }
                 | AgentViewState::Inactive => {
-                    // Terminal view - hide blocks that were created in agent mode
-                    if matches!(
-                        self.agent_view_visibility,
-                        AgentViewVisibility::Agent { .. }
-                    ) {
-                        return true;
-                    }
+                    // Uncaged: outside fullscreen the default is "show everything" --
+                    // Agent-origin command blocks stay visible in the one chronological
+                    // list. Agent-*requested* command blocks are still hidden via
+                    // `interaction_mode.should_hide_block()`, so they do not duplicate
+                    // the conversation's own turn cards.
                 }
             }
         }

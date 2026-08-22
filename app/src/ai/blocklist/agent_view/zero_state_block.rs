@@ -4,7 +4,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use itertools::Itertools as _;
-use markdown_parser::{parse_markdown_cached, FormattedText, FormattedTextFragment, FormattedTextLine};
+use markdown_parser::{
+    parse_markdown_cached, FormattedText, FormattedTextFragment, FormattedTextLine,
+};
 use parking_lot::FairMutex;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::Icon;

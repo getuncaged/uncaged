@@ -24,10 +24,7 @@ use crate::ai::agent::{
 };
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::toolbar_item::AgentToolbarItemKind;
-use crate::ai::blocklist::agent_view::{
-    AgentViewEntryBlock, AgentViewEntryOrigin, AgentViewState, EnterAgentBlockAction,
-    ExitAgentViewError,
-};
+use crate::ai::blocklist::agent_view::{AgentViewEntryOrigin, AgentViewState, ExitAgentViewError};
 use crate::ai::blocklist::block::cli_controller::UserTakeOverReason;
 use crate::ai::blocklist::{
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, InputConfig, InputType, ResponseStream,
@@ -278,22 +275,6 @@ fn ai_block_count(view: &TerminalView) -> usize {
             matches!(
                 rich_content.metadata(),
                 Some(RichContentMetadata::AIBlock(_))
-            )
-        })
-        .count()
-}
-
-fn agent_view_entry_count_for_conversation(
-    view: &TerminalView,
-    conversation_id: AIConversationId,
-) -> usize {
-    view.rich_content_views
-        .iter()
-        .filter(|rich_content| {
-            matches!(
-                rich_content.metadata(),
-                Some(RichContentMetadata::AgentViewEntry(params))
-                    if params.conversation_id == conversation_id
             )
         })
         .count()
@@ -648,7 +629,177 @@ fn unregister_cli_agent_session_restores_unlocked_input_config() {
 }
 
 #[test]
-fn clear_buffer_action_in_fullscreen_agent_view_starts_new_conversation() {
+fn default_entry_is_chronological_and_hides_no_blocks() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        FeatureFlag::AgentView.set_enabled(true);
+
+        let terminal = add_window_with_terminal(&mut app, None);
+
+        // A couple of ordinary terminal blocks before the conversation starts.
+        terminal.update(&mut app, |view, _ctx| {
+            let mut model = view.model.lock();
+            model.simulate_block("echo one", "one");
+            model.simulate_block("echo two", "two");
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            view.agent_view_controller().update(ctx, |controller, ctx| {
+                controller
+                    .try_enter_agent_view(
+                        None,
+                        AgentViewEntryOrigin::Input {
+                            was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
+                        },
+                        ctx,
+                    )
+                    .expect("Should be able to enter agent view")
+            });
+        });
+
+        terminal.read(&app, |view, ctx| {
+            let state = view.agent_view_controller().as_ref(ctx).agent_view_state();
+            assert!(
+                state.is_chronological(),
+                "ordinary entry must be chronological"
+            );
+            assert!(!state.is_fullscreen());
+
+            // Entering must not hide anything that was visible before: every
+            // block's visibility matches what it would be with no conversation
+            // at all (bootstrap blocks stay hidden for their own reasons).
+            let model = view.model.lock();
+            for block in model.block_list().blocks() {
+                assert_eq!(
+                    block.should_hide_block(&state),
+                    block.should_hide_block(&AgentViewState::Inactive),
+                    "a chronological conversation must not change any block's visibility"
+                );
+            }
+        });
+    })
+}
+
+#[test]
+fn dedicated_pane_origins_derive_fullscreen() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        FeatureFlag::AgentView.set_enabled(true);
+
+        for origin in [
+            AgentViewEntryOrigin::ChildAgent,
+            AgentViewEntryOrigin::CloudAgent,
+            AgentViewEntryOrigin::ThirdPartyCloudAgent,
+            AgentViewEntryOrigin::Cli,
+        ] {
+            let terminal = add_window_with_terminal(&mut app, None);
+            terminal.update(&mut app, |view, ctx| {
+                view.agent_view_controller().update(ctx, |controller, ctx| {
+                    controller
+                        .try_enter_agent_view(None, origin.clone(), ctx)
+                        .expect("Should be able to enter agent view");
+                });
+            });
+            terminal.read(&app, |view, ctx| {
+                assert!(
+                    view.agent_view_controller()
+                        .as_ref(ctx)
+                        .agent_view_state()
+                        .is_fullscreen(),
+                    "origin {origin:?} must derive FullScreen"
+                );
+            });
+        }
+    })
+}
+
+#[test]
+fn block_typed_during_chronological_conversation_is_terminal_visibility() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        FeatureFlag::AgentView.set_enabled(true);
+
+        let terminal = add_window_with_terminal(&mut app, None);
+
+        terminal.update(&mut app, |view, ctx| {
+            view.agent_view_controller().update(ctx, |controller, ctx| {
+                controller
+                    .try_enter_agent_view(
+                        None,
+                        AgentViewEntryOrigin::Input {
+                            was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
+                        },
+                        ctx,
+                    )
+                    .expect("Should be able to enter agent view");
+            });
+        });
+
+        terminal.update(&mut app, |view, _ctx| {
+            let mut model = view.model.lock();
+            model.simulate_block("git status", "clean");
+        });
+
+        terminal.read(&app, |view, ctx| {
+            let state = view
+                .agent_view_controller()
+                .as_ref(ctx)
+                .agent_view_state();
+            let model = view.model.lock();
+            let blocks = model.block_list().blocks();
+            // Every block minted during the chronological conversation stays an
+            // ordinary terminal block, visible in the one list.
+            for block in blocks {
+                assert!(
+                    !matches!(
+                        block.agent_view_visibility(),
+                        &AgentViewVisibility::Agent { .. }
+                    ),
+                    "commands typed during a chronological conversation must not be Agent-visibility"
+                );
+                assert_eq!(
+                    block.should_hide_block(&state),
+                    block.should_hide_block(&AgentViewState::Inactive),
+                );
+            }
+        });
+    })
+}
+
+#[test]
+fn chronological_entry_is_not_blocked_by_long_running_command() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        FeatureFlag::AgentView.set_enabled(true);
+
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, _ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block("sleep 100", "running");
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            view.agent_view_controller().update(ctx, |controller, ctx| {
+                controller
+                    .try_enter_agent_view(
+                        None,
+                        AgentViewEntryOrigin::Input {
+                            was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
+                        },
+                        ctx,
+                    )
+                    .expect("chronological entry must not be blocked by a long-running command");
+            });
+        });
+    })
+}
+
+#[test]
+fn clear_buffer_action_in_chronological_conversation_closes_it_without_restart() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         FeatureFlag::AgentView.set_enabled(true);
@@ -675,13 +826,19 @@ fn clear_buffer_action_in_fullscreen_agent_view_starts_new_conversation() {
         });
 
         terminal.update(&mut app, |view, ctx| {
-            let new_conversation_id = view
-                .agent_view_controller()
-                .as_ref(ctx)
-                .agent_view_state()
-                .active_conversation_id()
-                .expect("agent view should still be active");
-            assert_ne!(new_conversation_id, original_conversation_id);
+            // Uncaged: the fullscreen-only "cmd-k starts a new conversation"
+            // special case does not apply -- the normal clear path closes the
+            // on-screen conversation and activates none. This conversation was
+            // empty, so it is dropped from history entirely (empty conversations
+            // are never kept); the non-empty case is covered by
+            // cmd_k_in_chronological_conversation_keeps_conversation_active.
+            assert_eq!(
+                view.agent_view_controller()
+                    .as_ref(ctx)
+                    .agent_view_state()
+                    .active_conversation_id(),
+                None
+            );
         });
     })
 }
@@ -886,19 +1043,6 @@ fn restoring_conversation_to_new_pane_transfers_blocks_from_previous_owner() {
                 }],
                 ctx,
             );
-            view.insert_agent_view_entry_block(
-                AgentViewEntryBlockParams {
-                    conversation_id,
-                    is_new: false,
-                    is_restored: false,
-                    origin: AgentViewEntryOrigin::AgentViewBlock,
-                    agent_view_controller: view.agent_view_controller().clone(),
-                },
-                RichContentInsertionPosition::Append {
-                    insert_below_long_running_block: false,
-                },
-                ctx,
-            );
             {
                 let mut model = view.model.lock();
                 model.simulate_block("agent command", "agent output");
@@ -911,10 +1055,6 @@ fn restoring_conversation_to_new_pane_transfers_blocks_from_previous_owner() {
 
         original_owner.read(&app, |view, _| {
             assert_eq!(ai_block_count(view), 1);
-            assert_eq!(
-                agent_view_entry_count_for_conversation(view, conversation_id),
-                1
-            );
             assert_eq!(
                 command_block_count_for_conversation(view, conversation_id),
                 1
@@ -958,151 +1098,8 @@ fn restoring_conversation_to_new_pane_transfers_blocks_from_previous_owner() {
         original_owner.read(&app, |view, _| {
             assert_eq!(ai_block_count(view), 0);
             assert_eq!(
-                agent_view_entry_count_for_conversation(view, conversation_id),
-                1
-            );
-            assert_eq!(
                 command_block_count_for_conversation(view, conversation_id),
                 0
-            );
-        });
-        restored_view.read(&app, |view, _| {
-            assert_eq!(ai_block_count(view), 1);
-        });
-    })
-}
-
-#[test]
-fn clicking_old_banner_for_open_conversation_focuses_current_owner_without_transferring_blocks() {
-    App::test((), |mut app| async move {
-        initialize_app_for_terminal_view(&mut app);
-        let _agent_view = FeatureFlag::AgentView.override_enabled(true);
-
-        let original_owner = add_window_with_terminal(&mut app, None);
-        let restored_view = add_window_with_terminal(&mut app, None);
-
-        let original_owner_window_id = app.read(|ctx| original_owner.window_id(ctx));
-        let original_owner_view_id = original_owner.read(&app, |view, _| view.view_id);
-        let restored_view_id = restored_view.read(&app, |view, _| view.view_id);
-
-        let conversation_id = original_owner.update(&mut app, |view, ctx| {
-            let (conversation_id, _, _, _) = append_exchange_with_inputs_and_handle_event(
-                view,
-                vec![AIAgentInput::UserQuery {
-                    query: "first query".to_owned(),
-                    context: Default::default(),
-                    static_query_type: None,
-                    referenced_attachments: Default::default(),
-                    user_query_mode: UserQueryMode::Normal,
-                    running_command: None,
-                    intended_agent: None,
-                }],
-                ctx,
-            );
-            view.insert_agent_view_entry_block(
-                AgentViewEntryBlockParams {
-                    conversation_id,
-                    is_new: false,
-                    is_restored: false,
-                    origin: AgentViewEntryOrigin::AgentViewBlock,
-                    agent_view_controller: view.agent_view_controller().clone(),
-                },
-                RichContentInsertionPosition::Append {
-                    insert_below_long_running_block: false,
-                },
-                ctx,
-            );
-            conversation_id
-        });
-
-        let restored_conversation =
-            BlocklistAIHistoryModel::handle(&app).read(&app, |history, _| {
-                history
-                    .conversation(&conversation_id)
-                    .cloned()
-                    .expect("conversation should exist")
-            });
-
-        restored_view.update(&mut app, |view, ctx| {
-            view.restore_conversation_after_view_creation(
-                RestoredAIConversation::new(restored_conversation),
-                true,
-                RestoreConversationEntryBehavior::PreserveAgentViewState,
-                ctx,
-            );
-            assert_eq!(
-                view.agent_view_controller()
-                    .as_ref(ctx)
-                    .agent_view_state()
-                    .active_conversation_id(),
-                None
-            );
-            view.agent_view_controller().update(ctx, |controller, ctx| {
-                controller
-                    .try_enter_agent_view(
-                        Some(conversation_id),
-                        AgentViewEntryOrigin::AgentViewBlock,
-                        ctx,
-                    )
-                    .expect("restored view should enter agent view");
-            });
-        });
-        let restored_agent_view_controller =
-            restored_view.read(&app, |view, _| view.agent_view_controller().clone());
-        let restored_active_session =
-            restored_view.read(&app, |view, _| view.active_session().clone());
-        ActiveAgentViewsModel::handle(&app).update(&mut app, |active_views, ctx| {
-            active_views.register_agent_view_controller(
-                &restored_agent_view_controller,
-                &restored_active_session,
-                restored_view_id,
-                ctx,
-            );
-        });
-
-        ActiveAgentViewsModel::handle(&app).read(&app, |active_views, ctx| {
-            assert_eq!(
-                active_views.terminal_view_id_for_conversation(conversation_id, ctx),
-                Some(restored_view_id)
-            );
-        });
-        original_owner.read(&app, |view, _| {
-            assert_eq!(ai_block_count(view), 0);
-            assert_eq!(
-                agent_view_entry_count_for_conversation(view, conversation_id),
-                1
-            );
-        });
-        restored_view.read(&app, |view, _| {
-            assert_eq!(ai_block_count(view), 1);
-        });
-
-        let entry_blocks = app
-            .views_of_type::<AgentViewEntryBlock>(original_owner_window_id)
-            .expect("original window should contain agent entry block");
-        assert_eq!(entry_blocks.len(), 1);
-        entry_blocks[0].update(&mut app, |block, ctx| {
-            block.handle_action(
-                &EnterAgentBlockAction::EnterAgentMode { conversation_id },
-                ctx,
-            );
-        });
-
-        BlocklistAIHistoryModel::handle(&app).read(&app, |history, _| {
-            assert_eq!(
-                history.terminal_view_id_for_conversation(&conversation_id),
-                Some(restored_view_id)
-            );
-            assert!(history
-                .all_live_conversations_for_terminal_view(original_owner_view_id)
-                .next()
-                .is_none());
-        });
-        original_owner.read(&app, |view, _| {
-            assert_eq!(ai_block_count(view), 0);
-            assert_eq!(
-                agent_view_entry_count_for_conversation(view, conversation_id),
-                1
             );
         });
         restored_view.read(&app, |view, _| {
@@ -1371,13 +1368,6 @@ fn escape_does_not_exit_local_agent_view_with_long_running_command() {
             view.model
                 .lock()
                 .simulate_long_running_block("sleep 10", "running");
-
-            assert!(matches!(
-                view.agent_view_controller()
-                    .as_ref(ctx)
-                    .can_exit_agent_view(),
-                Err(ExitAgentViewError::LongRunningCommand)
-            ));
 
             view.handle_input_event(&InputEvent::Escape, ctx);
 
@@ -2086,7 +2076,7 @@ fn cmd_enter_from_terminal_without_selected_block_enters_agent_view() {
                 .agent_view_controller()
                 .as_ref(ctx)
                 .agent_view_state()
-                .is_fullscreen());
+                .is_chronological());
             assert!(view
                 .ai_context_model
                 .as_ref(ctx)
@@ -7260,9 +7250,9 @@ fn linear_deeplink_does_not_auto_submit_when_already_in_agent_view() {
 
         let terminal = add_window_with_terminal(&mut app, None);
 
-        // First enter fullscreen agent view with no initial prompt. This matches the
-        // pre-condition in the issue: the focused terminal is already in fullscreen
-        // agent view when the `warp://linear/work?prompt=...` URI is dispatched.
+        // First enter an agent conversation with no initial prompt. This matches the
+        // pre-condition in the issue: the focused terminal already has an active
+        // conversation when the `warp://linear/work?prompt=...` URI is dispatched.
         let original_conversation_id = terminal.update(&mut app, |view, ctx| {
             view.agent_view_controller().update(ctx, |controller, ctx| {
                 controller
@@ -7283,10 +7273,10 @@ fn linear_deeplink_does_not_auto_submit_when_already_in_agent_view() {
                 .agent_view_controller()
                 .as_ref(ctx)
                 .agent_view_state()
-                .is_fullscreen());
+                .is_chronological());
         });
 
-        // Now dispatch the Linear deeplink while already in fullscreen agent view.
+        // Now dispatch the Linear deeplink while a conversation is already active.
         terminal.update(&mut app, |view, ctx| {
             view.enter_agent_view_for_new_conversation(
                 Some("attacker prompt".to_owned()),
@@ -7675,7 +7665,7 @@ fn cmd_k_in_agent_view_clears_active_block_not_full_buffer_when_agent_driving_co
                 .agent_view_controller()
                 .as_ref(ctx)
                 .agent_view_state()
-                .is_fullscreen());
+                .is_chronological());
             assert!(view
                 .model
                 .lock()
@@ -7715,7 +7705,7 @@ fn cmd_k_in_agent_view_clears_active_block_not_full_buffer_when_agent_driving_co
 }
 
 #[test]
-fn cmd_k_in_agent_view_cancels_in_progress_conversation_and_starts_new_one() {
+fn cmd_k_in_chronological_conversation_keeps_conversation_active() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         FeatureFlag::AgentView.set_enabled(true);
@@ -7772,32 +7762,30 @@ fn cmd_k_in_agent_view_cancels_in_progress_conversation_and_starts_new_one() {
             });
         });
 
-        // Cmd+K with no long-running command: cancels the old in-progress conversation
-        // (stream is cancelled → AfterStreamFinished → Cancelled status) and starts a new one.
+        // Uncaged: cmd-k in a chronological conversation takes the NORMAL
+        // clear-buffer path -- the visible list is cleared and the on-screen
+        // conversation closes with it. Crucially the conversation is NOT
+        // destroyed: it stays in history, reachable via /conversations.
+        // (The fullscreen cancel-and-restart special case is dedicated-pane
+        // only; §3's watermark design will make cmd-k fully non-destructive.)
         terminal.update(&mut app, |view, ctx| {
             view.clear_buffer_for_testing(ctx);
         });
 
         terminal.read(&app, |view, ctx| {
-            // A new conversation must now be active.
-            let new_conversation_id = view
-                .agent_view_controller()
-                .as_ref(ctx)
-                .agent_view_state()
-                .active_conversation_id()
-                .expect("agent view should still be active after cmd-k");
-            assert_ne!(
-                new_conversation_id, old_conversation_id,
-                "cmd-k must start a new conversation when an in-progress one is active"
-            );
-
-            // The old conversation must be Cancelled — the stream was actually cancelled.
             assert_eq!(
+                view.agent_view_controller()
+                    .as_ref(ctx)
+                    .agent_view_state()
+                    .active_conversation_id(),
+                None,
+                "cmd-k clears the screen, closing the on-screen conversation"
+            );
+            assert!(
                 BlocklistAIHistoryModel::as_ref(ctx)
                     .conversation(&old_conversation_id)
-                    .map(|c| c.status().clone()),
-                Some(ConversationStatus::Cancelled),
-                "the old in-progress conversation must be Cancelled after cmd-k"
+                    .is_some(),
+                "the conversation must survive cmd-k in history"
             );
         });
     })

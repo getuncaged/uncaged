@@ -193,7 +193,7 @@ impl BlocklistAIContextModel {
                     // If AgentViewBlockContext is enabled and we're in agent view, track user-executed
                     // blocks for auto-attachment as context.
                     if FeatureFlag::AgentViewBlockContext.is_enabled()
-                        && me.agent_view_controller.as_ref(ctx).is_fullscreen()
+                        && me.agent_view_controller.as_ref(ctx).is_conversational()
                         && !user_block_completed.was_part_of_agent_interaction
                     {
                         me.auto_attached_agent_view_user_block_ids

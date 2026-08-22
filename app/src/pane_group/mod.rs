@@ -150,8 +150,8 @@ use crate::terminal::view::{
     LeftPanelTargetView, SyncEvent, TerminalViewState,
 };
 use crate::terminal::{
-    MockTerminalManager, ShellLaunchData, ShellLaunchState,
-    TerminalManager, TerminalModel, TerminalView,
+    MockTerminalManager, ShellLaunchData, ShellLaunchState, TerminalManager, TerminalModel,
+    TerminalView,
 };
 use crate::undo_close::{UndoCloseStack, UndoCloseStackEvent};
 #[cfg(target_family = "wasm")]

@@ -82,7 +82,7 @@ impl PaneGroup {
                     .agent_view_controller()
                     .as_ref(ctx)
                     .agent_view_state();
-                if agent_view_state.is_fullscreen() {
+                if agent_view_state.is_active() && !agent_view_state.is_inline() {
                     agent_view_state.active_conversation_id()
                 } else {
                     None
@@ -212,9 +212,11 @@ impl PaneGroup {
                 return;
             }
 
-            // Restore the conversation and enter agent view so the pill bar
-            // renders (its gate requires `is_fullscreen()`). The output area
-            // stays a loading spinner because the loading view's
+            // Restore the conversation and enter agent view. The pill bar now
+            // renders for any ACTIVE agent view; fullscreen (derived from the
+            // ChildAgent origin) is about the hidden child pane's presentation:
+            // block filtering and pinned layout. The output area stays a
+            // loading spinner because the loading view's
             // `ConversationTranscriptViewerStatus::Loading` short-circuits
             // the block list render in `TerminalView::render`.
             loading_view.update(ctx, |terminal_view, ctx| {
@@ -224,10 +226,13 @@ impl PaneGroup {
                     RestoreConversationEntryBehavior::PreserveAgentViewState,
                     ctx,
                 );
+                // Uncaged: this IS a child-agent pane -- the origin must derive
+                // FullScreen (hidden-pane presentation), which
+                // SharedSessionSelection no longer does.
                 terminal_view.enter_agent_view(
                     None,
                     Some(child_id),
-                    AgentViewEntryOrigin::SharedSessionSelection,
+                    AgentViewEntryOrigin::ChildAgent,
                     ctx,
                 );
             });
@@ -384,10 +389,11 @@ impl PaneGroup {
                 RestoreConversationEntryBehavior::PreserveAgentViewState,
                 ctx,
             );
+            // Uncaged: child-agent pane -- origin must derive FullScreen (see above).
             terminal_view.enter_agent_view(
                 None,
                 Some(child_conversation_id),
-                AgentViewEntryOrigin::SharedSessionSelection,
+                AgentViewEntryOrigin::ChildAgent,
                 ctx,
             );
             // Shared-session viewer is `is_cloud_mode=false`, so

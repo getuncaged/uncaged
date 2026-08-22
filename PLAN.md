@@ -195,8 +195,46 @@ incremental caches (16-24 GB each) filled the dev disk three times tonight.
   The two TOML settings definitions stay (inert; removing settings fields touches
   serde surface for no user-visible gain).
 
-Remaining §1.7 core (default entry stops being FullScreen; scope pill;
-`AgentViewEntryBlock` deletion) is still its own future slice.
+### §1.7 core — fullscreen stops being automatic (landed)
+
+Mapped by a 5-agent workflow (145 consumer sites, 4 clusters + architect synthesis),
+then implemented as designed:
+
+- **`AgentViewDisplayMode::Chronological`** is the new default: `try_enter_agent_view`
+  derives the mode from origin. Dedicated panes — `ChildAgent`, `CloudAgent`,
+  `ThirdPartyCloudAgent`, `Cli` — keep FullScreen (hiding non-conversation blocks is
+  their presentation contract). `Inline` stays LRC-tag-in only; reusing it was rejected
+  because ~14 `is_inline()` consumers carry tag-in semantics (header, locked input,
+  tag-out, the inline keymap set).
+- **Nothing is hidden outside fullscreen**: `should_hide_block` shows Agent-origin
+  blocks in Chronological/Inline/Inactive; conversation rich content is visible in
+  Chronological and Inactive (Inline keeps hiding it so tag-in monitoring is not
+  duplicated); the viewport iterator mirrors the predicate. The LRC entry guard only
+  applies to fullscreen-deriving origins — chronological entry is never blocked.
+- **`AgentViewEntryBlock` deleted** (the "you had a conversation here" card — turns
+  now stay visible after exit, so the card would render history twice), along with its
+  context-menu variant, metadata/type variants, the LRC-finish and restore insertion
+  paths, and the "continue conversation" message-bar producer that could only trigger
+  off the card. `render_block_container` survives in agent_view/mod.rs (ambient entry
+  uses it).
+- **Input semantics follow the conversation, not the display mode**: new
+  `is_conversational()` (fullscreen ∨ chronological) applied at 17 gates — `&` handoff
+  prefix, `!` shell-mode lock/exit/indicator, autodetection enable/re-enable/unlock,
+  keymap context flags (chronological gets the regular ACTIVE_AGENT_VIEW binding set),
+  auto-attach block context, pane-restore conversation capture, cloud-pane handoff
+  exits. The first mapping pass missed ten of these; the cloud-handoff test family
+  caught them — trust tests over maps.
+- **Cmd-K in a chronological conversation** takes the normal clear path: the screen
+  clears and the on-screen conversation closes but survives in history (empty ones are
+  dropped as always). §3's watermark design makes this fully non-destructive later.
+- **Verified zero regressions by name-level diff** against the recorded 115-failure
+  baseline (full suite, stash-compared). New invariant tests: default entry is
+  chronological and changes no block's visibility; the four origins derive fullscreen;
+  mid-conversation commands stay terminal-visibility; LRC never blocks entry.
+
+Still open from §1.7: the explicit "scope" pill (filtering as an opt-in view, backed
+by the surviving FullScreen machinery) and §2's zero-state merge for the empty-
+conversation affordance.
 
 ### Full-suite baseline (measured 2026-08-22, both sides of the split slices)
 

@@ -128,7 +128,3 @@ fn cwd_for_recent_conversations_does_not_use_startup_path_after_bootstrap() {
     let cwd = current_working_directory_for_zero_state(&terminal);
     assert_eq!(cwd, None);
 }
-
-
-
-

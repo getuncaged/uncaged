@@ -51,14 +51,6 @@ pub struct AIBlockMetadata {
     pub ai_block_handle: ViewHandle<AIBlock>,
 }
 
-/// Metadata for an agent view entry rich content.
-#[derive(Clone, Debug)]
-pub struct AgentViewEntryMetadata {
-    pub conversation_id: AIConversationId,
-    /// The origin when this block was created (not the current session origin).
-    pub origin: AgentViewEntryOrigin,
-}
-
 /// Wrapper type to hold rich content views and allow generating typed `ChildView` instances
 /// on-demand. The `ChildView`s are then passed to the `BlockListElement` to be used when
 /// displaying rich content.
@@ -160,10 +152,6 @@ impl RichContent {
         )
     }
 
-    pub fn is_agent_view_entry(&self) -> bool {
-        matches!(self.metadata, Some(RichContentMetadata::AgentViewEntry(_)))
-    }
-
     pub fn is_inline_agent_view_header(&self) -> bool {
         matches!(
             self.metadata,
@@ -203,13 +191,6 @@ impl RichContent {
     pub fn ai_block_metadata(&self) -> Option<&AIBlockMetadata> {
         match &self.metadata {
             Some(RichContentMetadata::AIBlock(metadata)) => Some(metadata),
-            _ => None,
-        }
-    }
-
-    pub fn agent_view_entry_metadata(&self) -> Option<&AgentViewEntryMetadata> {
-        match &self.metadata {
-            Some(RichContentMetadata::AgentViewEntry(metadata)) => Some(metadata),
             _ => None,
         }
     }
@@ -255,7 +236,6 @@ pub enum RichContentMetadata {
     TelemetryBanner {
         telemetry_banner_handle: ViewHandle<TelemetryBanner>,
     },
-    AgentViewEntry(AgentViewEntryMetadata),
     AmbientAgentBlock {
         block_handle: ViewHandle<AmbientAgentEntryBlock>,
     },
@@ -293,15 +273,17 @@ impl TerminalView {
         let is_agent_view_scoped_terminal_content = matches!(
             metadata,
             Some(
-                RichContentMetadata::AgentViewEntry(_)
-                    | RichContentMetadata::InlineAgentViewHeader
+                RichContentMetadata::InlineAgentViewHeader
                     | RichContentMetadata::TerminalViewZeroState
             )
         );
         let is_use_agent_footer = handle.id() == self.use_agent_footer.id();
 
         let (agent_view_conversation_id, should_hide) = if is_agent_view_scoped_terminal_content {
-            (None, self.agent_view_controller.as_ref(ctx).is_active())
+            // Uncaged: matches the steady-state predicate -- terminal-scoped
+            // content is hidden only under fullscreen; chronological and inline
+            // conversations keep it visible (no first-frame pop-in).
+            (None, self.agent_view_controller.as_ref(ctx).is_fullscreen())
         } else if is_use_agent_footer {
             (
                 self.agent_view_controller

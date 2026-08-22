@@ -42,10 +42,19 @@ pub enum ExitAgentViewError {
 /// The display mode for an active agent view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentViewDisplayMode {
-    /// Full-screen agent view (navstack-based).
+    /// Full-screen agent view (navstack-based). Uncaged: reserved for dedicated
+    /// panes -- child agents, cloud/ambient runs, third-party viewers, and
+    /// SDK-driven CLI panes -- where hiding non-conversation blocks is the
+    /// pane's presentation contract.
     FullScreen,
-    /// Inline agent view (e.g., for long-running commands).
+    /// Inline agent view: long-running-command tag-in only. Carries its own
+    /// semantics (InlineAgentViewHeader, locked AI input, tag-out behavior)
+    /// and must not be used for ordinary conversation entry.
     Inline,
+    /// Uncaged: the default for ordinary conversation entry. The conversation
+    /// renders in the one chronological block list; the terminal stays
+    /// visible; nothing is filtered and no chrome is swapped.
+    Chronological,
 }
 
 impl AgentViewDisplayMode {
@@ -55,6 +64,10 @@ impl AgentViewDisplayMode {
 
     pub fn is_fullscreen(self) -> bool {
         matches!(self, AgentViewDisplayMode::FullScreen)
+    }
+
+    pub fn is_chronological(self) -> bool {
+        matches!(self, AgentViewDisplayMode::Chronological)
     }
 }
 
@@ -285,6 +298,19 @@ impl AgentViewState {
         self.display_mode().is_some_and(|mode| mode.is_fullscreen())
     }
 
+    /// Returns `true` if in chronological display mode.
+    pub fn is_chronological(&self) -> bool {
+        self.display_mode()
+            .is_some_and(|mode| mode.is_chronological())
+    }
+
+    /// Uncaged: `true` when the input belongs to an agent conversation surface --
+    /// a fullscreen dedicated pane or an ordinary chronological conversation, but
+    /// NOT an LRC tag-in (Inline keeps its own input semantics).
+    pub fn is_conversational(&self) -> bool {
+        self.is_fullscreen() || self.is_chronological()
+    }
+
     pub fn fullscreen_conversation_id(&self) -> Option<AIConversationId> {
         match self {
             AgentViewState::Active {
@@ -400,6 +426,11 @@ impl AgentViewController {
 
     pub fn is_fullscreen(&self) -> bool {
         self.agent_view_state.is_fullscreen()
+    }
+
+    /// See [`AgentViewState::is_conversational`].
+    pub fn is_conversational(&self) -> bool {
+        self.agent_view_state.is_conversational()
     }
 
     pub fn agent_view_state(&self) -> &AgentViewState {
@@ -655,10 +686,25 @@ impl AgentViewController {
         origin: AgentViewEntryOrigin,
         ctx: &mut ModelContext<Self>,
     ) -> Result<AIConversationId, EnterAgentViewError> {
+        // Uncaged: the display mode derives from the origin. Dedicated panes --
+        // child agents, cloud/ambient runs, third-party viewers, SDK-driven CLI
+        // panes -- keep FullScreen (hiding non-conversation blocks is their
+        // presentation contract). Everything else enters Chronological: the
+        // conversation joins the one visible block list.
+        let display_mode = match &origin {
+            AgentViewEntryOrigin::ChildAgent
+            | AgentViewEntryOrigin::CloudAgent
+            | AgentViewEntryOrigin::ThirdPartyCloudAgent
+            | AgentViewEntryOrigin::Cli => AgentViewDisplayMode::FullScreen,
+            _ => AgentViewDisplayMode::Chronological,
+        };
+
         // Block entry to fullscreen mode if there's an active long-running command. Transcript
         // viewers and 3p cloud viewers are exempt: in those contexts the long-running block is
         // either a restored snapshot or the harness CLI we want to wrap in agent-view chrome.
-        let is_long_running = {
+        // Chronological entry never blocks on a long-running command: the terminal stays
+        // visible, so there is nothing to protect the user from.
+        let is_long_running = display_mode.is_fullscreen() && {
             let terminal_model = self.terminal_model.lock();
             terminal_model
                 .block_list()
@@ -672,12 +718,7 @@ impl AgentViewController {
             return Err(EnterAgentViewError::LongRunningCommand);
         }
 
-        self.enter_agent_view_internal(
-            conversation_id,
-            origin,
-            AgentViewDisplayMode::FullScreen,
-            ctx,
-        )
+        self.enter_agent_view_internal(conversation_id, origin, display_mode, ctx)
     }
 
     /// Attempts to enter inline agent view for the given conversation ID, creating a new

@@ -264,7 +264,7 @@ impl BlocklistAIInputModel {
                 AISettingsChangedEvent::AIAutoDetectionEnabled { .. }
                     if FeatureFlag::AgentView.is_enabled() =>
                 {
-                    if me.agent_view_controller.as_ref(ctx).is_fullscreen() {
+                    if me.agent_view_controller.as_ref(ctx).is_conversational() {
                         // Use context-specific check to determine if autodetection should be enabled
                         let is_nld_enabled =
                             AISettings::as_ref(ctx).is_ai_autodetection_enabled(ctx);
@@ -630,7 +630,7 @@ impl BlocklistAIInputModel {
 
         let ai_settings = AISettings::as_ref(app);
         if FeatureFlag::AgentView.is_enabled() {
-            if self.agent_view_controller.as_ref(app).is_fullscreen() {
+            if self.agent_view_controller.as_ref(app).is_conversational() {
                 ai_settings.is_ai_autodetection_enabled(app)
             } else {
                 ai_settings.is_nld_in_terminal_enabled(app)
@@ -681,7 +681,7 @@ impl BlocklistAIInputModel {
             // If NLD is enabled and input is currently locked, unlock it, as we want to
             // resume autodetection for the next input.
             self.input_config.unlocked_if_autodetection_enabled(
-                self.agent_view_controller.as_ref(ctx).is_fullscreen(),
+                self.agent_view_controller.as_ref(ctx).is_conversational(),
                 ctx,
             )
         };

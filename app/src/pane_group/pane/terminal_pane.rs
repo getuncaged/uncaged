@@ -385,7 +385,9 @@ impl PaneContent for TerminalPane {
                 ..
             } = event
             {
-                if display_mode.is_fullscreen() {
+                // Uncaged: parents opened chronologically must also re-materialize
+                // their hidden child panes; only LRC tag-ins are exempt.
+                if !display_mode.is_inline() {
                     group.restore_missing_child_agent_panes_for_parent(
                         *conversation_id,
                         terminal_pane_id.into(),
@@ -562,13 +564,15 @@ impl PaneContent for TerminalPane {
                 .map(|conversation| conversation.id())
                 .collect();
 
-            // Capture agent view state: if fullscreen, store the active conversation ID
+            // Capture agent view state: store the active conversation ID for any
+            // conversational mode (fullscreen or chronological) so pane restore
+            // re-activates it; LRC tag-ins are transient and not captured.
             let active_conversation_id = view
                 .agent_view_controller()
                 .as_ref(app)
                 .agent_view_state()
                 .display_mode()
-                .filter(|mode| mode.is_fullscreen())
+                .filter(|mode| !mode.is_inline())
                 .and_then(|_| {
                     view.agent_view_controller()
                         .as_ref(app)

@@ -2035,13 +2035,23 @@ impl Iterator for ViewportIter<'_> {
                     AgentViewState::Active {
                         display_mode: AgentViewDisplayMode::Inline,
                         ..
-                    }
-                    | AgentViewState::Inactive => {
-                        // If not in a fullscreen agent view, return the item only if it 'belongs'
-                        // to the terminal mode (represented as no `ai_conversation_id`).
+                    } => {
+                        // LRC tag-in: return the item only if it 'belongs' to the
+                        // terminal mode (represented as no `ai_conversation_id`),
+                        // mirroring `should_hide_for_agent_view_state`.
                         if fullscreen_agent_view_conversation_id.is_none() {
                             return next;
                         }
+                    }
+                    // Uncaged: chronological/inactive show every rich-content item --
+                    // this mirrors `should_hide_for_agent_view_state` and must stay in
+                    // lockstep with it, or viewport iteration and heights disagree.
+                    AgentViewState::Active {
+                        display_mode: AgentViewDisplayMode::Chronological,
+                        ..
+                    }
+                    | AgentViewState::Inactive => {
+                        return next;
                     }
                 },
                 _ => {

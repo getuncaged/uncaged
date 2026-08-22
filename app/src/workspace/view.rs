@@ -15374,7 +15374,7 @@ impl Workspace {
         if agent_view_controller
             .as_ref(ctx)
             .agent_view_state()
-            .is_fullscreen()
+            .is_conversational()
         {
             agent_view_controller.update(ctx, |controller, ctx| {
                 controller.exit_agent_view_without_confirmation(ctx);
@@ -26408,7 +26408,9 @@ impl View for Workspace {
                     .agent_view_controller()
                     .as_ref(app)
                     .agent_view_state();
-                if agent_view_state.is_fullscreen() {
+                // Chronological conversations use the regular agent-view binding
+                // set; only LRC tag-in gets the inline set.
+                if agent_view_state.is_fullscreen() || agent_view_state.is_chronological() {
                     context.set.insert(flags::ACTIVE_AGENT_VIEW);
                 } else if agent_view_state.is_inline() {
                     context.set.insert(flags::ACTIVE_INLINE_AGENT_VIEW);

@@ -515,8 +515,7 @@ impl TerminalView {
         // conversation with orchestration children, and it returns None (bar
         // renders Empty, costing one extra empty row slot) in the common
         // childless case.
-        if FeatureFlag::AgentView.is_enabled()
-            && self.agent_view_controller.as_ref(app).is_active()
+        if FeatureFlag::AgentView.is_enabled() && self.agent_view_controller.as_ref(app).is_active()
         {
             // The wrapping `Flex::column` would otherwise pass an infinite
             // vertical max constraint down to its non-flex children. That

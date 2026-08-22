@@ -6,9 +6,8 @@ use warpui::{EntityId, SingletonEntity, ViewContext};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::agent_view::{
-    AgentViewEntryBlock, AgentViewEntryBlockEvent, AgentViewEntryBlockParams, AgentViewEntryOrigin,
-    AutoTriggerBehavior, DismissalStrategy, EnterAgentViewError, EphemeralMessage,
-    ENTER_OR_EXIT_CONFIRMATION_WINDOW,
+    AgentViewEntryOrigin, AutoTriggerBehavior, DismissalStrategy, EnterAgentViewError,
+    EphemeralMessage, ENTER_OR_EXIT_CONFIRMATION_WINDOW,
 };
 use crate::ai::blocklist::history_model::CloudConversationData;
 use crate::ai::blocklist::BlocklistAIHistoryModel;
@@ -20,9 +19,7 @@ use crate::terminal::model::rich_content::RichContentType;
 use crate::terminal::view::load_ai_conversation::{
     RestoreConversationEntryBehavior, RestoredAIConversation,
 };
-use crate::terminal::view::{
-    AgentViewEntryMetadata, RichContentInsertionPosition, RichContentMetadata,
-};
+use crate::terminal::view::{RichContentInsertionPosition, RichContentMetadata};
 use crate::terminal::TerminalView;
 use crate::view_components::DismissibleToast;
 use crate::workspace::ToastStack;
@@ -245,7 +242,7 @@ impl TerminalView {
             .agent_view_controller
             .as_ref(ctx)
             .agent_view_state()
-            .is_fullscreen();
+            .is_active();
 
         let conversation_id = self.agent_view_controller.update(ctx, |controller, ctx| {
             controller.try_enter_agent_view(conversation_id, origin.clone(), ctx)
@@ -347,71 +344,7 @@ impl TerminalView {
             ctx
         );
 
-        // Mark all AgentViewEntry rich content as dirty so their heights get
-        // re-measured. When the agent view is active, AgentViewEntryBlock renders
-        // as Empty (0 height). When exiting, we need to force a re-layout so the
-        // block's actual height is restored. The dirty item processing happens
-        // before viewport iteration, so this works even for 0-height items at
-        // the prefix of the blocklist.
-        let mut model = self.model.lock();
-        self.mark_all_rich_content_items_dirty_where(&mut model, |metadata| {
-            matches!(metadata, RichContentMetadata::AgentViewEntry(_))
-        });
-        drop(model);
-
         Ok(conversation_id)
-    }
-
-    pub(super) fn insert_agent_view_entry_block(
-        &mut self,
-        params: AgentViewEntryBlockParams,
-        position: RichContentInsertionPosition,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(&params.conversation_id)
-            .is_some_and(|conversation| conversation.is_entirely_passive())
-        {
-            return;
-        }
-        let conversation_id = params.conversation_id;
-        let origin = params.origin.clone();
-        let agent_view_block =
-            ctx.add_typed_action_view(|ctx| AgentViewEntryBlock::new(params, ctx));
-        ctx.subscribe_to_view(&agent_view_block, |me, _, event, ctx| match event {
-            AgentViewEntryBlockEvent::EnterAgentView { conversation_id } => me
-                .enter_agent_view_for_conversation(
-                    None,
-                    AgentViewEntryOrigin::AgentViewBlock,
-                    *conversation_id,
-                    ctx,
-                ),
-            AgentViewEntryBlockEvent::OpenConversationContextMenu {
-                conversation_id,
-                agent_view_entry_block_id,
-                position,
-            } => me.open_agent_view_entry_context_menu(
-                *conversation_id,
-                *agent_view_entry_block_id,
-                *position,
-                ctx,
-            ),
-            AgentViewEntryBlockEvent::ForkConversation { conversation_id } => {
-                me.fork_ai_conversation(*conversation_id, None, ctx);
-            }
-        });
-        self.insert_rich_content(
-            Some(RichContentType::EnterAgentView),
-            agent_view_block,
-            Some(RichContentMetadata::AgentViewEntry(
-                AgentViewEntryMetadata {
-                    conversation_id,
-                    origin,
-                },
-            )),
-            position,
-            ctx,
-        );
     }
 
     /// Retags the rich content view with the given id so it renders under `conversation_id`'s

@@ -371,25 +371,6 @@ impl TerminalView {
         items
     }
 
-    pub(super) fn open_agent_view_entry_context_menu(
-        &mut self,
-        conversation_id: AIConversationId,
-        agent_view_entry_block_id: EntityId,
-        position: Vector2F,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.show_context_menu(
-            ContextMenuState {
-                menu_type: ContextMenuType::AgentViewEntryConversation {
-                    agent_view_entry_block_id,
-                    position,
-                },
-            },
-            self.conversation_menu_items(conversation_id, ctx),
-            ctx,
-        );
-    }
-
     pub(super) fn open_ai_block_overflow_context_menu(
         &mut self,
         ai_block_view_id: EntityId,

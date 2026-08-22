@@ -4163,7 +4163,7 @@ impl Input {
             && AISettings::as_ref(ctx).is_ampersand_handoff_enabled(ctx)
             && !is_powershell_with_nld_enabled
             && FeatureFlag::AgentView.is_enabled()
-            && self.agent_view_controller.as_ref(ctx).is_fullscreen()
+            && self.agent_view_controller.as_ref(ctx).is_conversational()
             && !is_cloud
             && !CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id)
             && self.prefix_mode(ctx) == InputPrefixMode::None
@@ -5310,12 +5310,12 @@ impl Input {
                     });
                 }
 
-                // In fullscreen agent view, lock to Shell mode so the '!' indicator is
+                // In an agent conversation, lock to Shell mode so the '!' indicator is
                 // rendered while cycling through shell command history.
-                let is_agent_view_fullscreen =
-                    self.agent_view_controller.as_ref(ctx).is_fullscreen();
+                let is_agent_conversation =
+                    self.agent_view_controller.as_ref(ctx).is_conversational();
                 self.ai_input_model.update(ctx, |ai_input_model, ctx| {
-                    if is_agent_view_fullscreen {
+                    if is_agent_conversation {
                         ai_input_model.set_input_config(
                             InputConfig {
                                 input_type: InputType::Shell,
@@ -6550,7 +6550,7 @@ impl Input {
 
         let ai_settings = AISettings::as_ref(ctx);
         if FeatureFlag::AgentView.is_enabled() {
-            if self.agent_view_controller.as_ref(ctx).is_fullscreen() {
+            if self.agent_view_controller.as_ref(ctx).is_conversational() {
                 if !ai_settings.is_ai_autodetection_enabled(ctx) {
                     return;
                 }
@@ -9184,7 +9184,7 @@ impl Input {
             self.clear_attached_context(ctx);
         } else {
             if FeatureFlag::AgentView.is_enabled()
-                && !self.agent_view_controller.as_ref(ctx).is_fullscreen()
+                && !self.agent_view_controller.as_ref(ctx).is_conversational()
             {
                 if self.ai_input_model.as_ref(ctx).is_ai_input_enabled() {
                     // This implies the contents of the terminal input are autodetected as an agent
@@ -10295,8 +10295,8 @@ impl Input {
                     let was_shell_mode_prefix_stripped =
                         last_buffer_text == TERMINAL_INPUT_PREFIX && buffer_text.is_empty();
 
-                    let is_fullscreen_agent_view_active =
-                        self.agent_view_controller.as_ref(ctx).is_fullscreen();
+                    let is_agent_conversation_active =
+                        self.agent_view_controller.as_ref(ctx).is_conversational();
                     let current_input_config = self.ai_input_model.as_ref(ctx).input_config();
 
                     // We should re-enable autodetection if the user overrode an autodetection
@@ -10309,7 +10309,7 @@ impl Input {
                         CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id);
                     let should_reenable_autodetection = (ai_settings
                         .is_ai_autodetection_enabled(ctx)
-                        && is_fullscreen_agent_view_active
+                        && is_agent_conversation_active
                         && current_input_config.is_ai()
                         && current_input_config.is_locked
                         && !was_shell_mode_prefix_stripped)
@@ -10870,9 +10870,9 @@ impl Input {
                 } else if self.ai_input_model.as_ref(ctx).is_input_type_locked() {
                     let is_cli_agent_input_open =
                         CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id);
-                    let is_agent_view_fullscreen =
-                        self.agent_view_controller.as_ref(ctx).is_fullscreen();
-                    if is_agent_view_fullscreen || is_cli_agent_input_open {
+                    let is_agent_conversation =
+                        self.agent_view_controller.as_ref(ctx).is_conversational();
+                    if is_agent_conversation || is_cli_agent_input_open {
                         self.exit_shell_mode_to_ai(ctx);
                     }
                 }
@@ -11499,7 +11499,8 @@ impl Input {
             InputPrefixMode::Shell => {
                 let is_cli_agent_input_open =
                     CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id);
-                if self.agent_view_controller.as_ref(ctx).is_fullscreen() || is_cli_agent_input_open
+                if self.agent_view_controller.as_ref(ctx).is_conversational()
+                    || is_cli_agent_input_open
                 {
                     self.exit_shell_mode_to_ai(ctx);
                     ctx.notify();
@@ -14839,7 +14840,7 @@ impl Input {
         // shell mode would be a bug.
         let has_locking_attachment = self.ai_context_model.as_ref(ctx).has_locking_attachment();
         let should_unlock = FeatureFlag::AgentView.is_enabled()
-            && self.agent_view_controller.as_ref(ctx).is_fullscreen()
+            && self.agent_view_controller.as_ref(ctx).is_conversational()
             && is_input_buffer_empty
             && AISettings::as_ref(ctx).is_ai_autodetection_enabled(ctx)
             && !has_locking_attachment;
@@ -15178,14 +15179,14 @@ impl Input {
         if let BlockType::User(block_completed) = block {
             self.last_user_block_completed = Some(block_completed.clone());
 
-            let is_in_fullscreen_agent_view =
-                self.agent_view_controller.as_ref(ctx).is_fullscreen();
+            let is_in_agent_conversation =
+                self.agent_view_controller.as_ref(ctx).is_conversational();
             self.ai_input_model.update(ctx, |ai_input_model, ctx| {
                 // If the user has autodetection enabled, unlock the input mode.
                 // Otherwise, keep it locked in the current mode.
                 let new_config = ai_input_model
                     .input_config()
-                    .unlocked_if_autodetection_enabled(is_in_fullscreen_agent_view, ctx);
+                    .unlocked_if_autodetection_enabled(is_in_agent_conversation, ctx);
                 ai_input_model.set_input_config(new_config, false, None, ctx);
             });
 
@@ -16211,7 +16212,9 @@ impl View for Input {
         if FeatureFlag::AgentView.is_enabled() {
             ctx.set.insert(flags::AGENT_VIEW_ENABLED);
             let agent_view_state = self.agent_view_controller.as_ref(app).agent_view_state();
-            if agent_view_state.is_fullscreen() {
+            // Chronological conversations use the regular agent-view binding
+            // set; only LRC tag-in gets the inline set.
+            if agent_view_state.is_fullscreen() || agent_view_state.is_chronological() {
                 ctx.set.insert(flags::ACTIVE_AGENT_VIEW);
             } else if agent_view_state.is_inline() {
                 ctx.set.insert(flags::ACTIVE_INLINE_AGENT_VIEW);
@@ -16491,7 +16494,7 @@ fn maybe_render_ai_input_indicators(
         appearance.monospace_font_size(),
     );
 
-    let is_agent_view_active = agent_view_controller.as_ref(app).is_fullscreen();
+    let is_agent_view_active = agent_view_controller.as_ref(app).is_conversational();
     let is_ai_input_enabled = ai_input_model.is_ai_input_enabled();
     let is_input_type_locked = ai_input_model.is_input_type_locked();
 
