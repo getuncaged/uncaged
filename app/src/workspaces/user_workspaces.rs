@@ -1591,27 +1591,14 @@ impl UserWorkspaces {
     }
 
     /// Updates whether or not session sharing is enabled based on the current team's tier policy.
-    fn update_session_sharing_enablement(&self, ctx: &AppContext) {
-        if cfg!(any(test, feature = "integration_tests")) {
-            return;
-        }
-
-        // If we have experiment state to unconditionally enable / disable the feature,
-        // then we defer to that.
-        let server_experiments = ServerExperiments::as_ref(ctx);
-        if server_experiments.is_experiment_enabled(&ServerExperiment::SessionSharingControl)
-            || server_experiments.is_experiment_enabled(&ServerExperiment::SessionSharingExperiment)
-        {
-            return;
-        }
-
-        let is_session_sharing_enabled_via_tier_policy = self
-            .current_team()
-            .and_then(|t| t.billing_metadata.tier.session_sharing_policy)
-            .map(|policy| policy.is_enabled)
-            .unwrap_or(true);
-        FeatureFlag::CreatingSharedSessions.set_enabled(is_session_sharing_enabled_via_tier_policy);
-    }
+    ///
+    /// Uncaged: permanently a no-op. Upstream this defaulted the flag ON for teamless
+    /// users (`unwrap_or(true)`), which in an account-free fork is *every* user — a
+    /// single reachable invocation would have silently resurrected the entire
+    /// session-upload UI at runtime, overriding the compile-time off. Session sharing
+    /// uploads terminal content to Warp's servers and stays off in this fork; no
+    /// server event may re-enable it.
+    fn update_session_sharing_enablement(&self, _ctx: &AppContext) {}
 }
 
 #[cfg(test)]

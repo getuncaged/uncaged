@@ -59,9 +59,7 @@ const MAX_RECENT_CONVERSATION_COUNT: usize = 3;
 #[derive(Default)]
 struct StateHandles {
     start_new_conversation: MouseStateHandle,
-    start_cloud_conversation: MouseStateHandle,
     switch_model: MouseStateHandle,
-    exit: MouseStateHandle,
     init_callout: MouseStateHandle,
     oz_updates: MouseStateHandle,
     changelog_link: MouseStateHandle,
@@ -80,7 +78,6 @@ pub struct AgentViewZeroStateBlock {
     cached_recent_conversations: Vec<ConversationNavigationData>,
     should_hide: bool,
     should_show_init_callout: bool,
-    has_parent_terminal: bool,
     state_handles: StateHandles,
     is_oz_updates_expanded: bool,
 }
@@ -205,8 +202,6 @@ impl AgentViewZeroStateBlock {
             });
         }
 
-        let has_parent_terminal =
-            cloud_agent_view_model.is_none_or(|model| !model.as_ref(ctx).is_ambient_agent());
         let is_local_to_cloud_handoff = cloud_agent_view_model
             .is_some_and(|model| model.as_ref(ctx).is_local_to_cloud_handoff());
         let changelog_model = ChangelogModel::handle(ctx);
@@ -271,7 +266,6 @@ impl AgentViewZeroStateBlock {
             cached_recent_conversations,
             should_hide,
             should_show_init_callout,
-            has_parent_terminal,
             state_handles,
             is_oz_updates_expanded,
         }
@@ -448,7 +442,6 @@ impl View for AgentViewZeroStateBlock {
         let body = render_body(
             ZeroStateBodyProps {
                 origin: self.origin.clone(),
-                has_parent_terminal: self.has_parent_terminal,
                 should_show_init_callout: self.should_show_init_callout,
                 recent_conversations: &self.cached_recent_conversations,
                 active_session: active_session.as_deref(),
@@ -692,7 +685,6 @@ fn render_title_and_description(props: HeaderProps, app: &AppContext) -> Vec<Box
 
 struct ZeroStateBodyProps<'a> {
     origin: AgentViewEntryOrigin,
-    has_parent_terminal: bool,
     should_show_init_callout: bool,
     recent_conversations: &'a [ConversationNavigationData],
     active_session: Option<&'a Session>,
@@ -703,7 +695,6 @@ struct ZeroStateBodyProps<'a> {
 fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn Element>> {
     let ZeroStateBodyProps {
         origin,
-        has_parent_terminal,
         should_show_init_callout,
         recent_conversations,
         active_session,
@@ -727,7 +718,7 @@ fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn E
         ) {
         vec![recent_conversations_section]
     } else {
-        let mut body_items = vec![
+        let body_items = vec![
             render_standard_message(
                 Message::new(vec![MessageItem::clickable(
                     vec![

@@ -10,6 +10,11 @@ MACOSX_DEPLOYMENT_TARGET = "10.14"
 
 [build]
 rustflags = ["-C", "symbol-mangling-version=v0", "-C", "link-args=-Wl,-headerpad_max_install_names"]
+# Uncaged: incremental caches for this workspace repeatedly grow past 16 GB per
+# feature combination and have filled development disks. Fresh-crate rebuild
+# times are acceptable without them; re-enable locally with CARGO_INCREMENTAL=1
+# if you iterate on a single crate and have the disk to spare.
+incremental = false
 
 [net]
 git-fetch-with-cli = true

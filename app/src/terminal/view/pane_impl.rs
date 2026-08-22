@@ -247,15 +247,27 @@ impl TerminalView {
 
         // Uncaged: the "for terminal" persona of this button is gone -- leaving
         // AI mode is the mode toggle's job, not a navigation. The button still
-        // renders for panes pushed onto the nav stack (child agents show it as
-        // "for Orchestrator", which is their swap-back affordance).
+        // renders for genuine navigations: panes pushed onto the nav stack, and
+        // child-agent panes, which are pane-tree SWAPS (Event::SwapPaneToConversation
+        // -> replace_pane), not stack pushes -- their PaneStack stays at depth 1,
+        // so they need their own predicate here. For them the button reads
+        // "for Orchestrator" and is the swap-back affordance.
         let in_nav_stack = self
             .pane_stack
             .as_ref()
             .and_then(|h| h.upgrade(app))
             .is_some_and(|stack| stack.as_ref(app).depth() > 1);
 
-        if in_nav_stack {
+        let is_child_agent = self
+            .agent_view_controller
+            .as_ref(app)
+            .agent_view_state()
+            .active_conversation_id()
+            .and_then(|id| BlocklistAIHistoryModel::as_ref(app).conversation(&id))
+            .and_then(|c| c.parent_conversation_id())
+            .is_some();
+
+        if in_nav_stack || is_child_agent {
             Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_child(ChildView::new(&self.agent_view_back_button).finish())

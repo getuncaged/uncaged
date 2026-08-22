@@ -74,6 +74,13 @@ jobs:
       - name: Build warp-oss (GUI binary)
         run: cargo build --bin warp-oss
 
+      # voice_input is no longer in any shipped feature set (gui = []), so no
+      # build path would catch it bit-rotting. This check keeps the optional
+      # feature compiling without shipping it anywhere.
+      - name: cargo check (voice_input feature stays compilable)
+        timeout-minutes: 25
+        run: cargo check --bin warp-oss --features gui,voice_input
+
       # clippy after a successful build reuses artifacts; keep it non-fatal on
       # warnings for now (large fork, many upstream lints) — flip to -D warnings
       # once the tree is clean.

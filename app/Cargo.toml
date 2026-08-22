@@ -547,7 +547,6 @@ default = [
     "agent_management_view",
     "agent_management_details_view",
     "interactive_conversation_management_view",
-    "shared_block_title_generation",
     "tab_close_button_on_left",
     "ai_resume_button",
     "code_find_replace",

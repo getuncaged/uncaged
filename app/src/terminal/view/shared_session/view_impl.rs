@@ -1909,6 +1909,13 @@ impl TerminalView {
     ) -> Vec<MenuItem<TerminalAction>> {
         let mut items = Vec::new();
 
+        // Uncaged: session sharing is off in this fork (it uploads terminal
+        // content to Warp's servers). Without the flag the item could only ever
+        // render permanently greyed out -- show nothing instead.
+        if !FeatureFlag::CreatingSharedSessions.is_enabled() {
+            return items;
+        }
+
         if !model.shared_session_status().is_sharer_or_viewer() {
             items.push(
                 MenuItemFields::new("Share session...")

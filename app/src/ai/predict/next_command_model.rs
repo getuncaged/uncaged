@@ -816,14 +816,18 @@ fn find_potential_autosuggestions_from_history<'a>(
     buffer_text: &str,
     working_dir: Option<&str>,
 ) -> Vec<String> {
-    let mut seen = std::collections::HashSet::new();
+    // Deduplication is PER BUCKET, deliberately: a single global seen-set would
+    // classify each command by its most recent occurrence anywhere, demoting a
+    // command out of the priority same-dir bucket whenever it was more recently
+    // run elsewhere (`git push` in another repo must not hide the `git push`
+    // you run here). A command present in both buckets appears once in each,
+    // same-dir first, exactly as the pre-dedup ranking behaved.
+    let mut seen_same_dir = std::collections::HashSet::new();
+    let mut seen_other_dirs = std::collections::HashSet::new();
     let mut commands_in_same_dir = vec![];
     let mut commands_in_other_dirs = vec![];
     for entry in history_entries.rev() {
         if !entry.command.starts_with(buffer_text) {
-            continue;
-        }
-        if !seen.insert(entry.command.as_str()) {
             continue;
         }
         let same_dir = entry
@@ -833,8 +837,10 @@ fn find_potential_autosuggestions_from_history<'a>(
             .is_some_and(|(pwd, working_dir)| pwd == working_dir);
 
         if same_dir {
-            commands_in_same_dir.push(entry.command.clone());
-        } else {
+            if seen_same_dir.insert(entry.command.as_str()) {
+                commands_in_same_dir.push(entry.command.clone());
+            }
+        } else if seen_other_dirs.insert(entry.command.as_str()) {
             commands_in_other_dirs.push(entry.command.clone());
         }
     }

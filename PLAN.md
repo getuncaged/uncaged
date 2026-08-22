@@ -140,6 +140,43 @@ Deliberately **not** done, with reasons:
 `AgentViewEntryBlock` deletion; pill bar out of fullscreen-only) is the next slice —
 bigger redesign, not started here.
 
+### Adversarial review + runtime verification of the split slices (this session)
+
+A 15-agent review (4 lenses, every finding adversarially verified) over the three
+slices produced 11 raw findings, 8 confirmed, all fixed:
+
+- **Child-agent "for Orchestrator" button had regressed** (high): child panes are
+  pane-tree *swaps* (`Event::SwapPaneToConversation` → `replace_pane`), not
+  nav-stack pushes, so the depth>1 gate missed them. Fixed with an explicit
+  `is_child_agent` predicate (parent conversation exists).
+- **Autosuggestion dedup demoted same-dir commands** (medium, found by two lenses):
+  a global seen-set classified each command by its newest occurrence anywhere.
+  Dedup is now per bucket; two regression tests guard the cross-directory case.
+- **`update_session_sharing_enablement` defaulted the share flag ON for teamless
+  users** — every user in this fork; one reachable server event would have
+  resurrected the session-upload UI at runtime. Now a documented no-op.
+- **`shared_block_title_generation` out of default features** (its only consumer
+  was the deleted share modal); the greyed "Share session…" context-menu item is
+  hidden behind `CreatingSharedSessions` (was rendering permanently disabled).
+- **`voice_input` kept compilable by a CI check** (no shipped build enables it now).
+- Ctrl-C tests now also assert the fall-through (ETX reaches the PTY with a
+  long-running block); dead `has_parent_terminal`/`exit`-handle plumbing removed.
+
+**Runtime verification (debug .app, driven live):** launch OK; toggle switches
+modes with agent tooling (slash/@/attach/model chip) only in AI mode; **ESC ×2 and
+Ctrl-C ×2 stay in AI mode**; context menu has no "Share…"; **no mic anywhere**;
+"/" renders the unified command menu (no `/create-environment` — NEVER works);
+zero state has no "escape to go back" row.
+
+**Found only by running the debug build:** `Availability::NEVER` overloaded
+`AGENT_VIEW|TERMINAL_VIEW`, which `Registry::new`'s debug_assert rejects — every
+debug-assertions build panicked at startup. NEVER is now its own bit. Lesson
+recorded: run a debug (assertions-on) build before calling a slice verified;
+release builds skip the checks that would have caught this.
+
+Also: `incremental = false` in `.cargo/config.toml` — per-feature-combo
+incremental caches (16-24 GB each) filled the dev disk three times tonight.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.

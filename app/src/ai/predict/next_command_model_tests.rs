@@ -132,6 +132,55 @@ fn test_find_autosuggestion_from_history_different_directory() {
 }
 
 #[test]
+fn test_find_autosuggestion_prefers_same_dir_even_if_command_ran_elsewhere_more_recently() {
+    // `git push` ran in ~/proj at some point, then MORE RECENTLY in ~/other.
+    // Typing in ~/proj must still suggest `git push` first: the same-dir
+    // occurrence wins over both the newer other-dir occurrence and any other
+    // same-dir command. Guards the per-bucket dedup in
+    // find_potential_autosuggestions_from_history (entries are oldest -> newest).
+    let history_entries = [
+        HistoryEntry::with_pwd_and_exit_code("git status", "/Users/tadej/proj", 0),
+        HistoryEntry::with_pwd_and_exit_code("git push", "/Users/tadej/proj", 0),
+        HistoryEntry::with_pwd_and_exit_code("git push", "/Users/tadej/other", 0),
+    ];
+
+    let autosuggestions = find_potential_autosuggestions_from_history(
+        history_entries.iter(),
+        "git ",
+        Some("/Users/tadej/proj"),
+    );
+
+    assert_eq!(
+        autosuggestions,
+        vec![
+            "git push".to_owned(),
+            "git status".to_owned(),
+            // The other-dir occurrence is still offered, after every same-dir hit.
+            "git push".to_owned(),
+        ]
+    );
+}
+
+#[test]
+fn test_find_autosuggestion_dedupes_repeats_within_a_bucket() {
+    // Repeated identical commands collapse to their newest occurrence per
+    // bucket, so consumers do not re-validate the same command over and over.
+    let history_entries = [
+        HistoryEntry::with_pwd_and_exit_code("git status", "/Users/tadej", 0),
+        HistoryEntry::with_pwd_and_exit_code("git status", "/Users/tadej", 0),
+        HistoryEntry::with_pwd_and_exit_code("git status", "/Users/tadej", 0),
+    ];
+
+    let autosuggestions = find_potential_autosuggestions_from_history(
+        history_entries.iter(),
+        "git ",
+        Some("/Users/tadej"),
+    );
+
+    assert_eq!(autosuggestions, vec!["git status".to_owned()]);
+}
+
+#[test]
 fn test_find_autosuggestion_from_history_no_matching_commands() {
     let history_entries = [
         HistoryEntry::with_pwd_and_exit_code("cd Dotfiles", "/Users/tadej", 0),

@@ -5607,6 +5607,38 @@ fn ctrl_c_never_exits_agent_view() {
                 assert!(view.agent_view_controller().as_ref(ctx).is_active());
             });
         }
+
+        // The press must still FALL THROUGH to the terminal: with a
+        // long-running command it interrupts it (ETX to the PTY) instead of
+        // being swallowed by the agent view.
+        let pty_writes: Rc<RefCell<Vec<Vec<u8>>>> = Rc::new(RefCell::new(Vec::new()));
+        let writes = pty_writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    writes.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block("sleep 10", "running");
+            view.handle_input_event(
+                &InputEvent::CtrlC {
+                    cleared_buffer_len: 0,
+                },
+                ctx,
+            );
+            assert!(view.agent_view_controller().as_ref(ctx).is_active());
+        });
+        assert!(
+            pty_writes
+                .borrow()
+                .iter()
+                .any(|bytes| bytes.contains(&0x03)),
+            "ctrl-c with a long-running command should write ETX to the pty"
+        );
     })
 }
 

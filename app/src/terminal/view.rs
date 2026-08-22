@@ -8730,13 +8730,6 @@ impl TerminalView {
         }
     }
 
-    /// Returns whether ctrl-c should exit the agent view.
-    ///
-    /// This is true when:
-    /// - Agent view feature is enabled
-    /// - Agent view is active and can be exited
-    /// - No long-running command
-    /// - Conversation is not in progress and not blocked
     /// Cancels the active agent conversation via the status bar's Ctrl+C handler.
     /// Includes shared session notification if applicable.
     fn cancel_active_conversation_via_status_bar(&mut self, ctx: &mut ViewContext<Self>) {
