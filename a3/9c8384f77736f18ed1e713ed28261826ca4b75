@@ -1,0 +1,33 @@
+app/src/ai/blocklist/agent_view/orchestration_pill_bar.rs
+  s_6e5dc450e2113a::t_16496d8c989373 2233-2235
+app/src/settings_view/ai_page.rs
+  s_6e5dc450e2113a::t_827dd515b3b0b7 99
+app/src/pane_group/mod.rs
+  s_6e5dc450e2113a::t_b0f5900d67fb85 34-35
+PLAN.md
+  s_6e5dc450e2113a::t_7275de2a485b21 180-200
+app/src/ai/blocklist/agent_view/zero_state_block_tests.rs
+  s_6e5dc450e2113a::t_d6904ff89784d6 6
+app/src/terminal/view/pane_impl.rs
+  s_6e5dc450e2113a::t_16496d8c989373 512-517,519
+app/src/ai/blocklist/agent_view/zero_state_block.rs
+  s_6e5dc450e2113a::t_3d2966e5ab8e77 17
+  s_6e5dc450e2113a::t_ddae1107a966f6 12-13
+  s_6e5dc450e2113a::t_d6904ff89784d6 192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "a39c8384f77736f18ed1e713ed28261826ca4b75",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
