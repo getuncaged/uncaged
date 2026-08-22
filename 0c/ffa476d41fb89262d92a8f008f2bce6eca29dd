@@ -1,0 +1,37 @@
+app/src/ai/predict/next_command_model_tests.rs
+  s_6e5dc450e2113a::t_1b5b6a7b8af271 134-182
+app/src/workspaces/user_workspaces.rs
+  s_6e5dc450e2113a::t_55c4e1f60543bf 1594-1601
+app/src/ai/predict/next_command_model.rs
+  s_6e5dc450e2113a::t_1b5b6a7b8af271 819-826,840-843
+app/src/terminal/view_tests.rs
+  s_6e5dc450e2113a::t_d99f34210a244a 5610-5641
+app/src/terminal/view/shared_session/view_impl.rs
+  s_6e5dc450e2113a::t_d0dccc6d8a78ee 1912-1918
+.github/workflows/uncaged-ci.yml
+  s_6e5dc450e2113a::t_6b51ab3b9bae0b 77-83
+PLAN.md
+  s_6e5dc450e2113a::t_bfcec2a680e9ba 143-179
+app/src/ai/blocklist/agent_view/zero_state_block.rs
+  s_6e5dc450e2113a::t_71944ede9c6272 721
+.cargo/config.toml
+  s_6e5dc450e2113a::t_43e12159c5bd6e 13-17
+app/src/terminal/view/pane_impl.rs
+  s_6e5dc450e2113a::t_5a624768a37c91 250-254,261-270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "0cffa476d41fb89262d92a8f008f2bce6eca29dd",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
