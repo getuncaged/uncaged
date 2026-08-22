@@ -23299,11 +23299,6 @@ impl Workspace {
                 .insert(flags::SHARED_BLOCK_TITLE_GENERATION_FLAG);
         }
 
-        if *ai_settings.should_show_oz_updates_in_zero_state.value() {
-            context
-                .set
-                .insert(flags::SHOW_OZ_UPDATES_IN_ZERO_STATE_FLAG);
-        }
         if *ai_settings.git_operations_autogen_enabled_internal.value() {
             context.set.insert(flags::GIT_OPERATIONS_AUTOGEN_FLAG);
         }

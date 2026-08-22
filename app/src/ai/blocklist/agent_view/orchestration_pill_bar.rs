@@ -2230,7 +2230,9 @@ pub fn render_orchestration_breadcrumbs(
     if !FeatureFlag::AgentView.is_enabled() {
         return None;
     }
-    if !agent_view_controller.is_fullscreen() {
+    // Uncaged: gate on active, not fullscreen — mirrors the pill-bar row in
+    // pane_impl.rs, which no longer requires a display mode (§1.7).
+    if !agent_view_controller.is_active() {
         return None;
     }
     // The caller (pane header) decides whether this view should render

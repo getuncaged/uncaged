@@ -31,8 +31,8 @@ use warp_util::path::convert_wsl_to_windows_host_path;
 use warp_util::path::LineAndColumnArg;
 use warp_util::remote_path::RemotePath;
 use warpui::elements::{
-    ChildView, Clipped, CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Flex,
-    MainAxisSize, ParentElement, Shrinkable, Stack,
+    ChildView, CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Flex, MainAxisSize,
+    ParentElement, Shrinkable, Stack,
 };
 use warpui::keymap::{Context, EditableBinding, FixedBinding};
 use warpui::notification::NotificationSendError;

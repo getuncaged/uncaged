@@ -509,8 +509,14 @@ impl TerminalView {
         // breadcrumb row instead. When no children have arrived yet,
         // `OrchestrationPillBar::pill_specs` returns `None` and the pill
         // bar's `render` short-circuits to `Empty`.
+        // Uncaged (§1.7 prerequisite): the pill bar renders whenever the agent
+        // view is ACTIVE, not only in fullscreen. Multi-agent navigation must
+        // not depend on a display mode — pill_specs itself only needs an active
+        // conversation with orchestration children, and it returns None (bar
+        // renders Empty, costing one extra empty row slot) in the common
+        // childless case.
         if FeatureFlag::AgentView.is_enabled()
-            && self.agent_view_controller.as_ref(app).is_fullscreen()
+            && self.agent_view_controller.as_ref(app).is_active()
         {
             // The wrapping `Flex::column` would otherwise pass an infinite
             // vertical max constraint down to its non-flex children. That

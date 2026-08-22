@@ -177,6 +177,27 @@ release builds skip the checks that would have caught this.
 Also: `incremental = false` in `.cargo/config.toml` — per-feature-combo
 incremental caches (16-24 GB each) filled the dev disk three times tonight.
 
+### §1.7 first step + §2 item 3 (this session, after the review round)
+
+- **Pill bar / breadcrumbs ungated from fullscreen** — both gates
+  (`pane_impl.rs` secondary row, `render_orchestration_breadcrumbs`) now require
+  only an *active* agent view. `pill_specs` never depended on fullscreen (verified;
+  PLAN risk #6 closed), and it still returns None → Empty when the conversation has
+  no orchestration children. This is the §1.7 prerequisite: multi-agent navigation
+  no longer depends on a display mode.
+- **The permanently-empty "What's new in Uncaged" zero-state section is gone**
+  (§2 item 3): `get_current_changelog` returns `Ok(None)` for Channel::Oss before
+  any network, so `oz_updates` could never be non-empty in a shipped build. Deleted:
+  the render fn + props + gating helper (~230 lines), the ChangelogModel
+  subscription, the expand state, `ToggleOzUpdates`, its four tests, AND the live
+  settings toggle ("Show Uncaged changelog in new conversation view") that
+  controlled the invisible section, with its action/binding/context-flag plumbing.
+  The two TOML settings definitions stay (inert; removing settings fields touches
+  serde surface for no user-visible gain).
+
+Remaining §1.7 core (default entry stops being FullScreen; scope pill;
+`AgentViewEntryBlock` deletion) is still its own future slice.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.

@@ -96,7 +96,7 @@ use crate::settings::{
     NaturalLanguageAutosuggestionsEnabled, OrchestrationMessageDisplayMode,
     PreferShellForKnownCommands, PromptSubmissionMode, RuleSuggestionsEnabled,
     SharedBlockTitleGenerationEnabled, ShouldRenderCLIAgentToolbar,
-    ShouldRenderUseAgentToolbarForUserCommands, ShouldShowOzUpdatesInZeroState, ShowAgentTips,
+    ShouldRenderUseAgentToolbarForUserCommands, ShowAgentTips,
     ShowConversationHistory, ShowHintText, ThinkingDisplayMode, VoiceInputEnabled,
     WarpDriveContextEnabled,
 };
@@ -305,29 +305,6 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         )
         .with_group(bindings::BindingGroup::WarpAi)
         .with_enabled(|| FeatureFlag::AgentTips.is_enabled())],
-        app,
-    );
-    ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
-        vec![ToggleSettingActionPair::custom(
-            SettingActionPairDescriptions::new(
-                "Show Uncaged changelog in new agent conversation view",
-                "Hide Uncaged changelog in new agent conversation view",
-            ),
-            builder(SettingsAction::AI(
-                AISettingsPageAction::ToggleShowOzUpdatesInZeroState,
-            )),
-            SettingActionPairContexts::new(
-                context.clone()
-                    & id!(flags::IS_ANY_AI_ENABLED)
-                    & !id!(flags::SHOW_OZ_UPDATES_IN_ZERO_STATE_FLAG),
-                context.clone()
-                    & id!(flags::IS_ANY_AI_ENABLED)
-                    & id!(flags::SHOW_OZ_UPDATES_IN_ZERO_STATE_FLAG),
-            ),
-            None,
-        )
-        .with_group(bindings::BindingGroup::WarpAi)
-        .with_enabled(|| FeatureFlag::AgentView.is_enabled())],
         app,
     );
     {
@@ -3870,7 +3847,6 @@ pub enum AISettingsPageAction {
     ToggleCodebaseContext,
     ToggleShowInputHintText,
     ToggleShowAgentTips,
-    ToggleShowOzUpdatesInZeroState,
     SetThinkingDisplayMode(ThinkingDisplayMode),
     SetOrchestrationMessageDisplayMode(OrchestrationMessageDisplayMode),
     SetPromptSubmissionMode(PromptSubmissionMode),
@@ -4346,14 +4322,6 @@ impl TypedActionView for AISettingsPageView {
                     Err(e) => {
                         log::warn!("Failed to set value for Show Agent Tips setting: {e:?}");
                     }
-                });
-                ctx.notify();
-            }
-            AISettingsPageAction::ToggleShowOzUpdatesInZeroState => {
-                AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    report_if_error!(settings
-                        .should_show_oz_updates_in_zero_state
-                        .toggle_and_save_value(ctx));
                 });
                 ctx.notify();
             }
@@ -7470,7 +7438,6 @@ impl SettingsWidget for VoiceWidget {
 }
 #[derive(Default)]
 struct OtherAIWidget {
-    show_oz_updates_in_zero_state_toggle: SwitchStateHandle,
     use_agent_footer_toggle: SwitchStateHandle,
     show_conversation_history_toggle: SwitchStateHandle,
 }
@@ -7598,15 +7565,6 @@ impl SettingsWidget for OtherAIWidget {
 
         if FeatureFlag::AgentView.is_enabled() {
             let mut agent_view_column = Flex::column()
-                .with_child(render_ai_setting_toggle::<ShouldShowOzUpdatesInZeroState>(
-                    "Show Uncaged changelog in new conversation view",
-                    AISettingsPageAction::ToggleShowOzUpdatesInZeroState,
-                    *ai_settings.should_show_oz_updates_in_zero_state,
-                    is_toggleable,
-                    self.show_oz_updates_in_zero_state_toggle.clone(),
-                    &view.local_only_icon_tooltip_states,
-                    app,
-                ))
                 .with_child(render_ai_setting_toggle::<ShouldRenderUseAgentToolbarForUserCommands>(
                     "Show \"Use Agent\" footer",
                     AISettingsPageAction::ToggleUseAgentToolbar,
