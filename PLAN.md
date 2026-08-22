@@ -198,6 +198,18 @@ incremental caches (16-24 GB each) filled the dev disk three times tonight.
 Remaining §1.7 core (default entry stops being FullScreen; scope pill;
 `AgentViewEntryBlock` deletion) is still its own future slice.
 
+### Full-suite baseline (measured 2026-08-22, both sides of the split slices)
+
+`cargo test -p warp --lib` fails **115 tests at 4e1fc87 and 115 at a39c838** —
+identical set, all pre-existing, none introduced by the split slices. They are
+upstream tests broken by deliberate fork changes: auth flows (accounts disabled),
+drive section counts (cloud sections removed), the URL rebrand in notebook link
+tests, a missing notebook fixture, and a family of `CLIAgentInstallModel`
+singleton-registration setup panics. **Do not read a failing full suite on this
+branch as a regression signal until the triage task lands** — compare failure
+sets against this baseline instead. Targeted filters over changed areas are the
+regression check that works today.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.
