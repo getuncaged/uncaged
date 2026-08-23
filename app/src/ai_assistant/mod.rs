@@ -19,9 +19,7 @@ use crate::terminal::model::terminal_model::BlockIndex;
 use crate::workflows::workflow::{Argument, Workflow};
 
 pub mod execution_context;
-pub mod panel;
 pub mod requests;
-pub mod transcript;
 pub mod utils;
 
 #[cfg(test)]

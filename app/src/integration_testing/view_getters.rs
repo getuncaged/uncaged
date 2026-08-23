@@ -8,7 +8,6 @@
 use warpui::integration::AssertionCallback;
 use warpui::{async_assert, App, Entity, View, ViewHandle, WindowId};
 
-use crate::ai_assistant::panel::AIAssistantPanelView;
 use crate::input_suggestions::InputSuggestions;
 use crate::notebooks::notebook::NotebookView;
 use crate::pane_group::{PaneGroup, PaneView};

@@ -232,6 +232,13 @@ then implemented as designed:
   chronological and changes no block's visibility; the four origins derive fullscreen;
   mid-conversation commands stay terminal-visibility; LRC never blocks entry.
 
+**Visually verified in the running debug bundle (2026-08-23):** prompt submission
+appends to the one list with zero-state hints and prior turns still visible (no
+screen swap); the `!` shell escape runs a real command block into the same list
+mid-conversation and ⌘I exits back to AI; restored scrollback interleaves
+previously-hidden conversation turns with terminal content (the documented
+one-time migration), rendering cleanly.
+
 Still open from §1.7: the explicit "scope" pill (filtering as an opt-in view, backed
 by the surviving FullScreen machinery) and §2's zero-state merge for the empty-
 conversation affordance.
@@ -247,6 +254,21 @@ singleton-registration setup panics. **Do not read a failing full suite on this
 branch as a regression signal until the triage task lands** — compare failure
 sets against this baseline instead. Targeted filters over changed areas are the
 regression check that works today.
+
+### §2 stage 1a — the legacy Uncaged-AI side panel is gone (this session)
+
+`AIAssistantPanelView` (1,185 lines) + its transcript renderer + all wiring:
+the right-panel render arm, focus-cycling arms, the warm-welcome overlay and its
+dismissed-preference, the legacy tab-bar entry button, five workspace actions,
+the `!AgentMode` keybinding registration, and the panel-open workspace-state flag.
+All of it was reachable only when `FeatureFlag::AgentMode` was off — a
+configuration that no longer ships. Ask-AI requests and the local-control surface
+toggle now route to the blocklist agent / a new agent-mode pane. The legacy
+`ai_assistant::requests` layer stays for now (server_api/ai.rs and auth still
+type-depend on it) — untangle with the §3/server cleanup. Net −2,900 lines.
+Full-suite name-diff vs the recorded baseline: no new failures (the
+secret-redaction family's run-to-run instability is pre-existing — verified at
+clean HEAD — and chip-filed).
 
 ## Survey claims corrected by measurement — do not re-chase these
 

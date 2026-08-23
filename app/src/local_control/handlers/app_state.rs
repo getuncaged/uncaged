@@ -135,10 +135,15 @@ pub(crate) fn handle(
             target,
             ctx,
         ),
+        // Uncaged: the legacy Uncaged AI side panel is gone; the surface toggle
+        // opens a new agent-mode pane instead.
         ActionKind::SurfaceAiAssistantToggle => workspace_action(
             instance_id,
             action,
-            WorkspaceAction::ToggleAIAssistant,
+            WorkspaceAction::NewPaneInAgentMode {
+                entrypoint: crate::server::telemetry::AgentModeEntrypoint::NewPaneBinding,
+                zero_state_prompt_suggestion_type: None,
+            },
             target,
             ctx,
         ),
