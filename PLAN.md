@@ -270,6 +270,18 @@ Full-suite name-diff vs the recorded baseline: no new failures (the
 secret-redaction family's run-to-run instability is pre-existing — verified at
 clean HEAD — and chip-filed).
 
+### §2 stage 1b — NLD checkbox machinery + UniversalInput onboarding (this session)
+
+- The zero-state NLD checkbox (neutralized earlier with a hardcoded `false`) is now
+  fully deleted: field, render fn, `ToggleNLD` action, mouse handle, imports, plus
+  the orphaned `start_cloud_conversation` handle sharing the struct.
+- The `AgentOnboardingVersion::UniversalInput` callout flow is unconstructible:
+  the two selection sites collapse to `AgentModality` (its `else` only ran with
+  `AgentView` off — a config that no longer ships), the two debug bindings and the
+  dispatcher arm are gone, and the variant is deleted. The onboarding crate's
+  internal `UniversalInputCalloutState` machine is now app-orphaned — left inert
+  (dead code costs disk); delete it when the crate is next touched.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.

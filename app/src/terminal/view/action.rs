@@ -50,9 +50,6 @@ use crate::workflows::workflow::Workflow;
 /// Version of the agent onboarding flow (non-legacy).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AgentOnboardingVersion {
-    UniversalInput {
-        has_project: bool,
-    },
     AgentModality {
         has_project: bool,
         intention: OnboardingIntention,

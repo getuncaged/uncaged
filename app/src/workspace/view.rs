@@ -7839,13 +7839,9 @@ impl Workspace {
         log::error!(
             "Triggering agent onboarding callout flow but not during initial login. This should not normally happen."
         );
-        let version = if FeatureFlag::AgentView.is_enabled() {
-            AgentOnboardingVersion::AgentModality {
-                has_project: false,
-                intention: OnboardingIntention::AgentDrivenDevelopment,
-            }
-        } else {
-            AgentOnboardingVersion::UniversalInput { has_project: false }
+        let version = AgentOnboardingVersion::AgentModality {
+            has_project: false,
+            intention: OnboardingIntention::AgentDrivenDevelopment,
         };
         self.dispatch_onboarding(
             TerminalAction::OnboardingFlow(OnboardingVersion::Agent(version)),

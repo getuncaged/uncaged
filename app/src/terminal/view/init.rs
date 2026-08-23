@@ -833,33 +833,6 @@ pub fn init(app: &mut AppContext) {
     app.register_editable_bindings([
         // UniversalInput callout debug bindings
         EditableBinding::new(
-            "terminal:agent_onboarding_flow_universal_input_project",
-            "[Debug] Onboarding Callout: WarpInput - Project",
-            TerminalAction::OnboardingFlow(OnboardingVersion::Agent(
-                AgentOnboardingVersion::UniversalInput { has_project: true },
-            )),
-        )
-        .with_enabled(|| {
-            FeatureFlag::AgentOnboarding.is_enabled() && ChannelState::enable_debug_features()
-        })
-        .with_context_predicate(
-            id!("Terminal") & id!(SharedSessionStatus::NotShared.as_keymap_context()),
-        ),
-        EditableBinding::new(
-            "terminal:agent_onboarding_flow_universal_input_no_project",
-            "[Debug] Onboarding Callout: WarpInput - No Project",
-            TerminalAction::OnboardingFlow(OnboardingVersion::Agent(
-                AgentOnboardingVersion::UniversalInput { has_project: false },
-            )),
-        )
-        .with_enabled(|| {
-            FeatureFlag::AgentOnboarding.is_enabled() && ChannelState::enable_debug_features()
-        })
-        .with_context_predicate(
-            id!("Terminal") & id!(SharedSessionStatus::NotShared.as_keymap_context()),
-        ),
-        // AgentModality callout debug bindings
-        EditableBinding::new(
             "terminal:agent_onboarding_flow_modality_project",
             "[Debug] Onboarding Callout: Modality - Project",
             TerminalAction::OnboardingFlow(OnboardingVersion::Agent(

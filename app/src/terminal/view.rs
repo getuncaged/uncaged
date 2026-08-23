@@ -14372,17 +14372,6 @@ impl TerminalView {
             let keybindings = build_onboarding_keybindings(ctx);
 
             match version {
-                AgentOnboardingVersion::UniversalInput { has_project } => {
-                    let initial_natural_language_detection_enabled = AISettings::handle(ctx)
-                        .as_ref(ctx)
-                        .is_nld_in_terminal_enabled(ctx);
-                    OnboardingCalloutView::new_universal_input(
-                        has_project,
-                        initial_natural_language_detection_enabled,
-                        keybindings,
-                        ctx,
-                    )
-                }
                 AgentOnboardingVersion::AgentModality {
                     has_project,
                     intention,

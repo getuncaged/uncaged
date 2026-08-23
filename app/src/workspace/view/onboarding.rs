@@ -197,13 +197,9 @@ impl Workspace {
         intention: OnboardingIntention,
         ctx: &mut ViewContext<Self>,
     ) {
-        let version = OnboardingVersion::Agent(if FeatureFlag::AgentView.is_enabled() {
-            AgentOnboardingVersion::AgentModality {
-                has_project,
-                intention,
-            }
-        } else {
-            AgentOnboardingVersion::UniversalInput { has_project }
+        let version = OnboardingVersion::Agent(AgentOnboardingVersion::AgentModality {
+            has_project,
+            intention,
         });
         self.dispatch_onboarding(TerminalAction::OnboardingFlow(version), ctx);
     }
