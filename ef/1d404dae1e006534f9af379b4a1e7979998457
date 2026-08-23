@@ -1,0 +1,37 @@
+app/src/workspace/view_tests.rs
+  s_6e5dc450e2113a::t_96825026cc7297 2164-2165
+app/src/workspace/util.rs
+  s_6e5dc450e2113a::t_fa92bb44ce2130 219
+app/src/workspace/view.rs
+  s_6e5dc450e2113a::t_f8cc3830114d38 4770
+  s_6e5dc450e2113a::t_486aadd197c7b3 4720,4911-4912,4919,4929,4946,4960-4961,14728,14737,15913-15921,17884,17886-17887,17889,17892-17893
+app/src/ai_assistant/utils.rs
+  s_6e5dc450e2113a::t_0e778068d2017f 105-116
+  s_6e5dc450e2113a::t_18de6bbf6264ea 117-118
+PLAN.md
+  s_6e5dc450e2113a::t_cd483e5fbf3f62 235-241
+  s_6e5dc450e2113a::t_f58e4106d53364 258-272
+app/src/search/command_palette/view.rs
+  s_6e5dc450e2113a::t_ab9fe96185f4d2 56
+app/src/local_control/handlers/app_state.rs
+  s_6e5dc450e2113a::t_ebebec18b8be51 144
+  s_6e5dc450e2113a::t_ab9fe96185f4d2 138-139,143,145-146
+app/src/workspace/mod.rs
+  s_6e5dc450e2113a::t_34703e47596dfb 1283-1294
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ef1d404dae1e006534f9af379b4a1e7979998457",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
