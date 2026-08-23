@@ -1,0 +1,27 @@
+app/src/ai/blocklist/agent_view/zero_state_block.rs
+  s_6e5dc450e2113a::t_1fe96ef6b75c3b 129-133,135-136,224,348-350,394,579-592,594-595,631-632
+  s_6e5dc450e2113a::t_0f31fe56b1534f 7,12-13,19,21
+app/src/ai/blocklist/block/status_bar.rs
+  s_6e5dc450e2113a::t_52ae475b0f80b3 336
+app/src/ai/blocklist/agent_view/agent_message_bar.rs
+  s_6e5dc450e2113a::t_84aac7b238f5a7 31
+  s_6e5dc450e2113a::t_4e5f19604f52f9 355-357
+PLAN.md
+  s_6e5dc450e2113a::t_b3ac49bbad6c86 285-301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "424b68f11d440d44cc6a5cf7f3a2ac7bb4fb85d9",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
