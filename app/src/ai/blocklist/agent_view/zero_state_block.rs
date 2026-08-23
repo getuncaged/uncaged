@@ -4,24 +4,21 @@ use std::path::Path;
 use std::sync::Arc;
 
 use itertools::Itertools as _;
-use markdown_parser::{
-    parse_markdown_cached, FormattedText, FormattedTextFragment, FormattedTextLine,
-};
+use markdown_parser::parse_markdown_cached;
 use parking_lot::FairMutex;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::Icon;
 use warpui::elements::{
-    Container, CornerRadius, CrossAxisAlignment, Flex, FormattedTextElement, HighlightedHyperlink,
-    MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
+    Container, CornerRadius, CrossAxisAlignment, Flex, FormattedTextElement, MainAxisSize,
+    MouseStateHandle, ParentElement, Radius, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::keymap::Keystroke;
 use warpui::prelude::{ConstrainedBox, Cursor, Empty, Hoverable, SavePosition};
 use warpui::scene::Border;
-use warpui::ui_components::components::{UiComponent as _, UiComponentStyles};
+use warpui::ui_components::components::UiComponent as _;
 use warpui::{
-    Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View,
-    ViewContext,
+    AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
 use crate::ai::active_agent_views_model::{ActiveAgentViewsModel, ConversationOrTaskId};
@@ -129,8 +126,14 @@ impl AgentViewZeroStateBlock {
             move |me, model_events_dispatcher, event, ctx| {
                 match event {
                     ModelEvent::BlockCompleted(block_completed) => {
+                        // Uncaged: short-circuit on the cached flag so the
+                        // FairMutex-taking recompute does not run on every
+                        // completed user block once the zero state is hidden.
+                        // (The old `me.should_hide != me.should_hide(ctx)` also
+                        // inverted a hidden->visible transition into "hide".)
                         if matches!(block_completed.block_type, BlockType::User(..))
-                            && me.should_hide != me.should_hide(ctx)
+                            && !me.should_hide
+                            && me.compute_should_hide(ctx)
                         {
                             me.should_hide = true;
                             ctx.unsubscribe_to_model(&model_events_dispatcher);
@@ -218,7 +221,7 @@ impl AgentViewZeroStateBlock {
         }
     }
 
-    fn should_hide(&self, app: &AppContext) -> bool {
+    fn compute_should_hide(&self, app: &AppContext) -> bool {
         let Some(conversation_id) = self
             .agent_view_controller
             .as_ref(app)
@@ -342,13 +345,9 @@ impl View for AgentViewZeroStateBlock {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
 
-        let header_props = if self.origin.is_cloud_agent() {
-            HeaderProps {
-                title: "New Uncaged cloud agent conversation".into(),
-                description: AgentViewDescription::CloudModeWithDocsLink,
-                icon: Icon::OzCloud,
-            }
-        } else {
+        // Uncaged: cloud-mode panes are compile-time off, so this zero state has
+        // exactly one persona.
+        let header_props = {
             let mut local_description =
                 "Send a prompt below to start a new conversation".to_owned();
             let active_session = self.active_session(app);
@@ -392,7 +391,7 @@ impl View for AgentViewZeroStateBlock {
         }));
         let content = content.finish();
 
-        let show_bottom_border = !self.origin.is_cloud_agent();
+        let show_bottom_border = true;
         let content = Container::new(content)
             .with_horizontal_padding(*terminal::view::PADDING_LEFT)
             .with_vertical_padding(styles::CONTAINER_VERTICAL_PADDING)
@@ -475,8 +474,6 @@ fn current_working_directory_for_zero_state(terminal_model: &TerminalModel) -> O
 enum AgentViewDescription {
     /// Plain text descriptions (used for local agent mode).
     PlainText(Vec<Cow<'static, str>>),
-    /// Cloud mode description with "Visit docs" hyperlink.
-    CloudModeWithDocsLink,
 }
 
 struct HeaderProps {
@@ -555,50 +552,6 @@ fn render_title_and_description(props: HeaderProps, app: &AppContext) -> Vec<Box
                     .finish()
             }));
         }
-        AgentViewDescription::CloudModeWithDocsLink => {
-            // First line: plain text.
-            items.push(
-                Container::new(
-                    Text::new(
-                        "Run your agent task in an isolated cloud environment.",
-                        appearance.ui_font_family(),
-                        appearance.monospace_font_size(),
-                    )
-                    .with_color(sub_text_color)
-                    .finish(),
-                )
-                .with_margin_bottom(styles::DESCRIPTION_LINE_MARGIN_BOTTOM)
-                .finish(),
-            );
-
-            // Second line: text with "Visit docs" hyperlink.
-            let description_with_link = FormattedText::new([FormattedTextLine::Line(vec![
-                FormattedTextFragment::plain_text(
-                    "Use cloud agents to run parallel agents, build agents that run autonomously, and check in on your agents from anywhere. ",
-                ),
-                FormattedTextFragment::hyperlink("Visit docs", CLOUD_AGENT_DOCS_URL),
-            ])]);
-
-            items.push(
-                Container::new(
-                    FormattedTextElement::new(
-                        description_with_link,
-                        appearance.monospace_font_size(),
-                        appearance.ui_font_family(),
-                        appearance.monospace_font_family(),
-                        sub_text_color,
-                        HighlightedHyperlink::default(),
-                    )
-                    .with_hyperlink_font_color(theme.accent().into_solid())
-                    .register_default_click_handlers(|url, _, ctx| {
-                        ctx.open_url(&url.url);
-                    })
-                    .finish(),
-                )
-                .with_margin_bottom(-12.)
-                .finish(),
-            );
-        }
     }
 
     items
@@ -623,23 +576,23 @@ fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn E
         state_handles,
     } = props;
 
-    // Cloud agent mode doesn't show keyboard shortcuts.
-    if origin.is_cloud_agent() {
-        return vec![];
+    // Uncaged: recent activity is ADDITIVE, not exclusive. The old either/or
+    // meant anyone who had worked in this directory never saw the keyboard
+    // hints, and a new user never saw recent activity.
+    let mut body_items = Vec::new();
+    if let Some(recent_conversations_section) = render_recent_conversations_section(
+        RecentConversationProps {
+            recent_conversations,
+            active_session,
+            current_working_directory,
+            state_handles,
+        },
+        app,
+    ) {
+        body_items.push(recent_conversations_section);
     }
-    let mut body_items = if let Some(recent_conversations_section) =
-        render_recent_conversations_section(
-            RecentConversationProps {
-                recent_conversations,
-                active_session,
-                current_working_directory,
-                state_handles,
-            },
-            app,
-        ) {
-        vec![recent_conversations_section]
-    } else {
-        let body_items = vec![
+    {
+        let hint_items = vec![
             render_standard_message(
                 Message::new(vec![MessageItem::clickable(
                     vec![
@@ -675,9 +628,8 @@ fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn E
                 app,
             ),
         ];
-
-        body_items
-    };
+        body_items.extend(hint_items);
+    }
 
     if should_show_init_callout {
         let appearance = Appearance::as_ref(app);
@@ -865,56 +817,6 @@ fn render_recent_conversations_section(
             .with_child(conversations.finish())
             .finish(),
     )
-}
-
-/// Renders the ambient credits banner showing free cloud credits.
-pub fn render_ambient_credits_banner<A>(
-    credits: i32,
-    close_button_mouse_state: MouseStateHandle,
-    dismiss_action: A,
-    app: &AppContext,
-) -> Box<dyn Element>
-where
-    A: Action + Clone + 'static,
-{
-    let appearance = Appearance::as_ref(app);
-    let theme = appearance.theme();
-    let font_family = appearance.ui_font_family();
-    let font_size = styles::CREDITS_BANNER_FONT_SIZE;
-    let text_color = theme.terminal_colors().normal.blue;
-
-    let credits_text = format!("{credits} free cloud agent credits");
-    let text = Text::new(credits_text, font_family, font_size)
-        .with_color(text_color.into())
-        .with_style(Properties::default().weight(Weight::Semibold))
-        .soft_wrap(false)
-        .finish();
-    let close_button = appearance
-        .ui_builder()
-        .close_button(12., close_button_mouse_state)
-        .with_style(UiComponentStyles {
-            font_color: Some(text_color.into()),
-            ..Default::default()
-        })
-        .build()
-        .on_click(move |ctx, _, _| {
-            ctx.dispatch_typed_action(dismiss_action.clone());
-        })
-        .finish();
-
-    let content = Flex::row()
-        .with_cross_axis_alignment(CrossAxisAlignment::Center)
-        .with_child(text)
-        .with_child(Container::new(close_button).with_margin_left(4.).finish())
-        .finish();
-
-    Container::new(content)
-        .with_border(Border::all(1.).with_border_color(text_color.into()))
-        .with_corner_radius(CornerRadius::with_all(Radius::Percentage(50.)))
-        .with_vertical_padding(2.)
-        .with_horizontal_padding(6.)
-        .with_margin_left(8.)
-        .finish()
 }
 
 mod styles {

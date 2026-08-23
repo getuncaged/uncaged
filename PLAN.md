@@ -282,6 +282,23 @@ clean HEAD — and chip-filed).
   internal `UniversalInputCalloutState` machine is now app-orphaned — left inert
   (dead code costs disk); delete it when the crate is next touched.
 
+### §2 stage 2a — agent zero state: one persona, additive activity, hide-bug fixed
+
+- Cloud branches deleted (#4/#5/#6): the cloud header + `CloudModeWithDocsLink`
+  description, the cloud no-bottom-border/empty-body gates, and
+  `render_ambient_credits_banner` with its message-bar caller, dismiss action, and
+  mouse handle (credits are a server concept; cloud panes are compile-time off).
+- **Recent activity is additive** (#11): the zero state shows recent conversations
+  AND the keyboard hints; the old either/or hid the hints from anyone who had
+  worked in the directory and hid recent activity from new users.
+- `should_hide` collision fixed: the method is `compute_should_hide`, the
+  per-completed-block handler short-circuits on the cached flag (no more FairMutex
+  on every user block after the zero state hides), and the inverted
+  `cached != fresh → hide` comparison is gone.
+- Verified by stash-rerun name-diff (baselines now stored in the session scratchpad
+  after /tmp cleanup ate the originals): identical 115 failures with and without
+  the slice.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.
