@@ -324,6 +324,15 @@ locally-driven messages, so exchange identity derives from the first MessageId):
   leftover tolerance) behind OneHistory, now DEFAULT ON; v1 kept byte-identical
   as the kill-switch. v1/v2 equivalence test is the guarantee.
 
+**Live-verified on the real profile (assertions-on bundle, 2026-08-25):** the
+migration ran on the user's actual warp.sqlite (86 shell turns backfilled, all
+turn_ids mirrored, unique index created, zero panics); a live command wrote its
+turn row (87); Cmd-K left every block, turn, and conversation on disk and set
+the watermark; the cleared pane restored EMPTY while every other pane kept its
+scrollback (incl. an Aug-7 session); and the ai_queries exchange-id set hash was
+byte-identical across two further restart cycles -- stable identity, no
+duplication. Pre-migration DB backup retained in the session scratchpad.
+
 **Still open in §3:** seq-driven placement of restored AI blocks (the
 interleave heuristic still runs; agent rows are now written, so the follow-up
 switches placement to (conversation, exchange_ord) matching + lazy backfill);
