@@ -1,0 +1,36 @@
+app/src/ai/blocklist/history_model.rs
+  s_6e5dc450e2113a::t_74241e4bad18ae 912-917,922-928,931,933,1025-1035
+app/src/persistence/mod.rs
+  s_6e5dc450e2113a::t_7fea379e50f6b9 243-246
+app/src/persistence/agent.rs
+  s_6e5dc450e2113a::t_6a309e07753438 313-316,319
+  s_6e5dc450e2113a::t_a600cf81a9327b 312,317-318,320-323
+app/src/persistence/block_list_tests.rs
+  s_6e5dc450e2113a::t_30af8986699d23 288-353
+app/src/pane_group/pane/terminal_pane.rs
+  s_6e5dc450e2113a::t_7fea379e50f6b9 238-255,1006-1016
+  s_6e5dc450e2113a::t_a92bda9d11e0af 13
+app/src/persistence/block_list.rs
+  s_6e5dc450e2113a::t_7fea379e50f6b9 300-311,316-333,360-366
+  s_6e5dc450e2113a::t_d314c040387a72 367
+app/src/persistence/sqlite.rs
+  s_6e5dc450e2113a::t_7fea379e50f6b9 578-580
+  s_6e5dc450e2113a::t_398f2a95fc55ab 52
+  s_6e5dc450e2113a::t_17c61e12f14187 51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "a3ce7a6d1b14f41f49e3d8a313c9ed89fb4a993e",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
