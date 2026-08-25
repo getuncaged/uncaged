@@ -92,7 +92,9 @@ pub fn append_text(task_id: &str, message_id: &str, delta: &str) -> api::ClientA
         action: Some(api::client_action::Action::AppendToMessageContent(
             api::client_action::AppendToMessageContent {
                 task_id: task_id.to_string(),
-                message: Some(agent_text_message(message_id, delta)),
+                // The field mask only merges the text path, so the identity
+                // metadata here is inert; the initial add_message carries it.
+                message: Some(agent_text_message(message_id, delta, "")),
                 mask: Some(prost_types::FieldMask {
                     paths: vec![AGENT_OUTPUT_TEXT_PATH.to_string()],
                 }),
@@ -101,8 +103,43 @@ pub fn append_text(task_id: &str, message_id: &str, delta: &str) -> api::ClientA
     }
 }
 
+/// The current wall clock as a proto timestamp.
+///
+/// Uncaged one-history: emitted messages carry identity metadata -- request_id
+/// and timestamp -- so restored tasks keep their per-request exchange
+/// boundaries. Warp's server stamped these; as the local "server", so do we.
+fn now_timestamp() -> prost_types::Timestamp {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    prost_types::Timestamp {
+        seconds: now.as_secs() as i64,
+        nanos: now.subsec_nanos() as i32,
+    }
+}
+
+/// A user-query message echoed into the task.
+///
+/// Uncaged one-history: Warp's server echoed the user's input into the task
+/// stream; the local engine now does the same so persisted tasks contain the
+/// full turn -- restored conversations get their inputs and per-request
+/// exchange boundaries back. Context/attachments are restored from ai_queries;
+/// the query text is the durable part.
+pub fn user_query_message(message_id: &str, query: &str, request_id: &str) -> api::Message {
+    api::Message {
+        id: message_id.to_string(),
+        message: Some(api::message::Message::UserQuery(api::message::UserQuery {
+            query: query.to_string(),
+            ..Default::default()
+        })),
+        request_id: request_id.to_string(),
+        timestamp: Some(now_timestamp()),
+        ..Default::default()
+    }
+}
+
 /// An agent-output (prose) message.
-pub fn agent_text_message(message_id: &str, text: &str) -> api::Message {
+pub fn agent_text_message(message_id: &str, text: &str, request_id: &str) -> api::Message {
     api::Message {
         id: message_id.to_string(),
         message: Some(api::message::Message::AgentOutput(
@@ -110,6 +147,8 @@ pub fn agent_text_message(message_id: &str, text: &str) -> api::Message {
                 text: text.to_string(),
             },
         )),
+        request_id: request_id.to_string(),
+        timestamp: Some(now_timestamp()),
         ..Default::default()
     }
 }
@@ -119,6 +158,7 @@ pub fn tool_call_message(
     message_id: &str,
     tool_call_id: &str,
     tool: api::message::tool_call::Tool,
+    request_id: &str,
 ) -> api::Message {
     api::Message {
         id: message_id.to_string(),
@@ -126,6 +166,8 @@ pub fn tool_call_message(
             tool_call_id: tool_call_id.to_string(),
             tool: Some(tool),
         })),
+        request_id: request_id.to_string(),
+        timestamp: Some(now_timestamp()),
         ..Default::default()
     }
 }

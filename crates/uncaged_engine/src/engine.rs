@@ -30,6 +30,28 @@ pub fn run_turn(config: &UncagedConfig, request: &api::Request) -> EngineStream 
     let system = system_prompt::build(request, &registry.specs);
     let parsed = request_parse::parse(request);
 
+    // Uncaged one-history: the user inputs of THIS turn, to echo into the task
+    // so persisted tasks carry the full exchange (see wire::user_query_message).
+    let echo_queries: Vec<String> =
+        request
+            .input
+            .as_ref()
+            .and_then(|input| input.r#type.as_ref())
+            .map(|input_type| match input_type {
+                api::request::input::Type::UserInputs(user_inputs) => user_inputs
+                    .inputs
+                    .iter()
+                    .filter_map(|item| match &item.input {
+                        Some(api::request::input::user_inputs::user_input::Input::UserQuery(
+                            uq,
+                        )) if !uq.query.is_empty() => Some(uq.query.clone()),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => Vec::new(),
+            })
+            .unwrap_or_default();
+
     let conversation = Conversation {
         system_prompt: system,
         messages: parsed.messages,
@@ -49,6 +71,7 @@ pub fn run_turn(config: &UncagedConfig, request: &api::Request) -> EngineStream 
             conversation,
             conversation_id,
             target_task_id,
+            echo_queries,
             tx,
         )
         .await;
@@ -57,12 +80,14 @@ pub fn run_turn(config: &UncagedConfig, request: &api::Request) -> EngineStream 
     rx.boxed()
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn drive(
     provider: Box<dyn providers::Provider>,
     registry: ToolRegistry,
     conversation: Conversation,
     conversation_id: String,
     target_task_id: Option<String>,
+    echo_queries: Vec<String>,
     tx: mpsc::UnboundedSender<Result<api::ResponseEvent, anyhow::Error>>,
 ) {
     let request_id = request_parse::new_id();
@@ -81,6 +106,17 @@ async fn drive(
         }
     };
 
+    // 2b. Echo this turn's user inputs into the task so the persisted proto
+    // carries the full exchange (inputs never enter the task otherwise -- the
+    // app's live exchange is in-memory only).
+    for query in &echo_queries {
+        let message_id = request_parse::new_id();
+        let _ = tx.unbounded_send(Ok(wire::client_actions(vec![wire::add_message(
+            &task_id,
+            wire::user_query_message(&message_id, query, &request_id),
+        )])));
+    }
+
     // 3. Stream the assistant turn.
     let assistant_message_id = request_parse::new_id();
     let mut started_text = false;
@@ -98,7 +134,7 @@ async fn drive(
                     started_text = true;
                     wire::add_message(
                         &task_id,
-                        wire::agent_text_message(&assistant_message_id, &delta),
+                        wire::agent_text_message(&assistant_message_id, &delta, &request_id),
                     )
                 };
                 let _ = tx.unbounded_send(Ok(wire::client_actions(vec![action])));
@@ -106,7 +142,7 @@ async fn drive(
             ProviderEvent::ToolCall { id, name, input } => match registry.encode(&name, &input) {
                 Some(tool) => {
                     let message_id = request_parse::new_id();
-                    let message = wire::tool_call_message(&message_id, &id, tool);
+                    let message = wire::tool_call_message(&message_id, &id, tool, &request_id);
                     let _ = tx.unbounded_send(Ok(wire::client_actions(vec![wire::add_message(
                         &task_id, message,
                     )])));
