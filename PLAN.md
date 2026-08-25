@@ -299,6 +299,36 @@ clean HEAD — and chip-filed).
   after /tmp cleanup ate the originals): identical 115 failures with and without
   the slice.
 
+### §3 one-history — stages 1–5 landed (this session, flag ON)
+
+Five commits, each compiled + tested, mapped first by a 6-agent workflow (139
+findings) whose surveys corrected the original design in three places (unique
+index needed fork-dedupe first; the watermark lives in its own table because
+terminal_panes rows are wiped on every snapshot; request_id is empty on all
+locally-driven messages, so exchange identity derives from the first MessageId):
+
+- **Stage 1** `2026-08-25-000000_one_history`: block_id backfill + dedupe +
+  unique index, `turn_index`, `pane_clear_watermarks`, `blocks.turn_id`
+  appended last, pure-SQL shell backfill. Tested against seeded dirty data.
+- **Stage 2a** durable exchange ids: UUIDv5(conversation, first message id),
+  flag-gated at the single mint point. Determinism tests both ways.
+- **Stage 2b** the local engine stamps request_id + timestamps on emitted
+  messages and echoes the turn's user queries into the task (verified safe:
+  local add_messages doesn't convert inputs; UserQuery has no client output
+  representation). Restored local tasks regain per-request boundaries.
+- **Stage 4** non-destructive Cmd-K (watermark upsert; pane close stays a hard
+  delete and purges timeline rows; conversation delete/eviction cascade) +
+  deterministic conversation→pane ownership.
+- **Stage 5** live turn writes (shell in save_block's txn; agent turns from the
+  history-event path) + `get_all_restored_blocks_v2` (seq order, watermark,
+  leftover tolerance) behind OneHistory, now DEFAULT ON; v1 kept byte-identical
+  as the kill-switch. v1/v2 equivalence test is the guarantee.
+
+**Still open in §3:** seq-driven placement of restored AI blocks (the
+interleave heuristic still runs; agent rows are now written, so the follow-up
+switches placement to (conversation, exchange_ord) matching + lazy backfill);
+GetStartedView removal rides this area's next slice with a restore fallback.
+
 ## Survey claims corrected by measurement — do not re-chase these
 
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.
