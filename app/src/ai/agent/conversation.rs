@@ -431,11 +431,14 @@ impl AIConversation {
                     .cmp(depths.get(a.as_str()).unwrap_or(&0))
             });
 
+            // The closure's map key shadows the conversation id param; capture it
+            // for the exchange-id derivation first.
+            let conversation_id_for_derivation = id;
             let mut api_tasks_and_exchanges_by_id: HashMap<_, _> = api_tasks_by_id
                 .into_iter()
-                .map(|(id, task)| {
-                    let exchanges = task.into_exchanges();
-                    (id, (task, exchanges))
+                .map(|(task_id, task)| {
+                    let exchanges = task.into_exchanges(conversation_id_for_derivation);
+                    (task_id, (task, exchanges))
                 })
                 .collect();
 

@@ -3036,6 +3036,12 @@ impl AIAgentExchangeId {
     }
 }
 
+impl From<Uuid> for AIAgentExchangeId {
+    fn from(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+}
+
 impl Default for AIAgentExchangeId {
     fn default() -> Self {
         Self::new()

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::Utc;
+use warp_core::features::FeatureFlag;
 use warp_multi_agent_api as api;
 
 use crate::ai::agent::api::convert_conversation::*;
@@ -455,7 +456,7 @@ fn test_into_exchanges_basic() {
     };
 
     // Test the function
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
 
     // We expect 3 exchanges (one for each user query + agent response pair)
     assert_eq!(exchanges.len(), 3, "Should create 3 exchanges");
@@ -518,7 +519,7 @@ fn test_invoke_skill_arguments_round_trip() {
         server_data: "".to_string(),
     };
 
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
     assert_eq!(exchanges.len(), 1);
 
     match &exchanges[0].input[0] {
@@ -565,7 +566,7 @@ fn test_invoke_skill_missing_user_query_maps_to_none() {
         server_data: "".to_string(),
     };
 
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
     assert_eq!(exchanges.len(), 1);
 
     match &exchanges[0].input[0] {
@@ -824,7 +825,7 @@ fn test_into_exchanges_with_tool_calls_and_cancellation() {
     let expected_persisted_block_count = 3;
 
     // Test the function
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
 
     // Verify we get the expected number of exchanges
     assert_eq!(
@@ -1100,7 +1101,7 @@ fn test_into_exchanges_with_code_diffs() {
     let expected_persisted_block_count = 4;
 
     // Test the function
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
 
     // Verify we get the expected number of exchanges
     assert_eq!(
@@ -1196,7 +1197,7 @@ fn test_user_query_mode_conversion() {
         server_data: "".to_string(),
     };
 
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
     assert_eq!(exchanges.len(), 1);
 
     match &exchanges[0].input[0] {
@@ -1240,7 +1241,7 @@ fn test_user_query_mode_conversion() {
         server_data: "".to_string(),
     };
 
-    let exchanges_normal = task_normal.into_exchanges();
+    let exchanges_normal = task_normal.into_exchanges(AIConversationId::new());
     assert_eq!(exchanges_normal.len(), 1);
 
     match &exchanges_normal[0].input[0] {
@@ -1284,7 +1285,7 @@ fn test_user_query_mode_conversion() {
         server_data: "".to_string(),
     };
 
-    let exchanges_default = task_default.into_exchanges();
+    let exchanges_default = task_default.into_exchanges(AIConversationId::new());
     assert_eq!(exchanges_default.len(), 1);
 
     match &exchanges_default[0].input[0] {
@@ -1516,7 +1517,7 @@ fn test_exchanges_grouped_by_request_id() {
         server_data: "".to_string(),
     };
 
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
 
     // We expect 3 exchanges based on the 3 different request_ids
     assert_eq!(
@@ -1734,7 +1735,7 @@ fn test_multiple_create_documents_get_default_version() {
         server_data: "".to_string(),
     };
 
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
     assert_eq!(exchanges.len(), 1, "Should create 1 exchange");
 
     // Find all CreateDocuments action results and verify their versions
@@ -2007,7 +2008,7 @@ fn test_create_then_edit_then_create_version_tracking() {
         server_data: "".to_string(),
     };
 
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
     assert_eq!(exchanges.len(), 1, "Should create 1 exchange");
 
     let default_version = AIDocumentVersion::default();
@@ -2119,7 +2120,7 @@ fn test_handoff_rehydration_system_query_is_hidden() {
         server_data: "".to_string(),
     };
 
-    let exchanges = task.into_exchanges();
+    let exchanges = task.into_exchanges(AIConversationId::new());
     assert_eq!(exchanges.len(), 1, "Should produce exactly one exchange");
 
     let exchange = &exchanges[0];
@@ -2135,5 +2136,93 @@ fn test_handoff_rehydration_system_query_is_hidden() {
     assert!(
         !output.get().messages.is_empty(),
         "Agent output should still be rendered"
+    );
+}
+
+/// Builds a minimal two-message task (user query + agent output) for the
+/// one-history determinism tests. Empty request_ids mirror the local engine,
+/// which never stamps them.
+fn task_with_user_query_and_response(query: &str, response: &str) -> api::Task {
+    api::Task {
+        id: "task1".to_string(),
+        messages: vec![
+            api::Message {
+                id: "user_msg1".to_string(),
+                task_id: "task1".to_string(),
+                server_message_data: "".to_string(),
+                citations: vec![],
+                message: Some(api::message::Message::UserQuery(api::message::UserQuery {
+                    query: query.to_string(),
+                    context: None,
+                    referenced_attachments: HashMap::new(),
+                    mode: None,
+                    intended_agent: Default::default(),
+                })),
+                request_id: "".to_string(),
+                timestamp: None,
+            },
+            api::Message {
+                id: "agent_msg1".to_string(),
+                task_id: "task1".to_string(),
+                server_message_data: "".to_string(),
+                citations: vec![],
+                message: Some(api::message::Message::AgentOutput(
+                    api::message::AgentOutput {
+                        text: response.to_string(),
+                    },
+                )),
+                request_id: "".to_string(),
+                timestamp: None,
+            },
+        ],
+        dependencies: None,
+        description: "".to_string(),
+        summary: "".to_string(),
+        server_data: "".to_string(),
+    }
+}
+
+/// One-history (B1): with the flag on, exchange ids derive deterministically
+/// from (conversation id, first message id) -- identical across conversions of
+/// the same task, and disjoint across conversations (fork safety).
+#[test]
+fn one_history_exchange_ids_are_stable_and_conversation_namespaced() {
+    let _flag = FeatureFlag::OneHistory.override_enabled(true);
+
+    let task = task_with_user_query_and_response("q", "a");
+    let conversation_a = AIConversationId::new();
+    let conversation_b = AIConversationId::new();
+
+    let first = (&task).into_exchanges(conversation_a);
+    let second = (&task).into_exchanges(conversation_a);
+    assert!(!first.is_empty());
+    let ids_first: Vec<_> = first.iter().map(|e| e.id).collect();
+    let ids_second: Vec<_> = second.iter().map(|e| e.id).collect();
+    assert_eq!(
+        ids_first, ids_second,
+        "same task + same conversation must derive identical exchange ids"
+    );
+
+    let other = (&task).into_exchanges(conversation_b);
+    let ids_other: Vec<_> = other.iter().map(|e| e.id).collect();
+    assert!(
+        ids_first.iter().all(|id| !ids_other.contains(id)),
+        "the same task under two conversations must derive disjoint ids"
+    );
+}
+
+/// One-history off (kill-switch): ids stay random per conversion.
+#[test]
+fn one_history_off_exchange_ids_stay_random() {
+    let _flag = FeatureFlag::OneHistory.override_enabled(false);
+
+    let task = task_with_user_query_and_response("q", "a");
+    let conversation = AIConversationId::new();
+    let first = (&task).into_exchanges(conversation);
+    let second = (&task).into_exchanges(conversation);
+    assert!(!first.is_empty());
+    assert_ne!(
+        first.iter().map(|e| e.id).collect::<Vec<_>>(),
+        second.iter().map(|e| e.id).collect::<Vec<_>>()
     );
 }

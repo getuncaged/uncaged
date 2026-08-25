@@ -254,6 +254,12 @@ pub enum FeatureFlag {
     /// If enabled, command palette searches will use Tantivy search instead of the default fuzzy search.
     UseTantivySearch,
 
+    /// Uncaged one-history (§3): stable exchange identity, the persisted
+    /// turn_index timeline read path, blocks-row-wins restore, and the
+    /// non-destructive Cmd-K watermark. Default off until stage 5 flips it on;
+    /// the runtime flag menu is the kill-switch afterwards.
+    OneHistory,
+
     /// Allows AI to call the grep tool.
     GrepTool,
 
@@ -993,7 +999,10 @@ pub const RELEASE_FLAGS: &[FeatureFlag] = &[
 ];
 
 /// Flags that we want to allow to switch at runtime (assuming RuntimeFeatureFlags is set)
-pub const RUNTIME_FEATURE_FLAGS: &[FeatureFlag] = &[FeatureFlag::LocalClaudeCodexChildHarnesses];
+pub const RUNTIME_FEATURE_FLAGS: &[FeatureFlag] = &[
+    FeatureFlag::LocalClaudeCodexChildHarnesses,
+    FeatureFlag::OneHistory,
+];
 
 impl FeatureFlag {
     pub fn is_enabled(&self) -> bool {

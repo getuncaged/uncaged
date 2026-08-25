@@ -16,6 +16,7 @@ use ai::skills::{ParsedSkill, SkillPathOrigin};
 use chrono::{DateTime, Local, TimeZone};
 use persistence::model::AgentConversationData;
 use warp_core::command::ExitCode;
+use warp_core::features::FeatureFlag;
 use warp_multi_agent_api as api;
 use warp_multi_agent_api::ask_user_question_result::answer_item::Answer as AskUserQuestionAnswer;
 
@@ -299,14 +300,14 @@ pub(crate) fn convert_input_context(context: Option<&api::InputContext>) -> Arc<
 /// Trait for converting task messages into AIAgentExchange objects
 /// for display in the UI as restored AI blocks.
 pub trait ConvertToExchanges {
-    fn into_exchanges(self) -> Vec<AIAgentExchange>;
+    fn into_exchanges(self, conversation_id: AIConversationId) -> Vec<AIAgentExchange>;
 }
 
 impl ConvertToExchanges for &api::Task {
     /// Converts a list of tasks into AIAgentExchange objects.
     ///
     /// Note: for now, we only restore messages from the root task (task with no parent).
-    fn into_exchanges(self) -> Vec<AIAgentExchange> {
+    fn into_exchanges(self, conversation_id: AIConversationId) -> Vec<AIAgentExchange> {
         let mut exchanges = Vec::new();
         let mut todo_lists: Vec<AIAgentTodoList> = Vec::new();
 
@@ -326,6 +327,11 @@ impl ConvertToExchanges for &api::Task {
         let mut current_inputs = Vec::new();
         let mut current_outputs = Vec::new();
         let mut current_message_ids = HashSet::new();
+        // Uncaged one-history: the first message id of the accumulating exchange,
+        // in message order (the HashSet above loses order). It is the only
+        // universally-present, restore-stable input for deriving a durable
+        // exchange id -- request_id is empty on locally-driven messages.
+        let mut current_first_message_id: Option<String> = None;
         let mut document_versions: HashMap<AIDocumentId, AIDocumentVersion> = HashMap::new();
         let mut current_request_id: Option<String> = None;
 
@@ -367,12 +373,15 @@ impl ConvertToExchanges for &api::Task {
                     &current_message_ids,
                     &message_map,
                     current_request_id.as_deref(),
+                    conversation_id,
+                    current_first_message_id.as_deref(),
                 ) {
                     exchanges.push(exchange);
                 }
                 current_inputs.clear();
                 current_outputs.clear();
                 current_message_ids.clear();
+                current_first_message_id = None;
             }
 
             // Update current_request_id
@@ -380,6 +389,9 @@ impl ConvertToExchanges for &api::Task {
 
             // Track this message ID for the current exchange
             current_message_ids.insert(api_message.id.clone());
+            if current_first_message_id.is_none() {
+                current_first_message_id = Some(api_message.id.clone());
+            }
 
             let added_message_as_exchange_input = match message {
                 api::message::Message::UserQuery(user_query) => {
@@ -557,6 +569,8 @@ impl ConvertToExchanges for &api::Task {
                 &current_message_ids,
                 &message_map,
                 current_request_id.as_deref(),
+                conversation_id,
+                current_first_message_id.as_deref(),
             ) {
                 exchanges.push(exchange);
             }
@@ -1800,6 +1814,7 @@ fn create_cancelled_result_for_tool_call(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_exchange_from_messages(
     inputs: &[AIAgentInput],
     outputs: &[AIAgentOutputMessage],
@@ -1807,13 +1822,33 @@ fn create_exchange_from_messages(
     message_ids: &HashSet<String>,
     message_map: &HashMap<&str, &api::Message>,
     server_output_id: Option<&str>,
+    conversation_id: AIConversationId,
+    first_message_id: Option<&str>,
 ) -> Option<AIAgentExchange> {
     // Allow exchanges with only outputs (e.g., when returning from a subtask).
     if inputs.is_empty() && outputs.is_empty() {
         return None;
     }
 
-    let exchange_id = AIAgentExchangeId::new();
+    // Uncaged one-history (B1): derive a durable exchange id instead of minting
+    // a fresh UUID on every restore. UUIDv5 over (conversation namespace, first
+    // message id): stable across restores because agent_tasks stores the proto
+    // byte-stable, and conversation-namespaced because forks copy message ids
+    // verbatim -- an un-namespaced derivation would let a fork clobber the
+    // source's ai_queries rows through the global exchange_id unique index.
+    let exchange_id = if FeatureFlag::OneHistory.is_enabled() {
+        first_message_id
+            .map(|message_id| {
+                let namespace = uuid::Uuid::new_v5(
+                    &uuid::Uuid::NAMESPACE_OID,
+                    conversation_id.to_string().as_bytes(),
+                );
+                AIAgentExchangeId::from(uuid::Uuid::new_v5(&namespace, message_id.as_bytes()))
+            })
+            .unwrap_or_else(AIAgentExchangeId::new)
+    } else {
+        AIAgentExchangeId::new()
+    };
 
     // get the exchange's start time from the latest input's context
     let start_time = inputs
