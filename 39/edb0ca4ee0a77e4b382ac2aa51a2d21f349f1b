@@ -1,0 +1,43 @@
+app/src/pane_group/pane/terminal_pane.rs
+  s_6e5dc450e2113a::t_e144f054c5a11e 2204-2208,2215,2221-2223,2239-2251,2272-2277
+  s_6e5dc450e2113a::t_15b16559ca1b99 380-382,387,2146,2202-2203,2209-2214,2216-2220
+app/src/persistence/block_list_tests.rs
+  s_6e5dc450e2113a::t_c28a5773f4948a 354-363,368-415,420-461,467
+  s_6e5dc450e2113a::t_d3fb182c04b1e5 365-367,417-419,462-466
+  s_6e5dc450e2113a::t_8beaa96de5330a 364,416
+app/src/persistence/mod.rs
+  s_6e5dc450e2113a::t_2fd1e9828888cf 323-331
+app/src/persistence/block_list.rs
+  s_6e5dc450e2113a::t_a9a8a29e6c1d03 339
+  s_6e5dc450e2113a::t_187d1a8232a6b5 206-287,465
+  s_6e5dc450e2113a::t_851b2ceb8f8505 318-329,340-347,350-351,353-370,372,440-464
+  s_6e5dc450e2113a::t_794debdc750377 348-349
+  s_6e5dc450e2113a::t_a6e50db06cfdd2 466
+app/src/ai/blocklist/history_model.rs
+  s_6e5dc450e2113a::t_c37343ded5ca71 1025-1029
+app/src/ai/blocklist/persistence.rs
+  s_6e5dc450e2113a::t_009c15f3d5ba2c 468-475
+app/src/lib.rs
+  s_6e5dc450e2113a::t_832511b7529e42 1359
+  s_6e5dc450e2113a::t_f6925e47a35d3d 1353-1358
+app/src/persistence/sqlite.rs
+  s_6e5dc450e2113a::t_93142955028f0e 91-93,2764-2770
+  s_6e5dc450e2113a::t_d3fb182c04b1e5 52
+  s_6e5dc450e2113a::t_851b2ceb8f8505 688-702
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "39edb0ca4ee0a77e4b382ac2aa51a2d21f349f1b",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
