@@ -1350,6 +1350,13 @@ pub(crate) fn initialize_app(
         | LaunchMode::Test { .. }
         | LaunchMode::Tui => persistence::PersistenceScope::App,
     };
+    // Uncaged one-history (§3): default ON. The runtime feature-flag menu is
+    // the kill-switch -- flipping it off reverts to the legacy restore
+    // heuristic and destructive Cmd-K (turns cleared while it was on will
+    // reappear then; a kill-switch that resurrects data errs on the safe
+    // side). Must precede persistence::initialize so the restore read path
+    // sees it.
+    FeatureFlag::OneHistory.set_enabled(true);
     let (sqlite_data, writer_handles) = persistence::initialize(ctx, persistence_scope);
     timer.mark_interval_end("SQLITE_INITIALIZED");
 

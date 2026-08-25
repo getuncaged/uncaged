@@ -49,7 +49,7 @@ use warpui::{AppContext, SingletonEntity};
 use super::agent::{delete_agent_conversations, upsert_agent_conversation};
 use super::block_list::{
     delete_ai_conversation, delete_blocks, save_block, set_cleared_before_seq,
-    update_block_agent_view_visibility, upsert_ai_query,
+    update_block_agent_view_visibility, upsert_agent_turn, upsert_ai_query,
 };
 use super::model::{
     self, ActiveMCPServer, CurrentUserInformation, MCPEnvironmentVariables, NewActiveMCPServer,
@@ -88,7 +88,9 @@ use crate::code::editor_management::CodeSource;
 use crate::drive::OpenWarpDriveObjectSettings;
 use crate::notebooks::NotebookId;
 use crate::persistence::agent::read_agent_conversations;
-use crate::persistence::block_list::{get_all_restored_blocks, read_ai_queries};
+use crate::persistence::block_list::{
+    get_all_restored_blocks, get_all_restored_blocks_v2, read_ai_queries,
+};
 use crate::persistence::model::{
     NewPersistedObjectAction, NewTeamSettings, ProjectRules, UserProfile, CODE_REVIEW_PANE_KIND,
     GET_STARTED_PANE_KIND,
@@ -683,6 +685,21 @@ fn handle_model_event(event: ModelEvent, connection: &mut SqliteConnection) -> a
         ModelEvent::SaveExperiments { experiments } => {
             save_experiments(connection, experiments).context("error saving experiments")
         }
+        ModelEvent::UpsertAgentTurn {
+            pane_uuid,
+            conversation_id,
+            turn_id,
+            exchange_ord,
+            created_ts,
+        } => upsert_agent_turn(
+            connection,
+            pane_uuid,
+            conversation_id,
+            turn_id,
+            exchange_ord,
+            created_ts,
+        )
+        .context("error upserting agent turn"),
         ModelEvent::UpsertAIQuery { query } => {
             upsert_ai_query(connection, query).context("error upserting AI query")
         }
@@ -2744,7 +2761,13 @@ fn read_sqlite_data(
         })
         .collect();
 
-    let restored_blocks = get_all_restored_blocks(conn)?;
+    // Uncaged one-history: the turn_index-driven read, with the legacy
+    // heuristic byte-identical behind the kill-switch.
+    let restored_blocks = if warp_core::features::FeatureFlag::OneHistory.is_enabled() {
+        get_all_restored_blocks_v2(conn)?
+    } else {
+        get_all_restored_blocks(conn)?
+    };
 
     // Load active MCP servers from database
     let running_mcp_servers = load_active_mcp_servers(conn)?;

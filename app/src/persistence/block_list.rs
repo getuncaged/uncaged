@@ -203,6 +203,88 @@ pub(super) fn get_all_restored_blocks(
     Ok(all_block_items_by_pane)
 }
 
+/// Uncaged one-history: the turn_index-driven restore read.
+///
+/// Blocks are returned in `turn_index.seq` order per pane, with turns below the
+/// pane's Cmd-K watermark filtered out. Blocks without a turn row (written
+/// while the flag was off, or legacy) are appended after the indexed ones in
+/// rowid order so nothing is ever silently dropped. `get_all_restored_blocks`
+/// stays byte-identical as the kill-switch fallback.
+pub(super) fn get_all_restored_blocks_v2(
+    conn: &mut SqliteConnection,
+) -> Result<PersistedBlocks, diesel::result::Error> {
+    use std::collections::HashMap as StdHashMap;
+
+    // q1: watermarks.
+    let watermarks: StdHashMap<Vec<u8>, i64> = schema::pane_clear_watermarks::table
+        .select(model::PaneClearWatermark::as_select())
+        .load::<model::PaneClearWatermark>(conn)?
+        .into_iter()
+        .map(|row| (row.pane_leaf_uuid, row.cleared_before_seq))
+        .collect();
+
+    // q2: shell turn rows, seq-ordered.
+    let turns: Vec<model::TurnIndexEntry> = schema::turn_index::table
+        .select(model::TurnIndexEntry::as_select())
+        .filter(schema::turn_index::dsl::kind.eq("shell"))
+        .order_by((
+            schema::turn_index::dsl::pane_leaf_uuid.asc(),
+            schema::turn_index::dsl::seq.asc(),
+        ))
+        .load(conn)?;
+
+    // q3: all blocks (same shape as v1), joined in memory by turn_id/block_id.
+    let terminal_sessions = schema::terminal_panes::table
+        .select(model::TerminalSession::as_select())
+        .load::<model::TerminalSession>(conn)?;
+    let block_lists = Block::belonging_to(&terminal_sessions)
+        .select(Block::as_select())
+        .order_by(schema::blocks::columns::id.asc())
+        .load::<Block>(conn)?
+        .grouped_by(&terminal_sessions);
+
+    let mut all_block_items_by_pane: PersistedBlocks = HashMap::new();
+    for (blocks, terminal_pane) in block_lists.into_iter().zip(terminal_sessions) {
+        let pane_uuid = terminal_pane.uuid.clone();
+        let watermark = watermarks.get(&pane_uuid).copied().unwrap_or(i64::MIN);
+
+        let mut by_block_id: StdHashMap<String, Block> = blocks
+            .into_iter()
+            .map(|block| (block.block_id.clone(), block))
+            .collect();
+
+        let mut ordered: Vec<SerializedBlockListItem> = Vec::new();
+        for turn in turns
+            .iter()
+            .filter(|turn| turn.pane_leaf_uuid == pane_uuid && turn.seq >= watermark)
+        {
+            if let Some(block_id) = turn.block_id.as_deref() {
+                if let Some(block) = by_block_id.remove(block_id) {
+                    ordered.push(block.into());
+                }
+            }
+        }
+        // Un-indexed leftovers (flag-off writes, legacy rows): keep them, in
+        // rowid order, after the indexed timeline -- but only when the pane was
+        // never cleared, since a cleared pane's leftovers predate the clear.
+        if watermarks.get(&pane_uuid).is_none() {
+            let mut leftovers: Vec<Block> = by_block_id.into_values().collect();
+            leftovers.sort_by_key(|block| block.id);
+            ordered.extend(leftovers.into_iter().map(Into::into));
+        }
+
+        // Same cap semantics as v1 (shell blocks only, most recent kept).
+        let overflow = ordered
+            .len()
+            .saturating_sub(MAX_TERMINAL_BLOCKS_TO_PERSIST_PER_SESSION as usize);
+        ordered.drain(0..overflow);
+
+        all_block_items_by_pane.insert(PaneUuid(pane_uuid), ordered);
+    }
+
+    Ok(all_block_items_by_pane)
+}
+
 pub(super) fn save_block(
     conn: &mut SqliteConnection,
     pane_id: Vec<u8>,
@@ -233,6 +315,18 @@ pub(super) fn save_block(
                 .first(conn)?;
 
             if let Some(last_kept_id) = last_kept_id {
+                // Uncaged one-history: evicted blocks take their turn rows
+                // with them, in the same transaction.
+                let evicted_block_ids: Vec<String> = schema::blocks::dsl::blocks
+                    .filter(id.lt(last_kept_id))
+                    .filter(pane_leaf_uuid.eq(pane_id.clone()))
+                    .select(block_id)
+                    .load(conn)?;
+                diesel::delete(
+                    schema::turn_index::dsl::turn_index
+                        .filter(schema::turn_index::dsl::turn_id.eq_any(&evicted_block_ids)),
+                )
+                .execute(conn)?;
                 diesel::delete(
                     schema::blocks::dsl::blocks
                         .filter(id.lt(last_kept_id))
@@ -242,10 +336,40 @@ pub(super) fn save_block(
             }
         }
 
-        let block = create_block(pane_id, block, is_local_block);
+        let serialized_block_id = block.id.to_string();
+        let block_start_ts = block.start_ts.map(|ts| ts.naive_utc());
+        let block_conversation_id = block
+            .ai_metadata
+            .as_ref()
+            .and_then(|meta| serde_json::from_str::<serde_json::Value>(meta).ok())
+            .and_then(|value| {
+                value
+                    .get("conversation_id")
+                    .and_then(|conv| conv.as_str())
+                    .map(|conv| conv.to_string())
+            });
+        let new_block = create_block(pane_id.clone(), block, is_local_block);
         diesel::insert_into(schema::blocks::dsl::blocks)
-            .values(block)
+            .values(new_block)
             .execute(conn)?;
+
+        // Uncaged one-history: record the shell turn in the shared timeline,
+        // same transaction. turn_id == block_id; idempotent on re-saves.
+        {
+            use diesel::sql_types::{Binary, Nullable, Text, Timestamp};
+            diesel::sql_query(
+                "INSERT INTO turn_index (turn_id, pane_leaf_uuid, seq, kind, block_id, conversation_id, exchange_ord, created_ts) \
+                 VALUES (?, ?, (SELECT COALESCE(MAX(seq), -1) + 1 FROM turn_index WHERE pane_leaf_uuid = ?), 'shell', ?, ?, NULL, ?) \
+                 ON CONFLICT(turn_id) DO NOTHING",
+            )
+            .bind::<Text, _>(serialized_block_id.clone())
+            .bind::<Binary, _>(pane_id.clone())
+            .bind::<Binary, _>(pane_id)
+            .bind::<Text, _>(serialized_block_id)
+            .bind::<Nullable<Text>, _>(block_conversation_id)
+            .bind::<Nullable<Timestamp>, _>(block_start_ts)
+            .execute(conn)?;
+        }
         Ok(())
     })
 }
@@ -311,6 +435,33 @@ pub(super) fn delete_blocks(conn: &mut SqliteConnection, pane_id: Vec<u8>) -> Re
         .execute(conn)?;
         Ok(())
     })
+}
+
+/// Uncaged one-history: inserts an agent exchange's turn row, allocating the
+/// pane's next seq. Idempotent on turn_id (streaming updates re-emit); the
+/// single writer thread makes MAX(seq)+1 race-free.
+pub(super) fn upsert_agent_turn(
+    conn: &mut SqliteConnection,
+    pane_uuid: Vec<u8>,
+    conversation_id: String,
+    turn_id: String,
+    exchange_ord: i64,
+    created_ts: Option<chrono::NaiveDateTime>,
+) -> Result<(), Error> {
+    use diesel::sql_types::{BigInt, Binary, Nullable, Text, Timestamp};
+    diesel::sql_query(
+        "INSERT INTO turn_index (turn_id, pane_leaf_uuid, seq, kind, block_id, conversation_id, exchange_ord, created_ts) \
+         VALUES (?, ?, (SELECT COALESCE(MAX(seq), -1) + 1 FROM turn_index WHERE pane_leaf_uuid = ?), 'agent', NULL, ?, ?, ?) \
+         ON CONFLICT(turn_id) DO UPDATE SET exchange_ord = excluded.exchange_ord",
+    )
+    .bind::<Text, _>(turn_id)
+    .bind::<Binary, _>(pane_uuid.clone())
+    .bind::<Binary, _>(pane_uuid)
+    .bind::<Text, _>(conversation_id)
+    .bind::<BigInt, _>(exchange_ord)
+    .bind::<Nullable<Timestamp>, _>(created_ts)
+    .execute(conn)?;
+    Ok(())
 }
 
 /// Uncaged one-history (B5): moves the pane's clear watermark past every

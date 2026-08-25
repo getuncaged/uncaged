@@ -320,6 +320,15 @@ pub enum ModelEvent {
     UpsertAIQuery {
         query: Arc<PersistedAIInput>,
     },
+    /// Uncaged one-history: records an agent exchange in the shared timeline.
+    /// Identity and order only -- content stays in `agent_tasks`.
+    UpsertAgentTurn {
+        pane_uuid: Vec<u8>,
+        conversation_id: String,
+        turn_id: String,
+        exchange_ord: i64,
+        created_ts: Option<chrono::NaiveDateTime>,
+    },
     /// Delete the AI query and related data for a given conversation.
     DeleteAIConversation {
         conversation_id: String,

@@ -377,10 +377,14 @@ impl PaneContent for TerminalPane {
                         })
                         .unwrap_or(false);
 
+                    let pane_uuid = group
+                        .terminal_session_by_id(terminal_pane_id)
+                        .map(|pane| pane.session_uuid());
                     handle_ai_history_event(
                         event,
                         terminal_view_id,
                         terminal_pane_id,
+                        pane_uuid,
                         model_event_sender,
                         is_shared_ambient_agent_session,
                         ctx,
@@ -2139,6 +2143,7 @@ fn handle_ai_history_event(
     event: &BlocklistAIHistoryEvent,
     terminal_view_id: EntityId,
     terminal_pane_id: TerminalPaneId,
+    pane_uuid: Option<Vec<u8>>,
     model_event_sender: SyncSender<ModelEvent>,
     is_shared_ambient_agent_session: bool,
     ctx: &mut ViewContext<PaneGroup>,
@@ -2194,6 +2199,28 @@ fn handle_ai_history_event(
                 return;
             }
 
+            // Uncaged one-history: record the agent turn in the shared timeline.
+            // Same visibility gates as above so turn_index stays aligned with
+            // the blocklist's hidden-exchange filter; built here (immutable
+            // borrows), sent below once the conversation borrow ends -- and
+            // before the ai_queries-specific input filter, because output-only
+            // exchanges are still turns.
+            let agent_turn_event = pane_uuid.clone().map(|pane_uuid| {
+                let exchange_ord = conversation
+                    .all_exchanges()
+                    .iter()
+                    .position(|candidate| candidate.id == *exchange_id)
+                    .map(|ord| ord as i64)
+                    .unwrap_or_default();
+                ModelEvent::UpsertAgentTurn {
+                    pane_uuid,
+                    conversation_id: conversation_id.to_string(),
+                    turn_id: exchange_id.to_string(),
+                    exchange_ord,
+                    created_ts: Some(exchange.start_time.naive_utc()),
+                }
+            });
+
             // Do not persist AI queries from shared ambient agent sessions that we've viewed,
             // as these were sent as part of an ambient agent run and shouldn't polute the up arrow history.
             if is_shared_ambient_agent_session {
@@ -2209,6 +2236,19 @@ fn handle_ai_history_event(
                 .filter_map(|input| PersistedAIInputType::try_from(input).ok())
                 .collect();
             if inputs.is_empty() {
+                if let Some(upsert_turn) = agent_turn_event {
+                    let turn_sender = model_event_sender.clone();
+                    let _ = ctx.spawn(
+                        async move { turn_sender.send(upsert_turn) },
+                        move |_, res, _| {
+                            if let Err(err) = res {
+                                log::error!(
+                                    "Error sending agent turn event for terminal id {terminal_pane_id:?} {err:?}"
+                                );
+                            }
+                        },
+                    );
+                }
                 return;
             }
 
@@ -2229,7 +2269,12 @@ fn handle_ai_history_event(
             let _ = ctx.spawn(
                 // Sending over a sync sender can block the current thread, so we
                 // do this async.
-                async move { model_event_sender.send(upsert_ai_query_event) },
+                async move {
+                    if let Some(upsert_turn) = agent_turn_event {
+                        model_event_sender.send(upsert_turn)?;
+                    }
+                    model_event_sender.send(upsert_ai_query_event)
+                },
                 move |_, res, _| {
                     if let Err(err) = res {
                         log::error!(

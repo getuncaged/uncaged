@@ -1022,17 +1022,11 @@ impl BlocklistAIHistoryModel {
         for conversation in conversations.into_iter() {
             let conversation_id = conversation.id();
             conversation_ids.push(conversation_id);
-            // Uncaged one-history (B6): restoring into this view removes the
-            // conversation from any OTHER view's live set -- a conversation has
-            // exactly one owner. The old code only deduped within one view,
-            // which is how nondeterministic multi-ownership arose.
-            for (other_view_id, other_ids) in
-                self.live_conversation_ids_for_terminal_view.iter_mut()
-            {
-                if *other_view_id != terminal_view_id {
-                    other_ids.retain(|other| *other != conversation_id);
-                }
-            }
+            // Uncaged one-history (B6): multi-view ownership is resolved
+            // deterministically by `terminal_view_id_for_conversation` (active
+            // view first, then lowest view id). Eagerly removing the
+            // conversation from other views here would erase the previous-owner
+            // information the restore-transfer path needs mid-flight.
             let live_conversation_ids = self
                 .live_conversation_ids_for_terminal_view
                 .entry(terminal_view_id)

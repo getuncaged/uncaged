@@ -351,3 +351,117 @@ fn pane_close_purges_turns_and_watermark() {
     let watermarks: i64 = w::pane_clear_watermarks.count().first(&mut conn).unwrap();
     assert_eq!((turns, watermarks), (0, 0));
 }
+
+/// One-history (stage 5): on a pure-shell database the v2 (turn_index-driven)
+/// restore read returns exactly what v1 returns -- same panes, same blocks,
+/// same order. This is the kill-switch guarantee: flipping the flag off can
+/// never change what a healthy database restores.
+#[test]
+fn restored_blocks_v2_matches_v1_on_pure_shell_db() {
+    use diesel::sql_query;
+
+    let mut conn = test_connection();
+    // Synthetic seeding: skip the pane-tree FK chain.
+    sql_query("PRAGMA foreign_keys = OFF")
+        .execute(&mut conn)
+        .unwrap();
+    let pane = b"eq-pane".to_vec();
+    sql_query(format!(
+        "INSERT INTO terminal_panes (kind, uuid, is_active) VALUES ('terminal', x'{}', 0)",
+        hex::encode(&pane)
+    ))
+    .execute(&mut conn)
+    .unwrap();
+
+    for (ordinal, block_id) in ["b-0", "b-1", "b-2"].iter().enumerate() {
+        sql_query(format!(
+            "INSERT INTO blocks (pane_leaf_uuid, stylized_command, stylized_output, exit_code, \
+             did_execute, is_background, honor_ps1, block_id, turn_id, start_ts, completed_ts) \
+             VALUES (x'{pane}', x'00', x'00', 0, 1, 0, 0, '{block_id}', '{block_id}', \
+             datetime('2026-01-01 10:0{ordinal}:00'), datetime('2026-01-01 10:0{ordinal}:30'))",
+            pane = hex::encode(&pane),
+        ))
+        .execute(&mut conn)
+        .unwrap();
+        sql_query(format!(
+            "INSERT INTO turn_index (turn_id, pane_leaf_uuid, seq, kind, block_id) \
+             VALUES ('{block_id}', x'{}', {ordinal}, 'shell', '{block_id}')",
+            hex::encode(&pane),
+        ))
+        .execute(&mut conn)
+        .unwrap();
+    }
+
+    let v1 = super::get_all_restored_blocks(&mut conn).unwrap();
+    let v2 = super::get_all_restored_blocks_v2(&mut conn).unwrap();
+
+    assert_eq!(v1.len(), v2.len());
+    for (pane_uuid, v1_items) in &v1 {
+        let v2_items = v2.get(pane_uuid).expect("pane present in v2");
+        assert_eq!(
+            v1_items.iter().map(|item| item.id()).collect::<Vec<_>>(),
+            v2_items.iter().map(|item| item.id()).collect::<Vec<_>>(),
+            "block order must match between v1 and v2"
+        );
+    }
+}
+
+/// One-history (stage 5): v2 honors the Cmd-K watermark -- turns below it do
+/// not restore -- while v1 (the kill-switch path) ignores it by design.
+#[test]
+fn restored_blocks_v2_honors_clear_watermark() {
+    use diesel::sql_query;
+
+    let mut conn = test_connection();
+    // Synthetic seeding: skip the pane-tree FK chain.
+    sql_query("PRAGMA foreign_keys = OFF")
+        .execute(&mut conn)
+        .unwrap();
+    let pane = b"wm-read-pane".to_vec();
+    sql_query(format!(
+        "INSERT INTO terminal_panes (kind, uuid, is_active) VALUES ('terminal', x'{}', 0)",
+        hex::encode(&pane)
+    ))
+    .execute(&mut conn)
+    .unwrap();
+    for (ordinal, block_id) in ["w-0", "w-1", "w-2"].iter().enumerate() {
+        sql_query(format!(
+            "INSERT INTO blocks (pane_leaf_uuid, stylized_command, stylized_output, exit_code, \
+             did_execute, is_background, honor_ps1, block_id, turn_id, start_ts, completed_ts) \
+             VALUES (x'{pane}', x'00', x'00', 0, 1, 0, 0, '{block_id}', '{block_id}', \
+             datetime('2026-01-01 11:0{ordinal}:00'), datetime('2026-01-01 11:0{ordinal}:30'))",
+            pane = hex::encode(&pane),
+        ))
+        .execute(&mut conn)
+        .unwrap();
+        sql_query(format!(
+            "INSERT INTO turn_index (turn_id, pane_leaf_uuid, seq, kind, block_id) \
+             VALUES ('{block_id}', x'{}', {ordinal}, 'shell', '{block_id}')",
+            hex::encode(&pane),
+        ))
+        .execute(&mut conn)
+        .unwrap();
+    }
+    // Clear happened after w-1: watermark at seq 2.
+    sql_query(format!(
+        "INSERT INTO pane_clear_watermarks (pane_leaf_uuid, cleared_before_seq) VALUES (x'{}', 2)",
+        hex::encode(&pane)
+    ))
+    .execute(&mut conn)
+    .unwrap();
+
+    let v2 = super::get_all_restored_blocks_v2(&mut conn).unwrap();
+    let items = v2.values().next().expect("one pane");
+    assert_eq!(
+        items.iter().map(|item| item.id()).collect::<Vec<_>>(),
+        vec!["w-2".to_string()],
+        "only the post-clear turn restores"
+    );
+
+    let v1 = super::get_all_restored_blocks(&mut conn).unwrap();
+    assert_eq!(
+        v1.values().next().unwrap().len(),
+        3,
+        "kill-switch path ignores the watermark"
+    );
+}
