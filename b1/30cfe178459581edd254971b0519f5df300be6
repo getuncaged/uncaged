@@ -1,0 +1,23 @@
+crates/uncaged_engine/src/wire.rs
+  s_6e5dc450e2113a::t_3839f816ca6ffe 95-97,106-120,142,150-151,161,169-170
+  s_6e5dc450e2113a::t_5fa9ceb43b6396 121-140
+crates/uncaged_engine/src/engine.rs
+  s_6e5dc450e2113a::t_5fa9ceb43b6396 33-54,74,83,90,109-119
+  s_6e5dc450e2113a::t_c04f9d43ea6180 137,145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "b130cfe178459581edd254971b0519f5df300be6",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
