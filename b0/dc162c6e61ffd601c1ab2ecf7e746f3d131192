@@ -1,0 +1,32 @@
+app/src/persistence/block_list.rs
+  s_6e5dc450e2113a::t_51673cd4790071 290-291
+crates/persistence/src/schema.rs
+  s_6e5dc450e2113a::t_b985aebed71ef2 105,300-306,430-441
+  s_6e5dc450e2113a::t_187b774915cfb4 442
+crates/persistence/migrations/2026-08-25-000000_one_history/down.sql
+  s_6e5dc450e2113a::t_8abeb69f81afe4 1-6
+app/src/persistence/block_list_tests.rs
+  s_6e5dc450e2113a::t_b6abc8c9bb5123 280-282,284-286
+  s_6e5dc450e2113a::t_2710501dd60f5f 198-279,283,287
+crates/persistence/migrations/2026-08-25-000000_one_history/up.sql
+  s_6e5dc450e2113a::t_8abeb69f81afe4 1-62
+crates/persistence/src/model.rs
+  s_6e5dc450e2113a::t_ff03de9621e766 18-21,740-742,776-803
+  s_6e5dc450e2113a::t_026a18ceb57f72 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "b0dc162c6e61ffd601c1ab2ecf7e746f3d131192",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
