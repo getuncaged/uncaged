@@ -287,6 +287,8 @@ fn create_block<'a>(
             .agent_view_visibility
             .as_ref()
             .and_then(|v| serde_json::to_string(v).ok()),
+        // Uncaged one-history: a shell turn's id IS its block id.
+        turn_id: Some(block.id.as_str()),
     }
 }
 

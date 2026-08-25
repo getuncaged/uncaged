@@ -195,3 +195,93 @@ fn empty_input_skip_filters_out_non_query_inputs() {
         .collect();
     assert_eq!(persisted.len(), 1);
 }
+
+/// One-history migration backfill (§3 Stage 1): dirty pre-migration data must
+/// migrate without failing (a failed migration bricks persistence every boot),
+/// with deterministic block-id repair and a faithful shell-turn timeline.
+#[test]
+fn one_history_migration_backfills_dirty_blocks() {
+    use diesel::sql_query;
+
+    let mut conn = test_connection();
+    // Roll back the one_history migration so we can seed pre-migration data.
+    conn.revert_last_migration(::persistence::MIGRATIONS)
+        .expect("down.sql should revert the one_history migration");
+
+    // Seed: (a) empty block_ids, (b) a fork-duplicated block_id across two
+    // panes, (c) malformed ai_metadata that json_extract would choke on.
+    for (pane, block_id, ai_metadata) in [
+        ("p1", "", "NULL"),
+        ("p1", "", "NULL"),
+        ("p1", "dup-1", "'{\"conversation_id\":\"c-1\"}'"),
+        ("p2", "dup-1", "NULL"),
+        ("p2", "ok-2", "'this is not json'"),
+    ] {
+        sql_query(format!(
+            "INSERT INTO blocks (pane_leaf_uuid, stylized_command, stylized_output, exit_code, \
+             did_execute, is_background, honor_ps1, block_id, ai_metadata, start_ts) \
+             VALUES (x'{}', x'00', x'00', 0, 1, 0, 0, '{}', {}, CURRENT_TIMESTAMP)",
+            hex::encode(pane.as_bytes()),
+            block_id,
+            ai_metadata,
+        ))
+        .execute(&mut conn)
+        .expect("seed insert should succeed");
+    }
+
+    // The migration must run cleanly on the dirty data.
+    conn.run_pending_migrations(::persistence::MIGRATIONS)
+        .expect("one_history migration should succeed on dirty data");
+
+    use crate::persistence::schema::blocks::dsl as b;
+    use crate::persistence::schema::turn_index::dsl as t;
+
+    // Block ids are unique and non-empty.
+    let ids: Vec<String> = b::blocks.select(b::block_id).load(&mut conn).unwrap();
+    assert_eq!(ids.len(), 5);
+    let unique: std::collections::HashSet<_> = ids.iter().collect();
+    assert_eq!(unique.len(), 5, "block_ids must be unique after backfill");
+    assert!(ids.iter().all(|id| !id.is_empty()));
+    // The empty and duplicated rows were rewritten to legacy-<rowid>; the
+    // canonical (lowest-rowid) duplicate keeps its id.
+    assert!(ids.contains(&"dup-1".to_string()));
+    assert!(ids.contains(&"ok-2".to_string()));
+    assert_eq!(ids.iter().filter(|id| id.starts_with("legacy-")).count(), 3);
+
+    // One shell turn row per block, seq in rowid order per pane, turn_id ==
+    // block_id, and the malformed ai_metadata degraded to NULL.
+    let turns: Vec<(String, Vec<u8>, i64, Option<String>)> = t::turn_index
+        .select((t::turn_id, t::pane_leaf_uuid, t::seq, t::conversation_id))
+        .order((t::pane_leaf_uuid.asc(), t::seq.asc()))
+        .load(&mut conn)
+        .unwrap();
+    assert_eq!(turns.len(), 5);
+    for pane in [b"p1".to_vec(), b"p2".to_vec()] {
+        let seqs: Vec<i64> = turns
+            .iter()
+            .filter(|(_, p, _, _)| *p == pane)
+            .map(|(_, _, s, _)| *s)
+            .collect();
+        assert_eq!(seqs, (0..seqs.len() as i64).collect::<Vec<_>>());
+    }
+    assert_eq!(
+        turns
+            .iter()
+            .filter(|(_, _, _, conv)| conv.as_deref() == Some("c-1"))
+            .count(),
+        1,
+        "the valid ai_metadata row keeps its conversation link"
+    );
+    let turn_ids: std::collections::HashSet<_> =
+        turns.iter().map(|(id, _, _, _)| id.clone()).collect();
+    assert_eq!(turn_ids, unique.into_iter().cloned().collect());
+
+    // blocks.turn_id mirrors block_id.
+    let pairs: Vec<(String, Option<String>)> = b::blocks
+        .select((b::block_id, b::turn_id))
+        .load(&mut conn)
+        .unwrap();
+    assert!(pairs
+        .iter()
+        .all(|(block_id, turn_id)| turn_id.as_deref() == Some(block_id.as_str())));
+}

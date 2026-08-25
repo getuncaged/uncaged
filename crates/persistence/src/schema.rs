@@ -102,6 +102,7 @@ diesel::table! {
         is_local -> Nullable<Bool>,
         agent_view_visibility -> Nullable<Text>,
         git_branch_name -> Nullable<Text>,
+        turn_id -> Nullable<Text>,
     }
 }
 
@@ -297,6 +298,13 @@ diesel::table! {
 }
 
 diesel::table! {
+    pane_clear_watermarks (pane_leaf_uuid) {
+        pane_leaf_uuid -> Binary,
+        cleared_before_seq -> BigInt,
+    }
+}
+
+diesel::table! {
     pane_leaves (pane_node_id, kind) {
         pane_node_id -> Integer,
         kind -> Text,
@@ -416,6 +424,19 @@ diesel::table! {
         active_profile_id -> Nullable<Text>,
         conversation_ids -> Nullable<Text>,
         active_conversation_id -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    turn_index (turn_id) {
+        turn_id -> Text,
+        pane_leaf_uuid -> Binary,
+        seq -> BigInt,
+        kind -> Text,
+        block_id -> Nullable<Text>,
+        conversation_id -> Nullable<Text>,
+        exchange_ord -> Nullable<BigInt>,
+        created_ts -> Nullable<Timestamp>,
     }
 }
 

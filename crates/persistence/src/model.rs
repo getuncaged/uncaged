@@ -14,10 +14,11 @@ use super::schema::{
     code_review_panes, commands, current_user_information, env_var_collection_panes, folders,
     generic_string_objects, ignored_suggestions, mcp_environment_variables,
     mcp_server_installations, mcp_server_panes, notebook_panes, notebooks, object_actions,
-    object_metadata, object_permissions, pane_branches, pane_leaves, pane_nodes, panels,
-    project_rules, projects, server_experiments, settings_panes, tab_groups, tabs, team_members,
-    team_settings, teams, terminal_panes, user_profiles, windows, workflow_panes, workflows,
-    workspace_language_server, workspace_metadata, workspace_teams, workspaces,
+    object_metadata, object_permissions, pane_branches, pane_clear_watermarks, pane_leaves,
+    pane_nodes, panels, project_rules, projects, server_experiments, settings_panes, tab_groups,
+    tabs, team_members, team_settings, teams, terminal_panes, turn_index, user_profiles, windows,
+    workflow_panes, workflows, workspace_language_server, workspace_metadata, workspace_teams,
+    workspaces,
 };
 
 #[derive(Insertable)]
@@ -736,6 +737,9 @@ pub struct NewBlock<'a> {
     pub ai_metadata: Option<&'a String>,
     pub is_local: Option<bool>,
     pub agent_view_visibility: Option<String>,
+    /// Uncaged one-history: equals `block_id` for shell turns. Appended last --
+    /// `blocks` columns are positional for older binaries; never reorder.
+    pub turn_id: Option<&'a str>,
 }
 
 #[derive(Identifiable, Queryable, Selectable, Associations)]
@@ -769,6 +773,34 @@ pub struct Block {
     pub ai_metadata: Option<String>,
     pub is_local: Option<bool>,
     pub agent_view_visibility: Option<String>,
+    /// Uncaged one-history: equals `block_id` for shell turns. Appended last.
+    pub turn_id: Option<String>,
+}
+
+/// Uncaged one-history: one row per turn (shell or agent) recording identity
+/// and order only -- content stays in `blocks` / `agent_tasks`. No FK clauses;
+/// see the `NewBlock` doc comment for why.
+#[derive(Debug, Clone, Queryable, Selectable, Insertable)]
+#[diesel(table_name = turn_index)]
+pub struct TurnIndexEntry {
+    pub turn_id: String,
+    pub pane_leaf_uuid: Vec<u8>,
+    pub seq: i64,
+    pub kind: String,
+    pub block_id: Option<String>,
+    pub conversation_id: Option<String>,
+    pub exchange_ord: Option<i64>,
+    pub created_ts: Option<NaiveDateTime>,
+}
+
+/// Uncaged one-history: the non-destructive Cmd-K watermark. A separate table
+/// (not a `terminal_panes` column) because `save_app_state` deletes and
+/// re-inserts every `terminal_panes` row on each snapshot.
+#[derive(Debug, Clone, Queryable, Selectable, Insertable)]
+#[diesel(table_name = pane_clear_watermarks)]
+pub struct PaneClearWatermark {
+    pub pane_leaf_uuid: Vec<u8>,
+    pub cleared_before_seq: i64,
 }
 
 #[derive(Insertable)]
