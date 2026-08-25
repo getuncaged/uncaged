@@ -1,0 +1,34 @@
+app/src/ai/agent/mod.rs
+  s_6e5dc450e2113a::t_5d9818025b832b 3039-3044
+Cargo.toml
+  s_6e5dc450e2113a::t_8e7e87d51fc07f 336
+app/src/ai/agent/api/convert_conversation.rs
+  s_6e5dc450e2113a::t_e5261284666020 19,303,310,330-334,376-377,384,392-394,572-573,1817,1825-1826,1833-1851
+app/src/ai/agent/conversation.rs
+  s_6e5dc450e2113a::t_a8a43368257bd4 434-436,439-441
+crates/warp_features/src/lib.rs
+  s_6e5dc450e2113a::t_8e7e87d51fc07f 257-262,1002-1003
+  s_6e5dc450e2113a::t_17d87df3bcef47 1004-1005
+app/src/ai/agent/api/convert_conversation_tests.rs
+  s_6e5dc450e2113a::t_176b007be1a6bb 459,522,569,828,1104,1200,1244,1288,1520,1738,2011,2123
+  s_6e5dc450e2113a::t_58a841ff4f3457 4,2141-2182
+  s_6e5dc450e2113a::t_160198beae6ef0 2183-2228
+Cargo.lock
+  s_6e5dc450e2113a::t_bfaedeb0edc5ec 12552-12557,14784
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "e482f960b002cbf85e21c1abe020588cd7419c17",
+  "prompts": {},
+  "sessions": {
+    "s_6e5dc450e2113a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88173777-993a-4bc3-b1df-b6f62d73fe24",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Anton Arnaudov <anton.arnaudov.me@gmail.com>"
+    }
+  }
+}
