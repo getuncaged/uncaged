@@ -285,3 +285,69 @@ fn one_history_migration_backfills_dirty_blocks() {
         .iter()
         .all(|(block_id, turn_id)| turn_id.as_deref() == Some(block_id.as_str())));
 }
+
+/// One-history (B5): the Cmd-K watermark is an upsert that always lands past
+/// every existing turn, and keeps growing monotonically across clears.
+#[test]
+fn clear_watermark_is_monotone_across_clears() {
+    use diesel::sql_query;
+
+    let mut conn = test_connection();
+    let pane = b"wm-pane".to_vec();
+
+    let watermark = |conn: &mut SqliteConnection| -> i64 {
+        use crate::persistence::schema::pane_clear_watermarks::dsl as w;
+        w::pane_clear_watermarks
+            .select(w::cleared_before_seq)
+            .first(conn)
+            .expect("watermark row should exist")
+    };
+
+    // Fresh pane, no turns: watermark = 0.
+    super::set_cleared_before_seq(&mut conn, pane.clone()).unwrap();
+    assert_eq!(watermark(&mut conn), 0);
+
+    // Two turns arrive (seq 0 and 1): the next clear moves the watermark to 2.
+    for (turn, seq) in [("t-0", 0), ("t-1", 1)] {
+        sql_query(format!(
+            "INSERT INTO turn_index (turn_id, pane_leaf_uuid, seq, kind) \
+             VALUES ('{turn}', x'{}', {seq}, 'shell')",
+            hex::encode(&pane),
+        ))
+        .execute(&mut conn)
+        .unwrap();
+    }
+    super::set_cleared_before_seq(&mut conn, pane.clone()).unwrap();
+    assert_eq!(watermark(&mut conn), 2);
+
+    // Repeat clear with no new turns: unchanged (still past everything).
+    super::set_cleared_before_seq(&mut conn, pane.clone()).unwrap();
+    assert_eq!(watermark(&mut conn), 2);
+}
+
+/// One-history: pane close (a hard delete, unlike Cmd-K) purges the pane's
+/// timeline and watermark alongside its blocks.
+#[test]
+fn pane_close_purges_turns_and_watermark() {
+    use diesel::sql_query;
+
+    let mut conn = test_connection();
+    let pane = b"close-pane".to_vec();
+
+    sql_query(format!(
+        "INSERT INTO turn_index (turn_id, pane_leaf_uuid, seq, kind) \
+         VALUES ('t-close', x'{}', 0, 'shell')",
+        hex::encode(&pane),
+    ))
+    .execute(&mut conn)
+    .unwrap();
+    super::set_cleared_before_seq(&mut conn, pane.clone()).unwrap();
+
+    super::delete_blocks(&mut conn, pane).unwrap();
+
+    use crate::persistence::schema::pane_clear_watermarks::dsl as w;
+    use crate::persistence::schema::turn_index::dsl as t;
+    let turns: i64 = t::turn_index.count().first(&mut conn).unwrap();
+    let watermarks: i64 = w::pane_clear_watermarks.count().first(&mut conn).unwrap();
+    assert_eq!((turns, watermarks), (0, 0));
+}

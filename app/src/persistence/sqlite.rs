@@ -48,8 +48,8 @@ use warpui::{AppContext, SingletonEntity};
 
 use super::agent::{delete_agent_conversations, upsert_agent_conversation};
 use super::block_list::{
-    delete_ai_conversation, delete_blocks, save_block, update_block_agent_view_visibility,
-    upsert_ai_query,
+    delete_ai_conversation, delete_blocks, save_block, set_cleared_before_seq,
+    update_block_agent_view_visibility, upsert_ai_query,
 };
 use super::model::{
     self, ActiveMCPServer, CurrentUserInformation, MCPEnvironmentVariables, NewActiveMCPServer,
@@ -574,6 +574,9 @@ fn handle_model_event(event: ModelEvent, connection: &mut SqliteConnection) -> a
             // Delete the blocks even if the setting is off so users can still remove
             // panes and have their data deleted locally.
             delete_blocks(connection, pane_id).context("error deleting blocks")
+        }
+        ModelEvent::SetClearedBeforeSeq(pane_id) => {
+            set_cleared_before_seq(connection, pane_id).context("error setting clear watermark")
         }
         ModelEvent::Snapshot(app_state) => {
             save_app_state(connection, &app_state).context("error saving app state")

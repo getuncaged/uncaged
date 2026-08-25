@@ -10,6 +10,7 @@ use session_sharing_protocol::sharer::SessionSourceType;
 use url::Url;
 use warp_cli::agent::Harness;
 use warp_core::execution_mode::AppExecutionMode;
+use warp_core::features::FeatureFlag;
 use warp_multi_agent_api as multi_agent_api;
 use warpui::{
     AppContext, EntityId, ModelHandle, SingletonEntity, ViewContext, ViewHandle, WindowId,
@@ -232,6 +233,24 @@ impl TerminalPane {
         ctx: &AppContext,
     ) -> ModelHandle<Box<dyn TerminalManager>> {
         self.view.as_ref(ctx).child_data(ctx).clone()
+    }
+
+    /// Uncaged one-history (B5): instructs the SQLite thread to move this
+    /// pane's clear watermark past every existing turn.
+    pub(in crate::pane_group) fn set_cleared_before_seq(&self, ctx: &AppContext) {
+        if !AppExecutionMode::as_ref(ctx).can_save_session() {
+            return;
+        }
+        if let Some(sender) = &self.model_event_sender {
+            let model_event = ModelEvent::SetClearedBeforeSeq(self.uuid.clone());
+            if let Err(err) = sender.send(model_event) {
+                log::error!(
+                    "Error sending clear-watermark event for terminal id {} {:?}",
+                    self.terminal_view(ctx).id(),
+                    err
+                );
+            }
+        }
     }
 
     /// Instructs the SQLite thread to delete blocks for this session.
@@ -983,10 +1002,18 @@ fn handle_terminal_view_event(
             }
             Event::Pane(pane_event) => group.handle_pane_event(pane_id, pane_event, ctx),
             Event::BlockListCleared => {
-                // Capture CMD-K to clear blocks here so we could remove
-                // all the associated blocks stored in the history.
                 if let Some(terminal_pane) = group.terminal_session_by_id(pane_id) {
-                    terminal_pane.delete_blocks(ctx);
+                    if FeatureFlag::OneHistory.is_enabled() {
+                        // Uncaged one-history (B5): Cmd-K is non-destructive.
+                        // Move the pane's clear watermark instead of deleting
+                        // the persisted blocks -- the agent half of history was
+                        // never deleted on clear, and now neither half is.
+                        terminal_pane.set_cleared_before_seq(ctx);
+                    } else {
+                        // Capture CMD-K to clear blocks here so we could remove
+                        // all the associated blocks stored in the history.
+                        terminal_pane.delete_blocks(ctx);
+                    }
                 }
             }
             Event::SendNotification(notification) => {

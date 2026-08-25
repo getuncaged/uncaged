@@ -240,6 +240,10 @@ pub struct FinishedCommandMetadata {
 pub enum ModelEvent {
     SaveBlock(BlockCompleted),
     DeleteBlocks(Vec<u8>),
+    /// Uncaged one-history (B5): Cmd-K records a watermark instead of deleting
+    /// rows. Turns with seq below the watermark stay on disk but are not
+    /// restored into the pane.
+    SetClearedBeforeSeq(Vec<u8>),
     Snapshot(AppState),
     UpsertWorkflows(Vec<CloudWorkflow>),
     UpsertNotebooks(Vec<CloudNotebook>),

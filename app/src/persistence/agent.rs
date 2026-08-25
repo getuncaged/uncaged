@@ -309,6 +309,18 @@ pub(super) fn delete_agent_conversations(
         )
         .execute(conn)?;
 
+        // Uncaged one-history: drop the deleted conversations' agent turn rows.
+        let optional_ids: Vec<Option<String>> = conversation_ids
+            .iter()
+            .map(|conversation| Some(conversation.clone()))
+            .collect();
+        diesel::delete(
+            schema::turn_index::dsl::turn_index
+                .filter(schema::turn_index::dsl::conversation_id.eq_any(optional_ids))
+                .filter(schema::turn_index::dsl::kind.eq("agent")),
+        )
+        .execute(conn)?;
+
         Ok(())
     })?;
 

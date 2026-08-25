@@ -909,14 +909,28 @@ impl BlocklistAIHistoryModel {
     }
 
     /// Returns the terminal view ID that owns the given conversation, if any.
+    ///
+    /// Uncaged one-history (B6): a conversation held by more than one view (a
+    /// restore-path bug this used to paper over) previously resolved to
+    /// whichever entry HashMap iteration happened to visit first -- a different
+    /// answer run to run. Prefer the view where the conversation is ACTIVE,
+    /// then the lowest view id, so the answer is stable within a session.
     pub fn terminal_view_id_for_conversation(
         &self,
         conversation_id: &AIConversationId,
     ) -> Option<EntityId> {
+        if let Some((view_id, _)) = self
+            .active_conversation_for_terminal_view
+            .iter()
+            .find(|(_, active)| *active == conversation_id)
+        {
+            return Some(*view_id);
+        }
         self.live_conversation_ids_for_terminal_view
             .iter()
-            .find(|(_, conversation_ids)| conversation_ids.contains(conversation_id))
+            .filter(|(_, conversation_ids)| conversation_ids.contains(conversation_id))
             .map(|(terminal_view_id, _)| *terminal_view_id)
+            .min()
     }
 
     /// Returns the conversation ID from the terminal view's history corresponding to the action,
@@ -1008,6 +1022,17 @@ impl BlocklistAIHistoryModel {
         for conversation in conversations.into_iter() {
             let conversation_id = conversation.id();
             conversation_ids.push(conversation_id);
+            // Uncaged one-history (B6): restoring into this view removes the
+            // conversation from any OTHER view's live set -- a conversation has
+            // exactly one owner. The old code only deduped within one view,
+            // which is how nondeterministic multi-ownership arose.
+            for (other_view_id, other_ids) in
+                self.live_conversation_ids_for_terminal_view.iter_mut()
+            {
+                if *other_view_id != terminal_view_id {
+                    other_ids.retain(|other| *other != conversation_id);
+                }
+            }
             let live_conversation_ids = self
                 .live_conversation_ids_for_terminal_view
                 .entry(terminal_view_id)
@@ -1930,16 +1955,6 @@ impl BlocklistAIHistoryModel {
             .active_conversation_for_terminal_view
             .remove(&terminal_view_id);
         let mut cleared_conversation_ids: Vec<AIConversationId> = Vec::new();
-        if let Some(ids) = self
-            .live_conversation_ids_for_terminal_view
-            .remove(&terminal_view_id)
-        {
-            cleared_conversation_ids.extend(ids.iter().copied());
-            self.cleared_conversation_ids_for_terminal_view
-                .entry(terminal_view_id)
-                .and_modify(|existing| existing.extend(ids.clone()))
-                .or_insert(ids);
-        }
         if let Some(ids) = self
             .live_conversation_ids_for_terminal_view
             .remove(&terminal_view_id)

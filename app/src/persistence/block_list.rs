@@ -297,8 +297,38 @@ pub(super) fn delete_blocks(conn: &mut SqliteConnection, pane_id: Vec<u8>) -> Re
     conn.transaction::<_, Error, _>(|conn| {
         diesel::delete(schema::blocks::dsl::blocks.filter(pane_leaf_uuid.eq(pane_id.clone())))
             .execute(conn)?;
+        // Uncaged one-history: a hard pane delete also drops the pane's
+        // timeline and watermark (this path is pane close, not Cmd-K).
+        diesel::delete(
+            schema::turn_index::dsl::turn_index
+                .filter(schema::turn_index::dsl::pane_leaf_uuid.eq(pane_id.clone())),
+        )
+        .execute(conn)?;
+        diesel::delete(
+            schema::pane_clear_watermarks::dsl::pane_clear_watermarks
+                .filter(schema::pane_clear_watermarks::dsl::pane_leaf_uuid.eq(pane_id)),
+        )
+        .execute(conn)?;
         Ok(())
     })
+}
+
+/// Uncaged one-history (B5): moves the pane's clear watermark past every
+/// existing turn. Seq keeps growing monotonically across clears.
+pub(super) fn set_cleared_before_seq(
+    conn: &mut SqliteConnection,
+    pane_id: Vec<u8>,
+) -> Result<(), Error> {
+    use diesel::sql_types::Binary;
+    diesel::sql_query(
+        "INSERT INTO pane_clear_watermarks (pane_leaf_uuid, cleared_before_seq) \
+         VALUES (?, (SELECT COALESCE(MAX(seq), -1) + 1 FROM turn_index WHERE pane_leaf_uuid = ?)) \
+         ON CONFLICT(pane_leaf_uuid) DO UPDATE SET cleared_before_seq = excluded.cleared_before_seq",
+    )
+    .bind::<Binary, _>(pane_id.clone())
+    .bind::<Binary, _>(pane_id)
+    .execute(conn)?;
+    Ok(())
 }
 
 pub(super) fn update_block_agent_view_visibility(
@@ -324,6 +354,14 @@ pub(super) fn delete_ai_conversation(
         // Delete the AI query
         diesel::delete(
             queries_dsl::ai_queries.filter(queries_dsl::conversation_id.eq(conversation_id_str)),
+        )
+        .execute(conn)?;
+
+        // Uncaged one-history: drop the conversation's agent turn rows too.
+        diesel::delete(
+            schema::turn_index::dsl::turn_index
+                .filter(schema::turn_index::dsl::conversation_id.eq(conversation_id_str))
+                .filter(schema::turn_index::dsl::kind.eq("agent")),
         )
         .execute(conn)?;
 
