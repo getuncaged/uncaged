@@ -23,6 +23,18 @@ pub async fn get_current_changelog(server_api: Arc<ServerApi>) -> Result<Option<
 
     let channel = ChannelState::channel();
 
+    // Uncaged has no changelog service, and this path must not reach the network.
+    //
+    // It runs on every window launch (root_view.rs -> Workspace::check_for_changelog
+    // with ChangelogRequestType::WindowLaunch) and does NOT go through
+    // AutoupdateState::start_polling, so it bypasses the update-consent gate
+    // entirely. It also already discards whatever it fetches for this channel —
+    // the match below maps Integration | Oss to None — so on Uncaged it is a
+    // request whose result is thrown away. Return before any of that happens.
+    if matches!(channel, Channel::Oss) {
+        return Ok(None);
+    }
+
     if should_fetch_changelog_json(channel) {
         log::info!("Attempting to fetch changelog.json");
         match fetch_current_changelog(server_api.http_client(), rand.as_str()).await {

@@ -15,3 +15,21 @@ We will acknowledge your report and work with you to understand and resolve the 
 ## Privacy & data handling
 
 Uncaged is designed so that your prompts and terminal data never leave your machine except to reach the model endpoint you configure yourself. There are no accounts, no login, no telemetry, no analytics, no cloud sync, and no autoupdate or phone-home. The only outbound network traffic is to the model provider or local runtime you connect in **Settings → AI Models**. Configuration is stored locally in `~/.uncaged/`.
+
+## Update checks
+
+Uncaged can check GitHub for a new release and tell you one exists. That is
+**off until you turn it on** — the app makes no update request of any kind
+before you answer the one-time question — and it can be turned off again in
+Settings.
+
+It only looks. Uncaged does not download or install updates and never replaces
+its own bundle; you update the way you installed, with `brew upgrade`, `winget
+upgrade`, or from the release page. That is deliberate: the app is ad-hoc signed,
+with no Apple Developer ID and no notarization, so it has no way to prove a
+downloaded build is genuinely ours. Homebrew and winget verify their own
+checksums, which is a better guarantee than anything we could offer in-app.
+
+The check itself reads `api.github.com` over TLS. No identifier is sent; the
+only header describing the client is a `User-Agent` of `Uncaged/<version>`,
+which does reveal the version you are running.
