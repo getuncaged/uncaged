@@ -1379,6 +1379,7 @@ impl PaneGroup {
                                 None,
                                 AgentViewEntryOrigin::Input {
                                     was_prompt_autodetected: false,
+                                    was_mode_explicitly_chosen: false,
                                 },
                                 ctx,
                             );
@@ -7662,6 +7663,7 @@ impl PaneGroup {
                     // link flow.
                     AgentViewEntryOrigin::Input {
                         was_prompt_autodetected: false,
+                        was_mode_explicitly_chosen: false,
                     },
                     terminal_view_ctx,
                 );

@@ -191,6 +191,7 @@ impl View for TerminalViewZeroStateBlock {
                         ctx.dispatch_typed_action(TerminalAction::StartNewAgentConversation {
                             origin: AgentViewEntryOrigin::Input {
                                 was_prompt_autodetected: false,
+                                was_mode_explicitly_chosen: false,
                             },
                         });
                     },

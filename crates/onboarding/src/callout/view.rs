@@ -101,8 +101,6 @@ fn get_agent_modality_callout_options(
     state: AgentModalityCalloutState,
     intention: OnboardingIntention,
     has_project: bool,
-    initial_natural_language_detection_enabled: bool,
-    natural_language_detection_enabled: bool,
     keybindings: &OnboardingKeybindings,
 ) -> Option<CalloutOptions> {
     let total_steps = match intention {
@@ -113,45 +111,28 @@ fn get_agent_modality_callout_options(
     match state {
         AgentModalityCalloutState::TerminalMode => {
             let is_final_step = intention == OnboardingIntention::Terminal;
-            // Show different callout content based on initial NL detection state
-            if initial_natural_language_detection_enabled {
-                // NL detection was already enabled - show simpler "overrides" callout without checkbox
-                Some(CalloutOptions {
-                    title: "Welcome to terminal mode",
-                    text: format!(
-                        "Run commands here, just like a regular terminal. If you type a question or task using natural language, Uncaged can suggest opening it in agent mode. You can always override using {}.",
-                        keybindings.toggle_input_mode
-                    ),
-                    step: StepStatus::new(0, total_steps),
-                    left_button: None,
-                    right_button: ButtonOptions {
-                        text: if is_final_step { "Finish" } else { "Next" },
-                        action: OnboardingCalloutViewAction::NextClicked,
-                        keystroke: Some(Keystroke::parse("enter").unwrap_or_default()),
-                    },
-                    checkbox: None,
-                })
-            } else {
-                // NL detection was disabled - show full explanation with checkbox to enable
-                Some(CalloutOptions {
-                    title: "You’re in terminal mode",
-                    text: format!(
-                        "Run commands here, just like a regular terminal. If you type a question or task using natural language, Uncaged can suggest opening it in agent mode. You can always override using {}.",
-                        keybindings.toggle_input_mode
-                    ),
-                    step: StepStatus::new(0, total_steps),
-                    left_button: None,
-                    right_button: ButtonOptions {
-                        text: if is_final_step { "Finish" } else { "Next" },
-                        action: OnboardingCalloutViewAction::NextClicked,
-                        keystroke: Some(Keystroke::parse("enter").unwrap_or_default()),
-                    },
-                    checkbox: Some(CheckboxOptions {
-                        label: "Enable Natural Language Detection",
-                        checked: natural_language_detection_enabled,
-                    }),
-                })
-            }
+            // Uncaged: one branch, no checkbox.
+            //
+            // Upstream forked here on whether natural-language detection was on, and when it was
+            // off it offered an "Enable Natural Language Detection" checkbox. Uncaged does not
+            // route input by classifying it -- the Terminal / Agent Mode toggle decides -- so
+            // there is no longer a detection state to describe, and inviting a first-run user to
+            // switch on a per-keystroke classifier is the opposite of the intent.
+            Some(CalloutOptions {
+                title: "You're in terminal mode",
+                text: format!(
+                    "Run commands here, just like a regular terminal. To talk to the agent, flip the Terminal / Agent Mode toggle in the input bar, or press {}. It stays where you put it. For a one-off, start the line with > and it goes to the agent without moving the toggle.",
+                    keybindings.toggle_input_mode
+                ),
+                step: StepStatus::new(0, total_steps),
+                left_button: None,
+                right_button: ButtonOptions {
+                    text: if is_final_step { "Finish" } else { "Next" },
+                    action: OnboardingCalloutViewAction::NextClicked,
+                    keystroke: Some(Keystroke::parse("enter").unwrap_or_default()),
+                },
+                checkbox: None,
+            })
         }
         AgentModalityCalloutState::AgentMode => {
             if has_project {
@@ -365,8 +346,6 @@ impl OnboardingCalloutView {
                 state,
                 model.intention(),
                 model.has_project(),
-                model.initial_natural_language_detection_enabled(),
-                model.natural_language_detection_enabled(),
                 &self.keybindings,
             ),
         }

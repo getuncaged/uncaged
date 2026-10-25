@@ -1122,6 +1122,7 @@ impl From<AgentViewEntryOrigin> for TelemetryAgentViewEntryOrigin {
         match origin {
             AgentViewEntryOrigin::Input {
                 was_prompt_autodetected,
+                was_mode_explicitly_chosen: _,
             } => Self::Input {
                 was_prompt_autodetected,
             },

@@ -202,6 +202,25 @@ fn renders_fixed_prompt_chip_command_without_interpolation() {
     );
 }
 
+/// Uncaged ships with input autodetection off, so a fresh input is locked to Shell
+/// (`InputConfig::new`). A number of upstream tests were written against the unlocked resting
+/// state and only ever used autodetection to get there -- they are really about slash commands,
+/// attachments, or the toggle itself. Rather than have them quietly assert Uncaged's defaults,
+/// they ask for the old state explicitly.
+///
+/// Note this also un-no-ops `set_input_mode_natural_language_detection`, which returns early when
+/// the setting is off.
+pub(crate) fn restore_upstream_autodetection_defaults(app: &mut App) {
+    AISettings::handle(app).update(app, |ai_settings, ctx| {
+        let _ = ai_settings
+            .ai_autodetection_enabled_internal
+            .set_value(true, ctx);
+        let _ = ai_settings
+            .nld_in_terminal_enabled_internal
+            .set_value(true, ctx);
+    });
+}
+
 pub fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);
 
@@ -1727,6 +1746,7 @@ fn select_conversation_via_pending_query_state(
                 conversation_id,
                 AgentViewEntryOrigin::Input {
                     was_prompt_autodetected: false,
+                    was_mode_explicitly_chosen: false,
                 },
                 ctx,
             );
@@ -2069,6 +2089,7 @@ fn shell_submission_queues_as_command_row_when_gated_under_v2() {
                     conversation_id,
                     AgentViewEntryOrigin::Input {
                         was_prompt_autodetected: false,
+                        was_mode_explicitly_chosen: false,
                     },
                     ctx,
                 );
@@ -2118,6 +2139,7 @@ fn shell_submission_is_not_queued_when_v2_disabled() {
                     conversation_id,
                     AgentViewEntryOrigin::Input {
                         was_prompt_autodetected: false,
+                        was_mode_explicitly_chosen: false,
                     },
                     ctx,
                 );
@@ -3467,6 +3489,7 @@ fn test_completions_while_typing_doesnt_hide_autosuggestion() {
 fn test_agent_mode_set_while_typing_slash_command() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        restore_upstream_autodetection_defaults(&mut app);
 
         let terminal = add_window_with_bootstrapped_terminal(
             &mut app, None, /* history_file_commands */
@@ -3516,6 +3539,7 @@ fn test_agent_mode_set_while_typing_slash_command() {
 fn test_plan_slash_command_argument_with_slash_does_not_disable_slash_command_parsing() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        restore_upstream_autodetection_defaults(&mut app);
 
         let terminal = add_window_with_bootstrapped_terminal(
             &mut app, None, /* history_file_commands */
@@ -3545,6 +3569,7 @@ fn test_plan_slash_command_argument_with_slash_does_not_disable_slash_command_pa
 fn test_open_slash_command_triggers_completions_on_space() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        restore_upstream_autodetection_defaults(&mut app);
 
         let session_id: SessionId = 1.into();
         let session_info = SessionInfo::new_for_test().with_id(session_id);
@@ -3635,6 +3660,7 @@ fn test_open_slash_command_does_not_autofill_single_file_completion() {
 fn test_open_slash_command_triggers_completions_when_selected() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        restore_upstream_autodetection_defaults(&mut app);
 
         let session_id: SessionId = 1.into();
         let session_info = SessionInfo::new_for_test().with_id(session_id);
@@ -3697,6 +3723,7 @@ fn test_open_slash_command_requires_path() {
 fn test_changelog_slash_command_clears_buffer_on_success() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        restore_upstream_autodetection_defaults(&mut app);
 
         let terminal = add_window_with_bootstrapped_terminal(
             &mut app, None, /* history_file_commands */
@@ -3752,6 +3779,7 @@ fn test_open_slash_command_opens_files_palette_when_entered_from_slash_menu() {
 fn test_open_slash_command_clears_buffer_on_success() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        restore_upstream_autodetection_defaults(&mut app);
 
         let temp_dir = std::env::temp_dir();
         let file_path = temp_dir.join("test_file.txt");
@@ -3797,6 +3825,7 @@ fn test_open_slash_command_clears_buffer_on_success() {
 fn test_open_slash_command_expands_tilde() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        restore_upstream_autodetection_defaults(&mut app);
 
         let home_dir = dirs::home_dir().expect("home directory must exist");
         let file_path = home_dir.join("warp_tilde_test_file.txt");
@@ -3895,6 +3924,7 @@ fn test_new_conversation_keybinding_requires_double_press_in_non_empty_agent_vie
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -3976,6 +4006,7 @@ fn test_new_conversation_keybinding_does_not_require_confirmation_in_empty_agent
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -4026,6 +4057,7 @@ fn test_new_conversation_input_trigger_remains_single_step_in_non_empty_agent_vi
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -4105,6 +4137,7 @@ fn test_create_docker_sandbox_slash_command_executes_and_clears_buffer() {
 fn test_agent_mode_set_when_block_attached() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        restore_upstream_autodetection_defaults(&mut app);
 
         let terminal = add_window_with_bootstrapped_terminal(
             &mut app, None, /* history_file_commands */
@@ -6656,6 +6689,7 @@ fn test_input_type_button_explicit_lock() {
 fn test_auto_detection_toggle() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        restore_upstream_autodetection_defaults(&mut app);
 
         let terminal = add_window_with_bootstrapped_terminal(
             &mut app, None, /* history_file_commands */
@@ -6900,6 +6934,7 @@ fn enter_fullscreen_agent_view_for_test(terminal: &ViewHandle<TerminalView>, app
                     None,
                     AgentViewEntryOrigin::Input {
                         was_prompt_autodetected: false,
+                        was_mode_explicitly_chosen: false,
                     },
                     ctx,
                 )
@@ -8857,6 +8892,272 @@ fn ctrl_enter_inserts_newline_in_normal_input_after_rich_input_closes() {
                 matches!(settings.ctrl_enter, EnterAction::InsertNewLineIfMultiLine),
                 "after Rich Input closes, ctrl_enter must be InsertNewLineIfMultiLine \
                  (the default); got Emit instead"
+            );
+        });
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Uncaged: the input mode is a toggle, not a guess.
+//
+// Upstream defaults `ai_autodetection_enabled_internal` to true, which runs a
+// classifier over the buffer as you type and can move the input between Shell
+// and AI underneath you. Uncaged defaults it off, which turns the UDI segmented
+// control into the two-state Terminal / Agent Mode toggle it already knows how
+// to render, and keeps every keystroke off the classifier path.
+//
+// These tests pin that down: the resting state, the two escape hatches that must
+// keep working while the input is locked, and the fact that nothing silently
+// re-enables detection.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_uncaged_input_autodetection_is_off_by_default() {
+    App::test((), |mut app| async move {
+        let _am_flag = FeatureFlag::AgentMode.override_enabled(true);
+
+        initialize_app(&mut app);
+
+        // Deliberately does NOT set the value: this asserts the *default*.
+        AISettings::handle(&app).update(&mut app, |ai_settings, ctx| {
+            assert!(
+                !ai_settings.is_ai_autodetection_enabled(ctx),
+                "Uncaged ships with input autodetection off so the mode toggle is authoritative"
+            );
+        });
+    });
+}
+
+#[test]
+fn test_uncaged_input_starts_locked_in_shell_mode() {
+    App::test((), |mut app| async move {
+        let _am_flag = FeatureFlag::AgentMode.override_enabled(true);
+
+        initialize_app(&mut app);
+
+        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
+        let input = terminal.read(&app, |terminal, _| terminal.input().clone());
+
+        let config = input.read(&app, |input, _| {
+            app.read_model(input.ai_input_model(), |ai_input, _| {
+                ai_input.input_config()
+            })
+        });
+
+        assert_eq!(
+            config.input_type,
+            InputType::Shell,
+            "toggle off means a terminal command"
+        );
+        assert!(
+            config.is_locked,
+            "with autodetection off the input must be locked, or the classifier could still move it"
+        );
+    });
+}
+
+#[test]
+fn test_uncaged_autodetection_never_runs_while_locked() {
+    App::test((), |mut app| async move {
+        let _am_flag = FeatureFlag::AgentMode.override_enabled(true);
+
+        initialize_app(&mut app);
+
+        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
+        let input = terminal.read(&app, |terminal, _| terminal.input().clone());
+
+        // The expensive path — history fuzzy matching, alias expansion, then the
+        // classifier — hangs off this predicate. It must be false in both modes.
+        let runs_in_shell = input.read(&app, |input, ctx| {
+            app.read_model(input.ai_input_model(), |ai_input, _| {
+                ai_input.should_run_input_autodetection(ctx)
+            })
+        });
+        assert!(!runs_in_shell, "no classification work in Terminal mode");
+
+        input.update(&mut app, |input, ctx| {
+            input.set_input_mode_agent(false, ctx);
+        });
+
+        let runs_in_agent = input.read(&app, |input, ctx| {
+            app.read_model(input.ai_input_model(), |ai_input, _| {
+                ai_input.should_run_input_autodetection(ctx)
+            })
+        });
+        assert!(
+            !runs_in_agent,
+            "no classification work in Agent Mode either"
+        );
+    });
+}
+
+#[test]
+fn test_uncaged_mode_toggle_sticks_in_both_directions() {
+    App::test((), |mut app| async move {
+        let _am_flag = FeatureFlag::AgentMode.override_enabled(true);
+
+        initialize_app(&mut app);
+
+        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
+        let input = terminal.read(&app, |terminal, _| terminal.input().clone());
+
+        input.update(&mut app, |input, ctx| {
+            input.set_input_mode_agent(false, ctx);
+        });
+        let config = input.read(&app, |input, _| {
+            app.read_model(input.ai_input_model(), |ai_input, _| {
+                ai_input.input_config()
+            })
+        });
+        assert_eq!(config.input_type, InputType::AI);
+        assert!(
+            config.is_locked,
+            "selecting Agent Mode must lock; an unlocked AI config is one the classifier may revert"
+        );
+
+        input.update(&mut app, |input, ctx| {
+            input.set_input_mode_terminal(false, ctx);
+        });
+        let config = input.read(&app, |input, _| {
+            app.read_model(input.ai_input_model(), |ai_input, _| {
+                ai_input.input_config()
+            })
+        });
+        assert_eq!(config.input_type, InputType::Shell);
+        assert!(config.is_locked, "and back again");
+    });
+}
+
+#[test]
+fn test_uncaged_agent_trigger_still_reaches_the_agent_while_locked_to_shell() {
+    App::test((), |mut app| async move {
+        let _am_flag = FeatureFlag::AgentMode.override_enabled(true);
+
+        initialize_app(&mut app);
+
+        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
+        let input = terminal.read(&app, |terminal, _| terminal.input().clone());
+
+        // Resting state: locked to Shell.
+        let config = input.read(&app, |input, _| {
+            app.read_model(input.ai_input_model(), |ai_input, _| {
+                ai_input.input_config()
+            })
+        });
+        assert!(config.is_locked && config.input_type == InputType::Shell);
+
+        // The `>` trigger is the one-line escape hatch and is gated only on AI
+        // being enabled — never on autodetection, and never on the lock.
+        let prompt = input.read(&app, |input, ctx| {
+            input.agent_trigger_prompt("> why did that fail", ctx)
+        });
+        assert_eq!(
+            prompt.as_deref(),
+            Some("why did that fail"),
+            "the agent trigger must survive the input being locked to Shell"
+        );
+
+        // A plain command is still a plain command.
+        let not_a_prompt = input.read(&app, |input, ctx| input.agent_trigger_prompt("ls -la", ctx));
+        assert_eq!(not_a_prompt, None);
+    });
+}
+
+/// The shipping configuration. `agent_view` is a default cargo feature, so `FeatureFlag::AgentView`
+/// is ON in a real build — but unit tests never call the app's feature-flag init, so the flag reads
+/// `false` from `FLAG_STATES` unless a test opts in. Every other toggle test in this file therefore
+/// exercises a configuration nobody ships.
+///
+/// That gap hid a real bug: `set_input_config_internal` refused `{ AI, is_locked: true }` outright
+/// while AgentView was enabled and no agent view was active, so clicking Agent Mode in the terminal
+/// changed nothing while the segmented control drew itself as switched.
+#[test]
+fn test_uncaged_agent_mode_toggle_locks_with_agent_view_enabled() {
+    App::test((), |mut app| async move {
+        let _am_flag = FeatureFlag::AgentMode.override_enabled(true);
+        let _agent_view_flag = FeatureFlag::AgentView.override_enabled(true);
+
+        initialize_app(&mut app);
+
+        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
+        let input = terminal.read(&app, |terminal, _| terminal.input().clone());
+
+        input.update(&mut app, |input, ctx| {
+            input.set_input_mode_agent(false, ctx);
+        });
+
+        let config = input.read(&app, |input, _| {
+            app.read_model(input.ai_input_model(), |ai_input, _| {
+                ai_input.input_config()
+            })
+        });
+        assert_eq!(
+            config.input_type,
+            InputType::AI,
+            "picking Agent Mode must actually reach the model, not be swallowed by the \
+             agent-view guard"
+        );
+        assert!(config.is_locked, "and it must stay there");
+
+        // And back, which never had the same problem but is worth pinning alongside it.
+        input.update(&mut app, |input, ctx| {
+            input.set_input_mode_terminal(false, ctx);
+        });
+        let config = input.read(&app, |input, _| {
+            app.read_model(input.ai_input_model(), |ai_input, _| {
+                ai_input.input_config()
+            })
+        });
+        assert_eq!(config.input_type, InputType::Shell);
+        assert!(config.is_locked);
+    });
+}
+
+/// Slash commands must survive the input being locked to Shell.
+///
+/// Several upstream slash-command tests started failing when Uncaged made locked-Shell the resting
+/// state, and the reason is real but confined: `SlashCommandModel::handle_input_buffer_update`
+/// disables parsing outright when the input is locked and not AI -- but only in its
+/// `!FeatureFlag::AgentView` branch. Uncaged ships `agent_view` as a default cargo feature, so the
+/// live branch is the other one, which gates on `enable_slash_commands_in_terminal` (default true).
+///
+/// Those tests were therefore given back the unlocked resting state they were written for, and this
+/// one checks the configuration Uncaged actually ships: locked to Shell, AgentView on, `/` still
+/// opens the menu. Without it the "no production regression" claim rests on reading the branch
+/// rather than running it.
+#[test]
+fn test_uncaged_slash_commands_work_while_locked_to_shell() {
+    App::test((), |mut app| async move {
+        let _am_flag = FeatureFlag::AgentMode.override_enabled(true);
+        let _agent_view_flag = FeatureFlag::AgentView.override_enabled(true);
+
+        initialize_app(&mut app);
+
+        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
+        let input = terminal.read(&app, |terminal, _| terminal.input().clone());
+
+        // Resting state: Uncaged's, not upstream's.
+        let config = input.read(&app, |input, _| {
+            app.read_model(input.ai_input_model(), |ai_input, _| {
+                ai_input.input_config()
+            })
+        });
+        assert!(
+            config.is_locked && config.input_type == InputType::Shell,
+            "precondition: the input starts locked to Shell"
+        );
+
+        input.update(&mut app, |input, ctx| {
+            input.user_insert("/", ctx);
+        });
+
+        input.read(&app, |input, ctx| {
+            assert!(
+                matches!(
+                    input.suggestions_mode_model.as_ref(ctx).mode(),
+                    InputSuggestionsMode::SlashCommands
+                ),
+                "typing / must still open the slash command menu with the toggle on Terminal"
             );
         });
     });

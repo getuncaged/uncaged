@@ -1584,6 +1584,7 @@ fn test_conversation_scoped_rich_content_hidden_outside_fullscreen_agent_view() 
         conversation_id,
         origin: AgentViewEntryOrigin::Input {
             was_prompt_autodetected: false,
+            was_mode_explicitly_chosen: false,
         },
         display_mode: AgentViewDisplayMode::FullScreen,
         original_conversation_length: 0,
@@ -1625,6 +1626,7 @@ fn test_conversation_scoped_rich_content_hidden_outside_fullscreen_agent_view() 
         conversation_id,
         origin: AgentViewEntryOrigin::Input {
             was_prompt_autodetected: false,
+            was_mode_explicitly_chosen: false,
         },
         display_mode: AgentViewDisplayMode::Inline,
         original_conversation_length: 0,
@@ -1723,6 +1725,7 @@ fn test_agent_origin_block_can_be_attached_to_other_conversation() {
         conversation_id,
         origin: AgentViewEntryOrigin::Input {
             was_prompt_autodetected: false,
+            was_mode_explicitly_chosen: false,
         },
         display_mode: AgentViewDisplayMode::FullScreen,
         original_conversation_length: 0,
