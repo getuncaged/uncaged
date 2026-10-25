@@ -12,6 +12,16 @@ same look — with **no account, no subscription, and no data collection.** Powe
 its agentic Agent Mode with a model *you* control: a hosted API key, a local
 model (Ollama, LM Studio, llama.cpp, vLLM), or a CLI agent you already run.
 
+[![Latest release](https://img.shields.io/github/v/release/getuncaged/uncaged?label=release&color=ff7a18)](https://github.com/getuncaged/uncaged/releases/latest)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-ff7a18)](LICENSE-AGPL)
+[![Platforms](https://img.shields.io/badge/macOS%20%C2%B7%20Linux%20%C2%B7%20Windows-x86__64%20%C2%B7%20arm64-8b93a5)](#install)
+
+```bash
+brew install --cask getuncaged/tap/uncaged     # macOS
+winget install Uncaged.Uncaged                 # Windows
+curl -fsSL https://getuncaged.dev/install.sh | bash   # Linux
+```
+
 </div>
 
 ---
@@ -25,9 +35,12 @@ engine** ([`crates/uncaged_engine`](crates/uncaged_engine)) that drives Agent Mo
 from a backend you choose, and removes the account/paywall gates. Nothing is sent
 anywhere you didn't ask for.
 
-The only outbound network traffic Uncaged makes is to the model endpoint **you**
-configure. No accounts, no telemetry, no crash reporting, no cloud sync, no
-auto-update phone-home — all off by design, and enforced in code on this build.
+Uncaged never phones home. The only request it makes on its own initiative is to
+the model endpoint **you** configure — no accounts, no telemetry, no crash
+reporting, no cloud sync, no auto-update poll. Anything else that touches the
+network is something you asked for: installing a language server pulls from
+nodejs.org and npm, and the theme gallery reads from GitHub. Never a background
+call about you.
 
 ## What's different from Warp
 
@@ -58,13 +71,35 @@ recommended local models.
 
 ## Install
 
-**Download** — grab the latest `Uncaged.dmg` from the
-[Releases](https://github.com/getuncaged/uncaged/releases) page, open it, and drag
-Uncaged into Applications.
+Prebuilt binaries for **macOS, Linux and Windows**, on both x86_64 and arm64 —
+no building from source required.
+
+**macOS**
+
+```bash
+brew install --cask getuncaged/tap/uncaged
+```
+
+**Windows**
+
+```powershell
+winget install Uncaged.Uncaged
+```
+
+**Linux**
+
+```bash
+curl -fsSL https://getuncaged.dev/install.sh | bash
+```
+
+Or download directly from [Releases](https://github.com/getuncaged/uncaged/releases/latest):
+`.dmg` (macOS), `.deb` / `.rpm` / `.AppImage` / `.tar.gz` (Linux), `-setup.exe`
+(Windows) — each for x86_64 and arm64.
 
 Because Uncaged is an independent fork without an Apple Developer ID, the app is
-ad-hoc signed. On first launch macOS may say it's from an unidentified developer —
-clear the quarantine flag once:
+ad-hoc signed. If you download the `.dmg` by hand, macOS may say it's from an
+unidentified developer — clear the quarantine flag once (Homebrew does this for
+you):
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Uncaged.app

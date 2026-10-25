@@ -13,8 +13,14 @@ fn main() -> Result<()> {
         ChannelConfig {
             app_id: AppId::new("dev", "uncaged", "WarpOss"),
             logfile_name: "warp-oss.log".into(),
-            server_config: WarpServerConfig::production(),
-            oz_config: OzConfig::production(),
+            // Fail-closed, not merely gated. Every Warp endpoint points at the
+            // RFC 5737 sentinel (192.0.2.0:9), which is guaranteed unroutable,
+            // so any egress path we missed — now or after an upstream merge —
+            // fails to connect instead of quietly reaching app.warp.dev. Uncaged
+            // drives Agent Mode from the local uncaged_engine and needs none of
+            // these hosts. See WarpServerConfig::uncaged_sentinel.
+            server_config: WarpServerConfig::uncaged_sentinel(),
+            oz_config: OzConfig::uncaged_sentinel(),
             telemetry_config: None,
             crash_reporting_config: None,
             autoupdate_config: None,

@@ -526,3 +526,23 @@ jobs:
         with:
           files: dist/Uncaged-windows-aarch64-setup.exe
           fail_on_unmatched_files: false
+
+  # --- winget: keep microsoft/winget-pkgs in step with the release ---------
+  # Runs after BOTH Windows jobs so the two installers are on the release before
+  # wingetcreate hashes them. `if: !cancelled()` rather than the default
+  # success() because both Windows jobs are continue-on-error — we still want to
+  # try, and the called workflow fails loudly with a clear message if an
+  # installer is genuinely missing.
+  #
+  # Inert until the repository secret WINGET_TOKEN (classic PAT, public_repo) is
+  # set — the called workflow skips with a notice rather than failing, so this
+  # cannot start submitting PRs to Microsoft's repo without that opt-in.
+  # `secrets: inherit` passes the token through.
+  winget:
+    name: Submit to winget-pkgs
+    needs: [windows, windows-aarch64]
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/uncaged-winget.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit

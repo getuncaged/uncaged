@@ -11,7 +11,7 @@ PublisherSupportUrl: https://github.com/getuncaged/uncaged/issues
 PackageName: Uncaged
 PackageUrl: https://getuncaged.dev/
 License: AGPL-3.0-or-later
-LicenseUrl: https://github.com/getuncaged/uncaged/blob/master/LICENSE
+LicenseUrl: https://github.com/getuncaged/uncaged/blob/main/LICENSE-AGPL
 Copyright: Uncaged contributors
 ShortDescription: Account-free, bring-your-own-model fork of the Warp terminal.
 Description: |-
