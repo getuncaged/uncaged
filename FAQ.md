@@ -10,7 +10,7 @@ Uncaged is an independent fork of the open-source Warp client. The differences t
 
 - **No account, no login.** Uncaged runs with its own local identity and never asks you to sign in.
 - **Bring your own model.** Instead of a hosted, server-side agent, Uncaged drives Agent Mode with a local Rust crate (`uncaged_engine`) that talks to a model endpoint you configure.
-- **No cloud dependency.** No telemetry, no analytics, no cloud sync, no autoupdate or phone-home.
+- **No cloud dependency.** No telemetry, no analytics, no cloud sync. Uncaged can check GitHub for new releases and install them, but only after you turn that on, and the check sends nothing that identifies you — see [SECURITY.md](SECURITY.md).
 - **AGPL-3.0.** Uncaged is a community fork, based on Warp (© Denver Technologies, Inc.); attribution lives in the repository's `NOTICE` file.
 
 ### Do I need an account?

@@ -47,11 +47,15 @@ pub const PR_COMMENTS: StaticCommand = StaticCommand {
     argument: None,
 };
 
+// Uncaged: guided Oz environment setup needs Warp's cloud. The `cloud_environments`
+// cargo feature is off, but this command list never consulted it, so the menu kept
+// offering a flow that cannot complete. Availability::NEVER keeps the definition (other
+// code references it by name for highlighting) while removing it from every menu.
 pub static CREATE_ENVIRONMENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/create-environment",
-    description: "Create an Oz environment (Docker image + repos) via guided setup",
+    description: "Create a cloud environment (unavailable in Uncaged)",
     icon_path: "bundled/svg/dataflow.svg",
-    availability: Availability::AI_ENABLED,
+    availability: Availability::NEVER,
     auto_enter_ai_mode: false,
     argument: Some(
         Argument::optional()
@@ -120,7 +124,7 @@ pub const ADD_RULE: StaticCommand = StaticCommand {
 
 pub static EDIT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/open-file",
-    description: "Open a file in Warp's code editor",
+    description: "Open a file in the code editor",
     icon_path: "bundled/svg/file-code-02.svg",
     availability: Availability::LOCAL,
     auto_enter_ai_mode: false,

@@ -83,7 +83,7 @@ use crate::ui_components::icons::Icon;
 use crate::user_config::WarpConfig;
 use crate::util::bindings;
 use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme};
-use crate::view_components::{Dropdown, DropdownItem, FilterableDropdown};
+use crate::view_components::{Dropdown, DropdownItem, FilterableDropdown, FilterableDropdownEvent};
 use crate::window_settings::{
     BackgroundBlurRadius, BackgroundBlurTexture, BackgroundOpacity, LeftPanelVisibilityAcrossTabs,
     OpenWindowsAtCustomSize, WindowSettings, WindowSettingsChangedEvent, ZoomLevel,
@@ -570,6 +570,8 @@ pub struct AppearanceSettingsPageView {
     zoom_level_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     zoom_reset_button_mouse_state: MouseStateHandle,
     available_families: HashMap<String, (Option<FamilyId>, FontType)>,
+    /// Uncaged: whether system-font enumeration has been kicked off (on first dropdown open).
+    system_fonts_requested: bool,
     view_font_type: FontType,
     alt_screen_padding_editor: ViewHandle<EditorView>,
     color_picker_dot_states: Vec<Vec<MouseStateHandle>>,
@@ -1057,19 +1059,12 @@ impl AppearanceSettingsPageView {
             ctx,
         );
 
-        // Don't load all available system fonts in integration tests; we don't
-        // have any integration tests which interact with the font dropdown, and
-        // loading them in the background slows down test execution.
-        if ChannelState::channel() != Channel::Integration {
-            // There's no such thing as a "system font" on the web, so the
-            // `all_system_fonts` API doesn't exist.
-            #[cfg(not(target_family = "wasm"))]
-            {
-                let all_system_fonts = warpui::fonts::Cache::handle(ctx)
-                    .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
-                ctx.spawn(all_system_fonts, Self::set_system_fonts);
-            }
-        }
+        // Uncaged: system fonts are enumerated when a font dropdown is opened, not when
+        // this page is constructed. Enumeration makes CoreText map every font file on the
+        // machine (measured at ~1.17 GB of mmaps), and constructing this page is not a
+        // signal anyone wants the font list -- a restored Settings tab constructs it at
+        // startup, which is exactly how "on settings open" became "on every launch".
+        // See `request_system_fonts_if_needed` and the dropdown subscriptions below.
         let font_family_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = FilterableDropdown::new(ctx);
             dropdown.set_top_bar_max_width(FONT_FAMILY_DROPDOWN_WIDTH);
@@ -1081,6 +1076,12 @@ impl AppearanceSettingsPageView {
             dropdown
         });
 
+        ctx.subscribe_to_view(&font_family_dropdown, |me, _, event, ctx| {
+            if matches!(event, FilterableDropdownEvent::ToggleExpanded) {
+                me.request_system_fonts_if_needed(ctx);
+            }
+        });
+
         let ai_font_family_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = FilterableDropdown::new(ctx);
             dropdown.set_top_bar_max_width(FONT_FAMILY_DROPDOWN_WIDTH);
@@ -1090,6 +1091,12 @@ impl AppearanceSettingsPageView {
             dropdown.add_items(vec![Self::default_font_item(ctx, true)], ctx);
             dropdown.set_selected_by_index(0, ctx);
             dropdown
+        });
+
+        ctx.subscribe_to_view(&ai_font_family_dropdown, |me, _, event, ctx| {
+            if matches!(event, FilterableDropdownEvent::ToggleExpanded) {
+                me.request_system_fonts_if_needed(ctx);
+            }
         });
 
         let font_weight_dropdown = ctx.add_typed_action_view(|ctx| {
@@ -1309,6 +1316,7 @@ impl AppearanceSettingsPageView {
             zoom_level_dropdown: Self::build_zoom_level_dropdown(ctx),
             zoom_reset_button_mouse_state: MouseStateHandle::default(),
             available_families: Default::default(),
+            system_fonts_requested: false,
             view_font_type: Default::default(),
             color_picker_dot_states: (0..directory_tab_colors(ctx).len())
                 .map(|_| {
@@ -2100,6 +2108,24 @@ impl AppearanceSettingsPageView {
     }
 
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
+    /// Kicks off system-font enumeration the first time a font dropdown is opened.
+    ///
+    /// The fonts::Cache memoises the result, so repeated opens after the first are a
+    /// cheap clone; the guard here only avoids re-spawning while the first load is still
+    /// in flight.
+    fn request_system_fonts_if_needed(&mut self, ctx: &mut ViewContext<Self>) {
+        #[cfg(not(target_family = "wasm"))]
+        {
+            if self.system_fonts_requested || ChannelState::channel() == Channel::Integration {
+                return;
+            }
+            self.system_fonts_requested = true;
+            let all_system_fonts = warpui::fonts::Cache::handle(ctx)
+                .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
+            ctx.spawn(all_system_fonts, Self::set_system_fonts);
+        }
+    }
+
     pub fn set_system_fonts(
         &mut self,
         available_families: Vec<(Option<FamilyId>, FontInfo)>,

@@ -771,6 +771,7 @@ fn complete_drain_of_edited_command_restores_text_in_shell_mode() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -818,6 +819,7 @@ fn error_drain_of_command_restores_text_in_shell_mode() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )

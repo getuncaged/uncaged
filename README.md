@@ -25,9 +25,11 @@ engine** ([`crates/uncaged_engine`](crates/uncaged_engine)) that drives Agent Mo
 from a backend you choose, and removes the account/paywall gates. Nothing is sent
 anywhere you didn't ask for.
 
-The only outbound network traffic Uncaged makes is to the model endpoint **you**
-configure. No accounts, no telemetry, no crash reporting, no cloud sync, no
-auto-update phone-home — all off by design, and enforced in code on this build.
+No accounts, no telemetry, no crash reporting, no cloud sync — all off by design,
+and enforced in code on this build. Uncaged talks to the model endpoint **you**
+configure, and to nothing else unless you ask it to: update checks are off until
+you turn them on, and send nothing that identifies you. See
+[SECURITY.md](SECURITY.md) for exactly what an update does and what it verifies.
 
 ## What's different from Warp
 

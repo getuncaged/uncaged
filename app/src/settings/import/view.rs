@@ -121,6 +121,17 @@ impl ToggleableSetting {
 impl SettingsImportView {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
         let model_handle = ImportedConfigModel::handle(ctx);
+
+        // Uncaged: the search starts here, on first open of the import UI, rather than at
+        // app startup -- it enumerates every system font (see lib.rs), which is far too
+        // expensive to pay on launch for a flow this rarely entered.
+        #[cfg(feature = "local_fs")]
+        if !model_handle.as_ref(ctx).is_started() {
+            model_handle.update(ctx, |model, ctx| {
+                model.search_for_settings_to_import(ctx);
+            });
+        }
+
         let is_complete = model_handle.as_ref(ctx).finished_searching_for_settings();
 
         ctx.subscribe_to_model(&model_handle, |me, model_handle, _, ctx| {

@@ -928,77 +928,6 @@ impl AgentInputFooter {
         }
     }
 
-    fn should_render_cloud_mode_v2(&self, app: &AppContext) -> bool {
-        FeatureFlag::CloudModeInputV2.is_enabled()
-            && FeatureFlag::CloudMode.is_enabled()
-            && self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|ambient_agent_model| {
-                    ambient_agent_model
-                        .as_ref(app)
-                        .is_configuring_ambient_agent()
-                })
-    }
-
-    fn render_cloud_mode_v2_footer(&self, app: &AppContext) -> Box<dyn Element> {
-        // `app` is only consumed under the `voice_input` cfg below; reference it here so the
-        // parameter doesn't trip the unused-variable lint when the feature is disabled.
-        #[cfg(not(feature = "voice_input"))]
-        let _ = app;
-
-        let mut left = Flex::row()
-            .with_main_axis_size(MainAxisSize::Min)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_spacing(CLOUD_MODE_V2_FOOTER_GAP);
-        if let Some(environment_selector) = self.environment_selector.as_ref() {
-            left = left.with_child(ChildView::new(environment_selector).finish());
-        }
-
-        let mut right = Flex::row()
-            .with_main_axis_size(MainAxisSize::Min)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_spacing(CLOUD_MODE_V2_FOOTER_GAP);
-
-        // Only show the mic button when voice input is compiled in *and* the
-        // user has voice input enabled in settings, matching V1's behavior.
-        #[cfg(feature = "voice_input")]
-        if AISettings::as_ref(app).is_voice_input_enabled(app) {
-            right = right.with_child(ChildView::new(&self.mic_button).finish());
-        }
-
-        right = right.with_child(ChildView::new(&self.file_button).finish());
-
-        if let Some(model_selector) = self.v2_model_selector.as_ref() {
-            // Only show the model selector when the active harness has available models.
-            // Some harnesses (e.g. Gemini) may not have any server-provided model options.
-            let show_selector = self
-                .ambient_agent_view_model
-                .as_ref()
-                .map(|m| m.as_ref(app).selected_harness())
-                .is_none_or(|harness| match harness {
-                    Harness::Oz | Harness::Unknown => true,
-                    _ => HarnessAvailabilityModel::as_ref(app)
-                        .models_for(harness)
-                        .is_some_and(|models| !models.is_empty()),
-                });
-            if show_selector {
-                right = right.with_child(ChildView::new(model_selector).finish());
-            }
-        }
-
-        let content = Flex::row()
-            .with_main_axis_size(MainAxisSize::Max)
-            .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_spacing(CLOUD_MODE_V2_FOOTER_GAP)
-            .with_child(left.finish())
-            .with_child(right.finish())
-            .finish();
-
-        Clipped::new(content).finish()
-    }
-
     fn all_display_chips(&self) -> impl Iterator<Item = &ViewHandle<DisplayChip>> {
         self.left_display_chips
             .iter()
@@ -2252,9 +2181,6 @@ impl View for AgentInputFooter {
     }
 
     fn render(&self, app: &warpui::AppContext) -> Box<dyn warpui::Element> {
-        if self.should_render_cloud_mode_v2(app) {
-            return self.render_cloud_mode_v2_footer(app);
-        }
         // When a CLI agent session is active, render the CLI agent toolbar instead.
         if self.is_cli_agent_session_active(app) {
             return self.render_cli_mode_footer(app);

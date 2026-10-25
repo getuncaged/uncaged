@@ -355,7 +355,7 @@ if [[ "$ARTIFACT" == cli || "$ARTIFACT" == warpctrl ]]; then
   FEATURES="$FEATURES,standalone"
 elif [[ "$ARTIFACT" == app ]]; then
   # All channels ship the v3 classifier and v2 heuristic.
-  FEATURES="$FEATURES,gui,nld_classifier_v3,nld_heuristic_v2"
+  FEATURES="$FEATURES,gui,nld_heuristic_v2"
 fi
 
 # If we're building a universal bundle for the app artifact, make sure the additional target is available.
@@ -555,6 +555,17 @@ EOF
   
   # Make the script executable
   chmod +x "$CLI_SCRIPT_PATH"
+
+  # Uncaged: ship the CLI updater inside the bundle.
+  #
+  # The app spawns this and quits rather than replacing the bundle it is running from, so
+  # it has to travel with the app. It is also runnable by hand -- `uncaged-update --check`
+  # reports what would happen without changing anything.
+  if [[ -f "$WORKSPACE_ROOT_DIR/script/uncaged-update" ]]; then
+    echo "Bundling the Uncaged CLI updater..."
+    cp "$WORKSPACE_ROOT_DIR/script/uncaged-update" "$BUNDLED_RESOURCES_DIR/bin/uncaged-update"
+    chmod +x "$BUNDLED_RESOURCES_DIR/bin/uncaged-update"
+  fi
 
   if [[ ",$FEATURES," =~ ",warp_control_cli," ]]; then
     # Each value must match `Channel::warpctrl_command_name` in the Rust source.

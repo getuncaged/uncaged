@@ -306,16 +306,28 @@ fn test_merge_ranges_with_same_end() {
 // Within this set of tests, we focus on testing the detect_secrets function that uses user-defined regexes,
 // rather than system default regexes.
 
+// #[serial] is used to ensure custom regexes state does not interfere with other tests,
+// as the custom regexes are global state.
+//
+// Note that `#[serial]` alone is not enough for a test that asserts something about the *absence*
+// of regexes: it serialises access, but it does not reset the global, and nothing in this file
+// restores it afterwards -- each test that installs regexes leaves them installed. A test whose
+// premise is "nothing is configured" therefore has to configure that itself.
+
 #[test]
+#[serial]
 fn test_detect_secrets_no_regexes_configured() {
+    // Establish the premise rather than inheriting it. `find_secrets_in_text` reads the process-wide
+    // `SECRETS_REGEX`, so running after any test that installed a regex made this fail with a match
+    // at 4..39 -- which is exactly `warp-server-staging.firebaseapp.com`. Passing alone and failing
+    // in a batch is the signature of a test that assumes a clean global it never asked for.
+    secrets::set_user_and_enterprise_secret_regexes(std::iter::empty(), std::iter::empty());
+
     // With no regexes configured, no secrets should be detected
     let text = "foo warp-server-staging.firebaseapp.com bar";
     let detected_secrets = find_secrets_in_text(text);
     assert_eq!(detected_secrets, vec![]);
 }
-
-// #[serial] is used to ensure custom regexes state does not interfere with other tests,
-// as the custom regexes are global state.
 
 #[test]
 #[serial]

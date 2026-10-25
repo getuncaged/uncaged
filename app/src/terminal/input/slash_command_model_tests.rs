@@ -7,7 +7,9 @@ use crate::ai::blocklist::{QueuedQuery, QueuedQueryModel, QueuedQueryOrigin};
 use crate::report_if_error;
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::settings::AISettings;
-use crate::terminal::input::tests::{add_window_with_bootstrapped_terminal, initialize_app};
+use crate::terminal::input::tests::{
+    add_window_with_bootstrapped_terminal, initialize_app, restore_upstream_autodetection_defaults,
+};
 
 #[test]
 fn test_parse_slash_command_handles_argument_rules() {
@@ -202,6 +204,9 @@ fn test_disabled_until_empty_buffer_ignores_non_slash_edits() {
 fn test_disabled_until_empty_buffer_reevaluates_when_slash_is_added_to_start() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        // Slash parsing is disabled while the input is locked to Shell, which
+        // is Uncaged's resting state; these tests are about parsing, not that.
+        restore_upstream_autodetection_defaults(&mut app);
 
         let terminal = add_window_with_bootstrapped_terminal(
             &mut app, None, /* history_file_commands */
@@ -253,6 +258,9 @@ fn test_disabled_until_empty_buffer_reevaluates_when_slash_is_added_to_start() {
 fn test_second_slash_in_command_token_sets_state_to_none() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        // Slash parsing is disabled while the input is locked to Shell, which
+        // is Uncaged's resting state; these tests are about parsing, not that.
+        restore_upstream_autodetection_defaults(&mut app);
 
         let terminal = add_window_with_bootstrapped_terminal(
             &mut app, None, /* history_file_commands */
@@ -355,6 +363,9 @@ fn test_detect_command_returns_none_for_unknown_slash() {
 fn test_detect_command_matches_buffer_driven_detection() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
+        // Slash parsing is disabled while the input is locked to Shell, which
+        // is Uncaged's resting state; these tests are about parsing, not that.
+        restore_upstream_autodetection_defaults(&mut app);
 
         let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
         let input = terminal.read(&app, |terminal, _| terminal.input().clone());

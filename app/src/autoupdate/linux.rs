@@ -25,6 +25,24 @@ pub(super) async fn download_update_and_cleanup(
     _update_id: &str,
     client: &http_client::Client,
 ) -> Result<DownloadReady> {
+    // Uncaged does not self-update on Linux.
+    //
+    // Upstream's Linux updater drives the system package manager, and its
+    // commands are Warp's: it appends `Server = https://releases.warp.dev/...`
+    // to /etc/pacman.conf and runs `sudo pacman-key -r "linux-maintainers@warp.dev"
+    // --lsign-key` (see the PackageManager arm below). Handing an Uncaged user a
+    // sudo line that trusts Warp's signing key and repository, to install an
+    // Uncaged update, is not something we will ship. The AppImage arm is no
+    // better: it buffers the whole download with no size cap and no hash of any
+    // kind, then moves it over the running executable.
+    //
+    // Linux users install from a .deb/.rpm/AppImage or their distro's package
+    // manager, so a self-update would fight whatever owns the file anyway. We
+    // detect the new version and tell them; they update the way they installed.
+    if matches!(ChannelState::channel(), Channel::Oss) {
+        return Ok(DownloadReady::NeedsAuthorization);
+    }
+
     match UpdateMethod::detect() {
         UpdateMethod::Unknown => Ok(DownloadReady::NeedsAuthorization),
         UpdateMethod::AppImage(appimage_path) => {
@@ -44,6 +62,13 @@ pub(super) fn apply_update(
 ) -> Result<ReadyForRelaunch> {
     // Make sure CURRENT_EXE is initialized before we actually apply the update.
     let _ = CURRENT_EXE.as_ref();
+
+    // See download_update_and_cleanup: Linux self-update is not supported on the
+    // Uncaged channel. Nothing should reach here, so fail loudly rather than
+    // fall through into upstream's package-manager path.
+    if matches!(ChannelState::channel(), Channel::Oss) {
+        bail!("Uncaged does not self-update on Linux; update via your package manager");
+    }
 
     match UpdateMethod::detect() {
         UpdateMethod::Unknown => bail!("Cannot apply update for unknown update method!"),
@@ -148,6 +173,10 @@ mod appimage {
         // If we're testing with a local copy of channel_versions.json, have the
         // newly-started binary also reference that same file (so we can test
         // displaying an updated changelog after an autoupdate).
+        // Debug-only: see channel_versions.rs. Never propagate the manifest
+        // override into the relaunched process in a shipped build — that would
+        // make a one-shot env var survive the update it just controlled.
+        #[cfg(debug_assertions)]
         if let Ok(path) = std::env::var("WARP_CHANNEL_VERSIONS_PATH") {
             command.env("WARP_CHANNEL_VERSIONS_PATH", path);
         }
@@ -296,6 +325,10 @@ mod package_manager {
         // If we're testing with a local copy of channel_versions.json, have the
         // newly-started binary also reference that same file (so we can test
         // displaying an updated changelog after an autoupdate).
+        // Debug-only: see channel_versions.rs. Never propagate the manifest
+        // override into the relaunched process in a shipped build — that would
+        // make a one-shot env var survive the update it just controlled.
+        #[cfg(debug_assertions)]
         if let Ok(path) = std::env::var("WARP_CHANNEL_VERSIONS_PATH") {
             command.env("WARP_CHANNEL_VERSIONS_PATH", path);
         }

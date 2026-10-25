@@ -6885,10 +6885,16 @@ impl AIInputWidget {
             static AUTODETECTION_DESCRIPTION_FRAGMENTS: LazyLock<Vec<FormattedTextFragment>> =
                 LazyLock::new(|| {
                     vec![
-                        FormattedTextFragment::plain_text("Encountered an incorrect detection? "),
+                        FormattedTextFragment::plain_text(
+                            "Both off by default. Uncaged routes input by the Terminal / Agent Mode toggle in the input bar rather than by guessing: the first switch classifies what you type in the terminal, the second classifies what you type in agent mode. On, either can move the input after you have already picked a mode, and every keystroke pays for the classifier.",
+                        ),
+                        FormattedTextFragment::plain_text(
+                            " Left off, the input stays where you put it. Start a line with the agent trigger (default >) to send just that line to the agent without moving the toggle.",
+                        ),
+                        FormattedTextFragment::plain_text(" Detection getting it wrong? "),
                         FormattedTextFragment::hyperlink(
-                            "Let us know",
-                            "https://warpdotdev.typeform.com/to/offrTIpq",
+                            "Open an issue",
+                            crate::brand::NEW_ISSUE_URL,
                         ),
                     ]
                 });
@@ -6940,15 +6946,15 @@ impl AIInputWidget {
             > = LazyLock::new(|| {
                 vec![
                     FormattedTextFragment::plain_text(
-                        "Enabling natural language detection will detect when natural language is written in the terminal input, and then automatically switch to Agent Mode for AI queries.",
+                        "Off by default. When on, Uncaged watches what you type and switches the input into Agent Mode when it reads as natural language — which also means it can switch out from under you mid-sentence, and adds work to every keystroke.",
                     ),
                     FormattedTextFragment::plain_text(
-                        " Encountered an incorrect input detection? ",
+                        " Left off, the input stays exactly where the Terminal / Agent Mode toggle in the input bar puts it. Type the agent trigger (default >) to send a single line to the agent without moving the toggle.",
                     ),
-                    FormattedTextFragment::hyperlink(
-                        "Let us know",
-                        "https://warpdotdev.typeform.com/to/offrTIpq",
+                    FormattedTextFragment::plain_text(
+                        " Detection getting it wrong? ",
                     ),
+                    FormattedTextFragment::hyperlink("Open an issue", crate::brand::NEW_ISSUE_URL),
                 ]
             });
 

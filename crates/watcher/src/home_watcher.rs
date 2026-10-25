@@ -7,7 +7,13 @@ use warpui_core::{Entity, ModelContext, ModelHandle, SingletonEntity};
 use crate::{BulkFilesystemWatcher, BulkFilesystemWatcherEvent};
 
 /// Duration between filesystem watch events for the home directory watcher, in milliseconds.
-const HOME_WATCHER_DEBOUNCE_MILLI_SECS: u64 = 500;
+// Uncaged: notify-debouncer-full runs a tick thread that polls at this interval
+// whether or not events are pending, so this value is an idle wakeup rate, not just a
+// coalescing window. Longer is strictly better for a background index: it coalesces
+// more, wakes less, and the only cost is how stale the index can be, which nothing
+// user-visible depends on.
+// Was 500ms. This one watches $HOME recursively, so it is also the widest.
+const HOME_WATCHER_DEBOUNCE_MILLI_SECS: u64 = 2000;
 
 pub enum HomeDirectoryWatcherEvent {
     /// Files directly under the home directory were changed.

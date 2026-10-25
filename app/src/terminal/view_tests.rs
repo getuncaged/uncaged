@@ -662,6 +662,7 @@ fn clear_buffer_action_in_fullscreen_agent_view_starts_new_conversation() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -1363,6 +1364,7 @@ fn escape_does_not_exit_local_agent_view_with_long_running_command() {
                 None,
                 AgentViewEntryOrigin::Input {
                     was_prompt_autodetected: false,
+                    was_mode_explicitly_chosen: false,
                 },
                 ctx,
             );
@@ -4960,6 +4962,7 @@ fn test_prompt_context_menu_items_for_agent_toolbelt_flag() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -5536,6 +5539,7 @@ fn exiting_agent_view_removes_empty_conversations() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -5581,6 +5585,7 @@ fn ctrl_c_exit_agent_view_requires_confirmation() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -5628,6 +5633,7 @@ fn ctrl_c_buffer_clear_then_exit_requires_three_presses_in_agent_view() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -5686,6 +5692,7 @@ fn terminal_action_ctrl_c_exit_agent_view_requires_confirmation() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -7251,6 +7258,7 @@ fn linear_deeplink_does_not_auto_submit_when_already_in_agent_view() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -7328,6 +7336,7 @@ fn linear_deeplink_via_default_entrypoint_does_not_auto_submit_in_fullscreen() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -7640,6 +7649,7 @@ fn cmd_k_in_agent_view_clears_active_block_not_full_buffer_when_agent_driving_co
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
@@ -7707,6 +7717,7 @@ fn cmd_k_in_agent_view_cancels_in_progress_conversation_and_starts_new_one() {
                         None,
                         AgentViewEntryOrigin::Input {
                             was_prompt_autodetected: false,
+                            was_mode_explicitly_chosen: false,
                         },
                         ctx,
                     )
