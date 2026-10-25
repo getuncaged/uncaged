@@ -988,6 +988,36 @@ enum NavStop {
     },
 }
 
+/// The Uncaged settings sidebar, in order — the single source of truth for
+/// which sections are reachable from the nav. AI/Code subpages are grouped under
+/// umbrellas; everything else is a direct page. Kept as a standalone builder so
+/// the reachable set — notably the theme editor (`ThemeCreator`) and the theme
+/// gallery (`ThemeGallery`) — is trivial to unit-test and hard to drop by
+/// accident. The cloud/account-era sections (Account, Billing, Teams, …) are
+/// omitted on purpose: Uncaged is account-free and fully local.
+fn base_nav_items() -> Vec<SettingsNavItem> {
+    vec![
+        SettingsNavItem::Umbrella(SettingsUmbrella::new(
+            "Agents",
+            SettingsSection::ai_subpages().to_vec(),
+        )),
+        SettingsNavItem::Umbrella(SettingsUmbrella::new(
+            "Code",
+            vec![
+                SettingsSection::CodeIndexing,
+                SettingsSection::EditorAndCodeReview,
+            ],
+        )),
+        SettingsNavItem::Page(SettingsSection::Appearance),
+        SettingsNavItem::Page(SettingsSection::CustomizeUi),
+        SettingsNavItem::Page(SettingsSection::ThemeGallery),
+        SettingsNavItem::Page(SettingsSection::ThemeCreator),
+        SettingsNavItem::Page(SettingsSection::Features),
+        SettingsNavItem::Page(SettingsSection::Keybindings),
+        SettingsNavItem::Page(SettingsSection::About),
+    ]
+}
+
 /// Builds the ordered list of arrow-key nav stops from `nav_items`.
 ///
 /// `is_visible` decides which sections are currently shown in the sidebar;
@@ -1342,26 +1372,7 @@ impl SettingsView {
         // Referrals, Shared blocks, Warp Drive, Warpify, and Privacy — are dropped from
         // the nav. Their page handles remain constructed (so nothing else breaks); they
         // are simply not navigable.
-        let mut nav_items = vec![
-            SettingsNavItem::Umbrella(SettingsUmbrella::new(
-                "Agents",
-                SettingsSection::ai_subpages().to_vec(),
-            )),
-            SettingsNavItem::Umbrella(SettingsUmbrella::new(
-                "Code",
-                vec![
-                    SettingsSection::CodeIndexing,
-                    SettingsSection::EditorAndCodeReview,
-                ],
-            )),
-            SettingsNavItem::Page(SettingsSection::Appearance),
-            SettingsNavItem::Page(SettingsSection::CustomizeUi),
-            SettingsNavItem::Page(SettingsSection::ThemeGallery),
-            SettingsNavItem::Page(SettingsSection::ThemeCreator),
-            SettingsNavItem::Page(SettingsSection::Features),
-            SettingsNavItem::Page(SettingsSection::Keybindings),
-            SettingsNavItem::Page(SettingsSection::About),
-        ];
+        let mut nav_items = base_nav_items();
 
         if FeatureFlag::WarpControlCli.is_enabled() {
             let shared_blocks_index = nav_items

@@ -17,6 +17,37 @@ fn ai_subpages_are_identified() {
     assert!(!SettingsSection::CodeIndexing.is_ai_subpage());
 }
 
+/// Guards the theme-editor regression: in v0.1.0 the colour-wheel editor had no
+/// sidebar entry and the Appearance "link" opened a web page instead, so the
+/// editor was unreachable in-app. It now lives at `SettingsSection::ThemeCreator`
+/// in the sidebar — this asserts that entry (and the theme gallery / Customize UI)
+/// stays in the nav so it can't silently disappear again.
+#[test]
+fn theme_editor_and_gallery_are_reachable_from_the_sidebar() {
+    use super::{base_nav_items, SettingsNavItem, SettingsSection};
+
+    let pages: Vec<SettingsSection> = base_nav_items()
+        .into_iter()
+        .filter_map(|item| match item {
+            SettingsNavItem::Page(section) => Some(section),
+            SettingsNavItem::Umbrella(_) => None,
+        })
+        .collect();
+
+    assert!(
+        pages.contains(&SettingsSection::ThemeCreator),
+        "the colour-wheel theme editor must have a sidebar entry"
+    );
+    assert!(
+        pages.contains(&SettingsSection::ThemeGallery),
+        "the theme gallery must have a sidebar entry"
+    );
+    assert!(
+        pages.contains(&SettingsSection::CustomizeUi),
+        "the Customize UI page must have a sidebar entry"
+    );
+}
+
 #[test]
 fn code_subpages_are_identified() {
     assert!(SettingsSection::CodeIndexing.is_code_subpage());
