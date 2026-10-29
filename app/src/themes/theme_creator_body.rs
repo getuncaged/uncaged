@@ -30,15 +30,12 @@ use warpui::{
 };
 
 use crate::appearance::{Appearance, AppearanceManager};
-use crate::editor::{EditorView, Event as EditorEvent};
-use crate::themes::theme::{InMemoryThemeOptions, ThemeKind};
+use crate::editor::{EditOrigin, EditorView, Event as EditorEvent};
+use crate::server::telemetry::TelemetryEvent;
+use crate::themes::theme::{CustomTheme, InMemoryThemeOptions, ThemeKind};
 use crate::themes::theme_background_image;
-use crate::user_config;
 use crate::window_settings::WindowSettings;
-use crate::{
-    report_if_error, send_telemetry_from_ctx, server::telemetry::TelemetryEvent,
-    themes::theme::CustomTheme,
-};
+use crate::{report_if_error, send_telemetry_from_ctx, user_config};
 
 /// The number of editable color slots in the manual editor (background + optional gradient bottom,
 /// foreground, accent, cursor, then 8 normal + 8 bright ANSI colors).
@@ -238,9 +235,13 @@ impl ThemeCreatorBody {
 
             let color_editor =
                 ctx.add_typed_action_view(|ctx| EditorView::new(Default::default(), ctx));
-            color_editor.update(ctx, |e, ctx| e.set_buffer_text(default_hex, ctx));
+            color_editor.update(ctx, |e, ctx| e.system_reset_buffer_text(default_hex, ctx));
             ctx.subscribe_to_view(&color_editor, move |me, _, event, ctx| {
-                if let EditorEvent::Edited(_) = event {
+                // Initialization events are queued and can arrive after this subscription is
+                // registered, even while the editor is hidden. Only user edits start a preview.
+                if let EditorEvent::Edited(EditOrigin::UserTyped | EditOrigin::UserInitiated) =
+                    event
+                {
                     me.on_manual_edit(ctx);
                 }
             });
@@ -337,8 +338,9 @@ impl ThemeCreatorBody {
         for (i, &(_label, default_hex)) in COLOR_SLOTS.iter().enumerate() {
             self.manual_colors[i] =
                 coloru_from_hex_string(default_hex).unwrap_or_else(|_| ColorU::black());
-            self.color_editors[i]
-                .update(ctx, |editor, ctx| editor.set_buffer_text(default_hex, ctx));
+            self.color_editors[i].update(ctx, |editor, ctx| {
+                editor.system_reset_buffer_text(default_hex, ctx)
+            });
         }
     }
 
@@ -2246,3 +2248,7 @@ impl TypedActionView for ThemeCreatorBody {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "theme_creator_body_tests.rs"]
+mod tests;
