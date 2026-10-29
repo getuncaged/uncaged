@@ -136,7 +136,7 @@ jobs:
           ditto -c -k --keepParent "$OUT/Uncaged.app" "dist/Uncaged-macos-${{ matrix.arch }}.zip"
 
       - name: Upload macOS ${{ matrix.arch }} assets to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           files: |
             dist/Uncaged-macos-${{ matrix.arch }}.dmg
@@ -259,7 +259,7 @@ jobs:
           ls -la dist/
 
       - name: Upload Linux assets to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           # Only whichever files were actually produced get uploaded.
           files: |
@@ -369,7 +369,7 @@ jobs:
           ls -la dist/ || true
 
       - name: Upload aarch64 Linux assets to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           files: |
             dist/Uncaged-linux-aarch64.deb
@@ -454,7 +454,7 @@ jobs:
           Get-ChildItem dist
 
       - name: Upload Windows x86_64 assets to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           files: |
             dist/Uncaged-windows-x86_64-setup.exe
@@ -522,7 +522,7 @@ jobs:
           Get-ChildItem dist
 
       - name: Upload Windows aarch64 asset to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.1
         with:
           files: dist/Uncaged-windows-aarch64-setup.exe
           fail_on_unmatched_files: false
