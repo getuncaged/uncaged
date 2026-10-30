@@ -255,6 +255,15 @@ branch as a regression signal until the triage task lands** — compare failure
 sets against this baseline instead. Targeted filters over changed areas are the
 regression check that works today.
 
+**Re-measured 2026-10-30 at `383a153`** (after one-history stages 1–5 and the #36/#37
+contributor ports): 5445 run, **113 failed** + 6 timed out; all 6 timeouts pass in
+isolation (load-induced: image capping, jellyfish, random-concurrent-ops, two 10 s view
+tests). 113 ≤ 115 — no new failures by count. Failing set saved nowhere durable yet;
+by module: workspace::view 77, cloud_objects::update_manager 11, request_usage_model 9,
+selection 3, notebooks 5, auth 3, drive 2, plus five singletons. Debug-assertions bundle
+launches clean on the real profile: no panic, no "Computing available system fonts",
+footprint 266 MB at T+~50 s (debug profile — not comparable to the release baselines above).
+
 ### §2 stage 1a — the legacy Uncaged-AI side panel is gone (this session)
 
 `AIAssistantPanelView` (1,185 lines) + its transcript renderer + all wiring:
