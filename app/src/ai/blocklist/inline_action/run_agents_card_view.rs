@@ -435,18 +435,14 @@ impl RunAgentsCardView {
                 }
                 HarnessAvailabilityEvent::Changed
                 | HarnessAvailabilityEvent::AuthSecretsLoaded
-                | HarnessAvailabilityEvent::AuthSecretsFetchFailed
-                | HarnessAvailabilityEvent::AuthSecretDeleted { .. } => {
+                | HarnessAvailabilityEvent::AuthSecretsFetchFailed => {
                     // Repopulate even on fetch failure to replace "Loading…".
-                    // Deleted events also force a repopulate so this card
-                    // stops surfacing the deleted secret as an option.
                     oc::repopulate_all_pickers(&mut me.state.orch, &me.handles.pickers, ctx);
                     me.refresh_accept_button_state(ctx);
                     me.maybe_auto_open_create_modal(ctx);
                     ctx.notify();
                 }
-                HarnessAvailabilityEvent::AuthSecretCreationFailed { .. }
-                | HarnessAvailabilityEvent::AuthSecretDeletionFailed { .. } => {}
+                HarnessAvailabilityEvent::AuthSecretCreationFailed { .. } => {}
             },
         );
 

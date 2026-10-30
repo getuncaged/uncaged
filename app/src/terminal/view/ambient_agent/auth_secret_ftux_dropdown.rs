@@ -123,14 +123,12 @@ impl AuthSecretFtuxDropdown {
             |me, _, event, ctx| match event {
                 HarnessAvailabilityEvent::AuthSecretsLoaded
                 | HarnessAvailabilityEvent::AuthSecretCreated { .. }
-                | HarnessAvailabilityEvent::AuthSecretDeleted { .. }
                 | HarnessAvailabilityEvent::AuthSecretsFetchFailed => {
                     me.refresh_menu(ctx);
                     ctx.notify();
                 }
                 HarnessAvailabilityEvent::Changed
-                | HarnessAvailabilityEvent::AuthSecretCreationFailed { .. }
-                | HarnessAvailabilityEvent::AuthSecretDeletionFailed { .. } => {}
+                | HarnessAvailabilityEvent::AuthSecretCreationFailed { .. } => {}
             },
         );
 

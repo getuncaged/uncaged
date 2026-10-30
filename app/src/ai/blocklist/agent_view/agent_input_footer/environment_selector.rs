@@ -317,13 +317,6 @@ impl EnvironmentSelector {
         self.is_menu_open
     }
 
-    pub fn open_menu(&mut self, ctx: &mut ViewContext<Self>) {
-        if !self.is_configuring(ctx) {
-            return;
-        }
-        self.set_menu_visibility(true, ctx);
-    }
-
     fn is_configuring(&self, ctx: &AppContext) -> bool {
         self.target.is_configuring(ctx)
     }

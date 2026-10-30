@@ -641,7 +641,6 @@ pub enum WorkspaceAction {
     /// Show the environment creation modal during `&` handoff compose when no
     /// environments exist.
     ShowHandoffEnvironmentCreationModal,
-    ShowCloudModeV2EnvironmentCreationModal,
     /// Open the workspace modal for creating a new managed auth secret.
     /// Dispatched by orchestration card pickers' "New API key…" item.
     OpenCreateAuthSecretModal {
@@ -1205,7 +1204,6 @@ impl WorkspaceAction {
             | OpenLocalToCloudHandoffPane { .. }
             | AutoHandoffActiveAgentToCloud { .. }
             | ShowHandoffEnvironmentCreationModal
-            | ShowCloudModeV2EnvironmentCreationModal
             | OpenCreateAuthSecretModal { .. }
             | OpenNetworkLogPane => false,
             #[cfg(debug_assertions)]

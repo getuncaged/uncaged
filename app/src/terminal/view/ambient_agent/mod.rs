@@ -1,15 +1,11 @@
 mod auth_secret_ftux_dropdown;
 mod auth_secret_ftux_view;
-pub(crate) mod auth_secret_selector;
 mod block;
-mod delete_auth_secret_confirmation_dialog;
 mod first_time_setup;
 mod footer;
 mod harness_selector;
-mod host_selector;
 mod loading_screen;
 mod model;
-mod model_selector;
 mod progress;
 mod progress_ui_state;
 mod tips;
@@ -18,16 +14,10 @@ mod view_impl;
 pub use auth_secret_ftux_view::{
     AuthSecretFtuxAction, AuthSecretFtuxView, AuthSecretFtuxViewEvent,
 };
-pub use auth_secret_selector::{
-    AuthSecretSelector, AuthSecretSelectorAction, AuthSecretSelectorEvent,
-};
 pub use block::*;
 pub use first_time_setup::{FirstTimeCloudAgentSetupView, FirstTimeCloudAgentSetupViewEvent};
 pub use footer::{render_error_footer, render_loading_footer};
 pub use harness_selector::{HarnessSelector, HarnessSelectorAction, HarnessSelectorEvent};
-pub use host_selector::{
-    Host, HostSelector, HostSelectorAction, HostSelectorEvent, NakedHeaderButtonTheme,
-};
 pub use loading_screen::{render_cloud_mode_error_screen, render_cloud_mode_loading_screen};
 pub(crate) use model::should_disable_snapshot;
 #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
@@ -35,9 +25,6 @@ pub(crate) use model::PendingHandoff;
 pub use model::{AgentProgress, AmbientAgentViewModel, AmbientAgentViewModelEvent, Status};
 #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
 pub(crate) use model::{HandoffSubmissionState, SnapshotUploadStatus};
-pub use model_selector::{
-    HarnessSelection, ModelSelection, ModelSelector, ModelSelectorAction, ModelSelectorEvent,
-};
 pub use progress::{render_progress, ProgressProps, ProgressStep, ProgressStepState};
 pub use progress_ui_state::AmbientAgentProgressUIState;
 pub use tips::{get_cloud_mode_tips, CloudModeTip};

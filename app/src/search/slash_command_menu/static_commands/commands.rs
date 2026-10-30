@@ -320,39 +320,6 @@ pub static MODEL: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     argument: None,
 });
 
-pub static HOST: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
-    name: "/host",
-    description: "Switch the cloud agent execution host",
-    icon_path: BRAND_MARK_SVG,
-    availability: Availability::AGENT_VIEW
-        | Availability::AI_ENABLED
-        | Availability::CLOUD_MODE_V2_COMPOSER,
-    auto_enter_ai_mode: true,
-    argument: None,
-});
-
-pub static HARNESS: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
-    name: "/harness",
-    description: "Switch the cloud agent harness",
-    icon_path: BRAND_MARK_SVG,
-    availability: Availability::AGENT_VIEW
-        | Availability::AI_ENABLED
-        | Availability::CLOUD_MODE_V2_COMPOSER,
-    auto_enter_ai_mode: true,
-    argument: None,
-});
-
-pub static ENVIRONMENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
-    name: "/environment",
-    description: "Switch the cloud agent environment",
-    icon_path: "bundled/svg/globe-04.svg",
-    availability: Availability::AGENT_VIEW
-        | Availability::AI_ENABLED
-        | Availability::CLOUD_MODE_V2_COMPOSER,
-    auto_enter_ai_mode: true,
-    argument: None,
-});
-
 pub static PROFILE: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/profile",
     description: "Switch the active execution profile",
@@ -743,12 +710,6 @@ fn all_commands() -> Vec<StaticCommand> {
 
     if FeatureFlag::SettingsFile.is_enabled() && cfg!(feature = "local_fs") {
         commands.push(OPEN_SETTINGS_FILE);
-    }
-
-    if FeatureFlag::CloudModeInputV2.is_enabled() {
-        commands.push(HOST.clone());
-        commands.push(HARNESS.clone());
-        commands.push(ENVIRONMENT.clone());
     }
 
     commands

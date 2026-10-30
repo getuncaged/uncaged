@@ -27,7 +27,7 @@ use crate::menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields};
 use crate::report_if_error;
 use crate::terminal::input::{MenuPositioning, MenuPositioningProvider};
 use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
-use crate::view_components::action_button::{ActionButton, ActionButtonTheme, ButtonSize};
+use crate::view_components::action_button::{ActionButton, ButtonSize};
 
 /// Font size for the header row (Figma: 12px).
 const HEADER_FONT_SIZE: f32 = 12.;
@@ -178,16 +178,6 @@ impl HarnessSelector {
         let selected_action = HarnessSelectorAction::SelectHarness(harness);
         self.menu.update(ctx, |menu, ctx| {
             menu.set_selected_by_action(&selected_action, ctx);
-        });
-    }
-
-    pub fn set_button_theme<T>(&self, theme: T, ctx: &mut ViewContext<Self>)
-    where
-        T: ActionButtonTheme + Clone + 'static,
-    {
-        self.button.update(ctx, |button, ctx| {
-            button.set_theme(theme.clone(), ctx);
-            button.set_disabled_theme(theme, ctx);
         });
     }
 

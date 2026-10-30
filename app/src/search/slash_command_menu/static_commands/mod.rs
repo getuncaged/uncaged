@@ -45,11 +45,6 @@ bitflags! {
         const NOT_CLOUD_AGENT = 1 << 8;
         /// Requires a cloud-agent context.
         const CLOUD_AGENT = 1 << 9;
-        /// Set on the session context iff the slash command data source was constructed via
-        /// `SlashCommandDataSource::for_cloud_mode_v2` *and* `FeatureFlag::CloudModeInputV2`
-        /// is enabled. Commands that require this bit are hidden everywhere except the V2
-        /// cloud-mode composing input.
-        const CLOUD_MODE_V2_COMPOSER = 1 << 10;
     }
 }
 

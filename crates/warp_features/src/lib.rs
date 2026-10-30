@@ -843,8 +843,6 @@ pub enum FeatureFlag {
     /// instead of individual pane rows.
     VerticalTabsSummaryMode,
 
-    CloudModeInputV2,
-
     /// Enables continuing cloud mode conversations in the cloud after an execution ends.
     HandoffCloudCloud,
 

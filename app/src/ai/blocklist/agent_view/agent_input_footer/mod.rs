@@ -92,9 +92,7 @@ use crate::terminal::session_settings::{
     SessionSettings, SessionSettingsChangedEvent, ToolbarChipSelection,
 };
 use crate::terminal::shared_session::SharedSessionStatus;
-use crate::terminal::view::ambient_agent::{
-    AmbientAgentViewModel, ModelSelector, ModelSelectorEvent,
-};
+use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
 use crate::terminal::view::init::OPEN_CLI_AGENT_RICH_INPUT_KEYBINDING;
 use crate::terminal::view::TerminalAction;
 #[cfg(not(target_family = "wasm"))]
@@ -124,8 +122,6 @@ const FAST_FORWARD_LOCKED_TOOLTIP: &str =
 
 const START_REMOTE_CONTROL_TOOLTIP: &str = "Start remote control";
 const START_REMOTE_CONTROL_LOGIN_REQUIRED_TOOLTIP: &str = "Log in to use /remote-control";
-
-const CLOUD_MODE_V2_FOOTER_GAP: f32 = 4.;
 
 /// Voice input state for the CLI agent footer. Unlike the editor-based voice
 /// flow (which goes through Input → EditorView), this state is self-contained
@@ -246,7 +242,6 @@ pub struct AgentInputFooter {
     cli_voice_input_state: CLIVoiceInputState,
     #[cfg(feature = "voice_input")]
     cli_transcription_handle: Option<SpawnedFutureHandle>,
-    v2_model_selector: Option<ViewHandle<ModelSelector>>,
 
     /// Pending one-shot timer that refreshes the context-window button at the
     /// prompt-cache expiry instant so the notification dot appears while idle.
@@ -813,30 +808,6 @@ impl AgentInputFooter {
             me.update_display_chips(&model, ctx);
         });
 
-        let v2_model_selector = if FeatureFlag::CloudModeInputV2.is_enabled() {
-            let ambient_agent_view_model_for_selector = ambient_agent_view_model.clone();
-            let view = ctx.add_typed_action_view(|ctx| {
-                ModelSelector::new(
-                    menu_positioning_provider.clone(),
-                    terminal_view_id,
-                    ambient_agent_view_model_for_selector,
-                    ctx,
-                )
-            });
-            ctx.subscribe_to_view(&view, |_, _, event, ctx| match event {
-                ModelSelectorEvent::MenuVisibilityChanged { open } => {
-                    if *open {
-                        ctx.emit(AgentInputFooterEvent::ModelSelectorOpened);
-                    } else {
-                        ctx.emit(AgentInputFooterEvent::ModelSelectorClosed);
-                    }
-                }
-            });
-            Some(view)
-        } else {
-            None
-        };
-
         let mut me = Self {
             terminal_view_id,
             ambient_agent_view_model,
@@ -881,7 +852,6 @@ impl AgentInputFooter {
                         ctx.dispatch_typed_action(AgentInputFooterAction::DismissFtuModelCallout);
                     })
             }),
-            v2_model_selector,
             prompt_cache_expiry_timer_handle: None,
             prompt_cache_expired: false,
         };
@@ -904,28 +874,10 @@ impl AgentInputFooter {
         ctx.notify();
     }
 
-    pub fn is_v2_model_selector_open(&self, app: &AppContext) -> bool {
-        self.v2_model_selector
-            .as_ref()
-            .is_some_and(|s| s.as_ref(app).is_menu_open())
-    }
-
-    pub fn open_v2_model_selector(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(selector) = self.v2_model_selector.clone() {
-            selector.update(ctx, |s, ctx| s.open_menu(ctx));
-        }
-    }
-
     pub fn is_v2_environment_selector_open(&self, app: &AppContext) -> bool {
         self.environment_selector
             .as_ref()
             .is_some_and(|s| s.as_ref(app).is_menu_open())
-    }
-
-    pub fn open_v2_environment_selector(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(selector) = self.environment_selector.clone() {
-            selector.update(ctx, |s, ctx| s.open_menu(ctx));
-        }
     }
 
     fn all_display_chips(&self) -> impl Iterator<Item = &ViewHandle<DisplayChip>> {
@@ -2723,17 +2675,6 @@ impl ActionButtonTheme for AgentInputButtonTheme {
 
     fn should_opt_out_of_contrast_adjustment(&self) -> bool {
         true
-    }
-
-    fn font_properties(&self) -> Option<warpui::fonts::Properties> {
-        if crate::features::FeatureFlag::CloudModeInputV2.is_enabled() {
-            Some(warpui::fonts::Properties {
-                weight: warpui::fonts::Weight::Semibold,
-                ..Default::default()
-            })
-        } else {
-            None
-        }
     }
 }
 

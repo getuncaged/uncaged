@@ -1,9 +1,8 @@
-use warp_cli::agent::Harness;
 use warp_core::settings::Setting;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
     Align, AnchorPair, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    DispatchEventResult, DropTarget, Element, Empty, EventHandler, Expanded, Flex, Hoverable,
+    DispatchEventResult, DropTarget, Element, EventHandler, Expanded, Flex, Hoverable,
     MainAxisSize, OffsetPositioning, OffsetType, ParentElement, PositionedElementOffsetBounds,
     PositioningAxis, Radius, SavePosition, Stack, XAxisAnchor, YAxisAnchor,
 };
@@ -32,19 +31,6 @@ use crate::terminal::view::TerminalAction;
 use crate::BlocklistAIHistoryModel;
 
 impl Input {
-    pub fn is_cloud_mode_input_v2_composing(&self, app: &AppContext) -> bool {
-        FeatureFlag::CloudModeInputV2.is_enabled()
-            && FeatureFlag::CloudMode.is_enabled()
-            && self.ambient_agent_view_model().is_some_and(|model| {
-                let view_model = model.as_ref(app);
-                view_model.is_configuring_ambient_agent()
-                    // The handoff pane intentionally stays on the existing input UI even
-                    // when V2 is on — V2 is for fresh cloud-mode runs only, and handoff has
-                    // its own pre-spawn flow (submit interception).
-                    && !view_model.is_local_to_cloud_handoff()
-            })
-    }
-
     /// Renders the input when there is an active `AgentView`.
     ///
     /// Only used when `FeatureFlag::AgentView` is enabled.
@@ -270,39 +256,6 @@ impl Input {
         );
 
         SavePosition::new(outer_stack.finish(), &self.save_position_id()).finish()
-    }
-
-    pub(super) fn should_show_auth_secret_ftux(&self, app: &AppContext) -> bool {
-        let Some(view_model) = self.ambient_agent_view_model() else {
-            return false;
-        };
-        let vm = view_model.as_ref(app);
-        let harness = vm.selected_harness();
-        if harness == Harness::Oz {
-            return false;
-        }
-        // Skip FTUX for harnesses that have no auth secret types defined.
-        if crate::ai::auth_secret_types::auth_secret_types_for_harness(harness).is_empty() {
-            return false;
-        }
-        if let Some(ftux_view) = self.auth_secret_ftux_view() {
-            if ftux_view.as_ref(app).has_creation_state() {
-                return true;
-            }
-        }
-        if crate::ai::cloud_agent_settings::CloudAgentSettings::as_ref(app)
-            .is_harness_auth_ftux_completed(harness)
-        {
-            return false;
-        }
-        vm.selected_harness_auth_secret_name().is_none()
-    }
-
-    fn render_auth_secret_ftux_content(&self) -> Box<dyn Element> {
-        match self.auth_secret_ftux_view() {
-            Some(view) => ChildView::new(view).finish(),
-            None => Empty::new().finish(),
-        }
     }
 }
 

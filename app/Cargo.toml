@@ -687,7 +687,6 @@ default = [
     "queue_slash_command",
     "queued_prompts_v2",
     # Uncaged: cloud-mode input/setup + cloud handoff disabled.
-    # "cloud_mode_input_v2",
     # "cloud_mode_setup_v2",
     # "handoff_cloud_cloud",
     # "remote_codebase_indexing",  # Uncaged: needs Warp servers
@@ -1029,7 +1028,6 @@ hoa_remote_control = []
 codex_notifications = []
 codex_plugin = []
 cloud_mode_setup_v2 = ["cloud_mode"]
-cloud_mode_input_v2 = ["cloud_mode"]
 handoff_cloud_cloud = ["cloud_mode_setup_v2"]
 git_credential_refresh = []
 prompt_cache_expiry_warning = []

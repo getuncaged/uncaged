@@ -489,8 +489,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::TrimTrailingBlankLines,
         #[cfg(feature = "cloud_mode_setup_v2")]
         FeatureFlag::CloudModeSetupV2,
-        #[cfg(feature = "cloud_mode_input_v2")]
-        FeatureFlag::CloudModeInputV2,
         #[cfg(feature = "handoff_cloud_cloud")]
         FeatureFlag::HandoffCloudCloud,
         #[cfg(feature = "git_credential_refresh")]

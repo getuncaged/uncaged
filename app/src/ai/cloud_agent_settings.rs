@@ -85,14 +85,6 @@ define_settings_group!(CloudAgentSettings, settings: [
 ]);
 
 impl CloudAgentSettings {
-    pub fn is_harness_auth_ftux_completed(&self, harness: Harness) -> bool {
-        self.harness_auth_ftux_completed
-            .value()
-            .get(harness.config_name())
-            .copied()
-            .unwrap_or(false)
-    }
-
     pub fn mark_harness_auth_ftux_completed(
         &mut self,
         harness: Harness,
