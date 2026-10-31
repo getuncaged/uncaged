@@ -393,12 +393,9 @@ pub const INPUT_A11Y_LABEL: &str = "Command Input.";
 pub const INPUT_A11Y_HELPER: &str = "Input your shell command, press enter to execute. Press cmd-up to navigate to output of previously executed commands. Press cmd-l to re-focus command input.";
 pub const AI_COMMAND_SEARCH_HINT_TEXT: &str = "Type '#' for AI command suggestions";
 
-const AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT: &str = "Run commands";
-
-/// Uncaged: the same resting state, but with AI available. The mode segments are icon-only
-/// and the agent trigger is invisible until you know about it, so the placeholder is the one
-/// place a new user reliably looks that can mention either.
-const TERMINAL_MODE_WITH_AGENT_HINT_TEXT: &str = "Run commands — > sends a line to the agent";
+/// Uncaged: Terminal mode is a plain terminal, so its placeholder says only that, whether or
+/// not AI is available. Agent hints belong to Agent Mode.
+const TERMINAL_MODE_HINT_TEXT: &str = "Run commands";
 
 // Rotating hint text options for new Agent Mode conversations
 const AGENT_MODE_HINT_OPTIONS: &[&str] = &[
@@ -5954,13 +5951,7 @@ impl Input {
             input_model.input_type(),
             input_model.should_run_input_autodetection(app),
         ) {
-            (InputType::Shell, false) => {
-                if AISettings::as_ref(app).is_any_ai_enabled(app) {
-                    TERMINAL_MODE_WITH_AGENT_HINT_TEXT.to_owned()
-                } else {
-                    AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT.to_owned()
-                }
-            }
+            (InputType::Shell, false) => TERMINAL_MODE_HINT_TEXT.to_owned(),
             (InputType::Shell, true) => {
                 // Ensure hint text is cached for new conversations
                 get_stable_agent_mode_hint_text(&mut self.cached_agent_mode_hint_text).to_owned()
@@ -6406,7 +6397,7 @@ impl Input {
     }
     fn cli_agent_rich_input_hint_text(&self, ctx: &ViewContext<Self>) -> Cow<'static, str> {
         if self.is_locked_in_shell_mode(ctx) {
-            return Cow::Borrowed(AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_TEXT);
+            return Cow::Borrowed(TERMINAL_MODE_HINT_TEXT);
         }
 
         CLIAgentSessionsModel::as_ref(ctx)

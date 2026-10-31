@@ -24,24 +24,28 @@ impl Input {
         self.render_composer(/*is_agent_view=*/ true, app)
     }
 
-    /// The composer box's border: magenta while composing a cloud handoff, blue when the input
-    /// will run as a shell command, neutral otherwise.
+    /// The composer box's border: magenta while composing a cloud handoff, otherwise the accent
+    /// of the mode the input will run in -- blue for a shell command, yellow for the agent --
+    /// the same colours as the mode toggle's selected segment.
+    ///
+    /// Uncaged: both modes get a coloured border. Colouring only the shell mode made the box
+    /// light up in one mode and go dark in the other, which reads as a different surface rather
+    /// than the same input in another mode.
     pub(super) fn composer_border_color(&self, app: &AppContext) -> ColorU {
-        let appearance = Appearance::as_ref(app);
+        let theme = Appearance::as_ref(app).theme();
         if self.handoff_compose_state.as_ref(app).is_active() {
-            appearance.theme().ansi_fg_magenta()
+            theme.ansi_fg_magenta()
         } else if !self.ai_input_model.as_ref(app).is_ai_input_enabled()
             && !self.suggestions_mode_model.as_ref(app).is_slash_commands()
-            && !self.slash_command_model.as_ref(app).state().is_detected_command()
-            // If NLD, don't color the border if the input is empty, because the current
-            // classification is necessarily stale (intentionally inherited from the last
-            // classification prior to clearing the input)
-            && (!self.editor.as_ref(app).is_empty(app)
-                || self.ai_input_model.as_ref(app).is_input_type_locked())
+            && !self
+                .slash_command_model
+                .as_ref(app)
+                .state()
+                .is_detected_command()
         {
-            appearance.theme().ansi_fg_blue()
+            theme.terminal_colors().normal.blue.into()
         } else {
-            styles::default_border_color(appearance.theme())
+            theme.terminal_colors().normal.yellow.into()
         }
     }
 
