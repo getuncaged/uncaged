@@ -210,7 +210,8 @@ impl Input {
         //
         // Drawing the box only in Agent Mode made every switch pop a bordered panel in or
         // out around the input, which is exactly the jump the mode switch must not make.
-        // The box is always there; only its border colour says which mode the input is in.
+        // The box and its border are the same in every mode; the mode toggle alone says
+        // which mode the input is in.
         let border = Border::all(1.).with_border_color(self.composer_border_color(app));
         container = container.with_border(border);
         if is_agent_view && self.agent_view_controller.as_ref(app).is_inline() {
