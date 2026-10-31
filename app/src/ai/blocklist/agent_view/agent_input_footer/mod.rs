@@ -257,7 +257,7 @@ pub struct AgentInputFooter {
     ai_input_model: ModelHandle<BlocklistAIInputModel>,
 
     /// Uncaged: the Terminal / Agent switch, pinned first in the row. The input owns it (it
-    /// lives on `UniversalDeveloperInputButtonBar`, which keeps its enabled state current);
+    /// lives on `InputModeToggle`, which keeps its enabled state current);
     /// the footer only renders it, so the switch sits in the same place in both modes.
     mode_toggle: Option<ViewHandle<SegmentedControl<InputToggleMode>>>,
 }

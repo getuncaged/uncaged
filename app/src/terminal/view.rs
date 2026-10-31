@@ -11214,12 +11214,9 @@ impl TerminalView {
                             match &repo_path_opt {
                                 Some(LocalOrRemotePath::Remote(remote_path)) => {
                                     #[cfg(not(target_family = "wasm"))]
-                                    DetectedRepositories::handle(ctx).update(
-                                        ctx,
-                                        |repos, _| {
-                                            repos.register_remote_repo_root(remote_path.clone());
-                                        },
-                                    );
+                                    DetectedRepositories::handle(ctx).update(ctx, |repos, _| {
+                                        repos.register_remote_repo_root(remote_path.clone());
+                                    });
 
                                     // Remote sessions can only materialize their working
                                     // directory after repo detection has resolved the host.
@@ -11227,14 +11224,6 @@ impl TerminalView {
                                     // is known so the active session's working directory catches up.
                                     ctx.emit(Event::AppStateChanged);
 
-                                    if FeatureFlag::AIContextMenuEnabled.is_enabled() {
-                                        me.input.update(ctx, |input, ctx| {
-                                            input
-                                                .check_and_update_ai_context_menu_disabled_state(
-                                                    ctx,
-                                                );
-                                        });
-                                    }
                                     ctx.emit(Event::Pane(PaneEvent::RemoteRepoNavigated {
                                         remote_path: remote_path.clone(),
                                     }));
@@ -11261,9 +11250,7 @@ impl TerminalView {
                                         };
 
                                         let Ok(active_directory) =
-                                            CanonicalizedPath::try_from(
-                                                active_directory,
-                                            )
+                                            CanonicalizedPath::try_from(active_directory)
                                         else {
                                             return;
                                         };
@@ -11285,30 +11272,16 @@ impl TerminalView {
                                             },
                                         );
 
-                                        if old_repo_path
-                                            .as_ref()
-                                            .and_then(|p| p.to_local_path())
+                                        if old_repo_path.as_ref().and_then(|p| p.to_local_path())
                                             != Some(repo_path.as_path())
                                         {
-                                                me.clear_git_repo_status_subscription(ctx);
+                                            me.clear_git_repo_status_subscription(ctx);
                                             me.update_git_status_subscription(ctx);
                                         }
 
                                         me.input.update(ctx, |input, ctx| {
-                                            input.update_repo_path(
-                                                Some(repo_path.clone()),
-                                                ctx,
-                                            );
+                                            input.update_repo_path(Some(repo_path.clone()), ctx);
                                         });
-
-                                        if FeatureFlag::AIContextMenuEnabled.is_enabled() {
-                                            me.input.update(ctx, |input, ctx| {
-                                                input
-                                                    .check_and_update_ai_context_menu_disabled_state(
-                                                        ctx,
-                                                    );
-                                            });
-                                        }
 
                                         me.start_lsp_server_in_active_pwd(ctx);
 
@@ -11751,12 +11724,9 @@ impl TerminalView {
                                     me.maybe_show_use_agent_footer_in_blocklist(ctx);
                                     me.maybe_auto_open_cli_agent_rich_input(ctx);
                                     me.input.update(ctx, |input, ctx| {
-                                        input.universal_developer_input_button_bar().update(
-                                            ctx,
-                                            |bar, ctx| {
-                                                bar.update_segmented_control_disabled_state(ctx);
-                                            },
-                                        )
+                                        input.input_mode_toggle().update(ctx, |toggle, ctx| {
+                                            toggle.update_segmented_control_disabled_state(ctx);
+                                        })
                                     });
                                     // Update agent view back button state when command becomes long-running
                                     if FeatureFlag::AgentView.is_enabled()
@@ -21175,14 +21145,10 @@ impl TerminalView {
             }
             InputEvent::InputStateChanged(_) => {}
             InputEvent::InputEmptyStateChanged { is_empty, reason } => {
-                // Update the universal developer input button bar with the new empty state
-                let universal_developer_input_button_bar = self
-                    .input
-                    .as_ref(ctx)
-                    .universal_developer_input_button_bar()
-                    .clone();
-                universal_developer_input_button_bar.update(ctx, |button_bar, ctx| {
-                    button_bar.update_input_empty_state(*is_empty, ctx);
+                // Update the mode toggle with the new empty state
+                let input_mode_toggle = self.input.as_ref(ctx).input_mode_toggle().clone();
+                input_mode_toggle.update(ctx, |toggle, ctx| {
+                    toggle.update_input_empty_state(*is_empty, ctx);
                 });
 
                 // When AgentView is enabled and the buffer is cleared, reset the input type
