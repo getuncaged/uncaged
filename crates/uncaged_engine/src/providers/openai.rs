@@ -16,6 +16,7 @@ use serde_json::json;
 use super::Provider;
 use super::ProviderEvent;
 use super::sse::SseDecoder;
+use crate::config::Effort;
 use crate::model::Conversation;
 use crate::model::NeutralMsg;
 
@@ -25,6 +26,7 @@ pub struct OpenAiProvider {
     pub api_key: Option<String>,
     pub model: String,
     pub max_tokens: u32,
+    pub effort: Option<Effort>,
 }
 
 impl Provider for OpenAiProvider {
@@ -52,6 +54,9 @@ impl OpenAiProvider {
             "stream": true,
             "max_tokens": self.max_tokens,
         });
+        if let Some(effort) = self.effort {
+            body["reasoning_effort"] = json!(effort.openai_value());
+        }
         let tools = build_tools(&conversation);
         if !tools.is_empty() {
             body["tools"] = Value::Array(tools);

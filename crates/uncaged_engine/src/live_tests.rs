@@ -29,6 +29,7 @@ fn lmstudio_config() -> UncagedConfig {
             api_key: None,
             model: MODEL.to_string(),
             max_tokens: 512,
+            effort: None,
             label: Some("lmstudio".to_string()),
         },
     }

@@ -49,23 +49,27 @@ pub fn build(config: &UncagedConfig, conversation_id: &str) -> Box<dyn Provider>
             model,
             base_url,
             max_tokens,
+            effort,
         } => Box::new(anthropic::AnthropicProvider {
             api_key: api_key.clone(),
             model: model.clone(),
             base_url: base_url.clone(),
             max_tokens: *max_tokens,
+            effort: *effort,
         }),
         ProviderConfig::OpenAiCompatible {
             base_url,
             api_key,
             model,
             max_tokens,
+            effort,
             ..
         } => Box::new(openai::OpenAiProvider {
             base_url: base_url.clone(),
             api_key: api_key.clone(),
             model: model.clone(),
             max_tokens: *max_tokens,
+            effort: *effort,
         }),
         ProviderConfig::Acp { command, model } => Box::new(acp::AcpProvider {
             command: command.clone(),

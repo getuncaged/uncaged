@@ -20,6 +20,7 @@ use crate::catalog;
 use crate::catalog::Preset;
 use crate::catalog::Wire;
 use crate::config;
+use crate::config::Effort;
 use crate::config::ProviderConfig;
 use crate::config::UncagedConfig;
 
@@ -51,6 +52,9 @@ pub struct Connection {
     pub cli_command: Vec<String>,
     #[serde(default = "default_max_tokens")]
     pub max_tokens: u32,
+    /// How hard the model should think; `None` leaves it at the model's default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<Effort>,
     /// Whether this provider requires an API key (drives the "Needs key" badge).
     #[serde(default)]
     pub needs_key: bool,
@@ -84,6 +88,7 @@ impl Connection {
             model: preset.model.to_string(),
             cli_command: preset.cli_command.iter().map(|s| s.to_string()).collect(),
             max_tokens: DEFAULT_MAX_TOKENS,
+            effort: None,
             needs_key: preset.needs_key,
             local: preset.local,
         }
@@ -133,6 +138,7 @@ impl Connection {
                     self.base_url.clone()
                 },
                 max_tokens: self.max_tokens,
+                effort: self.effort,
             },
             "cli" => ProviderConfig::Acp {
                 command: self.cli_command.clone(),
@@ -145,6 +151,7 @@ impl Connection {
                 model: self.model.clone(),
                 max_tokens: self.max_tokens,
                 label: Some(self.label.clone()),
+                effort: self.effort,
             },
         }
     }
@@ -166,7 +173,7 @@ impl Roster {
         self.connections.iter().find(|c| c.id == id)
     }
 
-    fn get(&self, id: &str) -> Option<&Connection> {
+    pub(crate) fn get(&self, id: &str) -> Option<&Connection> {
         self.connections.iter().find(|c| c.id == id)
     }
 
@@ -358,6 +365,17 @@ pub fn update(
     Ok(())
 }
 
+/// Set how hard a connection's model should think (`None` = the model's default).
+pub fn set_effort(id: &str, effort: Option<Effort>) -> anyhow::Result<()> {
+    let mut roster = load_or_seed();
+    if let Some(conn) = roster.connections.iter_mut().find(|c| c.id == id) {
+        conn.effort = effort;
+    }
+    write(&roster)?;
+    project(&roster)?;
+    Ok(())
+}
+
 /// Remove a connection. If it was active, the first remaining usable connection
 /// (or the first remaining, or none) becomes active.
 pub fn remove(id: &str) -> anyhow::Result<()> {
@@ -409,6 +427,7 @@ fn connection_from_config(cfg: &UncagedConfig, roster: &Roster) -> Connection {
             model,
             base_url,
             max_tokens,
+            effort,
         } => Connection {
             id: roster.unique_id("anthropic"),
             preset: "anthropic".to_string(),
@@ -419,6 +438,7 @@ fn connection_from_config(cfg: &UncagedConfig, roster: &Roster) -> Connection {
             model: model.clone(),
             cli_command: Vec::new(),
             max_tokens: *max_tokens,
+            effort: *effort,
             needs_key: true,
             local: false,
         },
@@ -427,6 +447,7 @@ fn connection_from_config(cfg: &UncagedConfig, roster: &Roster) -> Connection {
             api_key,
             model,
             max_tokens,
+            effort,
             label,
         } => {
             let preset = match_openai_preset(base_url);
@@ -440,6 +461,7 @@ fn connection_from_config(cfg: &UncagedConfig, roster: &Roster) -> Connection {
                 model: model.clone(),
                 cli_command: Vec::new(),
                 max_tokens: *max_tokens,
+                effort: *effort,
                 needs_key: preset.needs_key,
                 local: preset.local,
             }
@@ -457,6 +479,7 @@ fn connection_from_config(cfg: &UncagedConfig, roster: &Roster) -> Connection {
             model: model.clone().unwrap_or_default(),
             cli_command: command.clone(),
             max_tokens: DEFAULT_MAX_TOKENS,
+            effort: None,
             needs_key: false,
             local: true,
         },

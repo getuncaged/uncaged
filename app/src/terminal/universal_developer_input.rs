@@ -440,7 +440,12 @@ fn build_renderable_option_config(
 
     let terminal_keybindings = TerminalKeybindings::as_ref(app);
 
+    // Uncaged: with autodetection on, the control's selected option is `AutoDetection`, which
+    // has no segment of its own -- so turning autodetection on left neither segment lit, as if
+    // the input had no mode. Light the segment for the mode the input is currently in.
+    let is_autodetecting = !input_model.is_input_type_locked();
     let compute_colors = |input_type, accent_color| {
+        let is_selected = is_selected || (is_autodetecting && input_type == current_input_type);
         let fg_color = if is_selected {
             theme.background().into_solid()
         } else if input_type == current_input_type && !ui_state.is_input_empty {

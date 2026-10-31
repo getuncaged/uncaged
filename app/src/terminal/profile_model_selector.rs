@@ -197,6 +197,11 @@ pub enum ProfileModelSelectorAction {
         connection_id: String,
         model: String,
     },
+    /// Uncaged: set how hard the active connection's model thinks (`None` = model default).
+    SelectUncagedEffort {
+        connection_id: String,
+        effort: Option<String>,
+    },
     ManageProfiles,
     ToggleProfileMenu,
     ToggleModelMenu,
@@ -248,13 +253,46 @@ impl ProfileModelSelector {
     }
 
     /// A short label for one Uncaged connection: its model if set, else its
-    /// provider name (e.g. "LM Studio" when no model id is configured).
+    /// provider name (e.g. "LM Studio" when no model id is configured), followed by
+    /// the effort when one is set.
     fn uncaged_connection_label(c: crate::uncaged::ConnectionView) -> String {
-        if c.model.trim().is_empty() {
+        let name = if c.model.trim().is_empty() {
             c.label
         } else {
             c.model
+        };
+        let effort_label = c.effort.as_ref().and_then(|effort| {
+            c.effort_levels
+                .iter()
+                .find(|(value, _)| value == effort)
+                .map(|(_, label)| label.clone())
+        });
+        match effort_label {
+            Some(effort_label) => format!("{name} · {effort_label}"),
+            None => name,
         }
+    }
+
+    /// Ask the active connection's provider which models it serves, in the background, and
+    /// rebuild the menu with them if it is still open when the answer arrives.
+    fn discover_uncaged_models(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some(id) = crate::uncaged::connections()
+            .into_iter()
+            .find(|c| c.is_active && c.wire != "cli")
+            .map(|c| c.id)
+        else {
+            return;
+        };
+        let (tx, rx) = futures::channel::oneshot::channel();
+        std::thread::spawn(move || {
+            let _ = tx.send(crate::uncaged::discover_models(&id));
+        });
+        ctx.spawn(rx, |me, result, ctx| match result {
+            Ok(Ok(())) if me.is_model_menu_open => me.refresh_uncaged_model_menu(ctx),
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => log::info!("Uncaged: couldn't list models: {e}"),
+            Err(_) => {}
+        });
     }
 
     /// Show a brief toast in the current window. Used to confirm Uncaged model /
@@ -306,9 +344,16 @@ impl ProfileModelSelector {
             // click switches the specific model. Skip when there's nothing to
             // choose between (a single model equal to the current one).
             if conn.is_active {
+                let section_header = |title: &str| MenuItem::Header {
+                    fields: MenuItemFields::new(format!("  {title}"))
+                        .with_override_text_color(sub_color),
+                    clickable: false,
+                    right_side_fields: None,
+                };
                 let show_models = conn.models.len() > 1
                     || (conn.models.len() == 1 && conn.models[0] != conn.model);
                 if show_models {
+                    items.push(section_header("Model"));
                     for model in &conn.models {
                         let is_current = model == &conn.model;
                         let mut model_fields = MenuItemFields::new(format!("    {model}"))
@@ -323,6 +368,32 @@ impl ProfileModelSelector {
                             model_fields = model_fields.with_right_side_icon(Icon::Check);
                         }
                         items.push(MenuItem::Item(model_fields));
+                    }
+                }
+
+                // Uncaged: how hard the model thinks. "Default" sends nothing, leaving
+                // it to the model.
+                if !conn.effort_levels.is_empty() {
+                    items.push(section_header("Effort"));
+                    let levels = std::iter::once((None, "Default".to_string())).chain(
+                        conn.effort_levels
+                            .iter()
+                            .map(|(value, label)| (Some(value.clone()), label.clone())),
+                    );
+                    for (effort, label) in levels {
+                        let is_current = effort == conn.effort;
+                        let mut effort_fields = MenuItemFields::new(format!("    {label}"))
+                            .with_override_text_color(sub_color)
+                            .with_on_select_action(
+                                ProfileModelSelectorAction::SelectUncagedEffort {
+                                    connection_id: conn.id.clone(),
+                                    effort,
+                                },
+                            );
+                        if is_current {
+                            effort_fields = effort_fields.with_right_side_icon(Icon::Check);
+                        }
+                        items.push(MenuItem::Item(effort_fields));
                     }
                 }
             }
@@ -2331,6 +2402,29 @@ impl TypedActionView for ProfileModelSelector {
                 }
                 ctx.notify();
             }
+            ProfileModelSelectorAction::SelectUncagedEffort {
+                connection_id,
+                effort,
+            } => {
+                self.set_model_menu_visibility(false, ctx);
+                match crate::uncaged::set_effort(connection_id, effort.as_deref()) {
+                    Ok(()) => {
+                        let label = crate::uncaged::connections()
+                            .into_iter()
+                            .find(|c| &c.id == connection_id)
+                            .and_then(|c| {
+                                c.effort_levels
+                                    .into_iter()
+                                    .find(|(value, _)| Some(value) == effort.as_ref())
+                                    .map(|(_, label)| label)
+                            })
+                            .unwrap_or_else(|| "the model's default".to_string());
+                        self.show_toast(format!("Effort set to {label}"), ctx);
+                    }
+                    Err(e) => self.show_toast(format!("Couldn't set effort: {e}"), ctx),
+                }
+                ctx.notify();
+            }
             ProfileModelSelectorAction::ToggleModelMenu => {
                 if self.is_model_locked(ctx) {
                     return;
@@ -2342,6 +2436,7 @@ impl TypedActionView for ProfileModelSelector {
                     let opening = !self.is_model_menu_open;
                     if opening {
                         self.refresh_uncaged_model_menu(ctx);
+                        self.discover_uncaged_models(ctx);
                     }
                     self.set_model_menu_visibility(opening, ctx);
                 } else if self.is_third_party_harness(ctx) {

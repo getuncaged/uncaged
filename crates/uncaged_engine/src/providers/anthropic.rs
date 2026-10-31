@@ -11,6 +11,7 @@ use serde_json::json;
 use super::Provider;
 use super::ProviderEvent;
 use super::sse::SseDecoder;
+use crate::config::Effort;
 use crate::model::Conversation;
 use crate::model::NeutralMsg;
 
@@ -20,6 +21,7 @@ pub struct AnthropicProvider {
     pub model: String,
     pub base_url: String,
     pub max_tokens: u32,
+    pub effort: Option<Effort>,
 }
 
 impl Provider for AnthropicProvider {
@@ -41,7 +43,7 @@ impl AnthropicProvider {
         conversation: Conversation,
         tx: &mpsc::UnboundedSender<ProviderEvent>,
     ) -> anyhow::Result<()> {
-        let body = json!({
+        let mut body = json!({
             "model": self.model,
             "max_tokens": self.max_tokens,
             "system": conversation.system_prompt,
@@ -49,6 +51,9 @@ impl AnthropicProvider {
             "tools": build_tools(&conversation),
             "stream": true,
         });
+        if let Some(effort) = self.effort {
+            body["output_config"] = json!({ "effort": effort.anthropic_value() });
+        }
 
         let url = format!("{}/v1/messages", self.base_url.trim_end_matches('/'));
         let response = reqwest::Client::new()

@@ -30,6 +30,7 @@ mod config;
 mod connections;
 mod engine;
 mod model;
+mod models;
 mod proto;
 mod providers;
 mod request_parse;
@@ -51,6 +52,7 @@ pub use catalog::Wire;
 pub use catalog::preset_by_id;
 pub use catalog::presets_in;
 pub use config::ANTHROPIC_DEFAULT_BASE_URL;
+pub use config::Effort;
 pub use config::LMSTUDIO_DEFAULT_BASE_URL;
 pub use config::OLLAMA_DEFAULT_BASE_URL;
 pub use config::OPENAI_DEFAULT_BASE_URL;
@@ -69,9 +71,11 @@ pub use connections::load as load_roster;
 pub use connections::load_or_seed as roster;
 pub use connections::remove as remove_connection;
 pub use connections::set_active as set_active_connection;
+pub use connections::set_effort as set_connection_effort;
 pub use connections::update as update_connection;
 pub use engine::EngineStream;
 pub use engine::run_turn;
+pub use models::discover as discover_models;
 
 /// Whether the local engine is currently active (enabled with a valid backend).
 /// When `false`, callers should fall back to Warp's normal server path.

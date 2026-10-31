@@ -54,6 +54,12 @@ pub struct ConnectionView {
     /// or custom endpoints).
     pub models: Vec<String>,
     pub cli_command: Vec<String>,
+    /// How hard the model thinks, as the engine's value ("low" … "max"); `None` is the
+    /// model's own default.
+    pub effort: Option<String>,
+    /// The effort levels this connection's wire accepts, as `(value, label)`. Empty for a CLI
+    /// agent, which picks its own.
+    pub effort_levels: Vec<(String, String)>,
     /// Whether a key is stored (never the key itself).
     pub has_key: bool,
     pub needs_key: bool,
@@ -72,6 +78,13 @@ pub struct ConnectionView {
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+
+/// Model lists the providers reported, by connection id. Filled by [`discover_models`]; read
+/// when building each [`ConnectionView`].
+#[cfg_attr(target_family = "wasm", allow(dead_code))]
+static DISCOVERED_MODELS: std::sync::LazyLock<
+    Mutex<std::collections::HashMap<String, Vec<String>>>,
+> = std::sync::LazyLock::new(Default::default);
 
 use warp_core::ui::icons::Icon;
 
@@ -137,9 +150,7 @@ pub fn active_provider_icon() -> Option<Icon> {
 // ── native implementation ───────────────────────────────────────────────────
 #[cfg(not(target_family = "wasm"))]
 mod imp {
-    use super::CatalogSection;
-    use super::ConnectionView;
-    use super::PresetView;
+    use super::{CatalogSection, ConnectionView, PresetView};
 
     /// Whether the local Uncaged engine is configured and active.
     pub fn engine_active() -> bool {
@@ -208,9 +219,23 @@ mod imp {
         // connection's current model is present (it may be a custom edit, or the
         // preset list may be empty for locally-discovered endpoints).
         let mut models: Vec<String> = preset.models.iter().map(|m| m.to_string()).collect();
+        // Then whatever the provider itself reported serving, the last time it was asked.
+        if let Some(discovered) = super::DISCOVERED_MODELS.lock().unwrap().get(&c.id) {
+            for model in discovered {
+                if !models.contains(model) {
+                    models.push(model.clone());
+                }
+            }
+        }
         if !c.model.trim().is_empty() && !models.iter().any(|m| m == &c.model) {
             models.insert(0, c.model.clone());
         }
+        let effort_value = |effort: uncaged_engine::Effort| {
+            serde_json::to_value(effort)
+                .ok()
+                .and_then(|value| value.as_str().map(str::to_string))
+                .unwrap_or_default()
+        };
         ConnectionView {
             id: c.id.clone(),
             preset: c.preset.clone(),
@@ -221,6 +246,11 @@ mod imp {
             model: c.model.clone(),
             models,
             cli_command: c.cli_command.clone(),
+            effort: c.effort.map(effort_value),
+            effort_levels: uncaged_engine::Effort::levels_for_wire(&c.wire)
+                .iter()
+                .map(|&effort| (effort_value(effort), effort.label().to_string()))
+                .collect(),
             has_key: c
                 .api_key
                 .as_deref()
@@ -286,13 +316,33 @@ mod imp {
         super::invalidate_active_provider_icon();
         result
     }
+    /// Set how hard the connection's model thinks; `None` restores the model's default.
+    pub fn set_effort(id: &str, effort: Option<&str>) -> Result<(), String> {
+        let effort = effort
+            .map(|value| {
+                serde_json::from_value::<uncaged_engine::Effort>(serde_json::json!(value))
+                    .map_err(|e| e.to_string())
+            })
+            .transpose()?;
+        uncaged_engine::set_connection_effort(id, effort).map_err(|e| e.to_string())
+    }
+    /// Ask the connection's provider which models it serves and remember the answer, so
+    /// [`connections`] lists them. Blocking: run it off the UI thread.
+    pub fn discover_models(id: &str) -> Result<(), String> {
+        let models = uncaged_engine::discover_models(id).map_err(|e| e.to_string())?;
+        super::DISCOVERED_MODELS
+            .lock()
+            .unwrap()
+            .insert(id.to_string(), models);
+        Ok(())
+    }
 }
 
 // ── wasm stubs (no local engine on the web build) ───────────────────────────
+
 #[cfg(target_family = "wasm")]
 mod imp {
-    use super::CatalogSection;
-    use super::ConnectionView;
+    use super::{CatalogSection, ConnectionView};
 
     pub fn engine_active() -> bool {
         false
@@ -322,12 +372,15 @@ mod imp {
     ) -> Result<(), String> {
         Err("The local engine is not available on this build.".to_string())
     }
+    pub fn set_effort(_id: &str, _effort: Option<&str>) -> Result<(), String> {
+        Err("The local engine is not available on this build.".to_string())
+    }
+    pub fn discover_models(_id: &str) -> Result<(), String> {
+        Err("The local engine is not available on this build.".to_string())
+    }
 }
 
-pub use imp::activate;
-pub use imp::catalog_sections;
-pub use imp::connect;
-pub use imp::connections;
-pub use imp::engine_active;
-pub use imp::remove;
-pub use imp::update;
+pub use imp::{
+    activate, catalog_sections, connect, connections, discover_models, engine_active, remove,
+    set_effort, update,
+};

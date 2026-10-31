@@ -1,4 +1,5 @@
 use pathfinder_color::ColorU;
+use warp_core::ui::color::{coloru_with_opacity, Opacity};
 use warpui::elements::{Container, Element, Flex, MainAxisSize, ParentElement};
 use warpui::presenter::ChildView;
 use warpui::{AppContext, SingletonEntity as _};
@@ -13,6 +14,8 @@ use crate::appearance::Appearance;
 use crate::context_chips::spacing;
 use crate::features::FeatureFlag;
 use crate::BlocklistAIHistoryModel;
+
+const COMPOSER_BORDER_OPACITY: Opacity = 40;
 
 impl Input {
     /// Renders the input when there is an active `AgentView`.
@@ -33,7 +36,7 @@ impl Input {
     /// than the same input in another mode.
     pub(super) fn composer_border_color(&self, app: &AppContext) -> ColorU {
         let theme = Appearance::as_ref(app).theme();
-        if self.handoff_compose_state.as_ref(app).is_active() {
+        let accent: ColorU = if self.handoff_compose_state.as_ref(app).is_active() {
             theme.ansi_fg_magenta()
         } else if !self.ai_input_model.as_ref(app).is_ai_input_enabled()
             && !self.suggestions_mode_model.as_ref(app).is_slash_commands()
@@ -46,7 +49,10 @@ impl Input {
             theme.terminal_colors().normal.blue.into()
         } else {
             theme.terminal_colors().normal.yellow.into()
-        }
+        };
+        // The terminal palette's accents are saturated enough to read as neon at full strength
+        // around the whole input; a tint is enough to say which mode it is in.
+        coloru_with_opacity(accent, COMPOSER_BORDER_OPACITY)
     }
 
     /// The cloud-mode harness selector, shown above the editor while configuring a cloud agent.

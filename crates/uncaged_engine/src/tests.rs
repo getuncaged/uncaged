@@ -79,6 +79,7 @@ fn config_serializes_with_expected_tag() {
             api_key: None,
             model: "x".into(),
             max_tokens: 8192,
+            effort: None,
             label: Some("lmstudio".into()),
         },
     };
@@ -463,4 +464,57 @@ fn message_with(message: api::message::Message) -> api::Message {
         message: Some(message),
         ..Default::default()
     }
+}
+
+#[test]
+fn effort_serializes_as_lowercase_and_is_omitted_when_unset() {
+    let with_effort = ProviderConfig::Anthropic {
+        api_key: String::new(),
+        model: "claude-opus-5-5".into(),
+        base_url: "https://api.anthropic.com".into(),
+        max_tokens: 8192,
+        effort: Some(crate::config::Effort::XHigh),
+    };
+    let json = serde_json::to_value(&with_effort).unwrap();
+    assert_eq!(json["effort"], "xhigh");
+
+    let without = ProviderConfig::OpenAiCompatible {
+        base_url: "http://localhost:1234/v1".into(),
+        api_key: None,
+        model: "qwen".into(),
+        max_tokens: 8192,
+        label: None,
+        effort: None,
+    };
+    let json = serde_json::to_value(&without).unwrap();
+    assert!(json.get("effort").is_none());
+
+    // Old configs without the field still load.
+    let parsed: ProviderConfig = serde_json::from_value(json!({
+        "kind": "openai_compatible", "base_url": "http://x/v1", "model": "m"
+    }))
+    .unwrap();
+    assert!(matches!(
+        parsed,
+        ProviderConfig::OpenAiCompatible { effort: None, .. }
+    ));
+}
+
+#[test]
+fn openai_effort_tops_out_at_high() {
+    use crate::config::Effort;
+    assert_eq!(Effort::Max.openai_value(), "high");
+    assert_eq!(Effort::XHigh.anthropic_value(), "xhigh");
+    assert!(Effort::levels_for_wire("cli").is_empty());
+    assert_eq!(Effort::levels_for_wire("openai_compatible").len(), 3);
+}
+
+#[test]
+fn model_ids_parse_from_a_models_list() {
+    let body = json!({ "data": [{ "id": "claude-opus-5-5", "display_name": "Claude Opus 5.5" }, { "id": "qwen" }, { "name": "no id" }] });
+    assert_eq!(
+        crate::models::parse_model_ids(&body),
+        vec!["claude-opus-5-5".to_string(), "qwen".to_string()]
+    );
+    assert!(crate::models::parse_model_ids(&json!({})).is_empty());
 }

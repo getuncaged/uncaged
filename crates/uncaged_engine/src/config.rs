@@ -35,6 +35,69 @@ pub const OPENROUTER_DEFAULT_BASE_URL: &str = "https://openrouter.ai/api/v1";
 
 const DEFAULT_MAX_TOKENS: u32 = 8192;
 
+/// How much the model should think before it answers.
+///
+/// A connection with no effort set sends nothing, so the model runs at its own default. Each
+/// wire has its own scale: Anthropic takes `output_config.effort` (`low` through `max`), OpenAI
+/// Chat Completions takes `reasoning_effort` (`low` / `medium` / `high`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Effort {
+    Low,
+    Medium,
+    High,
+    XHigh,
+    Max,
+}
+
+impl Effort {
+    /// The levels a connection on `wire` ("anthropic" / "openai_compatible" / "cli") can pick
+    /// from. A CLI agent picks its own effort, so it has none.
+    pub fn levels_for_wire(wire: &str) -> &'static [Effort] {
+        match wire {
+            "anthropic" => &[
+                Effort::Low,
+                Effort::Medium,
+                Effort::High,
+                Effort::XHigh,
+                Effort::Max,
+            ],
+            "cli" => &[],
+            _ => &[Effort::Low, Effort::Medium, Effort::High],
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Effort::Low => "Low",
+            Effort::Medium => "Medium",
+            Effort::High => "High",
+            Effort::XHigh => "Extra high",
+            Effort::Max => "Max",
+        }
+    }
+
+    /// The value for Anthropic's `output_config.effort`.
+    pub fn anthropic_value(self) -> &'static str {
+        match self {
+            Effort::Low => "low",
+            Effort::Medium => "medium",
+            Effort::High => "high",
+            Effort::XHigh => "xhigh",
+            Effort::Max => "max",
+        }
+    }
+
+    /// The value for OpenAI's `reasoning_effort`, which tops out at `high`.
+    pub fn openai_value(self) -> &'static str {
+        match self {
+            Effort::Low => "low",
+            Effort::Medium => "medium",
+            Effort::High | Effort::XHigh | Effort::Max => "high",
+        }
+    }
+}
+
 /// Top-level engine configuration persisted to disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UncagedConfig {
@@ -66,6 +129,8 @@ pub enum ProviderConfig {
         base_url: String,
         #[serde(default = "default_max_tokens")]
         max_tokens: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort: Option<Effort>,
     },
     /// Any OpenAI Chat Completions-compatible endpoint.
     #[serde(rename = "openai_compatible")]
@@ -83,6 +148,8 @@ pub enum ProviderConfig {
         /// A human label purely for logging/telemetry ("openai", "ollama", ...).
         #[serde(default)]
         label: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort: Option<Effort>,
     },
     /// Delegate to a CLI agent over the Agent Client Protocol (stdio JSON-RPC).
     /// e.g. command = ["claude-code-acp"] or ["gemini", "--experimental-acp"].
@@ -234,6 +301,7 @@ fn read_env_config() -> Option<UncagedConfig> {
             model: model.unwrap_or_else(|| "claude-sonnet-4-5".to_string()),
             base_url: base_url.unwrap_or_else(anthropic_base_url),
             max_tokens: DEFAULT_MAX_TOKENS,
+            effort: None,
         },
         "openai" | "openrouter" | "ollama" | "lmstudio" | "openai_compatible" => {
             let default_base = match provider.as_str() {
@@ -249,6 +317,7 @@ fn read_env_config() -> Option<UncagedConfig> {
                 model: model.unwrap_or_else(|| "gpt-4o".to_string()),
                 max_tokens: DEFAULT_MAX_TOKENS,
                 label: Some(provider.clone()),
+                effort: None,
             }
         }
         "acp" => {

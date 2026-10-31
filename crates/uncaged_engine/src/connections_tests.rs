@@ -52,6 +52,7 @@ fn usable_rules() {
         model: "sonnet".into(),
         cli_command: vec!["claude-code-acp".into()],
         max_tokens: 8192,
+        effort: None,
         needs_key: false,
         local: true,
     };
@@ -71,6 +72,7 @@ fn usable_rules() {
         model: "gpt-4o".into(),
         cli_command: vec![],
         max_tokens: 8192,
+        effort: None,
         needs_key: true,
         local: false,
     };
@@ -95,6 +97,7 @@ fn to_provider_maps_each_wire() {
         model: "claude-sonnet-4-5".into(),
         cli_command: vec![],
         max_tokens: 4096,
+        effort: None,
         needs_key: true,
         local: false,
     };
@@ -123,6 +126,7 @@ fn to_provider_maps_each_wire() {
         model: String::new(),
         cli_command: vec!["gemini".into(), "--experimental-acp".into()],
         max_tokens: 8192,
+        effort: None,
         needs_key: false,
         local: true,
     };
@@ -265,6 +269,7 @@ fn seeds_roster_from_existing_engine_json() {
             api_key: None,
             model: "local-model".into(),
             max_tokens: 8192,
+            effort: None,
             label: Some("lmstudio".into()),
         },
     })
@@ -348,4 +353,29 @@ fn dedupe_collapses_existing_duplicate_roster() {
             .iter()
             .any(|c| c.id == "lmstudio" || c.id == "lmstudio-2")
     );
+}
+
+#[test]
+fn set_effort_projects_into_engine_json() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+    let id = connections::add("lmstudio").unwrap();
+
+    connections::set_effort(&id, Some(config::Effort::High)).unwrap();
+    assert_eq!(
+        connections::load().get(&id).unwrap().effort,
+        Some(config::Effort::High)
+    );
+    match config::read_persisted().unwrap().provider {
+        ProviderConfig::OpenAiCompatible { effort, .. } => {
+            assert_eq!(effort, Some(config::Effort::High))
+        }
+        other => panic!("expected OpenAiCompatible, got {other:?}"),
+    }
+
+    connections::set_effort(&id, None).unwrap();
+    match config::read_persisted().unwrap().provider {
+        ProviderConfig::OpenAiCompatible { effort, .. } => assert_eq!(effort, None),
+        other => panic!("expected OpenAiCompatible, got {other:?}"),
+    }
 }
