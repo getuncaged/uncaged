@@ -37,7 +37,7 @@ pub fn initialize_settings_for_tests_with_mode(
         CloudPreferencesSettings, CodeSettings, DebugSettings, EmacsBindingsSettings, FontSettings,
         GPUSettings, InputModeSettings, InputSettings, LocalControlSettings,
         NativePreferenceSettings, PaneSettings, SameLinePromptBlockSettings, ScrollSettings,
-        SelectionSettings, SshSettings, ThemeSettings, VimBannerSettings,
+        SelectionSettings, SshSettings, ThemeSettings, UpdateSettings, VimBannerSettings,
     };
     use crate::terminal::general_settings::GeneralSettings;
     use crate::terminal::keys_settings::KeysSettings;
@@ -113,6 +113,7 @@ pub fn initialize_settings_for_tests_with_mode(
     PaneSettings::register(app);
     ThemeSettings::register(app);
     UndoCloseSettings::register(app);
+    UpdateSettings::register(app);
     VimBannerSettings::register(app);
     WarpDriveSettings::register(app);
     WindowSettings::register(app);

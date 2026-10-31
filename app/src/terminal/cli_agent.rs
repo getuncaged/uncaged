@@ -675,6 +675,17 @@ impl CLIAgentInstallModel {
         }
     }
 
+    /// A finished scan that found no agents, with nothing hidden. Skips the
+    /// PATH scan and the on-disk visibility file so tests don't depend on the
+    /// host machine.
+    #[cfg(test)]
+    pub fn new_for_test() -> Self {
+        Self {
+            installed: Some(HashMap::new()),
+            hidden: HashSet::new(),
+        }
+    }
+
     /// Whether the given agent's binary was found on the user's PATH. Returns
     /// `false` until the scan completes.
     pub fn is_installed(&self, agent: CLIAgent) -> bool {
