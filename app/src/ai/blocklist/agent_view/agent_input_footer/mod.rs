@@ -38,6 +38,7 @@ use warpui::elements::{
     Stack, Text, Wrap, WrapFill, WrapFillEntireRun, DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
 use warpui::r#async::{SpawnedFutureHandle, Timer};
+use warpui::ui_components::segmented_control::SegmentedControl;
 use warpui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
@@ -52,7 +53,7 @@ use crate::ai::blocklist::agent_view::is_in_cloud_context;
 use crate::ai::blocklist::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::ai::blocklist::prompt::prompt_alert::{PromptAlertEvent, PromptAlertView};
 use crate::ai::blocklist::usage::icon_for_context_window_usage;
-use crate::ai::blocklist::BlocklistAIInputModel;
+use crate::ai::blocklist::{BlocklistAIInputModel, InputType};
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::ai::AIRequestUsageModel;
@@ -92,6 +93,7 @@ use crate::terminal::session_settings::{
     SessionSettings, SessionSettingsChangedEvent, ToolbarChipSelection,
 };
 use crate::terminal::shared_session::SharedSessionStatus;
+use crate::terminal::universal_developer_input::InputToggleMode;
 use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
 use crate::terminal::view::init::OPEN_CLI_AGENT_RICH_INPUT_KEYBINDING;
 use crate::terminal::view::TerminalAction;
@@ -251,6 +253,13 @@ pub struct AgentInputFooter {
     /// yellow notification dot on the context-window chip when the
     /// `PromptCacheExpiryWarning` flag is enabled.
     prompt_cache_expired: bool,
+
+    ai_input_model: ModelHandle<BlocklistAIInputModel>,
+
+    /// Uncaged: the Terminal / Agent switch, pinned first in the row. The input owns it (it
+    /// lives on `UniversalDeveloperInputButtonBar`, which keeps its enabled state current);
+    /// the footer only renders it, so the switch sits in the same place in both modes.
+    mode_toggle: Option<ViewHandle<SegmentedControl<InputToggleMode>>>,
 }
 
 impl AgentInputFooter {
@@ -614,7 +623,7 @@ impl AgentInputFooter {
             let mut selector = ProfileModelSelector::new(
                 menu_positioning_provider.clone(),
                 terminal_view_id,
-                ai_input_model,
+                ai_input_model.clone(),
                 ambient_agent_view_model.clone(),
                 terminal_model.clone(),
                 None,
@@ -808,6 +817,9 @@ impl AgentInputFooter {
             me.update_display_chips(&model, ctx);
         });
 
+        // The row's contents follow the input mode, so redraw whenever it changes.
+        ctx.subscribe_to_model(&ai_input_model, |_, _, _, ctx| ctx.notify());
+
         let mut me = Self {
             terminal_view_id,
             ambient_agent_view_model,
@@ -854,6 +866,8 @@ impl AgentInputFooter {
             }),
             prompt_cache_expiry_timer_handle: None,
             prompt_cache_expired: false,
+            ai_input_model,
+            mode_toggle: None,
         };
         me.sync_fast_forward_button(ctx);
         me.sync_remote_control_button(ctx);
@@ -861,6 +875,15 @@ impl AgentInputFooter {
         me.update_display_chips(&prompt, ctx);
         me.update_ftu_callout_render_state(ctx);
         me
+    }
+
+    pub fn set_mode_toggle(
+        &mut self,
+        mode_toggle: ViewHandle<SegmentedControl<InputToggleMode>>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.mode_toggle = Some(mode_toggle);
+        ctx.notify();
     }
 
     pub fn set_current_repo_path(
@@ -2166,6 +2189,32 @@ impl View for AgentInputFooter {
                 .with_child(ChildView::new(&self.handoff_environment_selector).finish());
         }
 
+        // Uncaged: one row for both modes. The switch is always first; Terminal mode shows
+        // the switch and nothing else, Agent mode adds the agent tooling after it. Context
+        // chips are left out while the switch is here, because the prompt row above the
+        // editor already shows them in both modes.
+        if let Some(mode_toggle) = self.mode_toggle.as_ref() {
+            left_buttons = left_buttons.with_child(ChildView::new(mode_toggle).finish());
+        }
+        let is_terminal_mode = self.mode_toggle.is_some()
+            && !is_ambient_agent
+            && matches!(
+                self.ai_input_model.as_ref(app).input_type(),
+                InputType::Shell
+            );
+        let hide_context_chips = self.mode_toggle.is_some();
+        let is_hidden = |item: &AgentToolbarItemKind| {
+            is_terminal_mode || (hide_context_chips && item.is_context_chip())
+        };
+        let left_items: Vec<_> = left_items
+            .into_iter()
+            .filter(|item| !is_hidden(item))
+            .collect();
+        let right_items: Vec<_> = right_items
+            .into_iter()
+            .filter(|item| !is_hidden(item))
+            .collect();
+
         let terminal_model = self.terminal_model.lock();
         let shared_status = terminal_model.shared_session_status();
         let is_cloud_context = super::is_in_cloud_context(
@@ -2192,7 +2241,7 @@ impl View for AgentInputFooter {
             .with_main_axis_size(MainAxisSize::Min)
             .with_spacing(4.);
 
-        let has_prompt_alert = !self.prompt_alert.as_ref(app).is_no_alert();
+        let has_prompt_alert = !is_terminal_mode && !self.prompt_alert.as_ref(app).is_no_alert();
         if has_prompt_alert {
             right_buttons.add_child(
                 Shrinkable::new(

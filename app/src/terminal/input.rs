@@ -2326,6 +2326,13 @@ impl Input {
                 ctx,
             )
         });
+        // Uncaged: the Terminal / Agent switch renders in the footer, in both modes, so
+        // switching never swaps one button row for another.
+        let mode_toggle = universal_developer_input_button_bar
+            .as_ref(ctx)
+            .segmented_control()
+            .clone();
+        agent_input_footer.update(ctx, |footer, ctx| footer.set_mode_toggle(mode_toggle, ctx));
 
         let ambient_agent_view_state =
             ambient_agent_view_model

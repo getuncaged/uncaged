@@ -11,6 +11,7 @@ use super::common::{
     wrap_input_with_terminal_padding_and_focus_handler,
 };
 use super::Input;
+use crate::ai::blocklist::agent_view::agent_view_bg_fill;
 use crate::ai::blocklist::InputType;
 use crate::appearance::Appearance;
 use crate::context_chips::spacing;
@@ -26,6 +27,22 @@ impl Input {
     /// Renders the universal input. This is used when `FeatureFlag::AgentView` is disabled and the
     /// user has 'universal' input type selected in settings.
     pub(super) fn render_universal_developer_input(&self, app: &AppContext) -> Box<dyn Element> {
+        self.render_composer(/*is_agent_view=*/ false, app)
+    }
+
+    /// Uncaged: the one input surface for Terminal mode, Agent mode and an active agent view.
+    ///
+    /// The agent view used to have its own renderer: no prompt row, the banner always on
+    /// top, a full-width top border instead of the inset box, and a different footer. Every
+    /// time a prompt entered or left the agent view the whole input changed shape. Now the
+    /// frame, the prompt row and the footer are the same in every mode; what changes is the
+    /// colour of the box and which items the footer shows. The agent view only adds the
+    /// panels that belong to a running conversation (harness row, shortcuts, queued prompts).
+    pub(super) fn render_composer(
+        &self,
+        is_agent_view: bool,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
         let menu_positioning = self.menu_positioning(app);
@@ -80,6 +97,12 @@ impl Input {
             }
         }
 
+        if is_agent_view {
+            if let Some(harness_row) = self.render_harness_row(app) {
+                column.add_child(harness_row);
+            }
+        }
+
         let terminal_spacing = TerminalSettings::as_ref(app)
             .terminal_input_spacing(appearance.line_height_ratio(), app);
         column.add_child(
@@ -90,7 +113,13 @@ impl Input {
                 )
                 .finish(),
         );
-        column.add_child(ChildView::new(&self.universal_developer_input_button_bar).finish());
+        column.add_child(
+            SavePosition::new(
+                ChildView::new(&self.agent_input_footer).finish(),
+                &self.prompt_save_position_id(),
+            )
+            .finish(),
+        );
 
         if matches!(input_mode, InputMode::PinnedToTop) {
             if let Some(banner) =
@@ -184,17 +213,18 @@ impl Input {
         // terminal prompt should sit flush against the output above it, the way every other
         // terminal does. The box therefore follows the mode, like everything else on this
         // surface.
+        //
+        // In an agent view the box stays even when the user switches to Terminal mode for a
+        // command -- it is the conversation's composer -- and only its border colour says
+        // which mode the input is in.
         let is_ai_mode = matches!(self.ai_input_model.as_ref(app).input_type(), InputType::AI);
-        if is_ai_mode {
-            if self.is_pane_focused(app) {
-                // Focused: show background
-                container = container
-                    .with_background(internal_colors::fg_overlay_1(theme))
-                    .with_border(Border::all(1.).with_border_fill(theme.outline()));
-            } else {
-                // Unfocused: no background
-                container =
-                    container.with_border(Border::all(1.).with_border_fill(theme.outline()));
+        if is_ai_mode || is_agent_view {
+            let border = Border::all(1.).with_border_color(self.composer_border_color(app));
+            container = container.with_border(border);
+            if is_agent_view && self.agent_view_controller.as_ref(app).is_inline() {
+                container = container.with_background(agent_view_bg_fill(app));
+            } else if self.is_pane_focused(app) {
+                container = container.with_background(internal_colors::fg_overlay_1(theme));
             }
         }
 
@@ -229,14 +259,27 @@ impl Input {
             self.render_active_inline_menu(app)
         };
 
-        if input_mode.is_pinned_to_top() {
+        // The agent view keeps its conversation at the bottom, whatever the input mode.
+        if input_mode.is_pinned_to_top() && !is_agent_view {
             column.add_child(input);
             if let Some(menu) = inline_menu {
                 column.add_child(menu);
             }
             column.add_child(ChildView::new(&self.agent_status_view).finish());
         } else {
+            if is_agent_view {
+                if let Some(shortcuts) = self.render_agent_shortcuts(app) {
+                    column.add_child(shortcuts);
+                }
+            }
             column.add_child(ChildView::new(&self.agent_status_view).finish());
+            if is_agent_view {
+                if let Some(panel) = self.queued_prompts_panel.as_ref() {
+                    if panel.as_ref(app).should_render(app) {
+                        column.add_child(ChildView::new(panel).finish());
+                    }
+                }
+            }
             if let Some(menu) = inline_menu {
                 column.add_child(menu);
             }
