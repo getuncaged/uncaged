@@ -206,26 +206,17 @@ impl Input {
         .with_margin_top(margin_top)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)));
 
-        // Uncaged: the composer box belongs to Agent Mode, not to the terminal.
+        // Uncaged: one box for every mode and context.
         //
-        // A bordered, inset, rounded panel reads as a chat composer -- which is right when
-        // you are writing a prompt, and wrong when you are typing a shell command. A
-        // terminal prompt should sit flush against the output above it, the way every other
-        // terminal does. The box therefore follows the mode, like everything else on this
-        // surface.
-        //
-        // In an agent view the box stays even when the user switches to Terminal mode for a
-        // command -- it is the conversation's composer -- and only its border colour says
-        // which mode the input is in.
-        let is_ai_mode = matches!(self.ai_input_model.as_ref(app).input_type(), InputType::AI);
-        if is_ai_mode || is_agent_view {
-            let border = Border::all(1.).with_border_color(self.composer_border_color(app));
-            container = container.with_border(border);
-            if is_agent_view && self.agent_view_controller.as_ref(app).is_inline() {
-                container = container.with_background(agent_view_bg_fill(app));
-            } else if self.is_pane_focused(app) {
-                container = container.with_background(internal_colors::fg_overlay_1(theme));
-            }
+        // Drawing the box only in Agent Mode made every switch pop a bordered panel in or
+        // out around the input, which is exactly the jump the mode switch must not make.
+        // The box is always there; only its border colour says which mode the input is in.
+        let border = Border::all(1.).with_border_color(self.composer_border_color(app));
+        container = container.with_border(border);
+        if is_agent_view && self.agent_view_controller.as_ref(app).is_inline() {
+            container = container.with_background(agent_view_bg_fill(app));
+        } else if self.is_pane_focused(app) {
+            container = container.with_background(internal_colors::fg_overlay_1(theme));
         }
 
         let drop_target = DropTarget::new(
