@@ -279,13 +279,18 @@ impl AgentInputFooter {
 
         let nld_button = ctx.add_typed_action_view(|ctx| {
             let is_nld_enabled = AISettings::as_ref(ctx).is_ai_autodetection_enabled(ctx);
-            let mut button = ActionButton::new("", NLDButtonTheme)
-                .with_icon(Icon::NLD)
-                .with_size(button_size)
-                .with_tooltip_alignment(TooltipAlignment::Left)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(AgentInputFooterAction::ToggleAutodetectionSetting);
-                });
+            let mut button = ActionButton::new(
+                "",
+                NLDButtonTheme {
+                    is_enabled: is_nld_enabled,
+                },
+            )
+            .with_icon(Icon::NLD)
+            .with_size(button_size)
+            .with_tooltip_alignment(TooltipAlignment::Left)
+            .on_click(|ctx| {
+                ctx.dispatch_typed_action(AgentInputFooterAction::ToggleAutodetectionSetting);
+            });
             button.set_active(is_nld_enabled, ctx);
             button.set_tooltip(
                 Some(if is_nld_enabled {
@@ -303,6 +308,12 @@ impl AgentInputFooter {
             };
             let is_nld_enabled = settings.as_ref(ctx).is_ai_autodetection_enabled(ctx);
             me.nld_button.update(ctx, |button, ctx| {
+                button.set_theme(
+                    NLDButtonTheme {
+                        is_enabled: is_nld_enabled,
+                    },
+                    ctx,
+                );
                 button.set_active(is_nld_enabled, ctx);
                 button.set_tooltip(
                     Some(if is_nld_enabled {
@@ -2902,7 +2913,14 @@ impl ActionButtonTheme for FastForwardLockedTheme {
 }
 
 /// Same as `AgentInputButtonTheme`, except with one-off special active styling for the NLD button.
-struct NLDButtonTheme;
+/// Uncaged: `ActionButton` draws its active state with the hover styles, so a theme that turns
+/// blue on hover made an off toggle look on the moment the pointer was over it -- right after
+/// clicking it off. The theme carries the real state instead: blue only while autodetection is
+/// on, and hover merely lifts the icon from disabled grey to the usual sub-text grey.
+#[derive(Clone)]
+struct NLDButtonTheme {
+    is_enabled: bool,
+}
 
 impl ActionButtonTheme for NLDButtonTheme {
     fn background(&self, hovered: bool, appearance: &Appearance) -> Option<Fill> {
@@ -2915,13 +2933,13 @@ impl ActionButtonTheme for NLDButtonTheme {
         _background: Option<Fill>,
         appearance: &Appearance,
     ) -> ColorU {
-        if hovered {
-            appearance.theme().ansi_fg_blue()
+        let theme = appearance.theme();
+        if self.is_enabled {
+            theme.ansi_fg_blue()
+        } else if hovered {
+            theme.sub_text_color(theme.surface_1()).into_solid()
         } else {
-            appearance
-                .theme()
-                .disabled_text_color(appearance.theme().surface_1())
-                .into_solid()
+            theme.disabled_text_color(theme.surface_1()).into_solid()
         }
     }
 

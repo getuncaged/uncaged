@@ -143,6 +143,7 @@ impl Connection {
             "cli" => ProviderConfig::Acp {
                 command: self.cli_command.clone(),
                 model: Some(self.model.clone()).filter(|m| !m.trim().is_empty()),
+                effort: self.effort,
             },
             // openai_compatible and anything else.
             _ => ProviderConfig::OpenAiCompatible {
@@ -466,7 +467,11 @@ fn connection_from_config(cfg: &UncagedConfig, roster: &Roster) -> Connection {
                 local: preset.local,
             }
         }
-        ProviderConfig::Acp { command, model } => Connection {
+        ProviderConfig::Acp {
+            command,
+            model,
+            effort,
+        } => Connection {
             id: roster.unique_id("cli-agent"),
             preset: match_cli_preset(command).to_string(),
             label: command
@@ -479,7 +484,7 @@ fn connection_from_config(cfg: &UncagedConfig, roster: &Roster) -> Connection {
             model: model.clone().unwrap_or_default(),
             cli_command: command.clone(),
             max_tokens: DEFAULT_MAX_TOKENS,
-            effort: None,
+            effort: *effort,
             needs_key: false,
             local: true,
         },

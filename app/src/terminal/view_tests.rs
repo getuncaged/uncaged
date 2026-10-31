@@ -5927,7 +5927,7 @@ fn cli_agent_rich_input_shell_mode_uses_run_commands_hint_text() {
                 .editor()
                 .as_ref(ctx)
                 .placeholder_text("");
-            assert_eq!(placeholder_text, Some("Run commands"));
+            assert_eq!(placeholder_text, Some("Run a command"));
         });
     })
 }

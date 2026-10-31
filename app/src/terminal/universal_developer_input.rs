@@ -136,6 +136,8 @@ impl AtContextMenuDisabledReason {
 }
 
 const BLURRED_OPACITY: Opacity = 50;
+/// The tint behind the segment autodetection currently resolves to.
+const DETECTED_SEGMENT_OPACITY: Opacity = 25;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputToggleMode {
@@ -442,13 +444,15 @@ fn build_renderable_option_config(
 
     // Uncaged: with autodetection on, the control's selected option is `AutoDetection`, which
     // has no segment of its own -- so turning autodetection on left neither segment lit, as if
-    // the input had no mode. Light the segment for the mode the input is currently in.
+    // the input had no mode. Mark the segment for the mode the input is currently detected as,
+    // with a soft tint rather than the solid fill of a chosen mode: detection can flip as you
+    // type, and a solid fill jumping between the segments reads as flicker.
     let is_autodetecting = !input_model.is_input_type_locked();
-    let compute_colors = |input_type, accent_color| {
-        let is_selected = is_selected || (is_autodetecting && input_type == current_input_type);
+    let compute_colors = |input_type, accent_color: ColorU| {
+        let is_detected = !is_selected && is_autodetecting && input_type == current_input_type;
         let fg_color = if is_selected {
             theme.background().into_solid()
-        } else if input_type == current_input_type && !ui_state.is_input_empty {
+        } else if is_detected || (input_type == current_input_type && !ui_state.is_input_empty) {
             accent_color
         } else {
             theme.sub_text_color(theme.surface_1()).into_solid()
@@ -456,6 +460,8 @@ fn build_renderable_option_config(
 
         let bg_color = if is_selected {
             accent_color
+        } else if is_detected {
+            coloru_with_opacity(accent_color, DETECTED_SEGMENT_OPACITY)
         } else {
             ColorU::transparent_black()
         };
@@ -485,7 +491,7 @@ fn build_renderable_option_config(
             let (fg_color, bg_color) = compute_colors(InputType::AI, accent_color);
 
             RenderableOptionConfig {
-                icon_path: Icon::AgentMode.into(),
+                icon_path: Icon::Stars.into(),
                 icon_color: fg_color,
                 label: None,
                 tooltip: Some(tooltip_config(

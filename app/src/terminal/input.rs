@@ -395,49 +395,12 @@ pub const AI_COMMAND_SEARCH_HINT_TEXT: &str = "Type '#' for AI command suggestio
 
 /// Uncaged: Terminal mode is a plain terminal, so its placeholder says only that, whether or
 /// not AI is available. Agent hints belong to Agent Mode.
-const TERMINAL_MODE_HINT_TEXT: &str = "Run commands";
-
-// Rotating hint text options for new Agent Mode conversations
-const AGENT_MODE_HINT_OPTIONS: &[&str] = &[
-    "Ask anything e.g. Deploy my React app to Vercel and set up environment variables",
-    "Ask anything e.g. Help me debug why my Python tests are failing in CI",
-    "Ask anything e.g. Set up a new microservice with Docker and create the deployment pipeline",
-    "Ask anything e.g. Find and fix the memory leak in my Node.js application",
-    "Ask anything e.g. Create a backup script for my PostgreSQL database and schedule it",
-    "Ask anything e.g. Help me migrate my data from MySQL to PostgreSQL",
-    "Ask anything e.g. Set up monitoring and alerts for my AWS infrastructure",
-    "Ask anything e.g. Build a REST API for my mobile app using FastAPI",
-    "Ask anything e.g. Help me optimize my SQL queries that are running slowly",
-    "Ask anything e.g. Create a GitHub Actions workflow to automatically deploy on merge",
-    "Ask anything e.g. Set up Redis caching for my web application",
-    "Ask anything e.g. Help me troubleshoot why my Kubernetes pods keep crashing",
-    "Ask anything e.g. Build a data pipeline to process CSV files and load them into BigQuery",
-    "Ask anything e.g. Set up SSL certificates and configure HTTPS for my domain",
-    "Ask anything e.g. Help me refactor this legacy code to use modern design patterns",
-    "Ask anything e.g. Create unit tests for my authentication service",
-    "Ask anything e.g. Set up log aggregation with ELK stack for my distributed system",
-    "Ask anything e.g. Help me implement OAuth2 authentication in my Express.js app",
-    "Ask anything e.g. Optimize my Docker images to reduce build times and size",
-    "Ask anything e.g. Set up A/B testing infrastructure for my web application",
-];
-
-fn get_agent_mode_new_conversation_hint_text() -> &'static str {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    static HINT_INDEX: AtomicUsize = AtomicUsize::new(0);
-
-    let index = HINT_INDEX.fetch_add(1, Ordering::Relaxed) % AGENT_MODE_HINT_OPTIONS.len();
-    AGENT_MODE_HINT_OPTIONS[index]
-}
-
-fn get_stable_agent_mode_hint_text(cached_hint: &mut Option<&'static str>) -> &'static str {
-    if let Some(hint) = cached_hint {
-        hint
-    } else {
-        let new_hint = get_agent_mode_new_conversation_hint_text();
-        *cached_hint = Some(new_hint);
-        new_hint
-    }
-}
+///
+/// The Terminal and new-conversation Agent placeholders are the same length, so switching
+/// modes swaps the words without the line growing or shrinking -- the rotating "Ask anything
+/// e.g. …" examples used to stretch across (and wrap) the input on every switch.
+const TERMINAL_MODE_HINT_TEXT: &str = "Run a command";
+const AGENT_MODE_HINT_TEXT: &str = "Ask the agent";
 
 const AGENT_MODE_AI_ENABLED_STEER_HINT_TEXT_UDI: &str = "Steer the running agent";
 const AGENT_MODE_AI_ENABLED_STEER_HINT_TEXT_CLASSIC: &str =
@@ -1656,9 +1619,6 @@ pub struct Input {
 
     #[cfg(feature = "local_fs")]
     conn: Option<Arc<Mutex<SqliteConnection>>>,
-
-    /// Cached hint text to ensure it remains stable during shell initialization hooks
-    cached_agent_mode_hint_text: Option<&'static str>,
 
     predict_am_queries_future_handle: Option<SpawnedFutureHandle>,
 
@@ -3471,7 +3431,6 @@ impl Input {
             rewind_menu_view,
             inline_history_menu_view,
             inline_terminal_menu_positioner,
-            cached_agent_mode_hint_text: None,
             is_editor_empty_on_last_edit: is_editor_empty,
             weak_view_handle: ctx.handle(),
             buy_credits_banner,
@@ -5952,10 +5911,7 @@ impl Input {
             input_model.should_run_input_autodetection(app),
         ) {
             (InputType::Shell, false) => TERMINAL_MODE_HINT_TEXT.to_owned(),
-            (InputType::Shell, true) => {
-                // Ensure hint text is cached for new conversations
-                get_stable_agent_mode_hint_text(&mut self.cached_agent_mode_hint_text).to_owned()
-            }
+            (InputType::Shell, true) => AGENT_MODE_HINT_TEXT.to_owned(),
             (InputType::AI, _) => {
                 if let Some(conversation) =
                     self.ai_context_model.as_ref(app).selected_conversation(app)
@@ -6001,11 +5957,7 @@ impl Input {
                             AGENT_MODE_AI_ENABLED_FOLLOW_UP_HINT_TEXT_CLASSIC.to_owned()
                         }
                     }
-                    None => {
-                        // Ensure hint text is cached for new conversations
-                        get_stable_agent_mode_hint_text(&mut self.cached_agent_mode_hint_text)
-                            .to_owned()
-                    }
+                    None => AGENT_MODE_HINT_TEXT.to_owned(),
                 }
             }
         }
@@ -6391,10 +6343,6 @@ impl Input {
         });
     }
 
-    /// Clear the cached hint text to generate a new one on next render
-    pub fn clear_cached_hint_text(&mut self) {
-        self.cached_agent_mode_hint_text = None;
-    }
     fn cli_agent_rich_input_hint_text(&self, ctx: &ViewContext<Self>) -> Cow<'static, str> {
         if self.is_locked_in_shell_mode(ctx) {
             return Cow::Borrowed(TERMINAL_MODE_HINT_TEXT);
@@ -8334,7 +8282,6 @@ impl Input {
     }
 
     pub fn clear_buffer_and_reset_undo_stack(&mut self, ctx: &mut ViewContext<Self>) {
-        self.clear_cached_hint_text();
         self.exit_cloud_handoff_compose(ctx);
         self.editor.update(ctx, |view, ctx| {
             view.clear_buffer_and_reset_undo_stack(ctx);

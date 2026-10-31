@@ -505,8 +505,10 @@ fn openai_effort_tops_out_at_high() {
     use crate::config::Effort;
     assert_eq!(Effort::Max.openai_value(), "high");
     assert_eq!(Effort::XHigh.anthropic_value(), "xhigh");
-    assert!(Effort::levels_for_wire("cli").is_empty());
-    assert_eq!(Effort::levels_for_wire("openai_compatible").len(), 3);
+    assert!(Effort::levels_for("cli", "gemini-cli").is_empty());
+    assert_eq!(Effort::levels_for("cli", "claude-code").len(), 4);
+    assert_eq!(Effort::levels_for("openai_compatible", "lmstudio").len(), 3);
+    assert_eq!(Effort::XHigh.claude_code_value(), "high");
 }
 
 #[test]

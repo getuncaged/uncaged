@@ -71,9 +71,14 @@ pub fn build(config: &UncagedConfig, conversation_id: &str) -> Box<dyn Provider>
             max_tokens: *max_tokens,
             effort: *effort,
         }),
-        ProviderConfig::Acp { command, model } => Box::new(acp::AcpProvider {
+        ProviderConfig::Acp {
+            command,
+            model,
+            effort,
+        } => Box::new(acp::AcpProvider {
             command: command.clone(),
             model: model.clone(),
+            effort: *effort,
             conversation_id: conversation_id.to_string(),
         }),
     }

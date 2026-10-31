@@ -131,7 +131,7 @@ fn to_provider_maps_each_wire() {
         local: true,
     };
     match cli.to_provider() {
-        ProviderConfig::Acp { command, model } => {
+        ProviderConfig::Acp { command, model, .. } => {
             assert_eq!(command, vec!["gemini", "--experimental-acp"]);
             assert!(model.is_none(), "blank model -> None (use CLI default)");
         }
@@ -247,7 +247,7 @@ fn cli_connection_round_trips_edited_command() {
     // And it reaches the ACP provider projected into engine.json.
     let engine = config::read_persisted().expect("engine.json written for a usable CLI");
     match engine.provider {
-        ProviderConfig::Acp { command, model } => {
+        ProviderConfig::Acp { command, model, .. } => {
             assert_eq!(command, edited, "ACP provider spawns the edited command");
             assert_eq!(model.as_deref(), Some("opus"), "model flows through to ACP");
         }

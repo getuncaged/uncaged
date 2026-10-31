@@ -1,6 +1,7 @@
 use core::fmt;
 use std::borrow::Cow;
 use std::boxed::Box;
+use std::time::Duration;
 
 use itertools::Itertools;
 
@@ -17,6 +18,7 @@ use crate::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use crate::ui_components::tool_tip::{Tooltip, TooltipWithSublabel};
 use crate::{AppContext, Element, Entity, TypedActionView, View, ViewContext};
 const MAX_WIDTH: f32 = 300.0;
+const TOOLTIP_HOVER_DELAY: Duration = Duration::from_millis(400);
 
 /// A segmented control component with multiple selectable options
 pub struct SegmentedControl<T> {
@@ -331,11 +333,16 @@ impl<T: SegmentedControlOption> View for SegmentedControl<T> {
             button = button.with_tooltip_position(ButtonTooltipPosition::AboveLeft);
 
             let option_copy = *option;
-            let mut hoverable = button.build().with_cursor(if is_disabled {
-                Cursor::Arrow
-            } else {
-                Cursor::PointingHand
-            });
+            // A short hover-in delay keeps the tooltips from flashing up one after the other
+            // as the pointer crosses the segments.
+            let mut hoverable = button
+                .build()
+                .with_hover_in_delay(TOOLTIP_HOVER_DELAY)
+                .with_cursor(if is_disabled {
+                    Cursor::Arrow
+                } else {
+                    Cursor::PointingHand
+                });
 
             // Buttons should not be clickable if they are disabled
             if !is_disabled {

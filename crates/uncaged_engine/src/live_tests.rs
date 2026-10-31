@@ -41,6 +41,7 @@ fn acp_config() -> UncagedConfig {
         provider: ProviderConfig::Acp {
             command: vec!["claude-code-acp".to_string()],
             model: Some("sonnet".to_string()),
+            effort: None,
         },
     }
 }

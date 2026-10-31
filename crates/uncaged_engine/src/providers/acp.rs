@@ -35,6 +35,7 @@ use tokio::sync::Mutex as AsyncMutex;
 
 use super::Provider;
 use super::ProviderEvent;
+use crate::config::Effort;
 use crate::model::Conversation;
 use crate::model::NeutralMsg;
 
@@ -44,6 +45,10 @@ struct AcpSession {
     stdin: tokio::process::ChildStdin,
     lines: tokio::io::Lines<BufReader<tokio::process::ChildStdout>>,
     session_id: String,
+    /// The model and effort the session is running with, so a change in the menu can be
+    /// applied to the live session instead of waiting for the next spawn.
+    model: Option<String>,
+    effort: Option<Effort>,
     /// Monotonic JSON-RPC request id — must keep climbing for the life of the
     /// session so responses can be matched unambiguously.
     next_id: u64,
@@ -108,6 +113,8 @@ pub struct AcpProvider {
     /// Passed to the agent at `session/new` (best-effort — agents that don't
     /// understand a model hint ignore it). `None` lets the CLI use its default.
     pub model: Option<String>,
+    /// Forwarded to Claude Code's Agent SDK options at `session/new`; other agents ignore it.
+    pub effort: Option<Effort>,
     /// The tab's agent-thread id; the key under which we keep the CLI session.
     pub conversation_id: String,
 }
@@ -139,13 +146,31 @@ impl AcpProvider {
         // stored session whose child has exited is treated as absent so we
         // transparently respawn (e.g. the CLI crashed or was killed).
         if guard.as_mut().is_none_or(|s| session_is_dead(s)) {
-            *guard = Some(self.open_session(tx).await?);
+            *guard = Some(self.open_session(None, tx).await?);
+        }
+
+        // Effort is fixed when a session is created, so a changed effort reopens the session,
+        // resuming the same conversation so the agent keeps its context.
+        if let Some(session) = guard.as_ref()
+            && session.effort != self.effort
+        {
+            let resume = session.session_id.clone();
+            *guard = None;
+            *guard = Some(self.open_session(Some(resume), tx).await?);
+        }
+
+        // A changed model is switched on the live session.
+        let session = guard.as_mut().expect("session established above");
+        if session.model != self.model {
+            if let Some(model) = self.model.as_ref().filter(|m| !m.is_empty()) {
+                set_model(session, model, tx).await;
+            }
+            session.model = self.model.clone();
         }
 
         // Reuse the live session for this turn. If the pipe breaks mid-turn,
         // drop the session so the *next* turn respawns cleanly rather than
         // wedging the tab on a dead process.
-        let session = guard.as_mut().expect("session established above");
         if let Err(err) = prompt_turn(session, &prompt_text, tx).await {
             *guard = None;
             return Err(err);
@@ -156,9 +181,11 @@ impl AcpProvider {
     }
 
     /// Spawn the CLI and complete the ACP handshake (`initialize` +
-    /// `session/new`), returning a session ready to take prompts.
+    /// `session/new`), returning a session ready to take prompts. `resume` is the id of an
+    /// earlier session to continue, for agents that support it (Claude Code).
     async fn open_session(
         &self,
+        resume: Option<String>,
         tx: &mpsc::UnboundedSender<ProviderEvent>,
     ) -> anyhow::Result<AcpSession> {
         let Some((program, args)) = self.command.split_first() else {
@@ -214,13 +241,20 @@ impl AcpProvider {
         .await?;
         let _ = read_result(&mut lines, 1, tx).await?; // capabilities ignored by the text bridge
 
-        send(
-            &mut stdin,
-            2,
-            "session/new",
-            json!({ "cwd": ".", "mcpServers": [] }),
-        )
-        .await?;
+        // Claude Code's ACP adapter spreads `_meta.claudeCode.options` into its Agent SDK
+        // options, which is where effort and resume live. Other agents ignore `_meta`.
+        let mut claude_code_options = serde_json::Map::new();
+        if let Some(effort) = self.effort {
+            claude_code_options.insert("effort".into(), json!(effort.claude_code_value()));
+        }
+        if let Some(resume) = resume {
+            claude_code_options.insert("resume".into(), json!(resume));
+        }
+        let mut new_session = json!({ "cwd": ".", "mcpServers": [] });
+        if !claude_code_options.is_empty() {
+            new_session["_meta"] = json!({ "claudeCode": { "options": claude_code_options } });
+        }
+        send(&mut stdin, 2, "session/new", new_session).await?;
         let session = read_result(&mut lines, 2, tx).await?;
         let session_id = session
             .get("sessionId")
@@ -232,26 +266,39 @@ impl AcpProvider {
         // the `session/new` result accept `session/set_model` (Claude Code's ids are
         // e.g. `default` / `sonnet` / `haiku` / `opus[1m]`). Best-effort: ignore a
         // failure so an unknown id, or an agent without model switching, still runs.
-        let mut next_id = 3;
-        if let Some(model) = self.model.as_ref().filter(|m| !m.is_empty()) {
-            send(
-                &mut stdin,
-                next_id,
-                "session/set_model",
-                json!({ "sessionId": session_id, "modelId": model }),
-            )
-            .await?;
-            let _ = read_result(&mut lines, next_id, tx).await;
-            next_id += 1;
-        }
-
-        Ok(AcpSession {
+        let mut session = AcpSession {
             child,
             stdin,
             lines,
             session_id,
-            next_id,
-        })
+            model: self.model.clone(),
+            effort: self.effort,
+            next_id: 3,
+        };
+        if let Some(model) = self.model.as_ref().filter(|m| !m.is_empty()) {
+            set_model(&mut session, model, tx).await;
+        }
+        Ok(session)
+    }
+}
+
+/// Select `model` on a live session. Agents that advertise `availableModels` in the
+/// `session/new` result accept `session/set_model` (Claude Code's ids are e.g. `default` /
+/// `sonnet` / `haiku` / `opus[1m]`). Best-effort: an unknown id, or an agent without model
+/// switching, keeps running on its current model.
+async fn set_model(
+    session: &mut AcpSession,
+    model: &str,
+    tx: &mpsc::UnboundedSender<ProviderEvent>,
+) {
+    let id = session.next_id;
+    session.next_id += 1;
+    let params = json!({ "sessionId": session.session_id, "modelId": model });
+    if send(&mut session.stdin, id, "session/set_model", params)
+        .await
+        .is_ok()
+    {
+        let _ = read_result(&mut session.lines, id, tx).await;
     }
 }
 

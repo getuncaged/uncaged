@@ -247,7 +247,7 @@ mod imp {
             models,
             cli_command: c.cli_command.clone(),
             effort: c.effort.map(effort_value),
-            effort_levels: uncaged_engine::Effort::levels_for_wire(&c.wire)
+            effort_levels: uncaged_engine::Effort::levels_for(&c.wire, &c.preset)
                 .iter()
                 .map(|&effort| (effort_value(effort), effort.label().to_string()))
                 .collect(),

@@ -51,18 +51,20 @@ pub enum Effort {
 }
 
 impl Effort {
-    /// The levels a connection on `wire` ("anthropic" / "openai_compatible" / "cli") can pick
-    /// from. A CLI agent picks its own effort, so it has none.
-    pub fn levels_for_wire(wire: &str) -> &'static [Effort] {
-        match wire {
-            "anthropic" => &[
+    /// The levels a connection on `wire` ("anthropic" / "openai_compatible" / "cli") from catalog
+    /// `preset` can pick from. Of the CLI agents only Claude Code takes an effort -- through the
+    /// Agent SDK options its ACP adapter forwards -- so the others have none.
+    pub fn levels_for(wire: &str, preset: &str) -> &'static [Effort] {
+        match (wire, preset) {
+            ("anthropic", _) => &[
                 Effort::Low,
                 Effort::Medium,
                 Effort::High,
                 Effort::XHigh,
                 Effort::Max,
             ],
-            "cli" => &[],
+            ("cli", "claude-code") => &[Effort::Low, Effort::Medium, Effort::High, Effort::Max],
+            ("cli", _) => &[],
             _ => &[Effort::Low, Effort::Medium, Effort::High],
         }
     }
@@ -84,6 +86,16 @@ impl Effort {
             Effort::Medium => "medium",
             Effort::High => "high",
             Effort::XHigh => "xhigh",
+            Effort::Max => "max",
+        }
+    }
+
+    /// The value for the Claude Agent SDK's `effort` option, which has no `xhigh`.
+    pub fn claude_code_value(self) -> &'static str {
+        match self {
+            Effort::Low => "low",
+            Effort::Medium => "medium",
+            Effort::High | Effort::XHigh => "high",
             Effort::Max => "max",
         }
     }
@@ -158,6 +170,8 @@ pub enum ProviderConfig {
         command: Vec<String>,
         #[serde(default)]
         model: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort: Option<Effort>,
     },
 }
 
@@ -326,7 +340,11 @@ fn read_env_config() -> Option<UncagedConfig> {
                 .split_whitespace()
                 .map(str::to_string)
                 .collect::<Vec<_>>();
-            ProviderConfig::Acp { command, model }
+            ProviderConfig::Acp {
+                command,
+                model,
+                effort: None,
+            }
         }
         _ => return None,
     };
