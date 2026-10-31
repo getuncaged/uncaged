@@ -9786,7 +9786,6 @@ impl Input {
 
                 // If the last buffer didn't start with the terminal input prefix and the current buffer does, then enable terminal input and lock it.
                 let is_locked_shell_mode = !is_ai_input_enabled && is_input_mode_locked;
-                let is_agent_view_active = self.agent_view_controller.as_ref(ctx).is_active();
                 let is_agent_in_control_or_tagged_in = self
                     .model
                     .lock()
@@ -9799,11 +9798,12 @@ impl Input {
                         s.agent.supports_bash_mode()
                             && matches!(s.input_state, CLIAgentInputState::Open { .. })
                     });
+                // Uncaged: not in the agent view, where typing `!` used to flip the input into
+                // shell mode -- the toggle and its keybinding are the ways to switch there. The
+                // CLI agent rich input keeps it: `!` is Claude Code's own bash-mode prefix.
                 if FeatureFlag::AgentMode.is_enabled()
                     && !is_locked_shell_mode
-                    && (!FeatureFlag::AgentView.is_enabled()
-                        || is_agent_view_active
-                        || is_cli_agent_bash_mode_input_open)
+                    && (!FeatureFlag::AgentView.is_enabled() || is_cli_agent_bash_mode_input_open)
                     && !is_agent_in_control_or_tagged_in
                     && self.prefix_mode(ctx) != InputPrefixMode::CloudHandoff
                 {
@@ -15870,8 +15870,10 @@ fn maybe_render_ai_input_indicators(
     let is_ai_input_enabled = ai_input_model.is_ai_input_enabled();
     let is_input_type_locked = ai_input_model.is_input_type_locked();
 
-    // Show the `!` shell mode indicator when in locked shell mode inside the
-    // agent view OR inside the CLI agent rich input (e.g. Claude Code bash mode).
+    // Show the `!` shell mode indicator inside the CLI agent rich input (e.g. Claude Code bash
+    // mode), where `!` is the CLI's own way in. Uncaged: not in the agent view -- there the
+    // mode toggle shows the mode, and a `!` in front of the input was a leftover of the old
+    // prefix switching.
     let is_locked_shell = !is_ai_input_enabled && is_input_type_locked;
     let is_cli_agent_input_open =
         CLIAgentSessionsModel::as_ref(app).is_input_open(terminal_view_id);
@@ -15885,7 +15887,7 @@ fn maybe_render_ai_input_indicators(
         ));
     }
 
-    if is_locked_shell && (is_agent_view_active || is_cli_agent_input_open) {
+    if is_locked_shell && is_cli_agent_input_open {
         return Some(render_prefix_mode_indicator(
             TERMINAL_INPUT_PREFIX,
             appearance.theme().ansi_fg_blue(),

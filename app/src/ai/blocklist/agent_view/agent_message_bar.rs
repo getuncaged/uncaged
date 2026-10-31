@@ -344,7 +344,6 @@ impl View for AgentMessageBar {
             .or_else(|| AttachedTextSelectionMessageProducer.produce_message(args))
             .or_else(|| AutodetectedBashModeMessageProducer.produce_message(args))
             .or_else(|| ExitCloudHandoffModeMessageProducer.produce_message(args))
-            .or_else(|| ExitBashModeMessageProducer.produce_message(args))
             .or_else(|| HideShortcutsMessageProducer.produce_message(args))
             .or_else(|| ZeroStateMessageProducer.produce_message(args))
             .or_else(|| EmptyMessageProducer.produce_message(args))
@@ -930,38 +929,6 @@ impl MessageProvider<AgentMessageArgs<'_>> for ExitCloudHandoffModeMessageProduc
                 color: Some(dismiss_text_color),
             },
         ]))
-    }
-}
-
-struct ExitBashModeMessageProducer;
-
-impl MessageProvider<AgentMessageArgs<'_>> for ExitBashModeMessageProducer {
-    fn produce_message(&self, args: AgentMessageArgs<'_>) -> Option<Message> {
-        let AgentMessageArgs {
-            input_model,
-            appearance,
-            app,
-            ..
-        } = args;
-        if input_model.is_ai_input_enabled() || !input_model.is_input_type_locked() {
-            return None;
-        }
-        let set_input_mode_agent_keystroke =
-            keybinding_name_to_keystroke(SET_INPUT_MODE_AGENT_ACTION_NAME, app)?;
-
-        let text_color = appearance.theme().ansi_fg_blue();
-
-        Some(
-            Message::new(vec![
-                MessageItem::Keystroke {
-                    keystroke: set_input_mode_agent_keystroke,
-                    color: None,
-                    background_color: None,
-                },
-                MessageItem::text("to exit shell mode"),
-            ])
-            .with_text_color(text_color),
-        )
     }
 }
 

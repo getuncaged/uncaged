@@ -480,7 +480,7 @@ fn build_renderable_option_config(
                 label: None,
                 tooltip: Some(tooltip_config(
                     "Terminal",
-                    Some(terminal_mode_tooltip_subtext(terminal_keybindings)),
+                    terminal_mode_tooltip_subtext(terminal_keybindings),
                     app,
                 )),
                 background: bg_color.into(),
@@ -496,7 +496,7 @@ fn build_renderable_option_config(
                 label: None,
                 tooltip: Some(tooltip_config(
                     "Agent Mode",
-                    Some(agent_mode_tooltip_subtext(terminal_keybindings)),
+                    agent_mode_tooltip_subtext(terminal_keybindings),
                     app,
                 )),
                 background: bg_color.into(),
@@ -533,27 +533,19 @@ fn build_renderable_option_config(
     Some(config)
 }
 
-const AGENT_MODE_TOOLTIP_PREFIX: &str = "* + space";
-// `TERMINAL_INPUT_PREFIX` is "!" with no trailing space, unlike `AI_INPUT_PREFIX` ("* "),
-// so the tooltip must not promise a space that the matcher does not want.
-const TERMINAL_MODE_TOOLTIP_PREFIX: &str = "!";
-
-fn agent_mode_tooltip_subtext(terminal_keybindings: &TerminalKeybindings) -> String {
-    let keybinding = terminal_keybindings.set_input_mode_agent_keybinding();
-    let Some(keybinding) = keybinding else {
-        return AGENT_MODE_TOOLTIP_PREFIX.into();
-    };
-
-    format!("{keybinding} or {AGENT_MODE_TOOLTIP_PREFIX}")
+// Uncaged: the tooltips name only the keybinding. The typed `!` / `* ` prefixes they used to
+// advertise are leftovers of the old input; the toggle and the keybinding are the ways to
+// switch.
+fn agent_mode_tooltip_subtext(terminal_keybindings: &TerminalKeybindings) -> Option<String> {
+    terminal_keybindings
+        .set_input_mode_agent_keybinding()
+        .map(|keybinding| keybinding.to_string())
 }
 
-fn terminal_mode_tooltip_subtext(terminal_keybindings: &TerminalKeybindings) -> String {
-    let keybinding = terminal_keybindings.set_input_mode_terminal_keybinding();
-    let Some(keybinding) = keybinding else {
-        return TERMINAL_MODE_TOOLTIP_PREFIX.into();
-    };
-
-    format!("{keybinding} or {TERMINAL_MODE_TOOLTIP_PREFIX}")
+fn terminal_mode_tooltip_subtext(terminal_keybindings: &TerminalKeybindings) -> Option<String> {
+    terminal_keybindings
+        .set_input_mode_terminal_keybinding()
+        .map(|keybinding| keybinding.to_string())
 }
 
 fn tooltip_config(

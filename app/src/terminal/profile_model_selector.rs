@@ -66,6 +66,9 @@ use crate::view_components::{FeaturePopup, NewFeaturePopupEvent, NewFeaturePopup
 use crate::workspace::WorkspaceAction;
 
 const MENU_WIDTH: f32 = 280.;
+/// Uncaged: the effort menu only lists a handful of short levels.
+const EFFORT_MENU_WIDTH: f32 = 160.;
+const EFFORT_BUTTON_POSITION_ID: &str = "profile_model_selector_effort_button";
 const NEW_MODEL_CHOICES_POPUP_DELAY: Duration = Duration::from_millis(500);
 const BLURRED_OPACITY: Opacity = 50;
 const SEPARATOR_WIDTH: f32 = 1.0;
@@ -156,12 +159,17 @@ pub struct ProfileModelSelector {
     model_compact_button: ViewHandle<ActionButton>,
     profile_dropdown: ViewHandle<Menu<ProfileModelSelectorAction>>,
     model_dropdown: ViewHandle<Menu<ProfileModelSelectorAction>>,
+    /// Uncaged: the effort levels of the active connection, opened from the chip's own effort
+    /// section rather than buried at the bottom of the model menu.
+    effort_dropdown: ViewHandle<Menu<ProfileModelSelectorAction>>,
     model_spec_sidecar: ModelSpecSidecar,
     is_profile_menu_open: bool,
     is_model_menu_open: bool,
+    is_effort_menu_open: bool,
     terminal_view_id: EntityId,
     profile_mouse_state: MouseStateHandle,
     model_mouse_state: MouseStateHandle,
+    effort_mouse_state: MouseStateHandle,
     menu_positioning_provider: Arc<dyn MenuPositioningProvider>,
     is_blurred: bool,
     new_model_popup: ViewHandle<FeaturePopup>,
@@ -197,6 +205,8 @@ pub enum ProfileModelSelectorAction {
         connection_id: String,
         model: String,
     },
+    /// Uncaged: open or close the effort menu.
+    ToggleEffortMenu,
     /// Uncaged: set how hard the active connection's model thinks (`None` = model default).
     SelectUncagedEffort {
         connection_id: String,
@@ -253,24 +263,146 @@ impl ProfileModelSelector {
     }
 
     /// A short label for one Uncaged connection: its model if set, else its
-    /// provider name (e.g. "LM Studio" when no model id is configured), followed by
-    /// the effort when one is set.
+    /// provider name (e.g. "LM Studio" when no model id is configured).
     fn uncaged_connection_label(c: crate::uncaged::ConnectionView) -> String {
-        let name = if c.model.trim().is_empty() {
+        if c.model.trim().is_empty() {
             c.label
         } else {
             c.model
-        };
-        let effort_label = c.effort.as_ref().and_then(|effort| {
-            c.effort_levels
-                .iter()
-                .find(|(value, _)| value == effort)
-                .map(|(_, label)| label.clone())
-        });
-        match effort_label {
-            Some(effort_label) => format!("{name} · {effort_label}"),
-            None => name,
         }
+    }
+
+    /// The active Uncaged connection, if the engine is on and the connection takes an effort.
+    fn uncaged_effort_connection() -> Option<crate::uncaged::ConnectionView> {
+        if !crate::uncaged::engine_active() {
+            return None;
+        }
+        crate::uncaged::connections()
+            .into_iter()
+            .find(|c| c.is_active && !c.effort_levels.is_empty())
+    }
+
+    /// The effort section's label: "Medium effort", or "Default effort" when none is set.
+    fn uncaged_effort_label(c: &crate::uncaged::ConnectionView) -> String {
+        let level = c
+            .effort
+            .as_ref()
+            .and_then(|effort| {
+                c.effort_levels
+                    .iter()
+                    .find(|(value, _)| value == effort)
+                    .map(|(_, label)| label.clone())
+            })
+            .unwrap_or_else(|| "Default".to_string());
+        format!("{level} effort")
+    }
+
+    /// Populate the effort menu: "Default" (sends nothing) plus the levels the active
+    /// connection accepts, the current one checked.
+    fn refresh_uncaged_effort_menu(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some(conn) = Self::uncaged_effort_connection() else {
+            return;
+        };
+        let levels = std::iter::once((None, "Default".to_string())).chain(
+            conn.effort_levels
+                .iter()
+                .map(|(value, label)| (Some(value.clone()), label.clone())),
+        );
+        let mut selected_index = 0;
+        let items: Vec<MenuItem<ProfileModelSelectorAction>> = levels
+            .enumerate()
+            .map(|(index, (effort, label))| {
+                let mut fields = MenuItemFields::new(label);
+                if effort == conn.effort {
+                    fields = fields.with_right_side_icon(Icon::Check);
+                    selected_index = index;
+                }
+                MenuItem::Item(fields.with_on_select_action(
+                    ProfileModelSelectorAction::SelectUncagedEffort {
+                        connection_id: conn.id.clone(),
+                        effort,
+                    },
+                ))
+            })
+            .collect();
+        self.effort_dropdown.update(ctx, |menu, ctx| {
+            menu.set_width(EFFORT_MENU_WIDTH);
+            menu.set_items(items, ctx);
+            menu.set_selected_by_index(selected_index, ctx);
+            ctx.notify();
+        });
+    }
+
+    /// The chip's effort section: the current effort and a chevron, opening the effort menu.
+    fn render_effort_section(
+        &self,
+        conn: &crate::uncaged::ConnectionView,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let appearance = Appearance::as_ref(app);
+        let theme = appearance.theme();
+        let text_color = if self.is_blurred {
+            theme.disabled_text_color(theme.surface_1()).into()
+        } else {
+            theme.sub_text_color(theme.surface_1()).into()
+        };
+        let scaled_font_size = calculate_scaled_font_size(appearance);
+        let icon_size = udi_icon_size(appearance, app);
+        let (vertical_padding, horizontal_padding) = self.get_padding_values(scaled_font_size);
+
+        let content = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(
+                Text::new_inline(
+                    Self::uncaged_effort_label(conn),
+                    appearance.ui_font_family(),
+                    scaled_font_size,
+                )
+                .with_color(text_color)
+                .with_line_height_ratio(appearance.line_height_ratio())
+                .finish(),
+            )
+            .with_child(
+                Container::new(
+                    ConstrainedBox::new(
+                        Icon::ChevronDown
+                            .to_warpui_icon(Fill::Solid(text_color))
+                            .finish(),
+                    )
+                    .with_height(icon_size)
+                    .with_width(icon_size)
+                    .finish(),
+                )
+                .with_margin_left(ICON_SPACING)
+                .finish(),
+            )
+            .finish();
+        let button = SavePosition::new(
+            Container::new(content)
+                .with_vertical_padding(vertical_padding)
+                .with_horizontal_padding(horizontal_padding)
+                .finish(),
+            EFFORT_BUTTON_POSITION_ID,
+        )
+        .finish();
+
+        Hoverable::new(self.effort_mouse_state.clone(), move |state| {
+            if state.is_hovered() {
+                Container::new(button)
+                    .with_background(theme.surface_2())
+                    .with_corner_radius(CornerRadius::with_right(Radius::Pixels(
+                        INNER_CORNER_RADIUS,
+                    )))
+                    .finish()
+            } else {
+                button
+            }
+        })
+        .on_click(|ctx, _app, _position| {
+            ctx.dispatch_typed_action(ProfileModelSelectorAction::ToggleEffortMenu);
+        })
+        .with_cursor(Cursor::PointingHand)
+        .finish()
     }
 
     /// Ask the active connection's provider which models it serves, in the background, and
@@ -368,32 +500,6 @@ impl ProfileModelSelector {
                             model_fields = model_fields.with_right_side_icon(Icon::Check);
                         }
                         items.push(MenuItem::Item(model_fields));
-                    }
-                }
-
-                // Uncaged: how hard the model thinks. "Default" sends nothing, leaving
-                // it to the model.
-                if !conn.effort_levels.is_empty() {
-                    items.push(section_header("Effort"));
-                    let levels = std::iter::once((None, "Default".to_string())).chain(
-                        conn.effort_levels
-                            .iter()
-                            .map(|(value, label)| (Some(value.clone()), label.clone())),
-                    );
-                    for (effort, label) in levels {
-                        let is_current = effort == conn.effort;
-                        let mut effort_fields = MenuItemFields::new(format!("    {label}"))
-                            .with_override_text_color(sub_color)
-                            .with_on_select_action(
-                                ProfileModelSelectorAction::SelectUncagedEffort {
-                                    connection_id: conn.id.clone(),
-                                    effort,
-                                },
-                            );
-                        if is_current {
-                            effort_fields = effort_fields.with_right_side_icon(Icon::Check);
-                        }
-                        items.push(MenuItem::Item(effort_fields));
                     }
                 }
             }
@@ -514,6 +620,17 @@ impl ProfileModelSelector {
         });
 
         let sidecar_dropdown = ctx.add_typed_action_view(|_ctx| Menu::new());
+
+        let effort_dropdown = ctx.add_typed_action_view(|_ctx| {
+            Menu::new()
+                .prevent_interaction_with_other_elements()
+                .with_drop_shadow()
+        });
+        ctx.subscribe_to_view(&effort_dropdown, |me, _, event, ctx| {
+            if let MenuEvent::Close { .. } = event {
+                me.set_effort_menu_visibility(false, ctx);
+            }
+        });
 
         let new_model_popup = ctx.add_typed_action_view(|_ctx| {
             FeaturePopup::new_feature(NewFeaturePopupLabel::FromCallable(Box::new(|ctx| {
@@ -738,6 +855,7 @@ impl ProfileModelSelector {
             model_compact_button,
             profile_dropdown,
             model_dropdown,
+            effort_dropdown,
             model_spec_sidecar: ModelSpecSidecar {
                 dropdown: sidecar_dropdown,
                 hovered_info: None,
@@ -745,9 +863,11 @@ impl ProfileModelSelector {
             },
             is_profile_menu_open: false,
             is_model_menu_open: false,
+            is_effort_menu_open: false,
             terminal_view_id,
             profile_mouse_state: Default::default(),
             model_mouse_state: Default::default(),
+            effort_mouse_state: Default::default(),
             menu_positioning_provider,
             is_blurred: false,
             new_model_popup,
@@ -770,6 +890,7 @@ impl ProfileModelSelector {
 
         self.is_profile_menu_open = is_open;
         self.is_model_menu_open = false;
+        self.is_effort_menu_open = false;
         if is_open {
             ctx.focus(&self.profile_dropdown);
         }
@@ -783,6 +904,7 @@ impl ProfileModelSelector {
         }
         self.is_model_menu_open = is_open;
         self.is_profile_menu_open = false;
+        self.is_effort_menu_open = false;
         if is_open {
             LLMPreferences::handle(ctx).update(ctx, |preferences, _| {
                 preferences.hide_llm_popup(self.terminal_view_id)
@@ -801,8 +923,24 @@ impl ProfileModelSelector {
         ctx.notify();
     }
 
+    /// Uncaged: open or close the effort menu (one menu at a time, like the others).
+    pub fn set_effort_menu_visibility(&mut self, is_open: bool, ctx: &mut ViewContext<Self>) {
+        if self.is_effort_menu_open == is_open {
+            return;
+        }
+        self.is_effort_menu_open = is_open;
+        self.is_profile_menu_open = false;
+        self.is_model_menu_open = false;
+        if is_open {
+            self.refresh_uncaged_effort_menu(ctx);
+            ctx.focus(&self.effort_dropdown);
+        }
+        ctx.emit(ProfileModelSelectorEvent::MenuVisibilityChanged { open: is_open });
+        ctx.notify();
+    }
+
     pub fn is_open(&self) -> bool {
-        self.is_profile_menu_open || self.is_model_menu_open
+        self.is_profile_menu_open || self.is_model_menu_open || self.is_effort_menu_open
     }
 
     pub fn model_menu_item_position_id(&self, llm_id: &LLMId) -> String {
@@ -1934,14 +2072,19 @@ impl ProfileModelSelector {
         let is_locked_for_non_oz = self.is_locked_for_non_oz_run(app);
         let is_locked = is_locked_for_followup || is_locked_for_non_oz;
         let can_interact = has_edit_access && !is_locked;
+        // Uncaged: the effort section, when shown, sits to the right of this one, so only
+        // round this section's hover background when it is the chip's last section.
+        let hover_corner_radius = if Self::uncaged_effort_connection().is_some() {
+            CornerRadius::with_all(Radius::Pixels(0.))
+        } else {
+            CornerRadius::with_right(Radius::Pixels(INNER_CORNER_RADIUS))
+        };
 
         let hoverable = Hoverable::new(self.model_mouse_state.clone(), move |state| {
             if state.is_hovered() && can_interact {
                 let button_with_hover = Container::new(button_with_save_position)
                     .with_background(theme.surface_2())
-                    .with_corner_radius(CornerRadius::with_right(Radius::Pixels(
-                        INNER_CORNER_RADIUS,
-                    )))
+                    .with_corner_radius(hover_corner_radius)
                     .finish();
 
                 let tooltip = appearance
@@ -2402,11 +2545,17 @@ impl TypedActionView for ProfileModelSelector {
                 }
                 ctx.notify();
             }
+            ProfileModelSelectorAction::ToggleEffortMenu => {
+                if self.is_model_locked(ctx) {
+                    return;
+                }
+                self.set_effort_menu_visibility(!self.is_effort_menu_open, ctx);
+            }
             ProfileModelSelectorAction::SelectUncagedEffort {
                 connection_id,
                 effort,
             } => {
-                self.set_model_menu_visibility(false, ctx);
+                self.set_effort_menu_visibility(false, ctx);
                 match crate::uncaged::set_effort(connection_id, effort.as_deref()) {
                     Ok(()) => {
                         let label = crate::uncaged::connections()
@@ -2508,6 +2657,13 @@ impl View for ProfileModelSelector {
             chip_content.add_child(self.render_separator(app, show_separator));
         }
         chip_content.add_child(self.render_model_section(app));
+        let effort_connection = Self::uncaged_effort_connection();
+        if let Some(conn) = effort_connection.as_ref() {
+            let model_hovered = self.model_mouse_state.lock().unwrap().is_hovered();
+            let effort_hovered = self.effort_mouse_state.lock().unwrap().is_hovered();
+            chip_content.add_child(self.render_separator(app, !(model_hovered || effort_hovered)));
+            chip_content.add_child(self.render_effort_section(conn, app));
+        }
 
         let unified_chip = Container::new(
             Container::new(chip_content.finish())
@@ -2533,6 +2689,31 @@ impl View for ProfileModelSelector {
             let profile_menu = ChildView::new(&self.profile_dropdown).finish();
             let positioning = self.get_menu_positioning(app, true);
             stack.add_positioned_overlay_child(profile_menu, positioning);
+        }
+
+        if self.is_effort_menu_open && effort_connection.is_some() && !self.render_compact {
+            let effort_menu = ChildView::new(&self.effort_dropdown).finish();
+            let positioning = match self.menu_positioning_provider.menu_position(app) {
+                MenuPositioning::BelowInputBox => {
+                    OffsetPositioning::offset_from_save_position_element(
+                        EFFORT_BUTTON_POSITION_ID,
+                        vec2f(0., 4.),
+                        PositionedElementOffsetBounds::WindowByPosition,
+                        PositionedElementAnchor::BottomRight,
+                        ChildAnchor::TopRight,
+                    )
+                }
+                MenuPositioning::AboveInputBox => {
+                    OffsetPositioning::offset_from_save_position_element(
+                        EFFORT_BUTTON_POSITION_ID,
+                        vec2f(0., -4.),
+                        PositionedElementOffsetBounds::WindowByPosition,
+                        PositionedElementAnchor::TopRight,
+                        ChildAnchor::BottomRight,
+                    )
+                }
+            };
+            stack.add_positioned_overlay_child(effort_menu, positioning);
         }
 
         if self.is_model_menu_open {

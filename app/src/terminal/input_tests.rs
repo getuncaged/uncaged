@@ -7317,8 +7317,10 @@ fn test_cloud_handoff_prefix_ignores_terminal_input_mode_toggle() {
     });
 }
 
+/// Uncaged: in the agent view `!` is plain text. Typing it used to flip the input into shell
+/// mode; the toggle and its keybinding are the ways to switch now.
 #[test]
-fn test_terminal_prefix_sets_shell_prefix_decision_source() {
+fn test_uncaged_typed_bang_does_not_switch_agent_view_to_shell() {
     App::test((), |mut app| async move {
         let _am_flag = FeatureFlag::AgentMode.override_enabled(true);
         let _agent_view_flag = FeatureFlag::AgentView.override_enabled(true);
@@ -7327,17 +7329,19 @@ fn test_terminal_prefix_sets_shell_prefix_decision_source() {
         let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
         let input = terminal.read(&app, |terminal, _| terminal.input().clone());
         enter_fullscreen_agent_view_for_test(&terminal, &mut app);
+        let input_type_before = input.read(&app, |input, ctx| {
+            input.ai_input_model().as_ref(ctx).input_type()
+        });
 
         input.update(&mut app, |input, ctx| {
             input.user_insert(TERMINAL_INPUT_PREFIX, ctx);
         });
 
         input.read(&app, |input, ctx| {
-            assert!(input.buffer_text(ctx).is_empty());
+            assert_eq!(input.buffer_text(ctx), TERMINAL_INPUT_PREFIX);
             app.read_model(input.ai_input_model(), |input_model, _| {
-                assert_eq!(input_model.input_type(), InputType::Shell);
-                assert!(input_model.is_input_type_locked());
-                assert_eq!(
+                assert_eq!(input_model.input_type(), input_type_before);
+                assert_ne!(
                     input_model.last_ai_autodetection_source(),
                     Some(InputTypeAutoDetectionSource::ShellPrefix)
                 );
