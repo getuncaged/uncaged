@@ -6443,18 +6443,7 @@ impl Workspace {
         let reopen_closed_session_shortcut_label =
             keybinding_name_to_display_string("app:reopen_closed_session", ctx);
 
-        // 1. Agent (if AI enabled)
-        if is_any_ai_enabled {
-            let mut agent_item = MenuItemFields::new("Agent")
-                .with_on_select_action(WorkspaceAction::AddAgentTab)
-                .with_icon(icons::Icon::LayoutAlt01);
-            if effective_default == DefaultSessionMode::Agent {
-                agent_item = agent_item.with_key_shortcut_label(shortcut_label.clone());
-            }
-            menu_items.push(agent_item.into_item());
-        }
-
-        // 2. Terminal (+ individual shells on Windows)
+        // 1. Terminal (+ individual shells on Windows)
         {
             // On Windows, list the default terminal and each available shell as
             // individual top-level items (no submenu) so each gets a sidecar.
@@ -6465,7 +6454,7 @@ impl Workspace {
                     .with_on_select_action(WorkspaceAction::AddTerminalTab {
                         hide_homepage: false,
                     })
-                    .with_icon(icons::Icon::LayoutAlt01);
+                    .with_icon(icons::Icon::Terminal);
                 if is_terminal_default {
                     terminal_item = terminal_item.with_key_shortcut_label(shortcut_label.clone());
                 }
@@ -6502,12 +6491,25 @@ impl Workspace {
                     .with_on_select_action(WorkspaceAction::AddTerminalTab {
                         hide_homepage: false,
                     })
-                    .with_icon(icons::Icon::LayoutAlt01);
+                    .with_icon(icons::Icon::Terminal);
                 if effective_default == DefaultSessionMode::Terminal {
                     terminal_item = terminal_item.with_key_shortcut_label(shortcut_label.clone());
                 }
                 menu_items.push(terminal_item.into_item());
             }
+        }
+
+        // 2. Agent (if AI enabled). Uncaged: listed after Terminal -- this is a terminal first --
+        // and with the same sparkles icon as the input's Agent mode segment, so the two entries
+        // no longer share one generic layout icon.
+        if is_any_ai_enabled {
+            let mut agent_item = MenuItemFields::new("Agent")
+                .with_on_select_action(WorkspaceAction::AddAgentTab)
+                .with_icon(icons::Icon::Stars);
+            if effective_default == DefaultSessionMode::Agent {
+                agent_item = agent_item.with_key_shortcut_label(shortcut_label.clone());
+            }
+            menu_items.push(agent_item.into_item());
         }
 
         // 3. Cloud Agent (if flags enabled)
@@ -21008,7 +21010,7 @@ impl Workspace {
             })
             .finish();
 
-            let new_session_menu_button = combo_inner_button(
+            let mut new_session_menu_button = combo_inner_button(
                 appearance,
                 icons::Icon::ChevronDown,
                 is_active,
@@ -21022,25 +21024,31 @@ impl Workspace {
             .with_active_styles(
                 UiComponentStyles::default()
                     .set_background(internal_colors::fg_overlay_3(theme).into()),
-            )
-            .with_tooltip(self.render_tab_bar_icon_button_tooltip(
-                appearance,
-                tab_configs_tool_tip_label_text.clone(),
-                tab_configs_tool_tip_sublabel_text.clone(),
-            ))
-            .build()
-            .on_click(move |ctx, app, _| {
-                // We are positioning the menu to the lower-left corner of the new tab button.
-                // This gives the impression that both individual buttons are one big button.
-                if let Some(position) =
-                    app.element_position_by_id_at_last_frame(window_id, NEW_TAB_BUTTON_POSITION_ID)
-                {
-                    ctx.dispatch_typed_action(WorkspaceAction::ToggleNewSessionMenu {
-                        anchor: NewSessionMenuAnchor::AddTabButton(position.lower_left()),
-                    });
-                }
-            })
-            .finish();
+            );
+            // Uncaged: no tooltip while the menu it opens is showing -- it peeked out from
+            // under the menu's edge.
+            if !is_active {
+                new_session_menu_button =
+                    new_session_menu_button.with_tooltip(self.render_tab_bar_icon_button_tooltip(
+                        appearance,
+                        tab_configs_tool_tip_label_text.clone(),
+                        tab_configs_tool_tip_sublabel_text.clone(),
+                    ));
+            }
+            let new_session_menu_button = new_session_menu_button
+                .build()
+                .on_click(move |ctx, app, _| {
+                    // We are positioning the menu to the lower-left corner of the new tab button.
+                    // This gives the impression that both individual buttons are one big button.
+                    if let Some(position) = app
+                        .element_position_by_id_at_last_frame(window_id, NEW_TAB_BUTTON_POSITION_ID)
+                    {
+                        ctx.dispatch_typed_action(WorkspaceAction::ToggleNewSessionMenu {
+                            anchor: NewSessionMenuAnchor::AddTabButton(position.lower_left()),
+                        });
+                    }
+                })
+                .finish();
 
             let row = Flex::row()
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)

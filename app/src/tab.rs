@@ -80,6 +80,10 @@ const TAB_INDICATOR_SYNCED_COLOR: u32 = 0x4A93FFFF;
 pub(crate) const COMPACT_TAB_WIDTH_THRESHOLD: f32 = 42.0;
 // Horizontal inset for the tab close button
 const TAB_CLOSE_BUTTON_HORIZONTAL_INSET: f32 = 2.0;
+/// Uncaged: the inset and rounding of a tab's highlight inside the tab bar.
+const TAB_VERTICAL_INSET: f32 = 4.0;
+const TAB_HORIZONTAL_INSET: f32 = 2.0;
+const TAB_CORNER_RADIUS: f32 = 6.0;
 
 /// Represents the user's manual tab-color selection state.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -1786,22 +1790,24 @@ impl<'a> TabComponent<'a> {
                 .finish();
         }
 
-        let mut tab = Container::new(stack)
-            .with_vertical_padding(2.)
-            .with_background(background_color);
-        if FeatureFlag::NewTabStyling.is_enabled() {
-            let is_first_tab = self.tab_index == 0;
-            tab = tab.with_border(
-                Border::all(1.)
-                    // We only include a left border on the very first tab to avoid double borders.
-                    .with_sides(false, is_first_tab, false, true)
-                    .with_border_fill(border_fill),
-            );
+        let tab = if FeatureFlag::NewTabStyling.is_enabled() {
+            // Uncaged: a tab is an inset, rounded highlight -- the grouped-member style -- rather
+            // than a full-height cell boxed in by dividers. The bar reads as one light strip
+            // with the active tab lifted out of it, instead of a row of blocks.
+            let highlight = Container::new(stack)
+                .with_background(background_color)
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(TAB_CORNER_RADIUS)))
+                .finish();
+            Container::new(highlight)
+                .with_vertical_padding(TAB_VERTICAL_INSET)
+                .with_horizontal_padding(TAB_HORIZONTAL_INSET)
         } else {
-            tab = tab
+            Container::new(stack)
+                .with_vertical_padding(2.)
+                .with_background(background_color)
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.0)))
-                .with_border(Border::all(1.).with_border_fill(border_fill));
-        }
+                .with_border(Border::all(1.).with_border_fill(border_fill))
+        };
 
         // If the tab is being dragged, add an opaque background behind it
         if is_tab_dragging {
