@@ -146,16 +146,15 @@ them to the GitHub Release. Asset names are the contract in
 
 | Platform | Runner | Formats | Status |
 |---|---|---|---|
-| macOS | `macos-latest` | `Uncaged-macos-{aarch64,x86_64,universal}.dmg` + `Uncaged-macos-aarch64.zip` | **first-class** (fails the release if broken) |
+| macOS | `macos-latest` | `Uncaged-macos-{aarch64,x86_64}.dmg` + `.zip` | **first-class** (fails the release if broken) |
 | Linux x86_64 | `ubuntu-latest` | `.deb`, `.rpm`, `.pkg.tar.zst`, `.AppImage`, `.tar.gz` | best-effort |
 | Linux aarch64 | `ubuntu-24.04-arm` (native) | `.deb`, `.rpm`, `.pkg.tar.zst`, `.AppImage`, `.tar.gz` | best-effort |
 | Windows x86_64 | `windows-latest` | `…-setup.exe` (Inno Setup) + `.zip` | best-effort |
 | Windows aarch64 | `windows-latest` (cross) | `…-setup.exe` | best-effort |
 
 Every non-macOS job is `continue-on-error: true`, so a release still publishes
-whatever succeeds. All three macOS DMGs are ad-hoc signed via
-`./script/bundle --channel oss --selfsign [--arch <arch>]` (universal omits
-`--arch`).
+whatever succeeds. Both macOS DMGs are ad-hoc signed via
+`./script/bundle --channel oss --selfsign --arch <arch>`.
 
 ### Linux packaging — what the fork changed
 
@@ -207,14 +206,22 @@ brew install --cask getuncaged/tap/uncaged
 ```
 
 **Updating the cask on release:** after a tag's release assets are published,
-copy `packaging/homebrew/uncaged.rb` into the tap as `Casks/uncaged.rb` and set:
+edit `Casks/uncaged.rb` in the tap and set:
 
-- `version` → the tag without the leading `v` (e.g. `0.1.0`),
-- `sha256` → `shasum -a 256 Uncaged-macos-universal.dmg` for that release.
+- `version` → the tag without the leading `v` (e.g. `0.3.0`),
+- the `on_arm` `sha256` → the checksum of `Uncaged-macos-aarch64.dmg`,
+- the `on_intel` `sha256` → the checksum of `Uncaged-macos-x86_64.dmg`.
 
-Then commit to the tap. (The cask points at the **universal** DMG so one formula
-covers Apple Silicon and Intel.) This is a manual/scriptable step in the tap
-repo; it does not run from this repo's workflow.
+GitHub records each asset's checksum, so nothing needs downloading:
+
+```bash
+gh api repos/getuncaged/uncaged/releases/tags/vX.Y.Z \
+  -q '.assets[] | select(.name | endswith(".dmg")) | "\(.name) \(.digest)"'
+```
+
+Then commit to the tap. The cask uses the per-arch DMGs; there is no universal
+DMG. This is a manual step in the tap repo; it does not run from this repo's
+workflow.
 
 ### winget (Windows)
 
