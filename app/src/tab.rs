@@ -83,7 +83,7 @@ const TAB_CLOSE_BUTTON_HORIZONTAL_INSET: f32 = 2.0;
 /// Uncaged: the inset and rounding of a tab's highlight inside the tab bar.
 const TAB_VERTICAL_INSET: f32 = 4.0;
 const TAB_HORIZONTAL_INSET: f32 = 2.0;
-const TAB_CORNER_RADIUS: f32 = 6.0;
+const TAB_CORNER_RADIUS: f32 = warp_core::ui::radius::MEDIUM;
 
 /// Represents the user's manual tab-color selection state.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

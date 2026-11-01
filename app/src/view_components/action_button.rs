@@ -6,6 +6,7 @@ use pathfinder_geometry::vector::{vec2f, Vector2F};
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::color::contrast::MinimumAllowedContrast;
 use warp_core::ui::color::{coloru_with_opacity, ContrastingColor};
+use warp_core::ui::radius;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::theme::{AnsiColorIdentifier, Fill};
 use warpui::elements::{
@@ -841,9 +842,9 @@ impl View for ActionButton {
             }
 
             let corner_radius = match self.adjoined_side {
-                Some(AdjoinedSide::Left) => CornerRadius::with_right(Radius::Pixels(4.)),
-                Some(AdjoinedSide::Right) => CornerRadius::with_left(Radius::Pixels(4.)),
-                None => CornerRadius::with_all(Radius::Pixels(4.)),
+                Some(AdjoinedSide::Left) => CornerRadius::with_right(Radius::Pixels(radius::SMALL)),
+                Some(AdjoinedSide::Right) => CornerRadius::with_left(Radius::Pixels(radius::SMALL)),
+                None => radius::small(),
             };
 
             let border = if let Some(adjoined_side_border) = theme.adjoined_side_border(appearance)

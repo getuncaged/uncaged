@@ -8,8 +8,8 @@ use warp_core::send_telemetry_from_app_ctx;
 use warp_util::path::LineAndColumnArg;
 use warpui::elements::{
     Align, Border, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
-    Container, CornerRadius, Dismiss, DispatchEventResult, Empty, EventHandler, Fill, Flex,
-    ParentElement, Radius, SavePosition, Shrinkable,
+    Container, Dismiss, DispatchEventResult, Empty, EventHandler, Fill, Flex, ParentElement,
+    SavePosition, Shrinkable,
 };
 use warpui::event::KeyState;
 use warpui::keymap::BindingId;
@@ -195,7 +195,7 @@ impl warpui::View for View {
                             .finish(),
                     )
                     .with_background(theme.surface_2())
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))
+                    .with_corner_radius(warp_core::ui::radius::large())
                     .with_border(Border::all(1.0).with_border_fill(theme.outline()))
                     .with_margin_top(117.)
                     .with_padding_bottom(10.)

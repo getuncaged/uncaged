@@ -26,7 +26,7 @@ use crate::appearance::Appearance;
 use crate::themes::theme::Fill;
 
 const TOAST_WIDTH: f32 = 464.;
-const TOAST_CORNER_RADIUS: f32 = 4.;
+const TOAST_CORNER_RADIUS: f32 = warp_core::ui::radius::MEDIUM;
 const TEXT_MARGIN: f32 = 16.;
 const VERTICAL_PADDING: f32 = 8.;
 const HORIZONTAL_PADDING: f32 = 12.;

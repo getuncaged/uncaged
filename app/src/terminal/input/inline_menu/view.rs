@@ -105,7 +105,7 @@ pub(super) static QUERY_RESULT_RENDERER_STYLES: LazyLock<QueryResultRendererStyl
         panel_border_fn: |appearance| {
             Border::all(1.0).with_border_fill(appearance.theme().outline())
         },
-        panel_corner_radius: CornerRadius::with_all(Radius::Pixels(0.)),
+        panel_corner_radius: warp_core::ui::radius::medium(),
         result_vertical_padding: 2.,
         ..Default::default()
     });

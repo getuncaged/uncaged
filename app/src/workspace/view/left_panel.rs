@@ -17,9 +17,7 @@ use warpui::{
     ViewContext, ViewHandle, WeakViewHandle,
 };
 
-use super::config_panel;
-use super::skills_panel;
-use super::ssh_panel;
+use super::{config_panel, skills_panel, ssh_panel};
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::appearance::Appearance;
@@ -1417,6 +1415,7 @@ impl View for LeftPanelView {
         if warpui::platform::is_mobile_device() {
             return panel_content;
         }
+        let panel_content = super::rounded_panel(panel_content, None, appearance);
 
         let drag_side = match self.panel_position {
             super::PanelPosition::Left => DragBarSide::Right,

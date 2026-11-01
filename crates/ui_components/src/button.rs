@@ -105,7 +105,7 @@ impl crate::Component for Button {
             }
 
             let mut button = Container::new(row.finish())
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(6.)));
             if let Some(background) = background {
                 button = button.with_background(background);
             }

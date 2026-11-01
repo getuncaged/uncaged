@@ -25,7 +25,7 @@ use crate::workspace::{Workspace, WorkspaceAction};
 
 const AGENT_TOAST_WIDTH: f32 = 260.;
 const AGENT_TOAST_PADDING: f32 = 12.;
-const AGENT_TOAST_CORNER_RADIUS: f32 = 4.;
+const AGENT_TOAST_CORNER_RADIUS: f32 = warp_core::ui::radius::MEDIUM;
 const CLOSE_BUTTON_SIZE: f32 = 20.;
 
 /// Data for an individual agent toast

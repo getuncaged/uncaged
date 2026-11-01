@@ -17,7 +17,7 @@ use crate::appearance::Appearance;
 use crate::themes::theme::Fill;
 use crate::ui_components::{blended_colors, icons};
 
-pub const MODAL_CORNER_RADIUS: Radius = Radius::Pixels(8.);
+pub const MODAL_CORNER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::LARGE);
 pub const MODAL_WIDTH: f32 = 440.;
 pub const MODAL_HEADER_HEIGHT: f32 = 70.;
 pub const MODAL_PADDING: f32 = 28.;

@@ -1899,6 +1899,7 @@ impl View for RightPanelView {
         if self.is_maximized(app) {
             return Shrinkable::new(1.0, panel_content).finish();
         }
+        let panel_content = super::rounded_panel(panel_content, None, Appearance::as_ref(app));
 
         let drag_side = match self.panel_position {
             super::PanelPosition::Left => DragBarSide::Right,

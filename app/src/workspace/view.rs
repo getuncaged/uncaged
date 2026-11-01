@@ -560,6 +560,31 @@ const TITLE_BAR_SEARCH_BAR_SLOT_PADDING: f32 = 8.;
 // The total height taken up by the tab bar, including its bottom border.
 pub const TOTAL_TAB_BAR_HEIGHT: f32 = TAB_BAR_HEIGHT + TAB_BAR_BORDER_HEIGHT;
 
+/// Uncaged: the gap around a side panel's rounded card.
+const PANEL_CARD_MARGIN: f32 = 4.;
+
+/// Uncaged: draw a side panel (tools sidebar, code review, vertical tabs) as a rounded,
+/// outlined card inset from the window and the terminal, instead of a full-height block
+/// fenced off by a 1px rule. `background` keeps whatever fill the panel already had; the card
+/// only changes its shape.
+pub(crate) fn rounded_panel(
+    contents: Box<dyn Element>,
+    background: Option<Fill>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let mut card = Container::new(contents)
+        .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
+        .with_corner_radius(warp_core::ui::radius::large())
+        .with_margin_top(PANEL_CARD_MARGIN)
+        .with_margin_bottom(PANEL_CARD_MARGIN)
+        .with_margin_left(PANEL_CARD_MARGIN)
+        .with_margin_right(PANEL_CARD_MARGIN);
+    if let Some(background) = background {
+        card = card.with_background(background);
+    }
+    card.finish()
+}
+
 const TAB_BAR_ICON_PADDING: f32 = 4.;
 
 const TAB_BAR_PILL_WIDTH: f32 = 100.;
@@ -21555,52 +21580,39 @@ impl Workspace {
             let config = TabSettings::as_ref(app)
                 .header_toolbar_chip_selection
                 .clone();
-            let mut prev_panel_added = false;
             for item in config.left_items() {
-                Self::add_panel_with_separator(
+                Self::add_panel(
                     &mut main_content,
-                    &mut prev_panel_added,
                     self.render_config_panel(&item, pane_group, &config, app),
-                    app,
                 );
             }
 
             if !is_right_maximized {
-                if prev_panel_added {
-                    main_content.add_child(Self::render_panel_separator(app));
-                }
                 main_content =
                     main_content.with_child(Shrinkable::new(1.0, terminal_content).finish());
-                prev_panel_added = true;
             }
 
             for item in config.right_items() {
-                Self::add_panel_with_separator(
+                Self::add_panel(
                     &mut main_content,
-                    &mut prev_panel_added,
                     self.render_config_panel(&item, pane_group, &config, app),
-                    app,
                 );
             }
 
             if is_right_maximized {
-                Self::add_panel_with_separator(
+                Self::add_panel(
                     &mut main_content,
-                    &mut prev_panel_added,
                     self.render_config_panel_maximized(pane_group, &config, app),
-                    app,
                 );
             } else if !config.contains_item(&HeaderToolbarItemKind::CodeReview) {
-                Self::add_panel_with_separator(
+                Self::add_panel(
                     &mut main_content,
-                    &mut prev_panel_added,
                     self.render_config_panel(
                         &HeaderToolbarItemKind::CodeReview,
                         pane_group,
                         &config,
                         app,
                     ),
-                    app,
                 );
             }
         } else if !is_right_maximized {
@@ -22208,29 +22220,11 @@ impl Workspace {
         container.finish()
     }
 
-    fn render_panel_separator(app: &AppContext) -> Box<dyn Element> {
-        let appearance = Appearance::as_ref(app);
-        ConstrainedBox::new(
-            Rect::new()
-                .with_background_color(appearance.theme().outline().into_solid())
-                .finish(),
-        )
-        .with_width(1.0)
-        .finish()
-    }
-
-    fn add_panel_with_separator(
-        panels_view: &mut Flex,
-        prev_panel_added: &mut bool,
-        panel: Option<Box<dyn Element>>,
-        app: &AppContext,
-    ) {
+    /// Uncaged: panels are rounded, outlined cards with their own margins (see
+    /// [`rounded_panel`]), so they're added side by side with no 1px rule between them.
+    fn add_panel(panels_view: &mut Flex, panel: Option<Box<dyn Element>>) {
         if let Some(panel) = panel {
-            if *prev_panel_added {
-                panels_view.add_child(Self::render_panel_separator(app));
-            }
             panels_view.add_child(panel);
-            *prev_panel_added = true;
         }
     }
 
@@ -22241,7 +22235,6 @@ impl Workspace {
         hide_vertical_tabs: bool,
     ) -> Box<dyn Element> {
         let mut panels_view = Flex::row();
-        let mut prev_panel_added = false;
 
         // Config-driven vertical-tabs-era panels (left side).
         // Hidden for simplified WASM views (notebooks, shared sessions, etc.)
@@ -22259,38 +22252,25 @@ impl Workspace {
             let pane_group = self.active_tab_pane_group().as_ref(app);
 
             for item in config.left_items() {
-                Self::add_panel_with_separator(
+                Self::add_panel(
                     &mut panels_view,
-                    &mut prev_panel_added,
                     self.render_config_panel(&item, pane_group, &config, app),
-                    app,
                 );
             }
         }
 
-        // Theme chooser (workspace-level, not configurable).
-        // Uses wrap_in_panel_surface which adds margin for its own visual separation,
-        // so we add a separator before it only if a config panel is to its left, then
-        // reset the flag so no separator is added between the theme chooser and the terminal.
+        // Theme chooser (workspace-level, not configurable). Uses wrap_in_panel_surface, which
+        // adds its own margin and rounded surface.
         if self.current_workspace_state.is_theme_chooser_open {
-            if prev_panel_added {
-                panels_view.add_child(Self::render_panel_separator(app));
-            }
             panels_view.add_child(self.render_panel(
                 app,
                 self.render_theme_chooser(),
                 &PanelPosition::Left,
             ));
-            prev_panel_added = false;
-        }
-
-        if prev_panel_added {
-            panels_view.add_child(Self::render_panel_separator(app));
         }
         // The outer workspace container in `render` already paints the terminal
         // background fill, so don't paint it again here (see APP-4328).
         panels_view = panels_view.with_child(Shrinkable::new(1.0, terminal_view).finish());
-        prev_panel_added = true;
 
         if vertical_tabs_active {
             let config = TabSettings::as_ref(app)
@@ -22299,32 +22279,26 @@ impl Workspace {
             let pane_group = self.active_tab_pane_group().as_ref(app);
 
             for item in config.right_items() {
-                Self::add_panel_with_separator(
+                Self::add_panel(
                     &mut panels_view,
-                    &mut prev_panel_added,
                     self.render_config_panel(&item, pane_group, &config, app),
-                    app,
                 );
             }
 
             if pane_group.right_panel_open && pane_group.is_right_panel_maximized {
-                Self::add_panel_with_separator(
+                Self::add_panel(
                     &mut panels_view,
-                    &mut prev_panel_added,
                     self.render_config_panel_maximized(pane_group, &config, app),
-                    app,
                 );
             } else if !config.contains_item(&HeaderToolbarItemKind::CodeReview) {
-                Self::add_panel_with_separator(
+                Self::add_panel(
                     &mut panels_view,
-                    &mut prev_panel_added,
                     self.render_config_panel(
                         &HeaderToolbarItemKind::CodeReview,
                         pane_group,
                         &config,
                         app,
                     ),
-                    app,
                 );
             }
         }

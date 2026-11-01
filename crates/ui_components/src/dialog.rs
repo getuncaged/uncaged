@@ -15,7 +15,7 @@ use warpui_core::{AppContext, EventContext};
 
 use crate::{Component, Options as _, Renderable, button};
 
-const CORNER_RADIUS: Radius = Radius::Pixels(8.);
+const CORNER_RADIUS: Radius = Radius::Pixels(12.);
 const BORDER_WIDTH: f32 = 1.;
 
 /// Base unit of dialog padding. The dialog component applies this to the header, but consumers are responsible

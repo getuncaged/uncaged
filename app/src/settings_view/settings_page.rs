@@ -62,6 +62,9 @@ pub const PAGE_TITLE_MARGIN_BOTTOM: f32 = 4.;
 pub(super) const PAGE_PADDING: f32 = 28.;
 pub(super) const HEADER_FONT_SIZE: f32 = 23.;
 pub const SUBHEADER_FONT_SIZE: f32 = 16.;
+/// Uncaged: the inner padding of, and the gap after, a settings category's card.
+const CATEGORY_CARD_PADDING: f32 = 16.;
+const CATEGORY_CARD_SPACING: f32 = 24.;
 const ALTERNATING_LIST_CLOSE_BUTTON_DIAMETER: f32 = 20.0;
 const ALTERNATING_LIST_ITEM_PADDING: f32 = 8.0;
 const GREY_TEXT_OPACITY: u8 = 60;
@@ -1691,20 +1694,36 @@ impl<V: warpui::View> PageType<V> {
                             page.add_child(render_sub_header(appearance, category.title, None));
                         }
                     }
+                    // Uncaged: a category's widgets sit in one rounded, outlined card (titled
+                    // from above, like grouped settings on macOS and Windows), instead of a flat
+                    // run of rows divided from the next category by a rule.
+                    let mut card = Flex::column();
+                    let mut has_widgets = false;
                     for widget in &category.widgets {
                         let highlighted =
                             highlighted_widget_id.is_some_and(|id| id == widget.widget_id());
                         if widget.should_render(app) {
-                            page.add_child(widget.render_widget(
+                            card.add_child(widget.render_widget(
                                 view,
                                 highlighted,
                                 appearance,
                                 app,
                             ));
+                            has_widgets = true;
                         }
                     }
-                    if i < num_categories - 1 {
-                        page.add_child(render_separator(appearance));
+                    if has_widgets {
+                        let mut card = Container::new(card.finish())
+                            .with_border(
+                                Border::all(1.).with_border_fill(appearance.theme().outline()),
+                            )
+                            .with_corner_radius(warp_core::ui::radius::large())
+                            .with_horizontal_padding(CATEGORY_CARD_PADDING)
+                            .with_padding_top(CATEGORY_CARD_PADDING);
+                        if i < num_categories - 1 {
+                            card = card.with_margin_bottom(CATEGORY_CARD_SPACING);
+                        }
+                        page.add_child(card.finish());
                     }
                 }
                 page.finish()

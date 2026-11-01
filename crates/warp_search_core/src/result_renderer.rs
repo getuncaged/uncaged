@@ -18,6 +18,9 @@ const DETAILS_MIN_WIDTH: f32 = 180.;
 const DETAILS_MAX_WIDTH: f32 = 480.;
 
 const CORNER_RADIUS: f32 = 8.;
+/// Uncaged: rows highlight as rounded pills inset from the panel's edges, not edge-to-edge bars.
+const HIGHLIGHT_CORNER_RADIUS: f32 = 6.;
+const OUTER_HORIZONTAL_PADDING: f32 = 4.;
 const DEFAULT_RESULT_HORIZONTAL_PADDING: f32 = 8.;
 
 /// Index of the [`QueryResult`] that was clicked.
@@ -67,8 +70,10 @@ impl Default for QueryResultRendererStyles {
             result_horizontal_padding: DEFAULT_RESULT_HORIZONTAL_PADDING,
             result_vertical_padding: 0.,
             result_multiline_vertical_padding: 0.,
-            result_outer_horizontal_padding_fn: |_| 0.,
-            item_highlight_corner_radius: CornerRadius::with_all(Radius::Pixels(0.)),
+            result_outer_horizontal_padding_fn: |_| OUTER_HORIZONTAL_PADDING,
+            item_highlight_corner_radius: CornerRadius::with_all(Radius::Pixels(
+                HIGHLIGHT_CORNER_RADIUS,
+            )),
         }
     }
 }

@@ -36,6 +36,7 @@ use super::color::contrast::MinimumAllowedContrast;
 use super::color::ContrastingColor;
 use super::theme::color::internal_colors::{self, text_main};
 use super::theme::{Fill, WarpTheme};
+use crate::ui::radius;
 
 const CLOSE_SVG_PATH: &str = "bundled/svg/close.svg";
 const COPY_SVG_PATH: &str = "bundled/svg/copy.svg";
@@ -93,7 +94,7 @@ impl UiBuilder {
                 right: 15.,
             }),
             border_width: Some(1.),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(radius::small()),
             background: background.map(|background| background.into()),
             border_color: Some(border.into()),
             font_color: Some(font_color.into_solid()),
@@ -106,6 +107,9 @@ impl UiBuilder {
             font_size: Some(self.ui_font_size),
             font_family_id: Some(self.ui_font_family),
             font_color: Some(font_color.into_solid()),
+            // Uncaged: rounded like every other button, so a text button's hover and
+            // selected backgrounds aren't square.
+            border_radius: Some(radius::small()),
             ..Default::default()
         }
     }
@@ -121,7 +125,7 @@ impl UiBuilder {
                 right: 10.,
             }),
             border_width: Some(1.),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(radius::small()),
             background: Some(self.warp_theme.background().into()),
             border_color: Some(self.warp_theme.foreground().with_opacity(20).into()),
             font_color: None,
@@ -149,7 +153,7 @@ impl UiBuilder {
                 left: 8.,
                 right: 8.,
             }),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(radius::small()),
             border_width: Some(1.),
             border_color: Some(self.warp_theme.outline().into()),
             font_family_id: Some(self.ui_font_family),
@@ -168,7 +172,7 @@ impl UiBuilder {
                 left: 14.,
                 right: 14.,
             }),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(radius::small()),
             border_width: Some(1.),
             border_color: Some(self.warp_theme.outline().into()),
             font_family_id: Some(self.ui_font_family),
@@ -354,7 +358,7 @@ impl UiBuilder {
                     .hint_text_color(self.warp_theme.background())
                     .into_solid(),
             ),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(radius::small()),
             background: Some(internal_colors::fg_overlay_1(self.warp_theme()).into()),
             height: Some(DEFAULT_KEYBOARD_SHORTCUT_HEIGHT),
             padding: Some(Coords::default().left(6.).right(6.)),
@@ -1128,7 +1132,7 @@ impl UiBuilder {
         mouse_state: MouseStateHandle,
     ) -> Button {
         let default_styles = UiComponentStyles {
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(radius::small()),
             border_color: Some(self.warp_theme.surface_3().into()),
             border_width: Some(1.),
             padding: Some(Coords {

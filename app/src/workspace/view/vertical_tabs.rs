@@ -1693,9 +1693,11 @@ fn render_vertical_tabs_panel(
     // Wrap the panel in a `Hoverable` so right-clicking the empty area of the
     // vertical tabs panel opens the tab configs dropdown.
     let inner = Hoverable::new(state.panel_right_click_mouse_state.clone(), |_| {
-        Container::new(panel_with_popup)
-            .with_background(internal_colors::fg_overlay_1(theme))
-            .finish()
+        super::rounded_panel(
+            panel_with_popup,
+            Some(internal_colors::fg_overlay_1(theme).into()),
+            appearance,
+        )
     })
     .on_right_click(|ctx, _, position| {
         if FeatureFlag::GroupedTabs.is_enabled() {

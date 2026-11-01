@@ -7,6 +7,7 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use warp_core::ui::color::blend::Blend;
+use warp_core::ui::radius;
 use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
 use warpui::assets::asset_cache::AssetSource;
 use warpui::elements::{
@@ -37,6 +38,8 @@ use crate::util::time_format::format_approx_duration_from_now_sentence_case;
 pub const CHEVRON_RIGHT_ALIGN_SVG_PATH: &str = "bundled/svg/chevron-right-align.svg";
 
 const SUBMENU_OVERLAP: f32 = 8.;
+/// Uncaged: how far a row's highlight sits in from the menu's left and right edges.
+const MENU_ITEM_INSET: f32 = 4.;
 const MENU_VERTICAL_PADDING: f32 = 9.;
 pub const MENU_ITEM_VERTICAL_PADDING: f32 = 5.;
 pub const MENU_ITEM_HORIZONTAL_PADDING: f32 = 14.;
@@ -1332,8 +1335,14 @@ impl<A: Action + Clone> MenuItemFields<A> {
             )
             .with_padding_top(vertical_padding)
             .with_padding_bottom(vertical_padding)
-            .with_padding_left(left_padding)
-            .with_padding_right(horizontal_padding);
+            .with_padding_left((left_padding - MENU_ITEM_INSET).max(0.))
+            .with_padding_right((horizontal_padding - MENU_ITEM_INSET).max(0.))
+            // Uncaged: the hover/selected highlight is a rounded pill inset from the menu's
+            // edges rather than a full-width bar; the inset comes out of the row's padding, so
+            // the label stays where it was.
+            .with_margin_left(MENU_ITEM_INSET)
+            .with_margin_right(MENU_ITEM_INSET)
+            .with_corner_radius(radius::small());
 
             let container_element = if let Some(background_color) = background_color {
                 container.with_background(background_color).finish()
@@ -2762,9 +2771,9 @@ impl<A: Action + Clone> SubMenu<A> {
             .enumerate()
             .for_each(|(depth, submenu)| {
                 let corner_radius = if flatten_bottom_corners && depth == 0 {
-                    CornerRadius::with_top(Radius::Pixels(5.))
+                    CornerRadius::with_top(Radius::Pixels(radius::MEDIUM))
                 } else {
-                    CornerRadius::with_all(Radius::Pixels(5.))
+                    radius::medium()
                 };
 
                 // At depth 0, place pinned header/footer inside the styled container

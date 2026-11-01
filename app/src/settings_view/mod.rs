@@ -35,7 +35,7 @@ use warp_core::ui::theme::color::internal_colors;
 use warp_editor::editor::NavigationKey;
 use warpify_page::{WarpifyPageAction, WarpifyPageView};
 use warpui::elements::{
-    Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable,
+    Align, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty,
     EventHandler, Expanded, Fill, Flex, MainAxisSize, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, SavePosition, ScrollbarWidth, Shrinkable, Stack,
@@ -155,9 +155,6 @@ fn sidebar_width() -> f32 {
         SIDEBAR_WIDTH_DEFAULT
     }
 }
-
-/// Width of the borders for the header and the sidebar.
-const SECTION_BORDER_WIDTH: f32 = 1.;
 
 const POSITION_ID: &str = "settings_pane";
 
@@ -2614,16 +2611,16 @@ impl View for SettingsView {
         .with_padding_top(HEADER_PADDING)
         .finish();
 
-        let sidebar = ConstrainedBox::new(
-            Container::new(
-                Flex::column()
-                    .with_child(Expanded::new(1., scrollable).finish())
-                    .with_child(footer)
-                    .finish(),
-            )
-            .with_border(Border::right(SECTION_BORDER_WIDTH).with_border_fill(theme.outline()))
-            .finish(),
-        )
+        // Uncaged: the sidebar is a rounded, outlined card like the workspace's side panels,
+        // instead of a full-height column fenced off by a rule.
+        let sidebar = ConstrainedBox::new(crate::workspace::view::rounded_panel(
+            Flex::column()
+                .with_child(Expanded::new(1., scrollable).finish())
+                .with_child(footer)
+                .finish(),
+            None,
+            appearance,
+        ))
         .with_width(sidebar_width())
         .finish();
 

@@ -1,5 +1,5 @@
 use warpui::elements::{
-    Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Element, Flex,
+    Border, ConstrainedBox, Container, CrossAxisAlignment, Dismiss, Element, Flex,
     MainAxisAlignment, MainAxisSize, ParentElement, Shrinkable, Text,
 };
 use warpui::fonts::{Properties, Weight};
@@ -39,7 +39,7 @@ pub fn dialog_styles(appearance: &Appearance) -> UiComponentStyles {
         font_weight: Some(warpui::fonts::Weight::Bold),
         background: Some(background.into()),
         border_color: Some(theme.surface_3().into()),
-        border_radius: Some(CornerRadius::with_all(warpui::elements::Radius::Pixels(8.))),
+        border_radius: Some(warp_core::ui::radius::large()),
         border_width: Some(1.),
         ..Default::default()
     }
