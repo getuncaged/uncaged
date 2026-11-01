@@ -46,6 +46,7 @@ pub(crate) mod ssh_remote_server_choice_view;
 pub(crate) mod ssh_remote_server_failed_banner;
 pub(crate) mod ssh_tmux_deprecation_banner;
 mod tab_metadata;
+pub(crate) use tab_metadata::minimal_tab_title;
 #[cfg(any(test, feature = "integration_tests"))]
 mod testing;
 mod tooltips;
@@ -6434,7 +6435,8 @@ impl TerminalView {
                 }
                 // When the active conversation is invalidated, fall back to the original pane title
                 self.pane_configuration.update(ctx, |pane_config, ctx| {
-                    pane_config.set_title(self.terminal_title.clone(), ctx);
+                    pane_config
+                        .set_title(tab_metadata::minimal_tab_title(&self.terminal_title), ctx);
                 });
                 self.is_using_conversation_for_pane_header_title = false;
             }

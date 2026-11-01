@@ -146,8 +146,8 @@ use crate::terminal::view::load_ai_conversation::{
 };
 use crate::terminal::view::ssh_file_upload::FileUploadId;
 use crate::terminal::view::{
-    BlockNotification, ConversationRestorationInNewPaneType, ExecuteCommandEvent,
-    LeftPanelTargetView, SyncEvent, TerminalViewState,
+    minimal_tab_title, BlockNotification, ConversationRestorationInNewPaneType,
+    ExecuteCommandEvent, LeftPanelTargetView, SyncEvent, TerminalViewState,
 };
 use crate::terminal::{
     MockTerminalManager, ShellLaunchData, ShellLaunchState, TerminalManager, TerminalModel,
@@ -5001,9 +5001,13 @@ impl PaneGroup {
     }
 
     /// The current pane group title, based on the focused pane.
+    ///
+    /// Uncaged: in its minimal tab form (see `minimal_tab_title`), so a title restored from a
+    /// previous session -- set before the cleanup existed -- reads `Brain`, not
+    /// `user@host:~/Brain`, without waiting for the shell to set a new one.
     pub(crate) fn title(&self, ctx: &AppContext) -> String {
         self.focused_pane_content(ctx)
-            .map(|pane| pane.pane_configuration().as_ref(ctx).title().to_owned())
+            .map(|pane| minimal_tab_title(pane.pane_configuration().as_ref(ctx).title()))
             .unwrap_or_default()
     }
 

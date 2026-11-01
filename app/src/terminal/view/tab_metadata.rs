@@ -97,3 +97,38 @@ impl TerminalView {
             })
     }
 }
+
+/// Uncaged: the tab-friendly form of a terminal title.
+///
+/// Shells set the title to `user@host:path` (zsh, bash and fish defaults), which comes out
+/// truncated from the left as `..v@Antons-MacBook-Pro:~`. Drop the `user@host:` prefix and
+/// keep just the folder name -- `~`, `Brain` -- for a path; any other title (what a running
+/// program sets, e.g. `vim notes.md`) is kept as it is.
+pub(crate) fn minimal_tab_title(title: &str) -> String {
+    let title = title.trim();
+    // The prefix may already be cut down by the shell itself (oh-my-zsh truncates the title
+    // from the left, `..ns-MacBook-Pro:~/Brain`), losing the `@`; a `host:` before a path is
+    // still a prefix.
+    let rest = match title.split_once(':') {
+        Some((prefix, rest))
+            if !prefix.is_empty()
+                && !prefix.contains(char::is_whitespace)
+                && (prefix.contains('@') || rest.trim_start().starts_with(['~', '/'])) =>
+        {
+            rest.trim()
+        }
+        _ => title,
+    };
+    let is_path = rest.starts_with('~') || rest.starts_with('/');
+    if !is_path || rest.contains(char::is_whitespace) {
+        return rest.to_owned();
+    }
+    match rest.trim_end_matches('/').rsplit('/').next() {
+        Some(folder) if !folder.is_empty() => folder.to_owned(),
+        _ => "/".to_owned(),
+    }
+}
+
+#[cfg(test)]
+#[path = "tab_metadata_tests.rs"]
+mod tests;

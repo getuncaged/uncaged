@@ -18,6 +18,7 @@ use warpui::{
 
 use super::ambient_agent::is_cloud_agent_pre_first_exchange;
 use super::shared_session::adapter::Kind as SharedSessionKind;
+use super::tab_metadata::minimal_tab_title;
 use super::{Event, PaneConfiguration, TerminalAction, TerminalViewState, Viewer};
 use crate::ai::agent::conversation::{
     AIConversation, ConversationStatus, ServerAIConversationMetadata,
@@ -128,7 +129,7 @@ impl TerminalView {
             cli_agent_title
         } else if self.is_long_running_and_user_controlled() && !self.terminal_title.is_empty() {
             self.is_using_conversation_for_pane_header_title = false;
-            self.terminal_title.clone()
+            minimal_tab_title(&self.terminal_title)
         } else {
             match selected_conversation_title {
                 Some(conversation_title) => {
@@ -139,7 +140,7 @@ impl TerminalView {
                     if is_ambient_agent {
                         default_agent_conversation_title(is_ambient_agent)
                     } else {
-                        self.terminal_title.clone()
+                        minimal_tab_title(&self.terminal_title)
                     }
                 }
             }
