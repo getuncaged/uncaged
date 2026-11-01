@@ -2864,6 +2864,15 @@ impl BackingView for SettingsView {
     fn set_focus_handle(&mut self, focus_handle: PaneFocusHandle, _ctx: &mut ViewContext<Self>) {
         self.focus_handle = Some(focus_handle);
     }
+
+    /// Uncaged: only in a split. On its own, the "Settings" title bar repeats the tab's title
+    /// and pushes the whole page down by a header's height; in a split it is the pane's handle
+    /// (drag, close, menu), so it stays there.
+    fn should_render_header(&self, app: &AppContext) -> bool {
+        self.focus_handle
+            .as_ref()
+            .is_some_and(|handle| handle.split_pane_state(app).is_in_split_pane())
+    }
 }
 
 #[cfg(test)]

@@ -150,6 +150,9 @@ pub enum Icon {
     InlineCode,
     Strikethrough,
     Stars,
+    /// Uncaged: the bold three-star sparkle (`sparkle.svg`) -- the Agent mark in the mode
+    /// toggle and menus, where `Stars`' thin curves turned jagged.
+    Sparkle,
     AgentMode,
     AmbientAgentMode,
     Github,
@@ -501,6 +504,7 @@ impl From<Icon> for &'static str {
             Icon::InlineCode => "bundled/svg/edit-code.svg",
             Icon::Strikethrough => "bundled/svg/edit-strikethrough.svg",
             Icon::Stars => "bundled/svg/stars-01.svg",
+            Icon::Sparkle => "bundled/svg/sparkle.svg",
             Icon::AgentMode => "bundled/svg/agentmode.svg",
             Icon::AmbientAgentMode => "bundled/svg/ambient-agent-mode.svg",
             Icon::Github => "bundled/svg/github.svg",

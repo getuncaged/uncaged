@@ -407,7 +407,9 @@ impl View for InputModeToggle {
 fn segmented_control_styles(app: &AppContext) -> UiComponentStyles {
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
-    let button_size = 5.0 + appearance.monospace_font_size();
+    // Whole pixels, so the segments' icons and rounded corners land on the pixel grid instead
+    // of being smeared across it.
+    let button_size = (5.0 + appearance.monospace_font_size()).round();
     // Use a smaller base font size that scales properly
     let base_font_size = 10.0; // Start with smaller font
     let scaled_ui_font_size = base_font_size * appearance.monospace_ui_scalar();
@@ -493,7 +495,7 @@ fn build_renderable_option_config(
             let (fg_color, bg_color) = compute_colors(InputType::AI, accent_color);
 
             RenderableOptionConfig {
-                icon_path: Icon::Stars.into(),
+                icon_path: Icon::Sparkle.into(),
                 icon_color: fg_color,
                 label: None,
                 tooltip: Some(tooltip_config(

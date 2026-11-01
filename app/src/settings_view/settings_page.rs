@@ -1721,13 +1721,14 @@ impl<V: warpui::View> PageType<V> {
                         }
                     }
                     if has_widgets {
-                        let mut card = Container::new(card.finish())
-                            .with_border(
-                                Border::all(1.).with_border_fill(appearance.theme().outline()),
-                            )
-                            .with_corner_radius(warp_core::ui::radius::large())
-                            .with_horizontal_padding(CATEGORY_CARD_PADDING)
-                            .with_padding_top(CATEGORY_CARD_PADDING);
+                        let mut card =
+                            Container::new(card.finish())
+                                .with_border(Border::all(1.).with_border_fill(
+                                    crate::workspace::view::card_outline(appearance),
+                                ))
+                                .with_corner_radius(warp_core::ui::radius::large())
+                                .with_horizontal_padding(CATEGORY_CARD_PADDING)
+                                .with_padding_top(CATEGORY_CARD_PADDING);
                         if i < num_categories - 1 {
                             card = card.with_margin_bottom(CATEGORY_CARD_SPACING);
                         }

@@ -560,6 +560,13 @@ const TITLE_BAR_SEARCH_BAR_SLOT_PADDING: f32 = 8.;
 // The total height taken up by the tab bar, including its bottom border.
 pub const TOTAL_TAB_BAR_HEIGHT: f32 = TAB_BAR_HEIGHT + TAB_BAR_BORDER_HEIGHT;
 
+/// Uncaged: the edge of a rounded card. A translucent foreground tint rather than the solid
+/// outline colour: on a curve a hard, high-contrast 1px line shows its stair-steps, while a
+/// soft one blends into the background.
+pub(crate) fn card_outline(appearance: &Appearance) -> Fill {
+    internal_colors::fg_overlay_2(appearance.theme()).into()
+}
+
 /// Uncaged: the gap around a side panel's rounded card.
 const PANEL_CARD_MARGIN: f32 = 4.;
 
@@ -573,7 +580,7 @@ pub(crate) fn rounded_panel(
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let mut card = Container::new(contents)
-        .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
+        .with_border(Border::all(1.).with_border_fill(card_outline(appearance)))
         .with_corner_radius(warp_core::ui::radius::large())
         .with_margin_top(PANEL_CARD_MARGIN)
         .with_margin_bottom(PANEL_CARD_MARGIN)
@@ -6531,7 +6538,7 @@ impl Workspace {
         if is_any_ai_enabled {
             let mut agent_item = MenuItemFields::new("Agent")
                 .with_on_select_action(WorkspaceAction::AddAgentTab)
-                .with_icon(icons::Icon::Stars);
+                .with_icon(icons::Icon::Sparkle);
             if effective_default == DefaultSessionMode::Agent {
                 agent_item = agent_item.with_key_shortcut_label(shortcut_label.clone());
             }
@@ -20907,9 +20914,9 @@ impl Workspace {
         .with_height(TAB_BAR_HEIGHT)
         .finish();
 
-        // Uncaged: the content below the tab bar is a rounded card with its own outline, so the
-        // full-width rule under the tabs is drawn transparent; its height still counts in the
-        // layout (`TOTAL_TAB_BAR_HEIGHT`).
+        // Uncaged: no full-width rule under the tabs -- the tab bar and the content below it read
+        // as one surface, with the side panels as the only cards. The rule is drawn transparent
+        // so its height still counts in the layout (`TOTAL_TAB_BAR_HEIGHT`).
         let tab_bar_border = Border::bottom(TAB_BAR_BORDER_HEIGHT)
             .with_border_fill(Fill::Solid(ColorU::transparent_black()));
 
@@ -21583,10 +21590,6 @@ impl Workspace {
             None => active_content,
         };
 
-        // Uncaged: the terminal / pane area is a rounded, outlined card like the side panels,
-        // so the window reads as a set of floating surfaces rather than full-bleed blocks.
-        let terminal_content = rounded_panel(terminal_content, None, appearance);
-
         let vertical_tabs_active =
             FeatureFlag::VerticalTabs.is_enabled() && *TabSettings::as_ref(app).use_vertical_tabs;
         let pane_group = self.active_tab_pane_group().as_ref(app);
@@ -21602,40 +21605,44 @@ impl Workspace {
             let config = TabSettings::as_ref(app)
                 .header_toolbar_chip_selection
                 .clone();
-            for item in config.left_items() {
-                Self::add_panel(
-                    &mut main_content,
-                    self.render_config_panel(&item, pane_group, &config, app),
-                );
+            let left_panels: Vec<_> = config
+                .left_items()
+                .into_iter()
+                .filter_map(|item| self.render_config_panel(&item, pane_group, &config, app))
+                .collect();
+            let mut right_panels: Vec<_> = config
+                .right_items()
+                .into_iter()
+                .filter_map(|item| self.render_config_panel(&item, pane_group, &config, app))
+                .collect();
+            if is_right_maximized {
+                right_panels.extend(self.render_config_panel_maximized(pane_group, &config, app));
+            } else if !config.contains_item(&HeaderToolbarItemKind::CodeReview) {
+                right_panels.extend(self.render_config_panel(
+                    &HeaderToolbarItemKind::CodeReview,
+                    pane_group,
+                    &config,
+                    app,
+                ));
             }
+            let has_side_panel = !left_panels.is_empty() || !right_panels.is_empty();
 
+            for panel in left_panels {
+                main_content.add_child(panel);
+            }
             if !is_right_maximized {
+                // Uncaged: with a side panel open the terminal / pane area is a rounded card
+                // beside it, matching the panels; on its own it stays a plain full surface.
+                let terminal_content = if has_side_panel {
+                    rounded_panel(terminal_content, None, appearance)
+                } else {
+                    terminal_content
+                };
                 main_content =
                     main_content.with_child(Shrinkable::new(1.0, terminal_content).finish());
             }
-
-            for item in config.right_items() {
-                Self::add_panel(
-                    &mut main_content,
-                    self.render_config_panel(&item, pane_group, &config, app),
-                );
-            }
-
-            if is_right_maximized {
-                Self::add_panel(
-                    &mut main_content,
-                    self.render_config_panel_maximized(pane_group, &config, app),
-                );
-            } else if !config.contains_item(&HeaderToolbarItemKind::CodeReview) {
-                Self::add_panel(
-                    &mut main_content,
-                    self.render_config_panel(
-                        &HeaderToolbarItemKind::CodeReview,
-                        pane_group,
-                        &config,
-                        app,
-                    ),
-                );
+            for panel in right_panels {
+                main_content.add_child(panel);
             }
         } else if !is_right_maximized {
             main_content = main_content.with_child(Shrinkable::new(1.0, terminal_content).finish());
@@ -22248,14 +22255,6 @@ impl Workspace {
         container.finish()
     }
 
-    /// Uncaged: panels are rounded, outlined cards with their own margins (see
-    /// [`rounded_panel`]), so they're added side by side with no 1px rule between them.
-    fn add_panel(panels_view: &mut Flex, panel: Option<Box<dyn Element>>) {
-        if let Some(panel) = panel {
-            panels_view.add_child(panel);
-        }
-    }
-
     fn render_panels(
         &self,
         app: &AppContext,
@@ -22273,18 +22272,40 @@ impl Workspace {
 
         // In vertical tabs mode, config-driven panels are rendered here.
         // In horizontal tabs mode, they're rendered inside render_banner_and_active_tab.
+        let mut left_panels = Vec::new();
+        let mut right_panels = Vec::new();
         if vertical_tabs_active {
             let config = TabSettings::as_ref(app)
                 .header_toolbar_chip_selection
                 .clone();
             let pane_group = self.active_tab_pane_group().as_ref(app);
 
-            for item in config.left_items() {
-                Self::add_panel(
-                    &mut panels_view,
-                    self.render_config_panel(&item, pane_group, &config, app),
-                );
+            left_panels.extend(
+                config
+                    .left_items()
+                    .into_iter()
+                    .filter_map(|item| self.render_config_panel(&item, pane_group, &config, app)),
+            );
+            right_panels.extend(
+                config
+                    .right_items()
+                    .into_iter()
+                    .filter_map(|item| self.render_config_panel(&item, pane_group, &config, app)),
+            );
+            if pane_group.right_panel_open && pane_group.is_right_panel_maximized {
+                right_panels.extend(self.render_config_panel_maximized(pane_group, &config, app));
+            } else if !config.contains_item(&HeaderToolbarItemKind::CodeReview) {
+                right_panels.extend(self.render_config_panel(
+                    &HeaderToolbarItemKind::CodeReview,
+                    pane_group,
+                    &config,
+                    app,
+                ));
             }
+        }
+        let has_side_panel = !left_panels.is_empty() || !right_panels.is_empty();
+        for panel in left_panels {
+            panels_view.add_child(panel);
         }
 
         // Theme chooser (workspace-level, not configurable). Uses wrap_in_panel_surface, which
@@ -22297,38 +22318,16 @@ impl Workspace {
             ));
         }
         // The outer workspace container in `render` already paints the terminal
-        // background fill, so don't paint it again here (see APP-4328).
+        // background fill, so don't paint it again here (see APP-4328). Uncaged: beside a side
+        // panel the terminal area is a rounded card, matching the panels.
+        let terminal_view = if has_side_panel {
+            rounded_panel(terminal_view, None, Appearance::as_ref(app))
+        } else {
+            terminal_view
+        };
         panels_view = panels_view.with_child(Shrinkable::new(1.0, terminal_view).finish());
-
-        if vertical_tabs_active {
-            let config = TabSettings::as_ref(app)
-                .header_toolbar_chip_selection
-                .clone();
-            let pane_group = self.active_tab_pane_group().as_ref(app);
-
-            for item in config.right_items() {
-                Self::add_panel(
-                    &mut panels_view,
-                    self.render_config_panel(&item, pane_group, &config, app),
-                );
-            }
-
-            if pane_group.right_panel_open && pane_group.is_right_panel_maximized {
-                Self::add_panel(
-                    &mut panels_view,
-                    self.render_config_panel_maximized(pane_group, &config, app),
-                );
-            } else if !config.contains_item(&HeaderToolbarItemKind::CodeReview) {
-                Self::add_panel(
-                    &mut panels_view,
-                    self.render_config_panel(
-                        &HeaderToolbarItemKind::CodeReview,
-                        pane_group,
-                        &config,
-                        app,
-                    ),
-                );
-            }
+        for panel in right_panels {
+            panels_view.add_child(panel);
         }
 
         #[cfg(target_family = "wasm")]
