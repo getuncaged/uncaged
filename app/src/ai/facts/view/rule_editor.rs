@@ -294,7 +294,9 @@ impl RuleEditorView {
             .with_border(
                 Border::all(1.).with_border_color(internal_colors::neutral_4(appearance.theme())),
             )
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_margin_bottom(style::ITEM_BOTTOM_MARGIN)
             .with_horizontal_padding(style::EDITOR_HORIZONTAL_PADDING)
             .with_vertical_padding(style::EDITOR_VERTICAL_PADDING)
@@ -320,7 +322,9 @@ impl RuleEditorView {
             .with_border(
                 Border::all(1.).with_border_color(internal_colors::neutral_4(appearance.theme())),
             )
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_margin_bottom(style::ITEM_BOTTOM_MARGIN)
             .with_padding_left(style::EDITOR_HORIZONTAL_PADDING)
             .with_vertical_padding(style::EDITOR_VERTICAL_PADDING)

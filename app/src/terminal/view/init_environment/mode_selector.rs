@@ -154,7 +154,9 @@ impl EnvironmentSetupModeSelector {
             .with_style(UiComponentStyles {
                 font_size: Some(OPTION_DESC_FONT_SIZE),
                 font_color: Some(theme.nonactive_ui_text_color().into_solid()),
-                border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+                border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                ))),
                 padding: Some(Coords {
                     top: 0.,
                     bottom: 0.,

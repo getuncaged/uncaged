@@ -1902,7 +1902,9 @@ fn render_segment_button<A: OrchestrationControlAction>(
         let centered = warpui::elements::Align::new(text).finish();
         let mut container = Container::new(centered)
             .with_vertical_padding(ORCHESTRATION_SEGMENT_VERTICAL_PADDING)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )));
         if is_active {
             container = container.with_background(segment_active_bg);
         }

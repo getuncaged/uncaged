@@ -747,7 +747,9 @@ impl View for OrchestrationConfigBlockView {
         // Outer container with accent styling per Figma
         let card = Container::new(column.finish())
             .with_uniform_padding(12.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_background(warp_core::ui::theme::color::internal_colors::accent_overlay_1(theme))
             .with_border(warpui::elements::Border::all(1.).with_border_fill(theme.accent()))
             .finish();

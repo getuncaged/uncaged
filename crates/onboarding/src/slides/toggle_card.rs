@@ -204,7 +204,9 @@ pub(super) fn render_inline_segmented_control(
             let mut container = Container::new(aligned)
                 .with_padding_left(8.)
                 .with_padding_right(8.)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )));
 
             if is_selected {
                 container = container.with_background(selected_bg);
@@ -280,7 +282,9 @@ fn render_chip(appearance: &Appearance, mut chip: ChipSpec) -> Box<dyn Element> 
         let mut container = Container::new(Align::new(label_el).finish())
             .with_padding_left(12.)
             .with_padding_right(12.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )));
 
         if let Some(bg) = bg {
             container = container.with_background(bg);

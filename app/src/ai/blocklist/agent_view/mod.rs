@@ -189,7 +189,9 @@ pub fn render_block_container(
             .with_horizontal_margin(16.)
             .with_margin_bottom(16.)
             .with_margin_top(8.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )));
     } else {
         container = container
             .with_horizontal_padding(20.)

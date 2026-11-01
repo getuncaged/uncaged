@@ -1885,7 +1885,9 @@ impl LocalCodeEditorView {
                                 .with_background(background_color)
                                 .with_padding_top(4.)
                                 .with_padding_bottom(4.)
-                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                                    warp_core::ui::radius::SMALL,
+                                )))
                                 .with_border(Border::all(1.5).with_border_fill(theme.surface_2()))
                                 .with_drop_shadow(DropShadow::new_with_standard_offset_and_spread(
                                     DROP_SHADOW_COLOR,

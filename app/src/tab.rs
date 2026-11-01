@@ -1805,7 +1805,9 @@ impl<'a> TabComponent<'a> {
             Container::new(stack)
                 .with_vertical_padding(2.)
                 .with_background(background_color)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.0)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_border(Border::all(1.).with_border_fill(border_fill))
         };
 
@@ -1974,7 +1976,9 @@ impl UiComponent for TabComponent<'_> {
 
                     let tooltip = Container::new(tooltip_content)
                         .with_background(appearance.theme().tooltip_background())
-                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                            warp_core::ui::radius::SMALL,
+                        )))
                         .with_padding(Padding::uniform(6.))
                         .finish();
 

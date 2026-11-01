@@ -386,7 +386,9 @@ impl View for WordBlockEditorView {
                 .with_padding_right(4.)
                 .with_horizontal_margin(3.)
                 .with_background(background_color)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .finish()
         });
 
@@ -403,7 +405,9 @@ impl View for WordBlockEditorView {
                 .build()
                 .finish(),
         )
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish();
 
         if self.list_of_words.is_empty() {

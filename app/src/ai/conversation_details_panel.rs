@@ -1232,7 +1232,9 @@ impl ConversationDetailsPanel {
             return Container::new(notice_row)
                 .with_uniform_padding(10.)
                 .with_background(coloru_with_opacity(blended_colors::neutral_2(theme), 70))
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .finish();
         }
 
@@ -1266,7 +1268,9 @@ impl ConversationDetailsPanel {
         Container::new(error_row)
             .with_uniform_padding(8.)
             .with_background(coloru_with_opacity(theme.ansi_fg_red(), 10))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     }
 
@@ -1316,7 +1320,9 @@ impl ConversationDetailsPanel {
         )
         .with_uniform_padding(4.)
         .with_background(coloru_with_opacity(color, 10))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish();
 
         Some(

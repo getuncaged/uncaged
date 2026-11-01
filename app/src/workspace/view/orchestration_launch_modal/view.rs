@@ -298,7 +298,9 @@ impl OrchestrationLaunchModal {
         )
         .with_horizontal_padding(6.)
         .with_vertical_padding(2.)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_background(modal_overlay_1(appearance))
         .finish()
     }

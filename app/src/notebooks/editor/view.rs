@@ -2347,7 +2347,9 @@ impl RichTextEditorView {
                     background: Some(background.into()),
                     border_color: Some(appearance.theme().outline().into()),
                     border_width: Some(1.),
-                    border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+                    border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    ))),
                     padding: Some(Coords {
                         top: 8.,
                         bottom: 8.,
@@ -2464,7 +2466,9 @@ impl RichTextEditorView {
                     .finish(),
                 )
                 .with_background(background)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
                 .finish()
             })

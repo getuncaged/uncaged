@@ -1260,7 +1260,7 @@ const CONTROL_BAR_VERTICAL_PADDING: f32 = 4.;
 const CONTROL_BAR_SPACING: f32 = 4.;
 const SEARCH_ICON_SIZE: f32 = 12.;
 const SEARCH_BAR_HEIGHT: f32 = 24.;
-const CONTROL_BAR_BUTTON_RADIUS: Radius = Radius::Pixels(4.);
+const CONTROL_BAR_BUTTON_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
 const SPLIT_BUTTON_HEIGHT: f32 = SEARCH_BAR_HEIGHT;
 pub(super) const VERTICAL_TABS_ADD_TAB_POSITION_ID: &str = "vertical_tabs_add_tab_button";
 pub(super) const VERTICAL_TABS_SETTINGS_BUTTON_POSITION_ID: &str = "vertical_tabs_settings_button";
@@ -2578,7 +2578,9 @@ fn render_group_action_buttons(
                 .finish(),
         )
         .with_padding(Padding::uniform(GROUP_ACTION_BUTTON_PADDING))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )));
         if is_menu_open || button_state.is_hovered() {
             container = container.with_background(internal_colors::fg_overlay_2(theme));
         }
@@ -2601,7 +2603,9 @@ fn render_group_action_buttons(
                 .finish(),
         )
         .with_padding(Padding::uniform(GROUP_ACTION_BUTTON_PADDING))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )));
         if button_state.is_hovered() {
             container = container.with_background(internal_colors::fg_overlay_3(theme));
         }
@@ -2627,7 +2631,9 @@ fn render_group_action_buttons(
             .with_background(ThemeFill::Solid(internal_colors::neutral_3(theme)))
             .with_border(Border::all(1.).with_border_fill(ThemeFill::Solid(belt_border_color)))
             .with_padding(Padding::uniform(GROUP_ACTION_BUTTON_PADDING))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     })
     .with_defer_events_to_children()
@@ -2684,7 +2690,9 @@ fn render_tab_group_header_icon_button(
                 .finish(),
         )
         .with_padding(Padding::uniform(GROUP_ACTION_BUTTON_PADDING))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )));
         if button_state.is_hovered() {
             container = container.with_background(hover_background);
         }
@@ -5367,7 +5375,9 @@ fn render_badge_container(content: Box<dyn Element>, background: ThemeFill) -> B
     Container::new(content)
         .with_padding(Padding::uniform(1.).with_left(4.).with_right(4.))
         .with_background(background)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish()
 }
 
@@ -6231,7 +6241,9 @@ fn render_popup_segment(
             .finish(),
         )
         .with_background(background)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_vertical_padding(2.)
         .finish()
     })
@@ -6271,7 +6283,9 @@ fn render_popup_text_segment(
             .finish(),
         )
         .with_background(background)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_vertical_padding(2.)
         .finish()
     })
@@ -6468,8 +6482,9 @@ fn render_detail_badge(
             .finish(),
     );
 
-    let mut badge = Container::new(content.finish())
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)));
+    let mut badge = Container::new(content.finish()).with_corner_radius(CornerRadius::with_all(
+        Radius::Pixels(warp_core::ui::radius::SMALL),
+    ));
     if let Some(background) = background {
         badge = badge
             .with_padding(Padding::uniform(2.).with_left(6.).with_right(6.))

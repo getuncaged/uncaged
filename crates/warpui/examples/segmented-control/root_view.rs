@@ -80,7 +80,7 @@ fn segmented_control_styles(font_family: FamilyId) -> UiComponentStyles {
     UiComponentStyles {
         font_family_id: Some(font_family),
         font_size: Some(12.0),
-        border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.0))),
+        border_radius: Some(CornerRadius::with_all(Radius::Pixels(6.))),
         border_width: Some(1.0),
         border_color: Some(Fill::Solid(ColorU::new(60, 60, 60, 255))), // surface_3
         background: Some(Fill::Solid(ColorU::new(30, 30, 30, 255))),   // background

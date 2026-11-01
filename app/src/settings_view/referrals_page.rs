@@ -43,7 +43,7 @@ const INVITE_FIELD_LABEL_BOTTOM_MARGIN: f32 = 8.;
 
 const LINK_BOTTOM_MARGIN: f32 = 12.;
 const LINK_TEXT_PADDING: f32 = 10.;
-const LINK_CORNER_RADIUS: Radius = Radius::Pixels(4.);
+const LINK_CORNER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
 const LINK_ERROR_TEXT: &str = "Failed to load referral code.";
 
 const BUTTON_WIDTH: f32 = 98.;
@@ -634,7 +634,9 @@ impl ReferralsWidget {
         let button_styles = UiComponentStyles {
             font_size: Some(14.),
             font_weight: Some(Weight::Semibold),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             padding: Some(Coords {
                 top: 12.,
                 bottom: 12.,

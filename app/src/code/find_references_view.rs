@@ -524,7 +524,9 @@ fn render_header(
         .finish();
 
         let container = Container::new(close_icon)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_uniform_padding(2.);
 
         if state.is_hovered() {

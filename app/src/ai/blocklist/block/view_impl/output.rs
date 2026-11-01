@@ -2093,7 +2093,9 @@ fn render_stopped_output(props: Props, app: &AppContext) -> Box<dyn Element> {
         };
 
         let button_styles = UiComponentStyles::default()
-            .set_border_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .set_border_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .set_border_width(1.)
             .set_border_color(internal_colors::neutral_4(theme).into())
             .set_padding(Coords {
@@ -3422,9 +3424,12 @@ fn render_usage_button(props: Props, app: &AppContext) -> Box<dyn Element> {
                     blended_colors::neutral_4(appearance.theme()).into()
                 };
 
-                content = content
-                    .with_background(background)
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                content =
+                    content
+                        .with_background(background)
+                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                            warp_core::ui::radius::SMALL,
+                        )));
 
                 // Show tooltip on hover or while clicked
                 let mut stack = Stack::new().with_child(content.finish());

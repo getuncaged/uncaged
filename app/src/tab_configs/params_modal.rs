@@ -505,7 +505,9 @@ impl View for TabConfigParamsModal {
             )
             .with_horizontal_padding(2.)
             .with_background(internal_colors::neutral_2(theme))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish();
 
             let close_icon = ConstrainedBox::new(Icon::X.to_warpui_icon(sub_text).finish())

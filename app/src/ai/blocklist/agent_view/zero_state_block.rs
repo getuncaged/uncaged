@@ -656,7 +656,9 @@ fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn E
                             .with_opacity(12)
                             .into_solid_bias_right_color(),
                     )
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .with_vertical_padding(4.)
                     .with_horizontal_padding(4.)
                     .finish()

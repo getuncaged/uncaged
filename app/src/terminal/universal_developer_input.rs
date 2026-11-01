@@ -417,7 +417,9 @@ fn segmented_control_styles(app: &AppContext) -> UiComponentStyles {
     UiComponentStyles {
         width: Some(button_size), // Match InputPrompt button height for square buttons
         height: Some(button_size), // Match InputPrompt button height
-        border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.0))),
+        border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        ))),
         border_width: Some(1.0),
         border_color: Some(Fill::Solid(theme.outline().into_solid())),
         font_family_id: Some(appearance.ui_font_family()),

@@ -1662,7 +1662,9 @@ impl CodePageWidget {
         Container::new(workspace_content)
             .with_uniform_padding(MAIN_SECTION_MARGIN)
             .with_background(theme.surface_1())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_margin_bottom(MAIN_SECTION_MARGIN)
             .finish()
     }
@@ -2223,7 +2225,9 @@ impl CodePageWidget {
         Container::new(row.finish())
             .with_uniform_padding(12.)
             .with_background(theme.surface_2())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     }
 
@@ -2415,7 +2419,9 @@ impl CodePageWidget {
         Container::new(row.finish())
             .with_uniform_padding(12.)
             .with_background(theme.surface_2())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     }
 

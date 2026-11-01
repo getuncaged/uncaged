@@ -220,7 +220,7 @@ impl<T: SegmentedControlOption> View for SegmentedControl<T> {
                 // Slightly tighter padding to keep controls compact in narrow headers.
                 padding: Some(Coords::uniform(2.0)),
                 border_width: None,
-                border_radius: Some(CornerRadius::with_all(Radius::Pixels(3.0))),
+                border_radius: Some(CornerRadius::with_all(Radius::Pixels(6.))),
                 margin: None,
                 ..self.styles
             };
@@ -307,7 +307,7 @@ impl<T: SegmentedControlOption> View for SegmentedControl<T> {
                     let styles = UiComponentStyles {
                         font_color: Some(text_color),
                         background: Some(Fill::Solid(background_color)),
-                        border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.0))),
+                        border_radius: Some(CornerRadius::with_all(Radius::Pixels(6.))),
                         border_width: Some(1.0),
                         border_color: Some(Fill::Solid(border_color)),
                         font_family_id: styles.font_family_id,

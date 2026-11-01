@@ -176,7 +176,9 @@ impl UpdateModalBody {
                         .with_height(16.)
                         .finish(),
                     )
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .with_padding(Padding::uniform(2.));
                     if state.is_hovered() {
                         icon = icon.with_background(appearance.theme().surface_2());
@@ -203,7 +205,9 @@ impl UpdateModalBody {
             .finish(),
         )
         .with_background_color(theme.surface_2().into())
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_padding(Padding::uniform(4.))
         .finish();
 

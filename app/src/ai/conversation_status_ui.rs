@@ -45,6 +45,8 @@ pub fn render_status_element(
     )
     .with_uniform_padding(STATUS_ELEMENT_PADDING)
     .with_background(coloru_with_opacity(color, 10))
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+        warp_core::ui::radius::SMALL,
+    )))
     .finish()
 }

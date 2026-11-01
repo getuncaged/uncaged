@@ -218,7 +218,9 @@ impl UsageHistoryEntry {
             .with_padding_left(width)
             .with_padding_top(height)
             .with_background(appearance.theme().surface_3())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     }
 }

@@ -800,7 +800,9 @@ impl UiComponent for WarpDriveRow<'_> {
                         .finish(),
                 )
                 .with_margin_bottom(ITEM_MARGIN_BOTTOM)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )));
 
                 match container_background_fill {
                     Some(background_fill) => {

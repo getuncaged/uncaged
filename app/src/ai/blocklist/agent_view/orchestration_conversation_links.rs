@@ -284,7 +284,9 @@ pub(crate) fn conversation_navigation_card_with_icon(
 
         Container::new(row)
             .with_background_color(background.into())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_horizontal_padding(10.)
             .with_vertical_padding(8.)
             .finish()

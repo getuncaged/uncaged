@@ -184,7 +184,7 @@ impl Key {
                 .finish(),
             )
             .with_padding(Padding::uniform(options.sizing.padding))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)));
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(6.)));
             if let Some(border_fill) = options.border_fill {
                 container =
                     container.with_border(Border::all(border_width).with_border_fill(border_fill));

@@ -2132,7 +2132,9 @@ impl TeamsWidget {
             .with_vertical_padding(12.)
             .with_horizontal_padding(horizontal_padding)
             .with_background(background_fill)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_border(Border::all(1.).with_border_fill(border_fill))
             .finish()
     }
@@ -2200,7 +2202,9 @@ impl TeamsWidget {
             .with_vertical_padding(20.)
             .with_horizontal_padding(horizontal_padding)
             .with_background(internal_colors::accent_overlay_1(theme))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     }
 
@@ -2224,7 +2228,9 @@ impl TeamsWidget {
         let mut main_content = Flex::column();
         let chip_editor_style = UiComponentStyles::default()
             .set_background(appearance.theme().background().into())
-            .set_border_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+            .set_border_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .set_border_width(1.)
             .set_border_color(appearance.theme().foreground().with_opacity(20).into())
             .set_padding(Coords::uniform(0.).top(4.).right(5.));
@@ -3419,7 +3425,9 @@ impl TeamsWidget {
         )
         .with_uniform_padding(4.)
         .with_background(chip_color)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish()
     }
 
@@ -3440,7 +3448,9 @@ impl TeamsWidget {
         )
         .with_uniform_padding(6.)
         .with_background(chip_color)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_margin_left(10.)
         .finish()
     }
@@ -3747,7 +3757,9 @@ impl TeamsWidget {
                 )
                 .with_background(theme.background())
                 .with_border(Border::all(1.).with_border_fill(theme.outline()))
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_padding_left(8.)
                 .with_padding_right(8.)
                 .finish(),

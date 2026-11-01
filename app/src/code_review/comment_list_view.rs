@@ -685,7 +685,9 @@ impl CommentListView {
 
         let mut outdated_section = Container::new(outdated_column.finish())
             .with_border(Border::all(1.).with_border_fill(Fill::Solid(yellow_border)))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_margin_bottom(8.);
         if !is_collapsed {
             outdated_section = outdated_section.with_padding_bottom(8.)
@@ -752,7 +754,7 @@ impl CommentListView {
                         .with_border(Border::bottom(1.).with_border_color(yellow_border));
                 }
 
-                let radius = Radius::Pixels(4.);
+                let radius = Radius::Pixels(warp_core::ui::radius::SMALL);
                 let header_corners = if is_collapsed {
                     CornerRadius::with_all(radius)
                 } else {
@@ -870,7 +872,9 @@ impl CommentListView {
                         .finish(),
                 )
                 .with_margin_right(8.)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )));
 
                 let container = if mouse_state.is_hovered() {
                     container.with_background(theme.surface_3())

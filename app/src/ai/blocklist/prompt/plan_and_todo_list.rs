@@ -232,9 +232,9 @@ impl PlanAndTodoListView {
         let chip_content = ConstrainedBox::new(chip_content).with_height(content_line_height);
 
         let corner_radius = if has_todo_list {
-            CornerRadius::with_left(Radius::Pixels(4.))
+            CornerRadius::with_left(Radius::Pixels(warp_core::ui::radius::SMALL))
         } else {
-            CornerRadius::with_all(Radius::Pixels(4.))
+            CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
         };
 
         let conversation_is_streaming = self
@@ -402,9 +402,9 @@ impl PlanAndTodoListView {
             .finish();
 
         let corner_radius = if has_planning_document {
-            CornerRadius::with_right(Radius::Pixels(4.))
+            CornerRadius::with_right(Radius::Pixels(warp_core::ui::radius::SMALL))
         } else {
-            CornerRadius::with_all(Radius::Pixels(4.))
+            CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
         };
 
         let todo_button = self

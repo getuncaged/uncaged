@@ -396,7 +396,9 @@ impl<P: BackingView> View for PaneView<P> {
         let mut container = Container::new(column.finish());
         if pane_configuration.show_accent_border {
             let border = Border::all(2.).with_border_fill(appearance.theme().accent());
-            container = container.with_border(border);
+            container = container
+                .with_border(border)
+                .with_corner_radius(warp_core::ui::radius::medium());
         }
 
         // Dim inactive panes.

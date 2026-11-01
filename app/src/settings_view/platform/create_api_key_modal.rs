@@ -507,7 +507,9 @@ impl CreateApiKeyModal {
         .with_border(Border::all(1.).with_border_fill(theme.outline()))
         .with_padding(Padding::uniform(8.))
         .with_background(theme.surface_2())
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish();
 
         let copy_label = if self.raw_key_copied {
@@ -773,7 +775,9 @@ impl View for CreateApiKeyModal {
                             .with_border(Border::all(1.).with_border_fill(theme.outline()))
                             .with_padding(Padding::uniform(16.))
                             .with_background(theme.surface_2())
-                            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                                warp_core::ui::radius::SMALL,
+                            )))
                             .with_margin_bottom(16.)
                             .finish(),
                         );
@@ -810,7 +814,9 @@ impl View for CreateApiKeyModal {
                             .with_border(Border::all(1.).with_border_fill(theme.outline()))
                             .with_padding(Padding::uniform(4.))
                             .with_background(theme.surface_2())
-                            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                                warp_core::ui::radius::SMALL,
+                            )))
                             .finish(),
                     )
                     .with_width(INPUT_WIDTH)
@@ -952,7 +958,9 @@ fn api_key_type_control_styles(app: &AppContext) -> UiComponentStyles {
     UiComponentStyles {
         font_family_id: Some(appearance.ui_font_family()),
         font_size: Some(appearance.ui_font_size()),
-        border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.0))),
+        border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        ))),
         border_width: Some(1.0),
         border_color: Some(Fill::Solid(theme.outline().into())),
         background: Some(Fill::Solid(theme.surface_2().into())),

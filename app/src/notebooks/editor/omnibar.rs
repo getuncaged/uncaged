@@ -362,7 +362,9 @@ impl View for Omnibar {
                 .finish(),
         )
         .with_uniform_padding(OMNIBAR_PADDING)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_background(appearance.theme().surface_2())
         .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
         .with_drop_shadow(DropShadow::default())

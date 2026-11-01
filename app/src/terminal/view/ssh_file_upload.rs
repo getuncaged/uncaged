@@ -338,7 +338,9 @@ impl FileUpload {
             .with_background_color(background_color)
             .with_uniform_padding(4.)
             .with_uniform_margin(4.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     }
 
@@ -500,7 +502,9 @@ impl FileUpload {
             )
             .with_uniform_padding(4.)
             .with_uniform_margin(4.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     }
 }

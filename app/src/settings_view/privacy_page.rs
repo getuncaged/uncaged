@@ -834,7 +834,9 @@ impl SecretRedactionWidget {
         let background = appearance.theme().surface_overlay_1();
         Container::new(content)
             .with_background(background)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_uniform_padding(8.)
             .with_margin_bottom(4.)
             .finish()
@@ -1387,7 +1389,7 @@ impl AppAnalyticsWidget {
                     .finish(),
             )
             .with_background(background_color)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL)))
             .with_uniform_padding(3.)
             .with_margin_left(8.)
             .finish();

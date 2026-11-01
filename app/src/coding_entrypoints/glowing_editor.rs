@@ -192,7 +192,9 @@ impl View for GlowingEditor {
 
         Container::new(editor_content.finish())
             .with_border(border_fill)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_drop_shadow(
                 DropShadow::new_with_standard_offset_and_spread(shadow_color)
                     .with_offset(Vector2F::zero()),

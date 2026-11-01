@@ -264,7 +264,9 @@ impl GetStartedView {
                         ..Default::default()
                     })
                     .with_hovered_styles(UiComponentStyles {
-                        border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+                        border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                            warp_core::ui::radius::SMALL,
+                        ))),
                         background: Some(
                             theme.background().blend(&theme.surface_overlay_1()).into(),
                         ),

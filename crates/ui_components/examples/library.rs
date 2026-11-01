@@ -745,6 +745,6 @@ fn example_row(contents: Box<dyn Element>, appearance: &Appearance) -> Box<dyn E
     Container::new(contents)
         .with_uniform_padding(16.)
         .with_border(internal_colors::neutral_4(appearance.theme()))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(6.)))
         .finish()
 }

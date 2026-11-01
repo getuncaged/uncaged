@@ -139,7 +139,9 @@ impl CommandSearchZeroStateView {
                 } else {
                     internal_colors::neutral_3(theme).into()
                 })
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .finish()
             },
         )

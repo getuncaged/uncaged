@@ -628,7 +628,9 @@ fn build_alias_pill<F: FnOnce(&MouseState, Fill) -> Box<dyn Element>>(
                 .with_vertical_padding(ALIAS_PILL_VERTICAL_PADDING)
                 .with_horizontal_padding(ALIAS_PILL_HORIZONTAL_PADDING)
                 .with_vertical_margin(ALIAS_PILL_VERTICAL_MARGIN)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_background(background)
                 .finish(),
         )

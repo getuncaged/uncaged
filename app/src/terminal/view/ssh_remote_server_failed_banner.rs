@@ -117,7 +117,9 @@ impl View for SshRemoteServerFailedBanner {
 
             let error_box = Container::new(error_text)
                 .with_background(error_bg)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_uniform_padding(12.)
                 .finish();
 

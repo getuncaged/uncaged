@@ -556,7 +556,8 @@ impl SuggestedRuleView {
         let editor_bg = blended_colors::neutral_4(appearance.theme());
         let editor_border =
             Border::all(1.).with_border_fill(blended_colors::neutral_2(appearance.theme()));
-        let editor_corner_radius = CornerRadius::with_all(Radius::Pixels(4.));
+        let editor_corner_radius =
+            CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL));
         let editor_horizontal_padding = 16.;
         let editor_vertical_padding = 12.;
         let editor_margin = 16.;

@@ -1585,7 +1585,9 @@ impl AgentManagementView {
             .with_background(theme.surface_1())
             .with_border(Border::all(1.).with_border_fill(theme.surface_2()))
             .with_uniform_padding(12.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     }
 
@@ -2088,7 +2090,9 @@ impl AgentManagementView {
                             .with_right(8.),
                     )
                     .with_border(Border::all(1.).with_border_fill(theme.outline()))
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .finish(),
             )
             .with_height(30.)

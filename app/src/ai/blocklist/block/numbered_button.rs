@@ -38,7 +38,9 @@ fn render_number_badge(
     .with_horizontal_padding(5.)
     .with_vertical_padding(NUMBER_BADGE_VERTICAL_PADDING)
     .with_border(Border::all(NUMBER_BADGE_BORDER_WIDTH).with_border_color(badge_border_color))
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+        warp_core::ui::radius::SMALL,
+    )))
     .with_background(badge_background)
     .finish()
 }
@@ -55,7 +57,9 @@ pub(super) fn render_recommended_badge(appearance: &Appearance) -> Box<dyn Eleme
         .finish(),
     )
     .with_background(internal_colors::fg_overlay_2(theme))
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+        warp_core::ui::radius::SMALL,
+    )))
     .with_vertical_padding(spacing::UDI_CHIP_VERTICAL_PADDING)
     .with_horizontal_padding(spacing::UDI_CHIP_HORIZONTAL_PADDING)
     .finish()

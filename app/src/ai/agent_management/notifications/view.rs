@@ -498,7 +498,9 @@ impl NotificationMailboxView {
                             .finish(),
                     )
                     .with_padding(Padding::default().with_vertical(4.).with_horizontal(8.))
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )));
 
                     if let Some(bg) = bg {
                         container = container.with_background_color(bg);

@@ -97,7 +97,9 @@ fn render_comment_chip_internal(
     Container::new(flex_column)
         .with_background(background_color)
         .with_uniform_padding(8.)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_border(
             Border::all(1.).with_border_fill(internal_colors::neutral_2(appearance.theme())),
         )

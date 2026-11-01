@@ -460,7 +460,9 @@ fn render_command_token_description(
             .with_uniform_padding(TOKEN_DESCRIPTION_PADDING)
             .with_margin_bottom(TOKEN_DESCRIPTION_MARGIN)
             .with_border(Border::all(1.).with_border_fill(theme.split_pane_border_color()))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_background_color(theme.surface_2().into_solid())
             .finish(),
     )

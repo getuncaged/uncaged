@@ -108,7 +108,9 @@ impl View for NewEnvironmentButtonView {
                 let mut container = Container::new(row.finish())
                     .with_horizontal_padding(12.)
                     .with_vertical_padding(6.)
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .with_border(Border::all(1.).with_border_fill(theme.surface_3()));
 
                 if let Some(bg) = background {

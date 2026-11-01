@@ -1587,7 +1587,9 @@ fn render_status_badge(
         .with_padding_top(2.)
         .with_padding_bottom(2.)
         .with_background_color(coloru_with_opacity(color, 10))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish()
 }
 
@@ -1637,7 +1639,9 @@ fn render_chip(
         .with_padding_top(2.)
         .with_padding_bottom(2.)
         .with_background(internal_colors::neutral_2(theme))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish()
 }
 
@@ -1855,7 +1859,9 @@ fn render_pill(
                             pin_hover_state.is_hovered() || pin_hover_state.is_clicked();
                         let mut container =
                             Container::new(render_pin_glyph_centered(is_pinned, text_color))
-                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                                    warp_core::ui::radius::SMALL,
+                                )));
                         if pin_button_hovered {
                             container =
                                 container.with_background(internal_colors::fg_overlay_1(theme));
@@ -2039,8 +2045,9 @@ fn render_overflow_button(
             .with_width(PILL_ICON_SIZE)
             .with_height(PILL_ICON_SIZE)
             .finish();
-        let mut container = Container::new(Align::new(icon).finish())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+        let mut container = Container::new(Align::new(icon).finish()).with_corner_radius(
+            CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL)),
+        );
         if let Some(bg) = bg {
             container = container.with_background(bg);
         }

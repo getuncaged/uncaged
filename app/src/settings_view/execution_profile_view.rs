@@ -392,7 +392,7 @@ impl View for ExecutionProfileView {
             warpui::elements::Border::new(1.).with_border_fill(appearance.theme().outline()),
         )
         .with_corner_radius(warpui::elements::CornerRadius::with_all(
-            warpui::elements::Radius::Pixels(4.),
+            warpui::elements::Radius::Pixels(warp_core::ui::radius::SMALL),
         ))
         .with_horizontal_padding(16.)
         .with_vertical_padding(12.)
@@ -452,7 +452,7 @@ where
                                 .with_border_fill(appearance.theme().outline()),
                         )
                         .with_corner_radius(warpui::elements::CornerRadius::with_all(
-                            warpui::elements::Radius::Pixels(3.),
+                            warpui::elements::Radius::Pixels(warp_core::ui::radius::SMALL),
                         ))
                         .with_horizontal_padding(6.)
                         .with_vertical_padding(2.)

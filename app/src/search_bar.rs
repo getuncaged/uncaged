@@ -55,7 +55,9 @@ impl View for SearchBar {
                     right: 10.,
                 }),
                 border_width: Some(1.),
-                border_radius: Some(CornerRadius::with_all(Radius::Pixels(3.))),
+                border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                ))),
                 background: Some(appearance.theme().background().into()),
                 border_color: Some(appearance.theme().foreground().with_opacity(20).into()),
                 font_color: Some(

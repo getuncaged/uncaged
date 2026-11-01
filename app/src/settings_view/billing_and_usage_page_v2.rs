@@ -2168,7 +2168,9 @@ fn render_balance_card(
     let status_dot = ConstrainedBox::new(
         Container::new(Empty::new().finish())
             .with_background_color(dot_color)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish(),
     )
     .with_width(8.)

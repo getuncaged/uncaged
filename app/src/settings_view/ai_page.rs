@@ -7803,7 +7803,9 @@ impl SettingsWidget for CLIAgentWidget {
                     .with_horizontal_padding(7.)
                     .with_vertical_padding(3.)
                     .with_background(internal_colors::fg_overlay_2(theme))
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(5.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .finish()
                 };
 
@@ -8006,7 +8008,9 @@ impl SettingsWidget for CLIAgentWidget {
                     .with_background(background)
                     .with_horizontal_padding(8.)
                     .with_vertical_padding(4.)
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .with_margin_bottom(4.)
                     .finish();
 
@@ -8493,7 +8497,9 @@ impl ConnectModelWidget {
         .with_horizontal_padding(7.)
         .with_vertical_padding(3.)
         .with_background(internal_colors::fg_overlay_2(appearance.theme()))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(5.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish()
     }
 
@@ -9172,7 +9178,9 @@ impl ApiKeysWidget {
                         .with_vertical_padding(4.)
                         .with_horizontal_padding(8.)
                         .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
-                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                            warp_core::ui::radius::SMALL,
+                        )))
                         .finish(),
                     )
                     .with_max_width(CUSTOM_INFERENCE_INFO_TOOLTIP_MAX_WIDTH)

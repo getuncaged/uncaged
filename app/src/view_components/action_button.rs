@@ -541,7 +541,9 @@ impl ActionButton {
                         .finish(),
                     )
                     .with_padding(padding)
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .with_background_color(
                         appearance.theme().terminal_colors().bright.magenta.into(),
                     )

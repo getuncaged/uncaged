@@ -244,7 +244,9 @@ pub fn render_customer_type_badge(appearance: &Appearance, text: String) -> Box<
             .background()
             .blend(&appearance.theme().foreground().with_opacity(25)),
     )
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+        warp_core::ui::radius::SMALL,
+    )))
     .with_margin_left(10.)
     .finish()
 }
@@ -458,7 +460,9 @@ pub fn render_full_pane_width_ai_button(
         .with_border(
             Border::new(1.).with_border_fill(internal_colors::neutral_4(appearance.theme())),
         )
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_horizontal_padding(16.)
         .with_vertical_padding(11.)
         .with_margin_bottom(12.)
@@ -1031,7 +1035,9 @@ pub(crate) fn render_settings_info_banner(
     )
     .with_background_color(appearance.theme().accent_overlay().into())
     .with_uniform_padding(12.)
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+        warp_core::ui::radius::SMALL,
+    )))
     .finish()
 }
 
@@ -1224,7 +1230,9 @@ fn render_alternating_color_list_item<SettingsPageAction: Action + Clone>(
     )
     .with_background(background)
     .with_uniform_padding(ALTERNATING_LIST_ITEM_PADDING)
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+        warp_core::ui::radius::SMALL,
+    )))
     // The bottom has a bit of extra padding b/c lines of text have more space above the text
     // than below. This visually balances that to make it look vertically centered.
     .with_padding_bottom(ALTERNATING_LIST_ITEM_PADDING + 2.)

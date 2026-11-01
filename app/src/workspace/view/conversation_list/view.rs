@@ -838,7 +838,9 @@ fn render_zero_state(
             let mut container = Container::new(button_content)
                 .with_padding(Padding::uniform(0.).with_left(8.).with_right(8.))
                 .with_border(Border::all(1.).with_border_fill(theme.surface_3()))
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )));
             if mouse_state.is_hovered() {
                 container = container.with_background(theme.surface_3());
             }
@@ -883,7 +885,9 @@ fn render_search_box(query_editor: &ViewHandle<EditorView>, app: &AppContext) ->
     let search_container = Container::new(search_row)
         .with_padding(Padding::uniform(6.).with_left(12.).with_right(12.))
         .with_border(Border::all(1.).with_border_fill(theme.surface_3()))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish();
 
     Container::new(search_container)

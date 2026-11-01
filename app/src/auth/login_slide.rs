@@ -167,7 +167,7 @@ enum LoginPurpose {
 // View
 // ---------------------------------------------------------------------------
 
-const AUTH_TOKEN_INPUT_BORDER_RADIUS: Radius = Radius::Pixels(4.);
+const AUTH_TOKEN_INPUT_BORDER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
 
 pub struct LoginSlideView {
     /// Whether this path wants AI (agent intent) vs. not (terminal intention).

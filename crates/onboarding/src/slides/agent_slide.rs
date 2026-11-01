@@ -612,7 +612,9 @@ impl AgentSlide {
                     .with_padding_right(8.)
                     .with_padding_top(4.)
                     .with_padding_bottom(4.)
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .with_background(Fill::Solid(internal_colors::neutral_3(theme)))
                     .finish()
             };

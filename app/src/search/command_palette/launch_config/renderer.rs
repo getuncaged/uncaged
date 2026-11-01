@@ -58,7 +58,9 @@ impl LaunchConfig {
                     .hint_text_color(appearance.theme().background())
                     .into_solid(),
             ),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             background: Some(appearance.theme().background().into()),
             height: Some(24.),
             padding: Some(Coords::default().left(6.).right(6.)),

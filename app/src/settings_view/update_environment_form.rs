@@ -2346,7 +2346,9 @@ impl UpdateEnvironmentForm {
             .with_padding_left(8.)
             .with_vertical_padding(4.)
             .with_padding_right(4.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_background(theme.surface_3())
             .finish();
 
@@ -2825,7 +2827,9 @@ impl UpdateEnvironmentForm {
             .with_padding_left(8.)
             .with_vertical_padding(4.)
             .with_padding_right(4.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_background(theme.surface_3())
             .finish();
 

@@ -2543,8 +2543,9 @@ impl Workspace {
                 .with_height(16.)
                 .finish();
 
-                let mut button = Container::new(icon)
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                let mut button = Container::new(icon).with_corner_radius(CornerRadius::with_all(
+                    Radius::Pixels(warp_core::ui::radius::SMALL),
+                ));
                 if hover_state.is_hovered() {
                     button =
                         button.with_background_color(PhenomenonStyle::modal_close_button_hover());
@@ -9971,7 +9972,9 @@ impl Workspace {
                         .with_padding_top(NEW_SESSION_SIDECAR_SEARCH_BOX_VERTICAL_PADDING)
                         .with_padding_bottom(NEW_SESSION_SIDECAR_SEARCH_BOX_VERTICAL_PADDING)
                         .with_border(Border::all(1.).with_border_fill(theme.surface_3()))
-                        .with_corner_radius(CornerRadius::with_top(Radius::Pixels(4.)))
+                        .with_corner_radius(CornerRadius::with_top(Radius::Pixels(
+                            warp_core::ui::radius::SMALL,
+                        )))
                         .finish(),
                 )
                 .with_height(NEW_SESSION_SIDECAR_SEARCH_BOX_HEIGHT)
@@ -10068,7 +10071,9 @@ impl Workspace {
                         .with_padding_bottom(NEW_SESSION_SIDECAR_FOOTER_VERTICAL_PADDING)
                         .with_background(bg)
                         .with_border(Border::top(1.).with_border_fill(border_fill))
-                        .with_corner_radius(CornerRadius::with_bottom(Radius::Pixels(5.)))
+                        .with_corner_radius(CornerRadius::with_bottom(Radius::Pixels(
+                            warp_core::ui::radius::SMALL,
+                        )))
                         .finish(),
                     )
                     .with_width(NEW_SESSION_SIDECAR_WIDTH)
@@ -20100,7 +20105,9 @@ impl Workspace {
             font_weight: Some(Weight::Medium),
             font_family_id: Some(appearance.ui_font_family()),
             height: Some(24.),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             border_width: Some(0.),
             padding: Some(Coords {
                 top: 0.,
@@ -20255,7 +20262,9 @@ impl Workspace {
                         } else {
                             internal_colors::fg_overlay_1(theme)
                         })
-                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                            warp_core::ui::radius::SMALL,
+                        )))
                         .with_padding_left(16.)
                         .with_padding_right(16.)
                         .with_padding_top(4.)
@@ -20898,8 +20907,11 @@ impl Workspace {
         .with_height(TAB_BAR_HEIGHT)
         .finish();
 
-        let tab_bar_border =
-            Border::bottom(TAB_BAR_BORDER_HEIGHT).with_border_fill(appearance.theme().outline());
+        // Uncaged: the content below the tab bar is a rounded card with its own outline, so the
+        // full-width rule under the tabs is drawn transparent; its height still counts in the
+        // layout (`TOTAL_TAB_BAR_HEIGHT`).
+        let tab_bar_border = Border::bottom(TAB_BAR_BORDER_HEIGHT)
+            .with_border_fill(Fill::Solid(ColorU::transparent_black()));
 
         let mut tab_bar_container = Container::new(
             EventHandler::new(Clipped::new(self.render_tab_bar_hoverable(bar_contents)).finish())
@@ -20964,7 +20976,7 @@ impl Workspace {
     }
 
     fn render_new_session_button(&self, ctx: &AppContext) -> Box<dyn Element> {
-        const CORNER_RADIUS: Radius = Radius::Pixels(4.);
+        const CORNER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
         const BUTTON_HEIGHT: f32 = 24.;
         const SIDE_MENU_WIDTH: f32 = 16.;
         const BUTTON_WIDTH: f32 = 24. + SIDE_MENU_WIDTH;
@@ -21164,7 +21176,9 @@ impl Workspace {
         let button = Hoverable::new(self.mouse_states.avatar_icon.clone(), |state| {
             let mut stack = Stack::new();
             let mut container = Container::new(avatar.build().finish())
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_uniform_padding(2.);
 
             if state.is_mouse_over_element() {
@@ -21280,7 +21294,9 @@ impl Workspace {
             font_weight: Some(Weight::Light),
             font_family_id: Some(appearance.ui_font_family()),
             border_color: None,
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(5.))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             border_width: Some(1.),
             width: Some(80.),
             height: Some(24.),
@@ -21321,7 +21337,9 @@ impl Workspace {
             font_weight: Some(Weight::Semibold),
             font_family_id: Some(appearance.ui_font_family()),
             border_color: Some(appearance.theme().active_ui_text_color().into()),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(5.))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             border_width: Some(1.),
             width: Some(80.),
             height: Some(24.),
@@ -21564,6 +21582,10 @@ impl Workspace {
                 .finish(),
             None => active_content,
         };
+
+        // Uncaged: the terminal / pane area is a rounded, outlined card like the side panels,
+        // so the window reads as a set of floating surfaces rather than full-bleed blocks.
+        let terminal_content = rounded_panel(terminal_content, None, appearance);
 
         let vertical_tabs_active =
             FeatureFlag::VerticalTabs.is_enabled() && *TabSettings::as_ref(app).use_vertical_tabs;
@@ -22038,7 +22060,11 @@ impl Workspace {
                                 .finish(),
                             )
                             .with_uniform_padding(2.)
-                            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                            .with_corner_radius(
+                                CornerRadius::with_all(Radius::Pixels(
+                                    warp_core::ui::radius::SMALL,
+                                )),
+                            );
                             if state.is_hovered() {
                                 container = container
                                     .with_background_color(coloru_with_opacity(text_color, 20));
@@ -22114,7 +22140,9 @@ impl Workspace {
             );
 
             let mut container = Container::new(row.finish())
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_horizontal_padding(8.);
             if matches!(variant, BannerButtonVariant::Outlined) {
                 container = container.with_border(Border::all(1.).with_border_color(text_color));

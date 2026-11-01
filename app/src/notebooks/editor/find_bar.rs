@@ -328,7 +328,9 @@ impl FindBar {
         UiComponentStyles {
             width: Some(size),
             height: Some(size),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             border_width: Some(1.),
             padding: Some(Coords::uniform(7.)),
             font_size: Some(appearance.ui_font_size()),

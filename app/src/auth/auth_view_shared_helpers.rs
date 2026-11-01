@@ -64,7 +64,9 @@ where
         background: Some(Fill::Solid(button_color)),
         border_width: Some(2.),
         border_color: Some(Fill::Solid(ColorU::transparent_black())),
-        border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+        border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        ))),
         padding: Some(Coords {
             top: 0.,
             bottom: 0.,
@@ -258,7 +260,9 @@ where
         background: Some(Fill::Solid(button_color)),
         border_width: Some(2.),
         border_color: Some(Fill::Solid(ColorU::transparent_black())),
-        border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+        border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        ))),
         padding: Some(Coords {
             top: 0.,
             bottom: 0.,

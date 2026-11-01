@@ -1223,7 +1223,9 @@ impl GlobalSearchView {
                 .with_horizontal_padding(4.)
                 .with_vertical_padding(1.)
                 .with_background_color(theme.terminal_colors().normal.yellow.into())
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .finish();
 
             let icon_from_file_path = icon_from_file_path(&file_path.display_path(), appearance)
@@ -1268,9 +1270,9 @@ impl GlobalSearchView {
                 Container::new(header_row).with_padding(Padding::uniform(4.).with_left(8.)); // 8px indent under directory
 
             if let Some(background_fill) = list_highlight_state.background_color(appearance) {
-                let corner_radius = list_highlight_state
-                    .corner_radius()
-                    .unwrap_or_else(|| CornerRadius::with_all(Radius::Pixels(4.)));
+                let corner_radius = list_highlight_state.corner_radius().unwrap_or_else(|| {
+                    CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
+                });
                 row_with_padding = row_with_padding
                     .with_background(background_fill)
                     .with_corner_radius(corner_radius);
@@ -1375,9 +1377,9 @@ impl GlobalSearchView {
                 .with_padding_right(12.);
 
             if let Some(background_fill) = list_highlight_state.background_color(appearance) {
-                let corner_radius = list_highlight_state
-                    .corner_radius()
-                    .unwrap_or_else(|| CornerRadius::with_all(Radius::Pixels(4.)));
+                let corner_radius = list_highlight_state.corner_radius().unwrap_or_else(|| {
+                    CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
+                });
                 row = row
                     .with_background(background_fill)
                     .with_corner_radius(corner_radius);
@@ -1996,7 +1998,9 @@ impl GlobalSearchView {
                 .with_horizontal_padding(4.)
                 .with_vertical_padding(1.)
                 .with_background_color(theme.terminal_colors().normal.yellow.into())
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .finish();
 
             let left_row = Flex::row()
@@ -2018,9 +2022,9 @@ impl GlobalSearchView {
                 Container::new(header_row).with_padding(Padding::uniform(4.).with_left(0.)); // Align chevron with header text
 
             if let Some(background_fill) = list_highlight_state.background_color(appearance) {
-                let corner_radius = list_highlight_state
-                    .corner_radius()
-                    .unwrap_or_else(|| CornerRadius::with_all(Radius::Pixels(4.)));
+                let corner_radius = list_highlight_state.corner_radius().unwrap_or_else(|| {
+                    CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
+                });
                 row_with_padding = row_with_padding
                     .with_background(background_fill)
                     .with_corner_radius(corner_radius);

@@ -268,7 +268,9 @@ impl AiAccessSlide {
             .with_horizontal_padding(7.)
             .with_vertical_padding(3.)
             .with_background(internal_colors::fg_overlay_2(theme))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(5.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     }
 

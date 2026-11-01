@@ -152,7 +152,7 @@ mod styles {
 
     pub const NOTIFICATION_CONTAINER_PADDING: f32 = 8.;
     pub const NOTIFICATION_CONTAINER_CORNER_RADIUS: CornerRadius =
-        CornerRadius::with_all(Radius::Pixels(4.));
+        CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL));
     pub const NOTIFICATION_BORDER_WIDTH: f32 = 1.;
 
     pub const NOTIFICATION_CLOSE_BUTTON_SIZE: f32 = 24.;

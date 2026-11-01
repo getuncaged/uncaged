@@ -1142,7 +1142,9 @@ fn render_row(props: RenderRowProps<'_>, app: &AppContext) -> Box<dyn Element> {
             ConstrainedBox::new(
                 Container::new(editor_viewport)
                     .with_border(Border::all(1.).with_border_fill(theme.outline()))
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .with_horizontal_padding(4.)
                     .finish(),
             )
@@ -1286,7 +1288,9 @@ fn render_row(props: RenderRowProps<'_>, app: &AppContext) -> Box<dyn Element> {
         let mut container = Container::new(row_content)
             .with_horizontal_padding(8.)
             .with_vertical_padding(4.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )));
         if is_being_dragged || state.is_hovered() {
             container = container.with_background(theme.surface_overlay_1());
         }

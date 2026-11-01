@@ -209,7 +209,9 @@ fn render_button(
                 font_size: Some(icon_size),
                 height: Some(20.),
 
-                border_radius: Some(CornerRadius::with_all(Radius::Pixels(3.))),
+                border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                ))),
                 padding: Some(Coords::uniform(3.)),
                 margin: Some(Coords::default().left(KEYBOARD_SHORTCUT_MARGIN)),
 
@@ -231,7 +233,9 @@ fn render_button(
 
         let mut container = Container::new(flex.finish())
             .with_background(background_fill)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_padding_right(INLINE_BANNER_BUTTON_PADDING);
 
         if button_index != 0 {

@@ -15058,7 +15058,9 @@ impl Input {
                 )),
                 border_width: Some(1.),
                 border_color: Some(internal_colors::neutral_4(appearance.theme()).into()),
-                border_radius: Some(CornerRadius::with_all(Radius::Pixels(5.))),
+                border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                ))),
                 ..Default::default()
             },
         )

@@ -114,7 +114,9 @@ impl UserOwnedBlock {
                     .finish(),
                 )
                 .with_uniform_padding(4.)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(5.)));
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )));
 
                 let container = if state.is_clicked() || state.is_hovered() {
                     container.with_background(appearance.theme().surface_2())
@@ -734,7 +736,9 @@ impl ShowBlocksWidget {
             )
             .with_background(appearance.theme().surface_2())
             .with_uniform_padding(20.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish(),
         )
         .with_height(220.)

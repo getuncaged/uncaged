@@ -1061,7 +1061,9 @@ where
 
     let button_content = button_content.finish();
     let styles = UiComponentStyles::default()
-        .set_border_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .set_border_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .set_border_width(1.)
         .set_border_color(internal_colors::neutral_4(theme).into())
         .set_padding(Coords {
@@ -3352,7 +3354,9 @@ pub(crate) fn render_debug_footer<V: View>(
                     .sub_text_color(appearance.theme().background())
                     .into(),
             ),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             padding: Some(Coords {
                 top: 4.,
                 bottom: 4.,

@@ -37,7 +37,7 @@ use crate::themes::theme::Fill as ThemeFill;
 use crate::util::bindings::CustomAction;
 
 const MODAL_WIDTH: f32 = 460.;
-const AUTH_TOKEN_INPUT_BORDER_RADIUS: Radius = Radius::Pixels(4.);
+const AUTH_TOKEN_INPUT_BORDER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
 
 pub fn init(app: &mut AppContext) {
     use warpui::keymap::macros::*;

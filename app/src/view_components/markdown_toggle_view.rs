@@ -109,7 +109,9 @@ fn markdown_toggle_styles(app: &AppContext) -> UiComponentStyles {
     UiComponentStyles {
         font_family_id: Some(appearance.ui_font_family()),
         font_size: Some(appearance.ui_font_size()),
-        border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.0))),
+        border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        ))),
         border_width: Some(1.0),
         border_color: Some(UiFill::Solid(theme.surface_3().into())),
         background: Some(UiFill::Solid(theme.background().into())),

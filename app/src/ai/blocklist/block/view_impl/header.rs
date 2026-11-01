@@ -181,7 +181,9 @@ fn render_attached_context_chip(
                     .finish(),
             )
             .with_background(theme.surface_3())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_vertical_overdraw(2.)
             .with_horizontal_padding(8.)
             .with_vertical_padding(4.)

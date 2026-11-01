@@ -502,7 +502,9 @@ impl MCPServersEditPageView {
                 .finish(),
         )
         .with_border(Border::all(1.).with_border_color(border_color))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish()
     }
 

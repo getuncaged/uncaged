@@ -557,7 +557,9 @@ impl LocalCodeEditorView {
             .with_horizontal_padding(8.)
             .with_vertical_padding(6.)
             .with_background(theme.background())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_border(Border::all(1.).with_border_fill(internal_colors::neutral_4(theme)))
             .finish();
 

@@ -72,7 +72,9 @@ pub fn render_input_row<A: Action + Clone>(
     let font_color = appearance.theme().main_text_color(background_color);
     let chip_editor_style = UiComponentStyles::default()
         .set_background(background_color.into())
-        .set_border_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+        .set_border_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .set_border_width(1.)
         .set_border_color(appearance.theme().foreground().with_opacity(20).into())
         .set_padding(Coords::uniform(0.).top(4.).right(5.));
@@ -81,7 +83,9 @@ pub fn render_input_row<A: Action + Clone>(
         TextInput::new(team_name_editor.clone(), chip_editor_style)
             .with_style(UiComponentStyles {
                 width: Some(350.),
-                border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+                border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                ))),
                 border_width: Some(1.),
                 border_color: Some(font_color.into()),
                 padding: Some(Coords::uniform(10.)),

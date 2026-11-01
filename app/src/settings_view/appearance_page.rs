@@ -2821,7 +2821,9 @@ impl ThemeSelectWidget {
                         .finish(),
                 )
                 .with_border(Border::all(border_width).with_border_fill(border_color))
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(5.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_padding_left(10. - border_width)
                 .with_padding_top(5. - border_width)
                 .with_padding_bottom(5. - border_width);
@@ -5165,7 +5167,9 @@ impl SettingsWidget for DirectoryTabColorsWidget {
                     .with_horizontal_padding(16.)
                     .with_vertical_padding(8.)
                     .with_background(theme.surface_1())
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .finish(),
             );
         }

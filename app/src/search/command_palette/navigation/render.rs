@@ -124,7 +124,9 @@ fn render_current_session_pill(
         .with_margin_left(10.)
         .with_margin_right(8.)
         .with_background_color(appearance.theme().background().into_solid())
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .finish();
 
     Shrinkable::new(

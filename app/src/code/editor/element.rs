@@ -1000,7 +1000,9 @@ impl<V: EditorView> EditorWrapper<V> {
                 .finish(),
             )
             .with_uniform_padding(2.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_background(button_background);
 
             let container = if let Some(border) = border {

@@ -155,7 +155,9 @@ pub(super) fn render_two_line_button(
                 .with_padding_right(6.)
                 .with_padding_top(2.)
                 .with_padding_bottom(2.)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_background_color(theme.ansi_fg_green())
                 .finish();
 

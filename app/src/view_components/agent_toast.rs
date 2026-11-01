@@ -442,7 +442,9 @@ impl AgentToast {
             font_color: Some(blended_colors::text_main(theme, theme.surface_2())),
             font_size: Some(appearance.ui_font_size()),
             background: Some(theme.surface_2().into()),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(3.0))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             padding: Some(Coords {
                 top: 1.0,
                 bottom: 1.0,

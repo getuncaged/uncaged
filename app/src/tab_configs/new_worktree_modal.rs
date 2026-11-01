@@ -57,11 +57,11 @@ const FOOTER_BUTTON_HORIZONTAL_PADDING: f32 = 12.;
 /// Gap between Cancel and Open buttons (Figma: gap-8).
 const FOOTER_BUTTON_GAP: f32 = 8.;
 /// Corner radius for footer buttons (Figma: rounded-4).
-const FOOTER_BUTTON_RADIUS: Radius = Radius::Pixels(4.);
+const FOOTER_BUTTON_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
 /// Size of the ESC keyboard shortcut badge (Figma: 14px tall, 10px font).
 const ESC_BADGE_HEIGHT: f32 = 14.;
 const ESC_BADGE_FONT_SIZE: f32 = 10.;
-const ESC_BADGE_CORNER_RADIUS: Radius = Radius::Pixels(3.);
+const ESC_BADGE_CORNER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
 /// Size of the close (X) icon in the header.
 const CLOSE_ICON_SIZE: f32 = 14.;
 /// Font size for inline validation error messages.

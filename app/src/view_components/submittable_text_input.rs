@@ -204,7 +204,9 @@ impl View for SubmittableTextInput {
                 .finish(),
         )
         .with_border(Border::all(1.).with_border_fill(border_fill))
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_margin_top(self.outer_margin_top)
         .with_margin_bottom(self.outer_margin_bottom)
         .with_padding_left(4.)

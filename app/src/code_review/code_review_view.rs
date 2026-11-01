@@ -4569,7 +4569,9 @@ impl CodeReviewView {
                     let mut container = Container::new(Shrinkable::new(1., file_row).finish())
                         .with_vertical_padding(5.)
                         .with_horizontal_padding(8.)
-                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                            warp_core::ui::radius::SMALL,
+                        )));
 
                     if mouse_state.is_hovered() {
                         container = container.with_background(warp_core::ui::theme::Fill::Solid(

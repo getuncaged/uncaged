@@ -474,7 +474,9 @@ fn render_keybinding_hint(keystroke: Keystroke, appearance: &Appearance) -> Box<
         font_color: Some(theme.sub_text_color(theme.surface_2()).into()),
         font_size: Some(12.),
         background: Some(internal_colors::fg_overlay_3(theme).into()),
-        border_radius: Some(CornerRadius::with_all(Radius::Pixels(3.0))),
+        border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        ))),
         padding: Some(Coords {
             top: 1.0,
             bottom: 1.0,

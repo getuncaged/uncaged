@@ -302,7 +302,9 @@ impl<S: Slide> LaunchModal<S> {
             let mut container = Container::new(Align::new(label.finish()).left().finish())
                 .with_horizontal_padding(12.)
                 .with_vertical_padding(8.)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_background(blended_colors::neutral_1(theme));
 
             if slide == self.slide {

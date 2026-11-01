@@ -200,7 +200,9 @@ fn build_rich_navigation_label(
         Container::new(enter_icon)
             .with_uniform_padding(ENTER_KEY_PADDING)
             .with_background(internal_colors::fg_overlay_1(theme))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish()
     } else {
         // Invisible spacer matching the enter indicator dimensions.
@@ -237,7 +239,9 @@ pub fn rich_navigation_button<A: warpui::Action + Clone + 'static>(
 
             let base_style = UiComponentStyles {
                 font_size: Some(font_size),
-                border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+                border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                ))),
                 ..UiComponentStyles::default()
             };
 

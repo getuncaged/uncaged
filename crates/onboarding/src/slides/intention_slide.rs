@@ -345,7 +345,9 @@ impl IntentionSlide {
                 .finish();
             Container::new(badge_text)
                 .with_background(internal_colors::fg_overlay_2(theme))
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_horizontal_padding(4.)
                 .with_vertical_padding(2.)
                 .finish()

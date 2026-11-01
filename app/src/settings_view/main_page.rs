@@ -333,7 +333,9 @@ impl AccountWidget {
         let button_styles = UiComponentStyles {
             font_size: Some(14.),
             font_weight: Some(Weight::Semibold),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             padding: Some(Coords {
                 top: 12.,
                 bottom: 12.,

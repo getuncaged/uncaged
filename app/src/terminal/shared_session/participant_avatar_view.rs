@@ -534,7 +534,9 @@ pub fn render_revoke_all_button(
                 appearance.theme().surface_2().into()
             };
             button = button
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_background_color(background_color)
                 .with_border(
                     Border::all(1.).with_border_color(appearance.theme().surface_3().into()),

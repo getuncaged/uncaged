@@ -192,7 +192,7 @@ impl SettingsWidget for WarpDriveHeaderWidget {
                     font_size: Some(14.),
                     font_weight: Some(Weight::Semibold),
                     border_radius: Some(warpui::elements::CornerRadius::with_all(
-                        warpui::elements::Radius::Pixels(4.),
+                        warpui::elements::Radius::Pixels(warp_core::ui::radius::SMALL),
                     )),
                     padding: Some(Coords {
                         top: 8.,

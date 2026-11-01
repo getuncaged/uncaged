@@ -159,7 +159,9 @@ fn render_footer_button(
         // is resized narrower than the row's natural content width.
         let mut container = Container::new(Clipped::new(row).finish())
             .with_border(Border::all(1.).with_border_color(border_color))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::MEDIUM,
+            )));
         if state.is_hovered() {
             container = container.with_background_color(coloru_with_opacity(text_color, 10));
         }
@@ -298,7 +300,9 @@ pub fn render_settings_error_alert(
 
     Container::new(alert_body)
         .with_background_color(bg_color)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::MEDIUM,
+        )))
         .with_uniform_padding(12.)
         .finish()
 }
@@ -403,7 +407,9 @@ fn render_alert_action_button(
         );
 
         let mut container = Container::new(row.finish())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::MEDIUM,
+            )))
             .with_horizontal_padding(ALERT_BUTTON_HORIZONTAL_PADDING);
         if bordered {
             container = container.with_border(Border::all(1.).with_border_color(text_color));

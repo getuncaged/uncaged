@@ -936,7 +936,9 @@ fn render_highlighted_pill(
             if state.is_hovered() || state.is_clicked() {
                 Container::new(inner)
                     .with_background(appearance.theme().surface_3())
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )))
                     .finish()
             } else {
                 inner

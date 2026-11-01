@@ -119,7 +119,9 @@ pub fn create_discount_badge(discount: u32, appearance: &Appearance) -> Box<dyn 
             .with_color(theme.main_text_color(bg_color).into())
             .finish(),
     )
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+        warp_core::ui::radius::SMALL,
+    )))
     .with_background(bg_color)
     .with_uniform_padding(4.)
     .finish()
@@ -3325,7 +3327,9 @@ impl BillingAndUsagePageView {
         let button_styles = UiComponentStyles {
             font_size: Some(14.),
             font_weight: Some(Weight::Semibold),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+            border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            ))),
             padding: Some(Coords {
                 top: 12.,
                 bottom: 12.,

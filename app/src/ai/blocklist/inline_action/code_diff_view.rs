@@ -1266,7 +1266,9 @@ impl CodeDiffView {
                         .finish(),
                 )
                 .with_background(background)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_uniform_padding(2.)
                 .finish()
             },
@@ -1418,7 +1420,9 @@ impl CodeDiffView {
         Container::new(stats.finish())
             .with_background(neutral_1(theme))
             .with_border(Border::all(1.).with_border_fill(neutral_4(theme)))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_vertical_padding(4.)
             .with_horizontal_padding(8.)
             .with_horizontal_margin(8.)

@@ -166,7 +166,9 @@ impl MCPServersListPageView {
                 let search_bar_styles = UiComponentStyles {
                     background: Some(internal_colors::neutral_2(appearance.theme()).into()),
                     border_color: Some(internal_colors::neutral_4(appearance.theme()).into()),
-                    border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
+                    border_radius: Some(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    ))),
                     padding: Some(Coords {
                         top: 8.,
                         bottom: 8.,

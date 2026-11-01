@@ -152,7 +152,9 @@ impl CreateProjectView {
         Hoverable::new(mouse_state, move |state| {
             Container::new(row.finish())
                 .with_vertical_padding(SUGGESTION_ITEM_PADDING)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_background(if state.is_hovered() {
                     theme.surface_overlay_1().into()
                 } else {

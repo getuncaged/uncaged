@@ -359,7 +359,9 @@ impl SearchItem for SkillSearchItem {
                 .with_horizontal_padding(6.0)
                 .with_vertical_padding(2.0)
                 .with_background(theme.surface_overlay_1())
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.0)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_margin_left(8.0)
                 .finish();
 

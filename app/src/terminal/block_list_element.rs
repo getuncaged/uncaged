@@ -4167,7 +4167,9 @@ impl Element for BlockListElement {
                                     block_menu_rect_size,
                                 ))
                                 .with_background(self.warp_theme.surface_1())
-                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                                    warp_core::ui::radius::SMALL,
+                                )));
                         } else if prompt_max_x > bookmark_button_origin.x()
                             || prompt_max_x > filter_button_origin.x()
                             || display_rprompt
@@ -4194,7 +4196,9 @@ impl Element for BlockListElement {
                                     background_rect_size,
                                 ))
                                 .with_background(self.warp_theme.surface_1())
-                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                                    warp_core::ui::radius::SMALL,
+                                )));
                         }
                     }
 
@@ -4836,7 +4840,9 @@ where
     F: 'static + FnMut(&mut EventContext, &AppContext, Vector2F),
 {
     let mut button = Hoverable::new(mouse_state, |state| {
-        let mut container = icon.with_corner_radius(CornerRadius::with_all(Radius::Pixels(5.)));
+        let mut container = icon.with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )));
 
         container = if state.is_clicked() || state.is_hovered() {
             container.with_background(theme.surface_2())

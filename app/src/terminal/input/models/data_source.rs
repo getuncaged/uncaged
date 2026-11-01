@@ -489,7 +489,9 @@ impl SearchItem for ModelSearchItem {
             .with_padding_left(4.)
             .with_padding_right(4.)
             .with_background(theme.green_overlay_1())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .with_margin_left(6.)
             .finish();
             row = row.with_child(chip);

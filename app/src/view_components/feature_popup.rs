@@ -145,7 +145,9 @@ impl View for FeaturePopup {
             .with_horizontal_padding(4.)
             .with_vertical_padding(4.)
             .with_background(appearance.theme().main_text_color(background))
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                warp_core::ui::radius::SMALL,
+            )))
             .finish(),
         )
         .finish()

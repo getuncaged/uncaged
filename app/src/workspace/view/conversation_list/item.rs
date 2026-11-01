@@ -127,7 +127,9 @@ pub fn render_static_item(props: StaticItemProps<'_>, app: &AppContext) -> Box<d
     )
     .with_uniform_padding(STATUS_ELEMENT_PADDING)
     .with_background(coloru_with_opacity(icon_color.into(), 10))
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+        warp_core::ui::radius::SMALL,
+    )))
     .finish();
 
     let title_text = Text::new_inline(

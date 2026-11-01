@@ -707,7 +707,9 @@ pub fn render_citation(
 
     let chip = Container::new(row.finish())
         .with_uniform_padding(padding)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_background(blended_colors::neutral_3(theme))
         .finish();
     let citation_clone = citation.clone();

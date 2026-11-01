@@ -1139,7 +1139,9 @@ fn render_context_window_other_tooltip(appearance: &Appearance) -> Box<dyn Eleme
     .finish();
     Container::new(text)
         .with_background_color(background)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )))
         .with_border(Border::all(1.).with_border_color(theme.outline().into_solid()))
         .with_horizontal_padding(8.)
         .with_vertical_padding(5.)

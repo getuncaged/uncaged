@@ -3747,7 +3747,9 @@ impl FeaturesPageView {
                 .with_padding_right(10.)
                 .with_padding_top(10.)
                 .with_margin_right(4.)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)));
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )));
 
             if let Some(background) = background {
                 container.with_background(background).finish()

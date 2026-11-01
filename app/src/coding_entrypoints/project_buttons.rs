@@ -128,7 +128,9 @@ impl ProjectButtons {
                         .finish(),
                 )
                 .with_border(theme.outline().into_solid())
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )))
                 .with_drop_shadow(
                     DropShadow::new_with_standard_offset_and_spread(ColorU::new(255, 143, 253, 15))
                         .with_offset(Vector2F::zero()),

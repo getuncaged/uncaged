@@ -224,7 +224,7 @@ fn render_button(inner: Box<dyn Element>, action: MainViewAction) -> Box<dyn Ele
     Container::new(
         EventHandler::new(
             Container::new(inner)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(6.)))
                 .with_border(Border::all(1.).with_border_color(ColorU::new(128, 128, 128, 255)))
                 .with_uniform_padding(4.)
                 .finish(),
