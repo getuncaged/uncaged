@@ -85,10 +85,15 @@ const CASK_APP_PATH: &str = "/Applications/Uncaged.app";
 
 /// Detects how *this running copy* was installed.
 pub fn detect() -> InstallSource {
+    // Homebrew casks only exist on macOS; elsewhere there is no bundle to match.
+    #[cfg(target_os = "macos")]
+    let running_bundle = warp_core::macos::get_bundle_path().ok().map(PathBuf::from);
+    #[cfg(not(target_os = "macos"))]
+    let running_bundle = None;
     detect_with(
         |name| std::env::var(name).ok(),
         BREW_PREFIXES.iter().map(Path::new),
-        warp_core::macos::get_bundle_path().ok().map(PathBuf::from),
+        running_bundle,
     )
 }
 
