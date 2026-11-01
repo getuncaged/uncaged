@@ -18,6 +18,13 @@ fn shell_truncated_titles_become_the_folder_name() {
     assert_eq!(minimal_tab_title("..v@Antons-MacBook-Pro:~"), "~");
     assert_eq!(minimal_tab_title("..ns-MacBook-Pro:~/Brain"), "Brain");
     assert_eq!(minimal_tab_title("Antons-MacBook-Pro:/tmp"), "tmp");
+    // Deep enough that the host is cut off as well.
+    assert_eq!(
+        minimal_tab_title("..lexiMeal/flexi-meal-ai"),
+        "flexi-meal-ai"
+    );
+    // A program title that merely starts with dots is left alone.
+    assert_eq!(minimal_tab_title("...loading"), "...loading");
 }
 
 #[test]

@@ -112,6 +112,28 @@ This is expected for an independent, source-available fork without a paid Apple
 Developer account. If Uncaged ever obtains a Developer ID, switch the build to the
 `CODESIGN`/notarize path in `script/macos/bundle` and drop this step.
 
+**Release notes.** The release workflow's `generate_release_notes` lists merged PR
+titles, and most work on the 0.3 line landed without PRs, so write the notes as
+`docs/releases/vX.Y.Z.md` and apply them once the release exists:
+
+```bash
+gh release edit vX.Y.Z --notes-file docs/releases/vX.Y.Z.md
+```
+
+### Pre-release checklist
+
+- `app/Cargo.toml` and `app/src/bin/oss.rs` (`CFBundleShortVersionString`) carry the
+  same version.
+- `cargo fmt --all --check` is clean — it is the one hard gate in `uncaged-ci.yml`.
+- `cargo clippy -p warp --lib --tests` and
+  `cargo clippy -p uncaged_engine --all-targets -- -D warnings` report no errors.
+- `cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2`:
+  unit tests all pass. Integration tests that need SSH targets / containers or
+  your own shell setup (`test_ssh_*`, `test_preferred_shell`, PS1 checks) fail
+  locally; compare against the previous release before treating one as new.
+- Build the bundle, copy it to `/Applications/Uncaged.app`, and smoke-test the mode
+  toggle, the model/effort chip, Settings and a new tab.
+
 ## 5. The full release matrix (all platforms)
 
 The steps above are the local macOS path. In practice a release is cut by

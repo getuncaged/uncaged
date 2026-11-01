@@ -119,7 +119,11 @@ pub(crate) fn minimal_tab_title(title: &str) -> String {
         }
         _ => title,
     };
-    let is_path = rest.starts_with('~') || rest.starts_with('/');
+    // Deep in a tree the shell may have cut the whole `user@host:` away too, leaving a
+    // left-truncated path such as `..lexiMeal/flexi-meal-ai`.
+    let is_path = rest.starts_with('~')
+        || rest.starts_with('/')
+        || (rest.starts_with("..") && rest.contains('/'));
     if !is_path || rest.contains(char::is_whitespace) {
         return rest.to_owned();
     }
