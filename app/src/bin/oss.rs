@@ -57,7 +57,7 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.2.9</string>
+    <string>0.3.0</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.developer-tools</string>
     <key>NSHighResolutionCapable</key>

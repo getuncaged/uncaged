@@ -151,6 +151,18 @@ impl AuthManager {
             return;
         }
 
+        self.validate_auth_payload_and_fetch_user(auth_payload, enforce_state_validation, ctx);
+    }
+
+    /// Upstream Warp login completion: validates the CSRF `state` token, then
+    /// fetches the user. Split out of [`Self::initialize_user_from_auth_payload`]
+    /// so the state validation stays unit-testable behind the Uncaged Oss gate.
+    fn validate_auth_payload_and_fetch_user(
+        &mut self,
+        auth_payload: AuthRedirectPayload,
+        enforce_state_validation: bool,
+        ctx: &mut ModelContext<Self>,
+    ) {
         let AuthRedirectPayload {
             refresh_token,
             user_uid,

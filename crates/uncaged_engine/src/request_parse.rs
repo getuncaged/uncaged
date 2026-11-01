@@ -185,7 +185,11 @@ fn lower_passive_suggestion(
 /// (directory/git/OS/project rules) is intentionally skipped — that belongs in
 /// the system prompt (see `system_prompt.rs`), not the message stream.
 fn lower_attached_context(ctx: &api::InputContext, builder: &mut Conversation) {
-    for cmd in &ctx.executed_shell_commands {
+    // Deprecated upstream in favour of block references, but it is still what the Warp client
+    // sends for "attach these commands", so the engine keeps reading it.
+    #[allow(deprecated)]
+    let executed_shell_commands = &ctx.executed_shell_commands;
+    for cmd in executed_shell_commands {
         if cmd.command.is_empty() && cmd.output.is_empty() {
             continue;
         }

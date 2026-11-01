@@ -401,6 +401,18 @@ impl CLIAgentSessionsModel {
 
     pub fn remove_session(&mut self, terminal_view_id: EntityId, ctx: &mut ModelContext<Self>) {
         if let Some(session) = self.sessions.remove(&terminal_view_id) {
+            // A session can end while its rich input is still open (the agent exits, the
+            // command finishes). Close the input first, so subscribers restore the input
+            // config saved when it opened and clear the composer -- otherwise the terminal
+            // input stays locked in agent mode with no agent behind it.
+            if session.input_state != CLIAgentInputState::Closed {
+                ctx.emit(CLIAgentSessionsModelEvent::InputSessionChanged {
+                    terminal_view_id,
+                    agent: session.agent,
+                    previous_input_state: session.input_state,
+                    new_input_state: CLIAgentInputState::Closed,
+                });
+            }
             ctx.emit(CLIAgentSessionsModelEvent::Ended {
                 terminal_view_id,
                 agent: session.agent,

@@ -75,6 +75,9 @@ fn slot_for(conversation_id: &str) -> SessionSlot {
 /// PATH once (markers guard against noisy rc output) and reuse it for spawns.
 static USER_PATH: LazyLock<Option<String>> = LazyLock::new(|| {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    // A Unix login-shell PATH probe; Windows has no login shell to ask, so the console-window
+    // flash the lint guards against doesn't arise here.
+    #[allow(clippy::disallowed_types)]
     let out = std::process::Command::new(shell)
         .args(["-lic", "printf '__UNCAGED_PATH__%s__END__' \"$PATH\""])
         .output()
@@ -145,7 +148,7 @@ impl AcpProvider {
         // (Re)establish the session if we don't have a live one. A previously
         // stored session whose child has exited is treated as absent so we
         // transparently respawn (e.g. the CLI crashed or was killed).
-        if guard.as_mut().is_none_or(|s| session_is_dead(s)) {
+        if guard.as_mut().is_none_or(session_is_dead) {
             *guard = Some(self.open_session(None, tx).await?);
         }
 

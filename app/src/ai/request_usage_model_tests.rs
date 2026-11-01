@@ -55,6 +55,10 @@ fn register_user_preferences_for_tests(app: &mut App) {
 }
 
 fn add_request_usage_model_without_auth(app: &mut App) -> ModelHandle<AIRequestUsageModel> {
+    // Uncaged: an active local engine makes `has_any_ai_remaining` always true
+    // (see `crate::uncaged::engine_active`). Pin it off so these tests exercise
+    // the Warp credit/BYOK logic regardless of the machine's ~/.uncaged config.
+    crate::uncaged::set_engine_active_for_test(Some(false));
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     register_user_preferences_for_tests(app);
     app.update(|ctx| {
@@ -364,6 +368,24 @@ fn test_has_any_ai_remaining_false_when_no_requests_or_bonus() {
             // At limit, no bonus credits and no overages.
             model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
             assert!(!model.has_any_ai_remaining(ctx));
+        });
+    });
+}
+
+#[test]
+fn test_has_any_ai_remaining_true_when_local_engine_active() {
+    App::test((), |mut app| async move {
+        app.add_singleton_model(UserWorkspaces::default_mock);
+        let request_usage_model = add_request_usage_model(&mut app);
+        // Uncaged: the local engine means unlimited local AI, no Warp credits needed.
+        crate::uncaged::set_engine_active_for_test(Some(true));
+
+        request_usage_model.update(&mut app, |model, ctx| {
+            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
+            assert!(
+                model.has_any_ai_remaining(ctx),
+                "expected has_any_ai_remaining to be true when the local engine is active",
+            );
         });
     });
 }

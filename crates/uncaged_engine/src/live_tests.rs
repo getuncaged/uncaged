@@ -55,7 +55,6 @@ fn request_with_user(query: &str, tools: Vec<api::ToolType>) -> api::Request {
                 id: "task-live".into(),
                 ..Default::default()
             }],
-            ..Default::default()
         }),
         input: Some(api::request::Input {
             r#type: Some(api::request::input::Type::UserInputs(
@@ -70,7 +69,6 @@ fn request_with_user(query: &str, tools: Vec<api::ToolType>) -> api::Request {
                             ),
                         ),
                     }],
-                    ..Default::default()
                 },
             )),
             ..Default::default()

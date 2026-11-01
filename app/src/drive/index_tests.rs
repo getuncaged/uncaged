@@ -128,42 +128,46 @@ fn test_retry_menu_item_visibility() {
             CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Workflow);
         let warp_drive_item_id = WarpDriveItemId::Object(cloud_object_type_and_id);
 
-        // by default, it doesn't show up
+        // by default, it doesn't show up.
+        // Uncaged (Oss): the Drive is local, so local (ClientId) objects can be trashed too.
         index.update(&mut app, |index, ctx| {
             let menu_items = index.menu_items(&Space::Personal, &warp_drive_item_id, ctx);
-            assert_eq!(menu_items.len(), 5);
+            assert_eq!(menu_items.len(), 6);
             assert_eq!(label_for_menu_item(&menu_items[0]), "Edit");
             assert_eq!(label_for_menu_item(&menu_items[1]), "Copy workflow text");
             assert_eq!(label_for_menu_item(&menu_items[2]), "Share");
             assert_eq!(label_for_menu_item(&menu_items[3]), "Duplicate");
             assert_eq!(label_for_menu_item(&menu_items[4]), "Export");
+            assert_eq!(label_for_menu_item(&menu_items[5]), "Trash");
         });
 
         // when the object is in error, it should show up
         set_object_in_error(&mut app, &cloud_object_type_and_id);
         index.update(&mut app, |index, ctx| {
             let menu_items = index.menu_items(&Space::Personal, &warp_drive_item_id, ctx);
-            assert_eq!(menu_items.len(), 6);
+            assert_eq!(menu_items.len(), 7);
             assert_eq!(label_for_menu_item(&menu_items[0]), "Retry");
             assert_eq!(label_for_menu_item(&menu_items[1]), "Edit");
             assert_eq!(label_for_menu_item(&menu_items[2]), "Copy workflow text");
             assert_eq!(label_for_menu_item(&menu_items[3]), "Share");
             assert_eq!(label_for_menu_item(&menu_items[4]), "Duplicate");
             assert_eq!(label_for_menu_item(&menu_items[5]), "Export");
+            assert_eq!(label_for_menu_item(&menu_items[6]), "Trash");
         });
 
-        // but if we're offline, it shouldn't show up
+        // but if we're offline, it shouldn't show up (Trash stays: local trashing needs no network)
         NetworkStatus::handle(&app).update(&mut app, |network_status, ctx| {
             network_status.reachability_changed(false, ctx);
         });
         index.update(&mut app, |index, ctx| {
             let menu_items = index.menu_items(&Space::Personal, &warp_drive_item_id, ctx);
-            assert_eq!(menu_items.len(), 5);
+            assert_eq!(menu_items.len(), 6);
             assert_eq!(label_for_menu_item(&menu_items[0]), "Edit");
             assert_eq!(label_for_menu_item(&menu_items[1]), "Copy workflow text");
             assert_eq!(label_for_menu_item(&menu_items[2]), "Share");
             assert_eq!(label_for_menu_item(&menu_items[3]), "Duplicate");
             assert_eq!(label_for_menu_item(&menu_items[4]), "Export");
+            assert_eq!(label_for_menu_item(&menu_items[5]), "Trash");
         });
     })
 }

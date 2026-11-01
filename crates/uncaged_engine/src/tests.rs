@@ -126,6 +126,7 @@ fn encode_run_shell_command() {
 // ---- attached context (regression: pinned blocks must reach the model) ----
 
 #[test]
+#[allow(deprecated)] // `executed_shell_commands` is deprecated upstream but still what clients send.
 fn attached_block_context_is_surfaced_to_the_model() {
     // A user pins a terminal block ("Attach as agent context") and asks a question.
     // The block rides on `input.context.executed_shell_commands`; the engine must
@@ -346,7 +347,6 @@ fn parse_builds_coalesced_deduped_conversation() {
                         ..Default::default()
                     },
                 )),
-                ..Default::default()
             })),
         ],
         ..Default::default()
@@ -383,13 +383,11 @@ fn parse_builds_coalesced_deduped_conversation() {
     let request = api::Request {
         task_context: Some(api::request::TaskContext {
             tasks: vec![history_task],
-            ..Default::default()
         }),
         input: Some(api::request::Input {
             r#type: Some(api::request::input::Type::UserInputs(
                 api::request::input::UserInputs {
                     inputs: vec![tool_result_input],
-                    ..Default::default()
                 },
             )),
             ..Default::default()

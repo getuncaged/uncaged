@@ -14,7 +14,7 @@ bundle id `dev.uncaged.WarpOss`). See `RELEASING.md` for the full release story.
 | File | Trigger | What it does |
 |------|---------|--------------|
 | `uncaged-ci.yml` | push / PR to `master` or `main` | Builds `warp-oss` on macOS (gating) plus best-effort Linux/Windows builds; runs `cargo fmt --check`, and best-effort `clippy` + `test`. |
-| `uncaged-review.yml` | PRs, and `@claude` comments | Runs Anthropic's `claude-code-action@v1` to review the diff for bugs and quality. |
+| `uncaged-review.yml` | PRs, and `@claude` comments | Runs Anthropic's `claude-code-action@v1.0.179` to review the diff for bugs and quality. |
 | `uncaged-release.yml` | pushed tag `v*` | Builds per-OS packages and attaches them to a GitHub Release. |
 
 macOS is the reference platform because the UI's shaders need Apple's Metal

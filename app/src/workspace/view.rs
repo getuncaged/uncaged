@@ -26740,8 +26740,8 @@ impl View for Workspace {
         // cloud tour, "Warp is now open-source", orchestration, cloud-handoff, and
         // free-AI-removal. They're cloud/billing announcements that don't apply to
         // a free, local, account-free fork.
-        let should_show_modal =
-            false && one_time_modal_model.target_window_id() == Some(self.window_id);
+        // (Upstream: shown in the modal's target window.)
+        let should_show_modal = false;
 
         if should_show_modal && one_time_modal_model.is_oz_launch_modal_open() {
             stack.add_child(ChildView::new(&self.oz_launch_modal.view).finish());

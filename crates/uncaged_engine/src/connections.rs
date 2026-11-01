@@ -223,15 +223,15 @@ impl Roster {
             c.preset == "custom" || keep.get(&c.preset).map(String::as_str) == Some(c.id.as_str())
         });
         // Defensive: if the active id was somehow dropped, repoint to a survivor.
-        if let Some(a) = &active {
-            if !self.connections.iter().any(|c| &c.id == a) {
-                self.active_id = self
-                    .connections
-                    .iter()
-                    .find(|c| c.usable())
-                    .or_else(|| self.connections.first())
-                    .map(|c| c.id.clone());
-            }
+        if let Some(a) = &active
+            && !self.connections.iter().any(|c| &c.id == a)
+        {
+            self.active_id = self
+                .connections
+                .iter()
+                .find(|c| c.usable())
+                .or_else(|| self.connections.first())
+                .map(|c| c.id.clone());
         }
         self.connections.len() != before
     }

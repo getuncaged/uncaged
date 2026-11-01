@@ -347,6 +347,16 @@ fn update_workflow(app: &mut App, update_manager: &ModelHandle<UpdateManager>, s
     });
 }
 
+/// Uncaged's Oss channel applies Drive moves locally; these move tests cover the
+/// server-backed path (still used by non-Oss channels), so opt into it explicitly.
+fn use_server_backed_moves(app: &mut App, update_manager_struct: &UpdateManagerStruct) {
+    update_manager_struct
+        .update_manager
+        .update(app, |update_manager, _| {
+            update_manager.set_local_only_moves(false)
+        });
+}
+
 #[track_caller]
 fn assert_pending_online_only_change_for_object(app: &mut App, uid: &ObjectUid, status: bool) {
     CloudModel::handle(app).update(app, |cloud_model, _| {
@@ -5618,6 +5628,7 @@ fn test_move_object_personal_to_team_success() {
         assert_space_for_object(&app, &sync_id.uid(), Space::Personal);
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the notebook from a personal folder to the team space.
         let type_and_id = CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Notebook);
@@ -5717,6 +5728,7 @@ fn test_move_object_personal_to_team_failure() {
         assert_space_for_object(&app, &sync_id.uid(), Space::Personal);
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the notebook from a personal folder to the team space.
         let type_and_id = CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Notebook);
@@ -5826,6 +5838,7 @@ fn test_move_cloud_environment_personal_to_team_success() {
         assert_space_for_object(&app, &sync_id.uid(), Space::Personal);
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         let type_and_id = CloudObjectTypeAndId::GenericStringObject {
             object_type: GenericStringObjectFormat::Json(JsonObjectType::CloudEnvironment),
@@ -5932,6 +5945,7 @@ fn test_move_workflow_with_enums_personal_to_team_success() {
         assert_space_for_object(&app, &enum_sync_id.uid(), Space::Personal);
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the workflow from a personal folder to the team space.
         let type_and_id =
@@ -6068,6 +6082,7 @@ fn test_move_workflow_with_enums_personal_to_team_failure() {
         assert_space_for_object(&app, &enum_sync_id.uid(), Space::Personal);
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the workflow from a personal folder to the team space.
         let type_and_id =
@@ -6207,6 +6222,7 @@ fn test_move_object_root_to_folder_success() {
         assert_root_level_for_object(&mut app, &sync_id.uid(), true);
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the notebook from the root to a folder.
         let type_and_id = CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Notebook);
@@ -6299,6 +6315,7 @@ fn test_move_object_root_to_folder_failure() {
         assert_root_level_for_object(&mut app, &sync_id.uid(), true);
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the notebook from the root to a folder.
         let type_and_id = CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Notebook);
@@ -6399,6 +6416,7 @@ fn test_move_object_folder_to_root_success() {
         assert_folder_for_object(&app, &sync_id.uid(), Some(folder_id.into()));
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the notebook from a folder to the root.
         let type_and_id = CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Notebook);
@@ -6491,6 +6509,7 @@ fn test_move_object_folder_to_root_failure() {
         assert_folder_for_object(&app, &sync_id.uid(), Some(folder_id.into()));
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the notebook from a folder to the root.
         let type_and_id = CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Notebook);
@@ -6593,6 +6612,7 @@ fn test_move_object_folder_to_folder_success() {
         assert_folder_for_object(&app, &sync_id.uid(), Some(folder_a_id.into()));
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the notebook from folder A to folder B.
         let type_and_id = CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Notebook);
@@ -6647,6 +6667,63 @@ fn test_move_object_folder_to_folder_success() {
 /// Test failing to move an object from one folder to another in the same space. This checks that
 /// we optimistically apply the move in-memory and then undo it on failure.
 #[test]
+fn test_move_object_folder_to_folder_local_only() {
+    // Uncaged (Oss): Drive moves are applied locally and persisted to SQLite with no server call.
+    App::test(ASSETS, |mut app| async move {
+        initialize_app(&mut app);
+        // No `expect_move_object`: the mock panics if the server is contacted.
+        let server_api = mock_server_api();
+
+        let notebook_id: NotebookId = ServerId::from(123).into();
+        let sync_id = SyncId::ServerId(notebook_id.into());
+        let folder_a_id: FolderId = 456.into();
+        let folder_b_id: FolderId = 789.into();
+
+        let notebook_metadata = ServerMetadata {
+            uid: ServerId::default(),
+            revision: Revision::now(),
+            metadata_last_updated_ts: Utc::now().into(),
+            trashed_ts: None,
+            folder_id: Some(folder_a_id),
+            is_welcome_object: false,
+            creator_uid: None,
+            last_editor_uid: None,
+            current_editor_uid: None,
+        };
+        let notebook =
+            mock_server_notebook(notebook_id, Owner::mock_current_user(), notebook_metadata);
+        CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
+            cloud_model.add_object(sync_id, CloudNotebook::new_from_server(notebook));
+            add_folder(folder_a_id, Owner::mock_current_user(), cloud_model);
+            add_folder(folder_b_id, Owner::mock_current_user(), cloud_model);
+        });
+
+        let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        update_manager_struct
+            .update_manager
+            .update(&mut app, |update_manager, _| {
+                update_manager.set_local_only_moves(true)
+            });
+        db_events(&update_manager_struct);
+
+        let type_and_id = CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Notebook);
+        update_manager_struct
+            .update_manager
+            .update(&mut app, |update_manager, ctx| {
+                update_manager.move_object_to_location(
+                    type_and_id,
+                    CloudObjectLocation::Folder(folder_b_id.into()),
+                    ctx,
+                );
+            });
+
+        assert_pending_online_only_change_for_object(&mut app, &sync_id.uid(), false);
+        assert_folder_for_object(&app, &sync_id.uid(), Some(folder_b_id.into()));
+        assert_eq!(db_events(&update_manager_struct).len(), 1);
+    })
+}
+
+#[test]
 fn test_move_object_folder_to_folder_failure() {
     App::test(ASSETS, |mut app| async move {
         initialize_app(&mut app);
@@ -6687,6 +6764,7 @@ fn test_move_object_folder_to_folder_failure() {
         assert_folder_for_object(&app, &sync_id.uid(), Some(folder_a_id.into()));
 
         let update_manager_struct = create_update_manager_struct(&mut app, Arc::new(server_api));
+        use_server_backed_moves(&mut app, &update_manager_struct);
 
         // Move the notebook from folder A to folder B.
         let type_and_id = CloudObjectTypeAndId::from_id_and_type(sync_id, ObjectType::Notebook);

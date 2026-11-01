@@ -399,13 +399,13 @@ fn test_inline_markdown() {
         editor.update(&mut app, |editor, ctx| {
             editor.cursor_at(CharOffset::from(6), ctx);
             editor.active_text_style = TextStyles::default();
-            editor.user_insert("[abc](https://github.com/uncaged-terminal/uncaged", ctx);
+            editor.user_insert("[abc](https://warp.dev", ctx);
         });
 
         editor.read(&app, |editor, ctx| {
             assert_eq!(
                 editor.content.as_ref(ctx).debug(),
-                "<text>First[abc](https://github.com/uncaged-terminal/uncaged <b_s>bold<b_e>"
+                "<text>First[abc](https://warp.dev <b_s>bold<b_e>"
             );
         });
 
@@ -417,7 +417,7 @@ fn test_inline_markdown() {
             assert_eq!(editor.active_text_style, TextStyles::default());
             assert_eq!(
                 editor.content.as_ref(ctx).debug(),
-                "<text>First<a_https://github.com/uncaged-terminal/uncaged <b_s>bold<b_e>"
+                "<text>First<a_https://warp.dev>abc<a> <b_s>bold<b_e>"
             );
         });
 
@@ -431,7 +431,7 @@ fn test_inline_markdown() {
 
             assert_eq!(
                 editor.content.as_ref(ctx).debug(),
-                "<text>First<a_https://github.com/uncaged-terminal/uncaged <b_s>bold`abc<b_e>"
+                "<text>First<a_https://warp.dev>abc<a> <b_s>bold`abc<b_e>"
             );
 
             editor.user_insert("`", ctx);
@@ -441,7 +441,7 @@ fn test_inline_markdown() {
             assert_eq!(editor.active_text_style, TextStyles::default().bold());
             assert_eq!(
                 editor.content.as_ref(ctx).debug(),
-                "<text>First<a_https://github.com/uncaged-terminal/uncaged <b_s>bold<b_e><c_s>abc<c_e>"
+                "<text>First<a_https://warp.dev>abc<a> <b_s>bold<b_e><c_s>abc<c_e>"
             );
         });
     })
@@ -788,7 +788,7 @@ fn test_pasting_link_on_selected_text() {
     App::test((), |mut app| async move {
         initialize_deps(&mut app);
         let editor = model_from_markdown("First text\nSecond line", &mut app, true);
-        let clipboard_content = "https://github.com/uncaged-terminal/uncaged";
+        let clipboard_content = "https://warp.dev";
 
         layout_model(&mut app, &editor).await;
 
@@ -803,7 +803,7 @@ fn test_pasting_link_on_selected_text() {
 
             assert_eq!(
                 editor.debug_buffer(ctx),
-                "<text><a_https://github.com/uncaged-terminal/uncaged text<a>\\nSecond line"
+                "<text><a_https://warp.dev>First text<a>\\nSecond line"
             );
         });
     });
@@ -3000,7 +3000,7 @@ fn test_multiselect_pasting() {
         });
 
         // Pasting a URL for multiple selections should paste as text.
-        let url_clipboard_content = "https://github.com/uncaged-terminal/uncaged";
+        let url_clipboard_content = "https://warp.dev";
 
         editor.update(&mut app, |editor, ctx| {
             editor.cursor_at(CharOffset::from(1), ctx);
@@ -3014,7 +3014,7 @@ fn test_multiselect_pasting() {
             editor.insert_formatted_from_paste(markdown, url_clipboard_content, ctx);
             assert_eq!(
                 editor.debug_buffer(ctx),
-                "<text><a_https://github.com/uncaged-terminal/uncaged line\\n<a_https://github.com/uncaged-terminal/uncaged"
+                "<text><a_https://warp.dev>https://warp.dev<a>\\nSecond line\\n<a_https://warp.dev>https://warp.dev<a><code:Shell><c_#b4fa72>code<c><text>"
             );
         });
 
@@ -3031,7 +3031,7 @@ fn test_multiselect_pasting() {
             editor.insert_formatted_from_paste(markdown, "echo test", ctx);
             assert_eq!(
                 editor.debug_buffer(ctx),
-                "<text>echo test<a_https://github.com/uncaged-terminal/uncaged line\\n<a_https://github.com/uncaged-terminal/uncaged testde<c><text>"
+                "<text>echo test<a_https://warp.dev>https://warp.dev<a>\\nSecond line\\n<a_https://warp.dev>https://warp.dev<a><code:Shell><c_#b4fa72>coecho testde<c><text>"
             );
         });
     });

@@ -144,7 +144,7 @@ fn test_resolve_bare_url() {
         );
         assert_eq!(
             resolve(&app, &links, "warp.dev").await,
-            url("https://github.com/uncaged-terminal/uncaged")
+            url("http://warp.dev")
         );
         assert_eq!(
             resolve(&app, &links, "bbc.co.uk").await,
@@ -253,8 +253,8 @@ fn test_resolve_valid_url() {
         let links = init_link_model(&mut app, None);
 
         assert_eq!(
-            resolve(&app, &links, "https://github.com/uncaged-terminal/uncaged").await,
-            url("https://github.com/uncaged-terminal/uncaged")
+            resolve(&app, &links, "https://warp.dev").await,
+            url("https://warp.dev")
         );
         assert_eq!(
             resolve(&app, &links, "mailto:test@warp.dev").await,

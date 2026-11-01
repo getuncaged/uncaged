@@ -35,6 +35,52 @@ fn track_invalid_state_failures(app: &mut App) -> Arc<AtomicBool> {
     saw_invalid_state
 }
 
+// Uncaged: on the Oss channel (the only one Uncaged ships) the public
+// `initialize_user_from_auth_payload` refuses every login before any state
+// validation runs. The upstream CSRF-state tests below therefore exercise the
+// validation path directly via `validate_auth_payload_and_fetch_user`.
+
+/// Uncaged: the Oss gate drops any auth payload -- even one with a valid state --
+/// without consuming the pending state, emitting an event, or fetching a user.
+#[test]
+fn test_oss_channel_ignores_auth_payload() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        assert!(matches!(
+            warp_core::channel::ChannelState::channel(),
+            warp_core::channel::Channel::Oss
+        ));
+
+        let saw_event = Arc::new(AtomicBool::new(false));
+        let saw_event_for_closure = saw_event.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&AuthManager::handle(ctx), move |_, _, _| {
+                saw_event_for_closure.store(true, Ordering::Relaxed);
+            });
+        });
+
+        AuthManager::handle(&app).update(&mut app, |auth_manager, ctx| {
+            let state = auth_manager.generate_auth_state();
+            let payload = AuthRedirectPayload {
+                refresh_token: RefreshToken::new("ignored"),
+                user_uid: Some(UserUid::new("someone_else")),
+                deleted_anonymous_user: Some(false),
+                state: Some(state),
+            };
+            auth_manager.initialize_user_from_auth_payload(payload, true, ctx);
+            assert!(
+                auth_manager.pending_auth_state.is_some(),
+                "Oss gate must return before the state token is consumed"
+            );
+        });
+
+        assert!(
+            !saw_event.load(Ordering::Relaxed),
+            "Oss gate must not emit any AuthManager event"
+        );
+    });
+}
+
 /// After a logged-in user successfully completes auth, pressing the browser's
 /// "Take me to Warp" button a second time should silently drop the stale
 /// redirect rather than surface an `InvalidStateParameter` error.
@@ -71,7 +117,7 @@ fn test_duplicate_redirect_for_logged_in_user_is_silently_ignored() {
 
         // First call: state validates and is consumed.
         AuthManager::handle(&app).update(&mut app, |auth_manager, ctx| {
-            auth_manager.initialize_user_from_auth_payload(auth_payload.clone(), true, ctx);
+            auth_manager.validate_auth_payload_and_fetch_user(auth_payload.clone(), true, ctx);
         });
 
         // The CSRF token must be single-use: successful validation clears it.
@@ -86,7 +132,7 @@ fn test_duplicate_redirect_for_logged_in_user_is_silently_ignored() {
         // logged in as the test user and the incoming user_uid matches, so we
         // must silently drop the redirect without emitting any AuthFailed event.
         AuthManager::handle(&app).update(&mut app, |auth_manager, ctx| {
-            auth_manager.initialize_user_from_auth_payload(auth_payload, true, ctx);
+            auth_manager.validate_auth_payload_and_fetch_user(auth_payload, true, ctx);
         });
     });
 }
@@ -121,7 +167,7 @@ fn test_stale_state_when_logged_out_emits_invalid_state_parameter() {
         };
 
         AuthManager::handle(&app).update(&mut app, |auth_manager, ctx| {
-            auth_manager.initialize_user_from_auth_payload(bogus_payload, true, ctx);
+            auth_manager.validate_auth_payload_and_fetch_user(bogus_payload, true, ctx);
         });
 
         assert!(
@@ -158,7 +204,7 @@ fn test_mismatched_state_with_different_user_uid_emits_invalid_state_parameter()
         };
 
         AuthManager::handle(&app).update(&mut app, |auth_manager, ctx| {
-            auth_manager.initialize_user_from_auth_payload(attacker_payload, true, ctx);
+            auth_manager.validate_auth_payload_and_fetch_user(attacker_payload, true, ctx);
         });
 
         assert!(

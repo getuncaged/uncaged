@@ -147,6 +147,19 @@ pub fn active_provider_icon() -> Option<Icon> {
     icon
 }
 
+#[cfg(test)]
+thread_local! {
+    static ENGINE_ACTIVE_OVERRIDE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Test-only: pins [`engine_active`] for the current thread. Without this,
+/// unit tests read the developer's real `~/.uncaged/engine.json` (or
+/// `UNCAGED_*` env), so results depend on the machine running them.
+#[cfg(test)]
+pub fn set_engine_active_for_test(active: Option<bool>) {
+    ENGINE_ACTIVE_OVERRIDE.with(|cell| cell.set(active));
+}
+
 // ── native implementation ───────────────────────────────────────────────────
 #[cfg(not(target_family = "wasm"))]
 mod imp {
@@ -154,6 +167,10 @@ mod imp {
 
     /// Whether the local Uncaged engine is configured and active.
     pub fn engine_active() -> bool {
+        #[cfg(test)]
+        if let Some(forced) = super::ENGINE_ACTIVE_OVERRIDE.with(std::cell::Cell::get) {
+            return forced;
+        }
         uncaged_engine::is_active()
     }
 

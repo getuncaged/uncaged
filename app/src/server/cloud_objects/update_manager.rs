@@ -13,6 +13,7 @@ use futures::stream::AbortHandle;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
+use warp_core::channel::{Channel, ChannelState};
 use warp_core::features::FeatureFlag;
 use warp_core::report_error;
 use warp_graphql::mcp_gallery_template::MCPGalleryTemplate;
@@ -199,6 +200,9 @@ pub struct UpdateManager {
     should_poll_for_updated_objects: bool,
     spawned_futures: Vec<FutureId>,
     has_initial_load: Condition,
+    /// Uncaged: whether Drive moves are applied locally (Oss channel) instead of
+    /// round-tripping through the server. Captured from the channel at construction.
+    local_only_moves: bool,
 }
 
 impl UpdateManager {
@@ -228,7 +232,14 @@ impl UpdateManager {
             should_poll_for_updated_objects: false,
             spawned_futures: Default::default(),
             has_initial_load: Condition::new(),
+            local_only_moves: matches!(ChannelState::channel(), Channel::Oss),
         }
+    }
+
+    /// Lets tests exercise the server-backed move path, which non-Oss channels still use.
+    #[cfg(test)]
+    pub fn set_local_only_moves(&mut self, local_only_moves: bool) {
+        self.local_only_moves = local_only_moves;
     }
 
     #[cfg(test)]
@@ -2956,10 +2967,7 @@ impl UpdateManager {
         // move, so we bypass move_object_to_folder and the sync queue entirely —
         // this is what makes drag-to-folder (and "Move to…") actually work for
         // local (ClientId) objects, which have no server id.
-        if matches!(
-            warp_core::channel::ChannelState::channel(),
-            warp_core::channel::Channel::Oss
-        ) {
+        if self.local_only_moves {
             let new_folder_id = match new_location {
                 // Moving to a space root clears the folder parent.
                 CloudObjectLocation::Space(_) => None,
