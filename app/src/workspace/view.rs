@@ -14000,7 +14000,7 @@ impl Workspace {
                 .is_some_and(|pane_group| pane_group.as_ref(ctx).visible_pane_ids().len() > 1);
             if is_split {
                 split_items.push(
-                    MenuItemFields::new("Move panes into separate tabs")
+                    MenuItemFields::new("Unsplit into tabs")
                         .with_on_select_action(WorkspaceAction::SeparateTabPanes(tab_index))
                         .into_item(),
                 );
