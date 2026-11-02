@@ -1,5 +1,6 @@
 use pathfinder_color::ColorU;
 use settings::Setting as _;
+use warp_core::ui::radius;
 use warp_editor::editor::NavigationKey;
 use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
 use warpui::elements::{
@@ -1093,7 +1094,8 @@ impl ThemeChooserItem {
                     .finish(),
             )
             .with_padding_top(THEME_CHOOSER_ITEM_PADDING)
-            .with_padding_bottom(THEME_CHOOSER_ITEM_PADDING);
+            .with_padding_bottom(THEME_CHOOSER_ITEM_PADDING)
+            .with_corner_radius(radius::medium());
 
             if is_selected {
                 container = container.with_background_color(selected_background_color);

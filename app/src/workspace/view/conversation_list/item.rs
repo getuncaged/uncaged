@@ -1,5 +1,6 @@
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::color::coloru_with_opacity;
+use warp_core::ui::radius;
 use warp_core::ui::theme::color::internal_colors;
 use warp_util::path::user_friendly_path;
 use warpui::elements::{
@@ -148,7 +149,11 @@ pub fn render_static_item(props: StaticItemProps<'_>, app: &AppContext) -> Box<d
         .finish();
 
     let hoverable = Hoverable::new(state.mouse_state.clone(), move |_| {
-        let mut container = Container::new(row).with_horizontal_padding(12.);
+        let mut container = Container::new(row)
+            .with_horizontal_padding(8.)
+            .with_margin_left(4.)
+            .with_margin_right(4.)
+            .with_corner_radius(radius::small());
         if is_selected {
             container = container.with_background(theme.surface_overlay_1());
         }
@@ -320,8 +325,11 @@ pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
     let overflow_button_state = state.overflow_button_state.clone();
     let hoverable = Hoverable::new(state.mouse_state.clone(), move |_| {
         let container = Container::new(row)
-            .with_horizontal_padding(12.)
-            .with_padding_top(8.);
+            .with_horizontal_padding(8.)
+            .with_padding_top(8.)
+            .with_margin_left(4.)
+            .with_margin_right(4.)
+            .with_corner_radius(radius::small());
 
         let container = if is_focused_conversation {
             container.with_background(theme.surface_overlay_2())

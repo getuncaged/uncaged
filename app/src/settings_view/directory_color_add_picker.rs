@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use warp_core::ui::radius;
 
 use ai::index::full_source_code_embedding::manager::{
     CodebaseIndexManager, CodebaseIndexManagerEvent,
@@ -152,23 +153,29 @@ impl DirectoryColorAddPicker {
                     Hoverable::new(mouse_state_clone, move |_| {
                         ConstrainedBox::new(
                             Container::new(
-                                Flex::row()
-                                    .with_main_axis_size(MainAxisSize::Max)
-                                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                                    .with_child(
-                                        Text::new_inline(
-                                            ADD_DIRECTORY_LABEL,
-                                            font_family,
-                                            font_size,
+                                Container::new(
+                                    Flex::row()
+                                        .with_main_axis_size(MainAxisSize::Max)
+                                        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                                        .with_child(
+                                            Text::new_inline(
+                                                ADD_DIRECTORY_LABEL,
+                                                font_family,
+                                                font_size,
+                                            )
+                                            .with_color(text_color.into())
+                                            .finish(),
                                         )
-                                        .with_color(text_color.into())
                                         .finish(),
-                                    )
-                                    .finish(),
+                                )
+                                .with_horizontal_padding(4.)
+                                .with_vertical_padding(6.)
+                                .with_background(bg)
+                                .with_corner_radius(radius::small())
+                                .finish(),
                             )
-                            .with_horizontal_padding(8.)
-                            .with_vertical_padding(6.)
-                            .with_background(bg)
+                            // The divider stays full width; the hover highlight is a rounded pill.
+                            .with_uniform_padding(4.)
                             .with_border(Border::top(1.).with_border_fill(border_fill))
                             .finish(),
                         )

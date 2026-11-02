@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::rc::Rc;
+use warp_core::ui::radius;
 
 use itertools::Itertools;
 use strum::IntoEnumIterator;
@@ -772,7 +773,8 @@ impl WorkflowArgSelector {
                         }
 
                         let mut container = Container::new(flex.finish())
-                            .with_horizontal_padding(MENU_ITEM_HORIZONTAL_PADDING);
+                            .with_horizontal_padding(MENU_ITEM_HORIZONTAL_PADDING)
+                            .with_corner_radius(radius::small());
 
                         if Some(*id) == current_enum_id || state.is_hovered() {
                             container = container
@@ -813,7 +815,8 @@ impl WorkflowArgSelector {
                     )
                     .with_main_axis_size(MainAxisSize::Max)
                     .finish(),
-            );
+            )
+            .with_corner_radius(radius::small());
 
             if state.is_hovered() {
                 container = container.with_background(appearance.theme().foreground_button_color())

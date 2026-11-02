@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use warp_core::ui::radius;
 
 use languages::language_by_local_filename;
 use pathfinder_color::ColorU;
@@ -5995,8 +5996,11 @@ fn render_compact_subtitle_option(
             .finish();
 
         let mut container = Container::new(row)
-            .with_horizontal_padding(16.)
-            .with_vertical_padding(2.);
+            .with_horizontal_padding(12.)
+            .with_vertical_padding(2.)
+            .with_margin_left(4.)
+            .with_margin_right(4.)
+            .with_corner_radius(radius::small());
         if hover_state.is_hovered() {
             container = container.with_background(internal_colors::fg_overlay_1(theme));
         }
@@ -6048,8 +6052,11 @@ fn render_tab_item_mode_option(
             .finish();
 
         let mut container = Container::new(row)
-            .with_horizontal_padding(16.)
-            .with_vertical_padding(2.);
+            .with_horizontal_padding(12.)
+            .with_vertical_padding(2.)
+            .with_margin_left(4.)
+            .with_margin_right(4.)
+            .with_corner_radius(radius::small());
         if hover_state.is_hovered() {
             container = container.with_background(internal_colors::fg_overlay_1(theme));
         }
@@ -6101,8 +6108,11 @@ fn render_primary_info_option(
             .finish();
 
         let mut container = Container::new(row)
-            .with_horizontal_padding(16.)
-            .with_vertical_padding(2.);
+            .with_horizontal_padding(12.)
+            .with_vertical_padding(2.)
+            .with_margin_left(4.)
+            .with_margin_right(4.)
+            .with_corner_radius(radius::small());
         if hover_state.is_hovered() {
             container = container.with_background(internal_colors::fg_overlay_1(theme));
         }
@@ -6200,8 +6210,11 @@ fn render_show_toggle_option(
         let row = row.finish();
 
         let mut container = Container::new(row)
-            .with_horizontal_padding(16.)
-            .with_vertical_padding(2.);
+            .with_horizontal_padding(12.)
+            .with_vertical_padding(2.)
+            .with_margin_left(4.)
+            .with_margin_right(4.)
+            .with_corner_radius(radius::small());
         if hover_state.is_hovered() {
             container = container.with_background(internal_colors::fg_overlay_1(theme));
         }

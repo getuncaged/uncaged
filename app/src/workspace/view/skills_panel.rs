@@ -12,6 +12,7 @@
 //! Fully local — no cloud, no account.
 
 use std::path::{Path, PathBuf};
+use warp_core::ui::radius;
 
 use ai::skills::SKILL_PROVIDER_DEFINITIONS;
 use warpui::elements::{
@@ -154,7 +155,8 @@ fn skill_row(
 
         let mut container = Container::new(column.finish())
             .with_padding_left(12.)
-            .with_vertical_padding(5.);
+            .with_vertical_padding(5.)
+            .with_corner_radius(radius::small());
         if state.is_hovered() {
             container = container.with_background_color(hover_bg);
         }

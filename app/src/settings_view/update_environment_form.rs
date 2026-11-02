@@ -1,5 +1,6 @@
-#[cfg(not(target_family = "wasm"))]
 use std::collections::HashMap;
+#[cfg(not(target_family = "wasm"))]
+use warp_core::ui::radius;
 
 use instant::{Duration, Instant};
 use log::debug;
@@ -2733,16 +2734,16 @@ impl UpdateEnvironmentForm {
 
                 let is_selected_row = self.github_dropdown_state.selected_index == Some(index);
                 let row = Hoverable::new(mouse_state, move |state| {
-                    let bg = if is_selected_row || state.is_mouse_over_element() {
-                        theme.surface_3()
-                    } else {
-                        theme.surface_2()
-                    };
-                    Container::new(row_content)
-                        .with_horizontal_padding(12.)
+                    let mut container = Container::new(row_content)
+                        .with_horizontal_padding(8.)
                         .with_vertical_padding(8.)
-                        .with_background(bg)
-                        .finish()
+                        .with_margin_left(4.)
+                        .with_margin_right(4.)
+                        .with_corner_radius(radius::small());
+                    if is_selected_row || state.is_mouse_over_element() {
+                        container = container.with_background(theme.surface_3());
+                    }
+                    container.finish()
                 })
                 .with_cursor(Cursor::PointingHand)
                 .on_click(move |ctx, _, _| {

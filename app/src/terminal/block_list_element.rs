@@ -100,6 +100,8 @@ const COMMAND_ALPHA: u8 = 255;
 
 const SEPARATOR_TO_MONOSPACE_FONT_SIZE_RATIO: f32 = 0.8;
 const SEPARATOR_LEFT_OFFSET: f32 = 20.;
+/// How far the restored-session band sits in from the pane's edges.
+const SEPARATOR_INSET: f32 = 4.;
 
 /// Border widths for selected blocks
 #[derive(Debug, Clone, Copy)]
@@ -4274,18 +4276,18 @@ impl Element for BlockListElement {
                 } => {
                     let bounds = self.bounds.expect("Bound should exist");
 
-                    // Paint the border between blocks and the separator.
-                    let border = ctx.scene.draw_rect_with_hit_recording(RectF::new(
-                        grid_origin,
-                        vec2f(bounds.width(), 1.),
-                    ));
-                    border.with_background(self.warp_theme.outline());
-
-                    let rect = ctx.scene.draw_rect_with_hit_recording(RectF::new(
-                        grid_origin,
-                        vec2f(bounds.width(), *height),
-                    ));
-                    rect.with_background(self.warp_theme.restored_blocks_overlay());
+                    // Uncaged: a rounded band inset from the pane's edges rather than a
+                    // full-width strip under a hard rule.
+                    let inset = vec2f(SEPARATOR_INSET, SEPARATOR_INSET);
+                    ctx.scene
+                        .draw_rect_with_hit_recording(RectF::new(
+                            grid_origin + inset,
+                            vec2f(bounds.width(), *height) - inset * 2.,
+                        ))
+                        .with_background(self.warp_theme.restored_blocks_overlay())
+                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                            warp_core::ui::radius::MEDIUM,
+                        )));
 
                     // Offset the text by the half of the remaining space between the separator height
                     // and the font line height to center it vertically.

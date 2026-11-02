@@ -1,3 +1,4 @@
+use warp_core::ui::radius;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
 use warpui::elements::{
@@ -603,7 +604,9 @@ impl NotificationMailboxView {
                         .with_vertical(ITEM_PADDING)
                         .with_horizontal(16.)
                 };
-                let mut container = Container::new(row).with_padding(item_padding);
+                let mut container = Container::new(row)
+                    .with_padding(item_padding)
+                    .with_corner_radius(radius::small());
 
                 if is_selected {
                     container = container

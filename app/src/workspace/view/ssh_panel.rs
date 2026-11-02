@@ -7,6 +7,7 @@
 //! no account.
 
 use std::path::PathBuf;
+use warp_core::ui::radius;
 
 use warpui::elements::{
     ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, CrossAxisAlignment,
@@ -80,7 +81,9 @@ fn host_row(
             .with_child(Container::new(icon).with_margin_left(6.).finish())
             .with_child(label)
             .finish();
-        let mut container = Container::new(row).with_vertical_padding(6.);
+        let mut container = Container::new(row)
+            .with_vertical_padding(6.)
+            .with_corner_radius(radius::small());
         if state.is_hovered() {
             container = container.with_background_color(hover_bg);
         }
@@ -118,7 +121,9 @@ fn add_host_row(mouse_state: MouseStateHandle, appearance: &Appearance) -> Box<d
             .with_child(Container::new(icon).with_margin_left(6.).finish())
             .with_child(label)
             .finish();
-        let mut container = Container::new(row).with_vertical_padding(6.);
+        let mut container = Container::new(row)
+            .with_vertical_padding(6.)
+            .with_corner_radius(radius::small());
         if state.is_hovered() {
             container = container.with_background_color(hover_bg);
         }

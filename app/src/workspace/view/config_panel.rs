@@ -7,6 +7,7 @@
 //! — the same whitelist that `settings_backup` uses. No cloud, no account.
 
 use std::path::PathBuf;
+use warp_core::ui::radius;
 
 use warpui::elements::{
     ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, CrossAxisAlignment,
@@ -78,7 +79,9 @@ fn action_row(
             .with_child(Container::new(icon).with_margin_left(6.).finish())
             .with_child(label_el)
             .finish();
-        let mut container = Container::new(row).with_vertical_padding(6.);
+        let mut container = Container::new(row)
+            .with_vertical_padding(6.)
+            .with_corner_radius(radius::small());
         if state.is_hovered() {
             container = container.with_background_color(hover_bg);
         }

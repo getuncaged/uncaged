@@ -7,6 +7,7 @@
 //! from field-change events to their own action enum.
 
 use std::collections::HashMap;
+use warp_core::ui::radius;
 
 use ai::agent::action::RunAgentsExecutionMode;
 use ai::agent::orchestration_config::{OrchestrationConfig, OrchestrationExecutionMode};
@@ -881,27 +882,33 @@ fn render_new_environment_footer<A: OrchestrationControlAction>(
     let mouse_state = mouse_state.clone();
 
     Hoverable::new(mouse_state, move |_| {
+        // The divider stays full width; the hover highlight is a rounded pill.
         Container::new(
-            Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_spacing(8.)
-                .with_child(
-                    ConstrainedBox::new(Icon::Plus.to_warpui_icon(text_color).finish())
-                        .with_width(icon_size)
-                        .with_height(icon_size)
-                        .finish(),
-                )
-                .with_child(
-                    Text::new_inline("New environment", font_family, font_size)
-                        .with_color(text_color.into())
-                        .finish(),
-                )
-                .finish(),
+            Container::new(
+                Flex::row()
+                    .with_main_axis_size(MainAxisSize::Max)
+                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                    .with_spacing(8.)
+                    .with_child(
+                        ConstrainedBox::new(Icon::Plus.to_warpui_icon(text_color).finish())
+                            .with_width(icon_size)
+                            .with_height(icon_size)
+                            .finish(),
+                    )
+                    .with_child(
+                        Text::new_inline("New environment", font_family, font_size)
+                            .with_color(text_color.into())
+                            .finish(),
+                    )
+                    .finish(),
+            )
+            .with_horizontal_padding(8.)
+            .with_vertical_padding(8.)
+            .with_background(bg)
+            .with_corner_radius(radius::small())
+            .finish(),
         )
-        .with_horizontal_padding(12.)
-        .with_vertical_padding(8.)
-        .with_background(bg)
+        .with_uniform_padding(4.)
         .with_border(Border::top(1.).with_border_fill(theme.outline()))
         .finish()
     })

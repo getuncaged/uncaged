@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::sync::{Arc, Mutex};
+use warp_core::ui::radius;
 
 use pathfinder_geometry::vector::Vector2F;
 use warp_core::features::FeatureFlag;
@@ -938,8 +939,11 @@ fn render_section_header(
     ConstrainedBox::new(
         Hoverable::new(mouse_state, move |mouse_state| {
             let mut container = Container::new(row)
-                .with_horizontal_padding(12.)
-                .with_vertical_padding(14.);
+                .with_horizontal_padding(8.)
+                .with_vertical_padding(14.)
+                .with_margin_left(4.)
+                .with_margin_right(4.)
+                .with_corner_radius(radius::small());
             if mouse_state.is_hovered() {
                 container = container.with_background(theme.surface_overlay_1());
             }

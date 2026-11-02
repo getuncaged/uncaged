@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use warp_core::ui::radius;
 
 use lsp::supported_servers::LSPServerType;
 use lsp::{
@@ -1137,8 +1138,11 @@ impl CodeFooterView {
             };
 
             let container = Container::new(row)
-                .with_horizontal_padding(16.)
-                .with_vertical_padding(4.);
+                .with_horizontal_padding(12.)
+                .with_vertical_padding(4.)
+                .with_margin_left(4.)
+                .with_margin_right(4.)
+                .with_corner_radius(radius::small());
 
             let container = if let Some(bg) = hover_background {
                 container.with_background(bg)

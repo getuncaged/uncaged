@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use warp_core::ui::radius;
 
 use lsp::ReferenceLocation;
 use pathfinder_geometry::vector::Vector2F;
@@ -677,7 +678,8 @@ fn render_reference_entry(
 
             let container = Container::new(row)
                 .with_horizontal_padding(8.)
-                .with_vertical_padding(6.);
+                .with_vertical_padding(6.)
+                .with_corner_radius(radius::small());
 
             if state.is_hovered() || is_selected {
                 container

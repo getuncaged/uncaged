@@ -1,6 +1,7 @@
 //! Overlay menu for the code review diff selector: pinned search input and
 //! a filtered list of label-only rows with a left check slot.
 use std::cmp;
+use warp_core::ui::radius;
 
 use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
 use warp_core::ui::theme::Fill;
@@ -372,8 +373,11 @@ impl CodeReviewDiffMenu {
                             .finish();
 
                         let mut container = Container::new(row)
-                            .with_horizontal_padding(ROW_HORIZONTAL_PADDING)
-                            .with_vertical_padding(ROW_VERTICAL_PADDING);
+                            .with_horizontal_padding((ROW_HORIZONTAL_PADDING - 4.).max(0.))
+                            .with_vertical_padding(ROW_VERTICAL_PADDING)
+                            .with_margin_left(4.)
+                            .with_margin_right(4.)
+                            .with_corner_radius(radius::small());
 
                         if let Some(bg) = bg {
                             container = container.with_background(bg);

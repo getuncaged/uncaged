@@ -9,6 +9,7 @@ use instant::Instant;
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::builder::MIN_FONT_SIZE;
+use warp_core::ui::radius;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::theme::Fill;
 use warp_editor::editor::NavigationKey;
@@ -92,6 +93,8 @@ const LABEL_HORIZONTAL_PADDING: f32 = 14.;
 const SEARCH_INPUT_HORIZONTAL_PADDING: f32 = 8.;
 const LABEL_VERTICAL_PADDING: f32 = 5.;
 const MENU_VERTICAL_PADDING: f32 = 9.;
+/// How far a highlighted row's rounded pill sits in from the menu's edges.
+const MENU_ITEM_INSET: f32 = 4.;
 const MENU_WIDTH: f32 = 360.;
 
 // Environments menu sizing from Figma mock.
@@ -1026,16 +1029,22 @@ impl DisplayChipMenu {
                     .finish(),
                 );
 
-                let mut container = Container::new(updated_text.finish())
-                    .with_horizontal_padding(item_horizontal_padding)
+                let mut row = Container::new(updated_text.finish())
+                    .with_horizontal_padding((item_horizontal_padding - MENU_ITEM_INSET).max(0.))
                     .with_vertical_padding(item_vertical_padding)
-                    .with_border(Border::top(1.0));
+                    .with_margin_left(MENU_ITEM_INSET)
+                    .with_margin_right(MENU_ITEM_INSET)
+                    .with_corner_radius(radius::small());
 
                 if let Some(bg_color) = background_color {
-                    container = container.with_background(bg_color);
+                    row = row.with_background(bg_color);
                 }
 
-                container.finish()
+                // The divider stays full width; only the highlight is inset.
+                Container::new(row.finish())
+                    .with_padding_top(MENU_ITEM_INSET)
+                    .with_border(Border::top(1.0))
+                    .finish()
             })
             .on_click(|ctx, _, _| {
                 ctx.dispatch_typed_action(DisplayChipMenuAction::SelectFixedFooterOption);
@@ -1104,7 +1113,6 @@ impl DisplayChipMenu {
         }
 
         let selected_index = self.selected_index;
-        let filtered_items_length = self.filtered_items.len();
         let filtered_items = self.filtered_items.clone();
         let is_footer_hovered = self.is_footer_selected();
         let menu_width = self.menu_width();
@@ -1249,15 +1257,16 @@ impl DisplayChipMenu {
                             main_container.add_child(right_element);
                         }
 
+                        // Uncaged: the selected row is a rounded pill inset from the menu's
+                        // edges, like the app's other menus, with no dividers between rows.
                         let mut container = Container::new(main_container.finish())
-                            .with_horizontal_padding(item_horizontal_padding)
-                            .with_vertical_padding(item_vertical_padding);
-
-                        if !matches!(chip_menu_type, ChipMenuType::Environments)
-                            && (is_selected || index < filtered_items_length - 1)
-                        {
-                            container = container.with_border(Border::bottom(1.0));
-                        }
+                            .with_horizontal_padding(
+                                (item_horizontal_padding - MENU_ITEM_INSET).max(0.),
+                            )
+                            .with_vertical_padding(item_vertical_padding)
+                            .with_margin_left(MENU_ITEM_INSET)
+                            .with_margin_right(MENU_ITEM_INSET)
+                            .with_corner_radius(radius::small());
 
                         if let Some(bg) = selected_background {
                             container = container.with_background(bg);

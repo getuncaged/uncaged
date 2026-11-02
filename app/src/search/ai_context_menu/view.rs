@@ -1270,11 +1270,8 @@ impl AIContextMenu {
             return self.render_no_results(app);
         }
 
-        let last_display_index = filtered_categories.len().saturating_sub(1);
         for (display_index, category) in filtered_categories.iter().enumerate() {
             let is_selected = display_index == self.state.selected_category_index;
-            let is_first = display_index == 0;
-            let is_last = display_index == last_display_index;
             let text_color = if is_selected {
                 theme.main_text_color(theme.accent()).into_solid()
             } else {
@@ -1333,13 +1330,9 @@ impl AIContextMenu {
             let accent_color = theme.accent();
             let accent_overlay_color = theme.accent_overlay();
 
-            let highlight_radius = Radius::Pixels(styles::MENU_ITEM_HIGHLIGHT_CORNER_RADIUS);
-            let highlight_corner_radius = match (is_first, is_last) {
-                (true, true) => CornerRadius::with_all(highlight_radius),
-                (true, false) => CornerRadius::with_top(highlight_radius),
-                (false, true) => CornerRadius::with_bottom(highlight_radius),
-                (false, false) => CornerRadius::default(),
-            };
+            // Uncaged: every row's highlight is a rounded pill, not just the outer two.
+            let highlight_corner_radius =
+                CornerRadius::with_all(Radius::Pixels(styles::MENU_ITEM_HIGHLIGHT_CORNER_RADIUS));
 
             let category_clone_for_click = *category;
             let category_row = Hoverable::new(hover_state, move |hover_state| {

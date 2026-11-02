@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ops::Range;
 use std::{cmp, vec};
+use warp_core::ui::radius;
 
 use async_channel::Sender;
 use chrono::{DateTime, Local};
@@ -237,6 +238,8 @@ pub enum Event {
 const SUGGESTIONS_LIST_POSITION_ID: &str = "InputSuggestionsList";
 
 pub const LABEL_PADDING: f32 = 6.;
+/// How far a selected row's rounded highlight sits in from the menu's edges.
+const ROW_INSET: f32 = 4.;
 pub const DESCRIPTION_PADDING: f32 = 10.;
 const SCROLLBAR_WIDTH: ScrollbarWidth = ScrollbarWidth::Auto;
 
@@ -911,12 +914,13 @@ impl InputSuggestions {
                                 );
                             }
 
-                            let mut container =
-                                Container::new(row.finish()).with_uniform_padding(LABEL_PADDING);
-
-                            if is_selected || index < input_suggestions.items.len() - 1 {
-                                container = container.with_border(Border::bottom(1.0));
-                            }
+                            // Uncaged: a rounded, inset highlight and no dividers between rows.
+                            let mut container = Container::new(row.finish())
+                                .with_vertical_padding(LABEL_PADDING)
+                                .with_horizontal_padding((LABEL_PADDING - ROW_INSET).max(0.))
+                                .with_margin_left(ROW_INSET)
+                                .with_margin_right(ROW_INSET)
+                                .with_corner_radius(radius::small());
 
                             if is_selected {
                                 container = container.with_background(background_color);

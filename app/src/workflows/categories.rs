@@ -3,6 +3,7 @@ use std::ops::Deref;
 #[cfg(feature = "local_fs")]
 use std::path::PathBuf;
 use std::sync::Arc;
+use warp_core::ui::radius;
 
 use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
 use itertools::Itertools;
@@ -131,7 +132,8 @@ impl WorkflowViewType {
         .with_padding_top(5.)
         .with_padding_bottom(5.)
         .with_padding_left(10.)
-        .with_padding_right(10.);
+        .with_padding_right(10.)
+        .with_corner_radius(radius::small());
 
         if selection_state.is_selected() {
             container = container.with_background(bg_color);
@@ -243,6 +245,7 @@ fn render_workflow(
     if selection_state.is_selected() {
         Container::new(workflow_row)
             .with_background(bg_color)
+            .with_corner_radius(radius::small())
             .finish()
     } else {
         workflow_row

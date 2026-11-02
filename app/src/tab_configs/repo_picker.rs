@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use warp_core::ui::radius;
 
 use warp_util::path::user_friendly_path;
 use warpui::elements::{Border, ChildView, Container, Hoverable, MouseStateHandle, Text};
@@ -111,14 +112,20 @@ impl RepoPicker {
                     let border_fill = theme.outline();
                     let mouse_state_clone = mouse_state.clone();
                     Hoverable::new(mouse_state_clone, move |_| {
+                        // The divider stays full width; the hover highlight is a rounded pill.
                         Container::new(
-                            Text::new_inline(ADD_NEW_REPO_LABEL, font_family, font_size)
-                                .with_color(text_color.into())
-                                .finish(),
+                            Container::new(
+                                Text::new_inline(ADD_NEW_REPO_LABEL, font_family, font_size)
+                                    .with_color(text_color.into())
+                                    .finish(),
+                            )
+                            .with_horizontal_padding(4.)
+                            .with_vertical_padding(6.)
+                            .with_background(bg)
+                            .with_corner_radius(radius::small())
+                            .finish(),
                         )
-                        .with_horizontal_padding(8.)
-                        .with_vertical_padding(6.)
-                        .with_background(bg)
+                        .with_uniform_padding(4.)
                         .with_border(Border::top(1.).with_border_fill(border_fill))
                         .finish()
                     })
