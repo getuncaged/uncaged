@@ -20,18 +20,18 @@ cask "uncaged" do
   # (e.g. tag v0.2.3 -> version "0.2.3"). Pinned to the current release; on each
   # new release, bump `version` and both per-arch `sha256` below to that tag's
   # DMG checksums (see "Updating the cask").
-  version "0.3.1"
+  version "0.3.2"
 
   # Per-arch DMGs (there is no universal DMG). Homebrew picks the block matching
   # the host. The download URL points at a versioned release asset (not /latest/)
   # so Homebrew can verify the checksum deterministically.
   on_arm do
-    sha256 "1bc5b6a9a017a2d2f07efb395ae15fd724a68e31447a816a95a23d154d6318fb"
+    sha256 "db3bcfdf029bdd74c34caee2b6bca3d2be9d342ed0f203075ca993046c05c596"
     url "https://github.com/getuncaged/uncaged/releases/download/v#{version}/Uncaged-macos-aarch64.dmg",
         verified: "github.com/getuncaged/uncaged/"
   end
   on_intel do
-    sha256 "c640883b17d02d1850b60532089e659af4ba305c98d89a6783ee0ef6ff0a393e"
+    sha256 "9d27531f0724af7ea205c489feeb193c1fb01e8da57bf5e8f1de92f323f7643d"
     url "https://github.com/getuncaged/uncaged/releases/download/v#{version}/Uncaged-macos-x86_64.dmg",
         verified: "github.com/getuncaged/uncaged/"
   end
