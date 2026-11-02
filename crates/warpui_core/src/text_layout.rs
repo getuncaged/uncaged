@@ -462,6 +462,14 @@ impl ClipConfig {
             style: ClipStyle::Ellipsis,
         }
     }
+
+    /// Clip at the front of the text with an ellipsis, keeping the tail visible.
+    pub fn start_ellipsis() -> Self {
+        Self {
+            direction: ClipDirection::Start,
+            style: ClipStyle::Ellipsis,
+        }
+    }
 }
 
 pub struct ComputeBaselinePositionArgs<'a> {

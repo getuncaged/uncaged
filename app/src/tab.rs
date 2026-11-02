@@ -1261,11 +1261,16 @@ impl<'a> TabComponent<'a> {
                     .expect("Font family defined"),
                 self.styles.default.font_size.expect("Font size defined"),
             )
-            .with_clip(if self.should_clip_text_start() {
-                ClipConfig::start()
-            } else {
-                ClipConfig::end()
-            })
+            // Uncaged: overflowing titles end in an ellipsis instead of a soft fade that read as
+            // a hard cut ("SKILL.md" -> "ILL.md"). Paths keep their tail, which is the part that
+            // tells tabs apart; anything else keeps its start.
+            .with_clip(
+                if self.should_clip_text_start() && is_path_like(&self.title) {
+                    ClipConfig::start_ellipsis()
+                } else {
+                    ClipConfig::ellipsis()
+                },
+            )
             .with_style(font_style)
             .with_color(font_color)
             .finish()
@@ -1843,6 +1848,12 @@ impl<'a> TabComponent<'a> {
 /// Determine the `SavePosition` ID for a draggable tab based on its index
 pub fn tab_position_id(index: usize) -> String {
     format!("tab_position_{index}")
+}
+
+/// Uncaged: whether a tab title reads as a path (a working directory such as
+/// `~/Developer/app`), whose tail is what's worth keeping when it has to be shortened.
+fn is_path_like(title: &str) -> bool {
+    title.starts_with('~') || title.contains('/') || title.contains('\\')
 }
 
 impl UiComponent for TabComponent<'_> {
