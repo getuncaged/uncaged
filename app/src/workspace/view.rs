@@ -570,6 +570,20 @@ pub(crate) fn card_outline(appearance: &Appearance) -> Fill {
 /// Uncaged: the gap around a side panel's rounded card.
 pub(crate) const PANEL_CARD_MARGIN: f32 = 4.;
 
+/// Uncaged: how close to the tab bar a dragged tab still counts as over it (reordering)
+/// rather than over the panes (splitting).
+const TAB_SPLIT_DROP_TAB_BAR_MARGIN: f32 = 10.;
+
+/// Uncaged: where a tab dragged over the panes would land: the hovered pane, and the side of it
+/// the dragged tab's panes would split onto.
+struct TabSplitDrop {
+    dragged: ViewHandle<PaneGroup>,
+    pane_id: PaneId,
+    direction: Direction,
+    /// The hovered pane's bounds in window coordinates, for drawing the drop preview.
+    pane_rect: RectF,
+}
+
 /// Uncaged: draw a side panel (tools sidebar, code review, vertical tabs) as a rounded,
 /// outlined card inset from the window and the terminal, instead of a full-height block
 /// fenced off by a 1px rule. `background` keeps whatever fill the panel already had; the card
@@ -1196,6 +1210,11 @@ pub struct Workspace {
     /// for a multi-tab cross-window drag. Reduces chrome (e.g. hides traffic
     /// lights). Cleared when the preview is promoted or hands off its tab.
     is_tab_drag_preview: bool,
+    /// Uncaged: the tab that was active before the user pressed on another one. If that press
+    /// turns into a drag over the panes, this is the tab the dragged one splits into.
+    tab_drag_split_target: Option<ViewHandle<PaneGroup>>,
+    /// Uncaged: where a tab being dragged over the panes would land if dropped now.
+    tab_split_drop: Option<TabSplitDrop>,
     /// Sidecar menu for submenu-parent items (Terminal, New worktree config) in the
     /// new-session dropdown. Shown as a positioned overlay next to the hovered
     /// parent item, following the model picker sidecar pattern.
@@ -3468,6 +3487,8 @@ impl Workspace {
             pending_pane_group_transfer: false,
             suppress_detach_panes_on_window_close: false,
             is_tab_drag_preview: false,
+            tab_drag_split_target: None,
+            tab_split_drop: None,
             new_session_sidecar_menu,
             show_new_session_sidecar: false,
             worktree_sidecar_active: false,
@@ -7561,7 +7582,7 @@ impl Workspace {
                 ctx,
             )
         };
-        let menu_items = self.with_move_into_active_tab_item(tab_index, menu_items);
+        let menu_items = self.with_split_tab_items(tab_index, menu_items, ctx);
         ctx.update_view(&self.tab_right_click_menu, |context_menu, view_ctx| {
             context_menu.set_items(menu_items, view_ctx);
         });
@@ -7646,7 +7667,7 @@ impl Workspace {
             Some(pane_name_target),
             ctx,
         );
-        let menu_items = self.with_move_into_active_tab_item(tab_index, menu_items);
+        let menu_items = self.with_split_tab_items(tab_index, menu_items, ctx);
 
         ctx.update_view(&self.tab_right_click_menu, |context_menu, view_ctx| {
             context_menu.set_items(menu_items, view_ctx);
@@ -13906,16 +13927,17 @@ impl Workspace {
         }
     }
 
-    /// Moves the tab at `index` one slot left/right, where a "slot" is either a
-    /// single tab or an entire adjacent group. If the neighbor in the move
-    /// direction belongs to a *different* group, the tab hops over that whole
-    /// group so it never lands inside the group's contiguous run. Moving past an
-    /// ungrouped tab, or reordering within the tab's own group, is an ordinary
-    /// one-slot move.
-    /// Uncaged: brings the tab at `index` beside the active tab's panes as splits on the right,
-    /// so several chats (or a chat and its code) can be laid out side by side without dragging
-    /// pane headers one at a time. The source tab closes once its last pane has moved.
-    fn move_tab_into_active_tab(&mut self, index: usize, ctx: &mut ViewContext<Self>) {
+    /// Uncaged: brings the tab at `index` into the active tab as splits, so several chats (or a
+    /// chat and its code) can be laid out side by side without dragging pane headers one at a
+    /// time. The panes land on `direction`'s side of `base_pane` (the whole tab when `None`),
+    /// in order. The source tab closes once its last pane has moved.
+    fn move_tab_into_active_tab(
+        &mut self,
+        index: usize,
+        direction: Direction,
+        base_pane: Option<PaneId>,
+        ctx: &mut ViewContext<Self>,
+    ) {
         if index == self.active_tab_index {
             return;
         }
@@ -13925,31 +13947,93 @@ impl Workspace {
         let target = self.active_tab_pane_group().clone();
         let panes = source.update(ctx, |pane_group, ctx| pane_group.take_panes_for_merge(ctx));
         target.update(ctx, |pane_group, ctx| {
+            let mut base_pane = base_pane;
             for pane in panes {
-                pane_group.add_moved_pane(pane, Direction::Right, ctx);
+                if let Some(added) = pane_group.add_moved_pane(pane, direction, base_pane, ctx) {
+                    base_pane = Some(added);
+                }
             }
         });
     }
 
-    /// Uncaged: the tab menu's "Move into current tab" entry, offered on every tab but the
-    /// active one.
-    fn with_move_into_active_tab_item(
+    /// Uncaged: splits the tab at `index` back apart, moving every pane but its first into a
+    /// tab of its own right after it.
+    fn separate_tab_panes(&mut self, index: usize, ctx: &mut ViewContext<Self>) {
+        let Some(source) = self.get_pane_group_view(index).cloned() else {
+            return;
+        };
+        let group_id = self.tabs.get(index).and_then(|tab| tab.group_id);
+        let pane_ids = source.as_ref(ctx).visible_pane_ids();
+        for (offset, pane_id) in pane_ids.into_iter().skip(1).enumerate() {
+            let pane = source.update(ctx, |pane_group, ctx| {
+                pane_group.remove_pane_for_move(&pane_id, ctx)
+            });
+            if let Some(pane) = pane {
+                self.add_tab_from_existing_pane(pane, index + 1 + offset, group_id, ctx);
+            }
+        }
+    }
+
+    /// Uncaged: split controls at the top of a tab's right-click menu. The active tab can split
+    /// itself (and, once split, come apart again); any other tab can be brought into the active
+    /// one as a split.
+    fn with_split_tab_items(
         &self,
         tab_index: usize,
         mut menu_items: Vec<MenuItem<WorkspaceAction>>,
+        ctx: &AppContext,
     ) -> Vec<MenuItem<WorkspaceAction>> {
-        if tab_index != self.active_tab_index {
-            menu_items.insert(
-                0,
-                MenuItemFields::new("Move into current tab as split")
-                    .with_on_select_action(WorkspaceAction::MoveTabIntoActiveTab(tab_index))
+        let mut split_items = Vec::new();
+        if tab_index == self.active_tab_index {
+            split_items.push(
+                MenuItemFields::new("Split right")
+                    .with_on_select_action(WorkspaceAction::SplitActiveTab(Direction::Right))
                     .into_item(),
             );
-            menu_items.insert(1, MenuItem::Separator);
+            split_items.push(
+                MenuItemFields::new("Split down")
+                    .with_on_select_action(WorkspaceAction::SplitActiveTab(Direction::Down))
+                    .into_item(),
+            );
+            let is_split = self
+                .get_pane_group_view(tab_index)
+                .is_some_and(|pane_group| pane_group.as_ref(ctx).visible_pane_ids().len() > 1);
+            if is_split {
+                split_items.push(
+                    MenuItemFields::new("Move panes into separate tabs")
+                        .with_on_select_action(WorkspaceAction::SeparateTabPanes(tab_index))
+                        .into_item(),
+                );
+            }
+        } else {
+            split_items.push(
+                MenuItemFields::new("Split right of current tab")
+                    .with_on_select_action(WorkspaceAction::MoveTabIntoActiveTab {
+                        index: tab_index,
+                        direction: Direction::Right,
+                    })
+                    .into_item(),
+            );
+            split_items.push(
+                MenuItemFields::new("Split below current tab")
+                    .with_on_select_action(WorkspaceAction::MoveTabIntoActiveTab {
+                        index: tab_index,
+                        direction: Direction::Down,
+                    })
+                    .into_item(),
+            );
         }
-        menu_items
+        split_items.push(MenuItem::Separator);
+        split_items.append(&mut menu_items);
+        split_items
     }
 
+    /// Moves the tab at `index` one slot left/right, where a "slot" is either a
+    /// single tab or an entire adjacent group. If the neighbor in the move
+    /// direction belongs to a *different* group, the tab hops over that whole
+    /// group so it never lands inside the group's contiguous run. Moving past an
+    /// ungrouped tab, or reordering within the tab's own group, is an ordinary
+    /// one-slot move.
     fn move_tab(&mut self, index: usize, direction: TabMovement, ctx: &mut ViewContext<Self>) {
         if !self.can_move_tab(index, direction) {
             return;
@@ -23429,7 +23513,11 @@ impl TypedActionView for Workspace {
         }
 
         match action {
-            ActivateTab(index) => self.activate_tab(*index, ctx),
+            ActivateTab(index) => {
+                self.tab_drag_split_target =
+                    (*index != self.active_tab_index).then(|| self.active_tab_pane_group().clone());
+                self.activate_tab(*index, ctx)
+            }
             ActivateTabByNumber(num) => self.activate_tab(num.saturating_sub(1), ctx),
             ActivatePrevTab => self.activate_prev_tab(ctx),
             OpenLaunchConfigSaveModal => self.open_launch_config_save_modal(ctx),
@@ -23441,7 +23529,15 @@ impl TypedActionView for Workspace {
             MoveActiveTabRight => self.move_tab(self.active_tab_index, TabMovement::Right, ctx),
             MoveTabLeft(index) => self.move_tab(*index, TabMovement::Left, ctx),
             MoveTabRight(index) => self.move_tab(*index, TabMovement::Right, ctx),
-            MoveTabIntoActiveTab(index) => self.move_tab_into_active_tab(*index, ctx),
+            MoveTabIntoActiveTab { index, direction } => {
+                self.move_tab_into_active_tab(*index, *direction, None, ctx)
+            }
+            SplitActiveTab(direction) => {
+                self.active_tab_pane_group().update(ctx, |pane_group, ctx| {
+                    pane_group.split_with_new_terminal(*direction, ctx)
+                });
+            }
+            SeparateTabPanes(index) => self.separate_tab_panes(*index, ctx),
             RenameTab(index) => self.rename_tab(*index, ctx),
             ResetTabName(index) => self.clear_tab_name(*index, ctx),
             RenamePane(locator) => self.rename_pane(*locator, ctx),
@@ -24573,6 +24669,24 @@ impl TypedActionView for Workspace {
                 tab_position,
             } => self.on_tab_drag(*tab_index, *tab_position, ctx),
             DropTab => {
+                self.tab_drag_split_target = None;
+                if let Some(drop) = self.tab_split_drop.take() {
+                    self.current_workspace_state.is_tab_being_dragged = false;
+                    if let Some(index) = self
+                        .tabs
+                        .iter()
+                        .position(|tab| tab.pane_group.id() == drop.dragged.id())
+                    {
+                        self.move_tab_into_active_tab(
+                            index,
+                            drop.direction,
+                            Some(drop.pane_id),
+                            ctx,
+                        );
+                    }
+                    ctx.notify();
+                    return;
+                }
                 let is_cross_window = CrossWindowTabDrag::as_ref(ctx).is_active();
                 let handed_off_tab_index =
                     CrossWindowTabDrag::as_ref(ctx)
@@ -27105,6 +27219,43 @@ impl View for Workspace {
             }
         }
 
+        // Uncaged: a tab dragged over the panes previews the half of the hovered pane its panes
+        // will take when dropped.
+        if let Some(drop) = &self.tab_split_drop {
+            let rect = drop.pane_rect;
+            let half_width = vec2f(rect.width() / 2., rect.height());
+            let half_height = vec2f(rect.width(), rect.height() / 2.);
+            let (origin, size) = match drop.direction {
+                Direction::Left => (rect.origin(), half_width),
+                Direction::Right => (rect.origin() + vec2f(rect.width() / 2., 0.), half_width),
+                Direction::Up => (rect.origin(), half_height),
+                Direction::Down => (rect.origin() + vec2f(0., rect.height() / 2.), half_height),
+            };
+            let theme = appearance.theme();
+            stack.add_positioned_overlay_child(
+                ConstrainedBox::new(
+                    Container::new(Empty::new().finish())
+                        .with_background(internal_colors::accent_overlay_2(theme))
+                        .with_border(
+                            Border::all(2.)
+                                .with_border_fill(internal_colors::accent_bg_strong(theme)),
+                        )
+                        .with_corner_radius(warp_core::ui::radius::large())
+                        .with_uniform_margin(PANEL_CARD_MARGIN)
+                        .finish(),
+                )
+                .with_width(size.x())
+                .with_height(size.y())
+                .finish(),
+                OffsetPositioning::offset_from_parent(
+                    origin,
+                    ParentOffsetBounds::Unbounded,
+                    ParentAnchor::TopLeft,
+                    ChildAnchor::TopLeft,
+                ),
+            );
+        }
+
         let window_corner_radius = app.windows().window_corner_radius();
         let workspace = Container::new(stack.finish()).with_corner_radius(window_corner_radius);
 
@@ -27825,6 +27976,92 @@ impl Workspace {
     /// one of three modes: forward to an in-progress cross-window drag,
     /// initiate a new cross-window drag when the drag leaves the tab bar
     /// (or from a single-tab window), or reorder within the current window.
+    /// Uncaged: while a tab is dragged over this window's panes (below the tab bar, inside the
+    /// window), shows the tab the user was on and the side of the hovered pane the dragged tab
+    /// would split into, instead of tearing the tab off into a new window. Returns whether the
+    /// drag is being handled as a split drop. Leaving the window still detaches the tab.
+    fn update_tab_split_drop(
+        &mut self,
+        dragged_index: usize,
+        position: RectF,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let was_split_drop = self.tab_split_drop.take().is_some();
+        let target_index = self.tab_drag_split_target.as_ref().and_then(|target| {
+            self.tabs
+                .iter()
+                .position(|tab| tab.pane_group.id() == target.id())
+        });
+        let Some(target_index) = target_index.filter(|index| *index != dragged_index) else {
+            if was_split_drop {
+                ctx.notify();
+            }
+            return false;
+        };
+        if CrossWindowTabDrag::as_ref(ctx).is_active() {
+            return false;
+        }
+
+        let center = position.center();
+        let inside_window = ctx.window_bounds(&ctx.window_id()).is_some_and(|bounds| {
+            RectF::new(Vector2F::zero(), bounds.size()).contains_point(center)
+        });
+        let over_tab_bar = tab_bar_rects_for_window(ctx.window_id(), ctx)
+            .into_iter()
+            .any(|rect| {
+                rect.dilate(Vector2F::splat(TAB_SPLIT_DROP_TAB_BAR_MARGIN))
+                    .contains_point(center)
+            });
+        if !inside_window || over_tab_bar {
+            // Back over the tab bar (or off the window): the dragged tab is the one being moved,
+            // so show it again.
+            if was_split_drop && self.active_tab_index != dragged_index {
+                self.activate_tab(dragged_index, ctx);
+            }
+            return false;
+        }
+
+        if self.active_tab_index != target_index {
+            self.activate_tab(target_index, ctx);
+        }
+        let target = self.tabs[target_index].pane_group.clone();
+        let hovered = target
+            .as_ref(ctx)
+            .visible_pane_ids()
+            .into_iter()
+            .find_map(|pane_id| {
+                ctx.element_position_by_id(pane_id.position_id())
+                    .filter(|rect| rect.contains_point(center))
+                    .map(|rect| (pane_id, rect))
+            });
+        if let Some((pane_id, pane_rect)) = hovered {
+            let offset = center - pane_rect.center();
+            let normalized = Vector2F::new(
+                offset.x() / pane_rect.width().max(1.),
+                offset.y() / pane_rect.height().max(1.),
+            );
+            let direction = if normalized.y().abs() > normalized.x().abs() {
+                if normalized.y() > 0. {
+                    Direction::Down
+                } else {
+                    Direction::Up
+                }
+            } else if normalized.x() < 0. {
+                Direction::Left
+            } else {
+                Direction::Right
+            };
+            self.tab_split_drop = Some(TabSplitDrop {
+                dragged: self.tabs[dragged_index].pane_group.clone(),
+                pane_id,
+                direction,
+                pane_rect,
+            });
+        }
+        ctx.notify();
+        true
+    }
+
     pub(crate) fn on_tab_drag(
         &mut self,
         current_index: usize,
@@ -27857,6 +28094,9 @@ impl Workspace {
                 .unwrap_or(current_index)
         };
         if current_index >= self.tabs.len() {
+            return;
+        }
+        if self.update_tab_split_drop(current_index, position, ctx) {
             return;
         }
         // Only detach when the drag leaves the active tab presentation on its

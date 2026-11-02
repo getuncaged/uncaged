@@ -136,9 +136,16 @@ pub enum WorkspaceAction {
     MoveActiveTabRight,
     MoveTabLeft(usize),
     MoveTabRight(usize),
-    /// Uncaged: move every pane of the tab at this index into the active tab, as splits on the
-    /// right, and close the emptied tab.
-    MoveTabIntoActiveTab(usize),
+    /// Uncaged: move every pane of the tab at `index` into the active tab, as splits on
+    /// `direction`'s side, and close the emptied tab.
+    MoveTabIntoActiveTab {
+        index: usize,
+        direction: crate::pane_group::Direction,
+    },
+    /// Uncaged: split the active tab's focused pane with a new terminal on `direction`'s side.
+    SplitActiveTab(crate::pane_group::Direction),
+    /// Uncaged: move every pane but the first of the tab at this index into tabs of their own.
+    SeparateTabPanes(usize),
     RenameTab(usize),
     ResetTabName(usize),
     RenamePane(PaneViewLocator),
@@ -940,7 +947,9 @@ impl WorkspaceAction {
             | MoveActiveTabRight
             | MoveTabLeft(_)
             | MoveTabRight(_)
-            | MoveTabIntoActiveTab(_)
+            | MoveTabIntoActiveTab { .. }
+            | SplitActiveTab(_)
+            | SeparateTabPanes(_)
             | DropTab
             | DropGroup
             | RenameTab(_)

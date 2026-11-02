@@ -13305,6 +13305,8 @@ impl TerminalView {
             && !is_launch_modal_open
             && !is_subshell_or_ssh
             && !has_plugin_instructions_block
+            // Uncaged: the same welcome card in every pane of a split is clutter.
+            && !self.split_pane_state(ctx).is_in_split_pane()
         {
             let agent_view_zero_state = ctx.add_typed_action_view(|ctx| {
                 TerminalViewZeroStateBlock::new(
@@ -14297,24 +14299,8 @@ fn fork_label_for_query(query: &str) -> String {
 }
 
 impl TerminalView {
-    fn start_agent_onboarding_tutorial(
-        &mut self,
-        version: AgentOnboardingVersion,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        // If we are already showing the onboarding callout, do nothing.
-        if self.onboarding_callout_view.is_some() {
-            log::warn!("Attempted to start onboarding tutorial when one is already active.");
-            return;
-        }
-
-        // The first Agent Modality callout expects terminal mode. If the default
-        // session mode is Agent (e.g. from cloud-synced settings), the tab
-        // may already be in agent view — exit it first.
-        self.exit_agent_view(ctx);
-
-        // Remove the terminal zero-state welcome block so it doesn't appear
-        // underneath the onboarding callout.
+    /// Removes the terminal zero-state welcome block, if one is showing.
+    pub(crate) fn remove_terminal_zero_state_block(&mut self) {
         let zero_state_ids: Vec<_> = self
             .rich_content_views
             .iter()
@@ -14334,6 +14320,27 @@ impl TerminalView {
             self.rich_content_views
                 .retain(|view| view.view_id() != view_id);
         }
+    }
+
+    fn start_agent_onboarding_tutorial(
+        &mut self,
+        version: AgentOnboardingVersion,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        // If we are already showing the onboarding callout, do nothing.
+        if self.onboarding_callout_view.is_some() {
+            log::warn!("Attempted to start onboarding tutorial when one is already active.");
+            return;
+        }
+
+        // The first Agent Modality callout expects terminal mode. If the default
+        // session mode is Agent (e.g. from cloud-synced settings), the tab
+        // may already be in agent view — exit it first.
+        self.exit_agent_view(ctx);
+
+        // Remove the terminal zero-state welcome block so it doesn't appear
+        // underneath the onboarding callout.
+        self.remove_terminal_zero_state_block();
 
         log::info!("Starting onboarding tutorial with version: {:?}", version);
 

@@ -91,6 +91,12 @@ impl TerminalView {
     pub fn on_pane_state_change(&mut self, ctx: &mut ViewContext<Self>) {
         self.refresh_pane_header(ctx);
 
+        // Uncaged: once a pane joins a split its welcome card goes; the same card in every pane
+        // of a split is clutter.
+        if self.split_pane_state(ctx).is_in_split_pane() {
+            self.remove_terminal_zero_state_block();
+        }
+
         // Trigger refresh of the pane header overflow menu to reflect the new pane state
         // (e.g., updating the Maximize/Minimize pane menu item)
         self.pane_configuration.update(ctx, |config, ctx| {

@@ -5589,6 +5589,20 @@ impl PaneGroup {
         self.focus_state.as_ref(ctx).is_focused_pane_maximized()
     }
 
+    /// Splits the focused pane with a new terminal on `direction`'s side, using the active
+    /// session's shell.
+    pub fn split_with_new_terminal(&mut self, direction: Direction, ctx: &mut ViewContext<Self>) {
+        let chosen_shell = {
+            if let Some(model) = self.active_session_terminal_model(ctx) {
+                let model = model.lock();
+                model.shell_launch_state().available_shell()
+            } else {
+                None
+            }
+        };
+        self.add_terminal_pane(direction, chosen_shell, ctx);
+    }
+
     /// Uncaged: takes every pane out of this group, in order, for another tab to adopt as splits.
     /// Closed-pane undo history is dropped, as with any rearrange. Returns nothing if a pane is
     /// hidden for a job or a child agent, since moving the rest would strand it in an empty tab.
@@ -5608,19 +5622,20 @@ impl PaneGroup {
             .collect()
     }
 
-    /// Uncaged: adds a pane moved here from another tab as a visible split at the root on the
-    /// given side, and focuses it.
+    /// Uncaged: adds a pane moved here from another tab as a visible split on `direction`'s side
+    /// of `base_pane_id` (of the whole group when `None`), and focuses it.
     pub fn add_moved_pane(
         &mut self,
         pane: Box<dyn AnyPaneContent>,
         direction: Direction,
+        base_pane_id: Option<PaneId>,
         ctx: &mut ViewContext<Self>,
     ) -> Option<PaneId> {
         self.add_pane_with_options(
             pane,
             AddPaneOptions {
                 direction,
-                base_pane_id: None,
+                base_pane_id,
                 focus_new_pane: true,
                 visibility: NewPaneVisibility::Visible,
                 emit_app_state_changed: true,
@@ -7849,17 +7864,7 @@ impl TypedActionView for PaneGroup {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         use PaneGroupAction::*;
         match action {
-            Add(direction) => {
-                let chosen_shell = {
-                    if let Some(model) = self.active_session_terminal_model(ctx) {
-                        let model = model.lock();
-                        model.shell_launch_state().available_shell()
-                    } else {
-                        None
-                    }
-                };
-                self.add_terminal_pane(*direction, chosen_shell, ctx);
-            }
+            Add(direction) => self.split_with_new_terminal(*direction, ctx),
             Remove(view_id) => self.close_pane_with_confirmation(*view_id, ctx),
             RemoveActive => self.close_active_pane_with_confirmation(ctx),
             Activate(view_id, reason) => self.focus_pane_on_mouse_event(*view_id, *reason, ctx),

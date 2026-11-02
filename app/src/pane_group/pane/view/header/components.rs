@@ -83,6 +83,9 @@ pub fn render_pane_header_buttons<A: ActionPayload, B: ActionPayload>(
     let mut row = Flex::row()
         .with_cross_axis_alignment(CrossAxisAlignment::Center)
         .with_main_axis_size(MainAxisSize::Min);
+    if !header_ctx.show_controls {
+        return row.finish();
+    }
 
     if header_ctx.has_overflow_items {
         row.add_child(render_pane_overflow_button::<A, B>(

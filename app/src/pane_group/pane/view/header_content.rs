@@ -32,6 +32,10 @@ pub struct HeaderRenderContext<'a> {
     /// Extra left inset for the header's left-side controls, used to avoid
     /// overlap with a floating button overlay (e.g. the vertical tabs toggle).
     pub header_left_inset: f32,
+    /// Uncaged: whether the header's own buttons (overflow, close) should be drawn: only while
+    /// the header is hovered or one of its menus is open, so a screen of splits isn't a grid of
+    /// identical controls.
+    pub show_controls: bool,
     /// Closure that renders the sharing controls. Use [`Self::sharing_controls`] to call this.
     pub(super) render_sharing_controls_fn: RenderSharingControlsFn<'a>,
 }

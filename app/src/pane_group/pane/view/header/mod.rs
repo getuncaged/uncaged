@@ -725,6 +725,14 @@ impl<P: BackingView> View for PaneHeader<P> {
             overflow_button_position_id: self.overflow_button_position_id(),
             has_overflow_items,
             header_left_inset,
+            show_controls: self
+                .mouse_state_handles
+                .header_click_handle
+                .lock()
+                .expect("lock acquired")
+                .is_hovered()
+                || self.open_overlay != OpenOverlay::None
+                || warpui::platform::is_mobile_device(),
             render_sharing_controls_fn: Box::new(|app, icon_color, button_size| {
                 if !self.is_sharing_dialog_enabled(app) {
                     return None;
