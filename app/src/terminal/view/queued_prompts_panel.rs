@@ -920,7 +920,15 @@ impl View for QueuedPromptsPanelView {
             );
         }
 
-        panel.finish()
+        // Uncaged: a rounded card lined up with the input box, rather than a full-width band.
+        Container::new(panel.finish())
+            .with_border(
+                Border::all(1.).with_border_fill(Appearance::as_ref(app).theme().outline()),
+            )
+            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_horizontal_margin(6.)
+            .with_margin_bottom(4.)
+            .finish()
     }
 }
 
@@ -998,7 +1006,6 @@ fn render_header(
     // The keycap is dimmed relative to the header text so it reads as a secondary affordance.
     let keycap_color: ColorU = internal_colors::text_disabled(theme, theme.surface_1());
     let banner_background: Fill = theme.surface_overlay_1().into();
-    let border_color: Fill = theme.split_pane_border_color().into();
     let chevron_icon = if collapsed {
         TerminalIcon::ChevronRight
     } else {
@@ -1051,11 +1058,18 @@ fn render_header(
             );
         }
         let row = row.finish();
+        // Uncaged: the panel itself is a rounded card (see `render`); the header rounds with
+        // its top edge instead of sitting under a full-width rule.
+        let inner_radius = Radius::Pixels(warp_core::ui::radius::MEDIUM - 1.);
         Container::new(row)
             .with_horizontal_padding(16.)
             .with_vertical_padding(8.)
             .with_background(banner_background)
-            .with_border(Border::top(1.).with_border_fill(border_color))
+            .with_corner_radius(if collapsed {
+                CornerRadius::with_all(inner_radius)
+            } else {
+                CornerRadius::with_top(inner_radius)
+            })
             .finish()
     })
     .with_cursor(Cursor::PointingHand)

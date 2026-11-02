@@ -379,12 +379,13 @@ fn render_inline_block_list_banner(
             crate::themes::theme::Fill::Solid(ColorU::new(0, 0, 0, 51))
         }
     };
+    // Uncaged: a rounded strip inset from the pane's edges, like the other cards in the block
+    // list, instead of a full-width band.
     Container::new(Clipped::new(banner.finish()).finish())
         .with_background(background)
-        // Add 1px top padding to balance out the 1px overdraw on the bottom
-        // and keep everything vertically centered.
-        .with_padding_top(1.)
-        .with_overdraw_bottom(1.)
+        .with_corner_radius(warp_core::ui::radius::medium())
+        .with_horizontal_margin(6.)
+        .with_vertical_margin(3.)
         .finish()
 }
 

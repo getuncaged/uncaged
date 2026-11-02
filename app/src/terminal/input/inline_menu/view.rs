@@ -387,8 +387,6 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> InlineMenuView<A, T> {
     ) -> Self {
         let menu_bar_args = InlineMenuMessageBarArgs {
             inline_menu_model: inline_menu_model.clone(),
-            agent_view_controller: agent_view_controller.clone(),
-            positioner: positioner.clone(),
         };
         let message_bar = ctx.add_view(|ctx| InlineMenuMessageBar::new(menu_bar_args, ctx));
 
@@ -721,7 +719,11 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> InlineMenuView<A, T> {
         true
     }
 
-    fn render_header(&self, app: &AppContext) -> Option<Box<dyn Element>> {
+    fn render_header(
+        &self,
+        is_rendering_below_input: bool,
+        app: &AppContext,
+    ) -> Option<Box<dyn Element>> {
         if !FeatureFlag::InlineMenuHeaders.is_enabled() {
             return None;
         }
@@ -852,15 +854,18 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> InlineMenuView<A, T> {
         .with_height(inline_styles::HEADER_ROW_HEIGHT)
         .finish();
 
+        // Uncaged: the menu is a rounded card (see `render`), so the header fills the card's
+        // outer end and rounds with it; the card's own border replaces the full-width rules.
+        let inner_radius = Radius::Pixels(warp_core::ui::radius::MEDIUM - 1.);
         let header = Container::new(header_row)
             .with_padding_left(*terminal::view::PADDING_LEFT)
             .with_padding_right(8.)
             .with_background(theme.surface_overlay_1())
-            .with_border(
-                Border::new(inline_styles::HEADER_BORDER)
-                    .with_sides(true, false, true, false)
-                    .with_border_fill(theme.outline()),
-            )
+            .with_corner_radius(if is_rendering_below_input {
+                CornerRadius::with_bottom(inner_radius)
+            } else {
+                CornerRadius::with_top(inner_radius)
+            })
             .finish();
 
         // Clip so trailing controls don't paint past the pane in a narrow split pane.
@@ -1124,7 +1129,7 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> View for InlineMenuView<A, T
             Align::new(content).bottom_center().finish()
         };
 
-        let header = self.render_header(app);
+        let header = self.render_header(is_rendering_below_input, app);
         let has_header = header.is_some();
 
         let height = self.positioner.as_ref(app).inline_menu_height(app);
@@ -1132,10 +1137,12 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> View for InlineMenuView<A, T
             Container::new(aligned_content)
                 .with_border(
                     Border::new(inline_styles::CONTENT_BORDER_WIDTH)
+                        // A rule between the results and the header, and between the results
+                        // and the message bar; the card's border draws the outer edges.
                         .with_sides(
-                            is_rendering_below_input || !has_header,
+                            is_rendering_below_input || has_header,
                             false,
-                            !is_rendering_below_input || !has_header,
+                            !is_rendering_below_input || has_header,
                             false,
                         )
                         .with_border_fill(if self.agent_view_controller.as_ref(app).is_active() {
@@ -1174,9 +1181,18 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> View for InlineMenuView<A, T
         children.push(Clipped::new(menu).finish());
         children.push(ChildView::new(&self.message_bar).finish());
 
-        column.with_children(children).finish()
+        // Uncaged: a rounded card lined up with the input box's 6px inset, instead of a
+        // full-width band fenced by rules.
+        Container::new(column.with_children(children).finish())
+            .with_border(Border::all(1.).with_border_fill(theme.outline()))
+            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_horizontal_margin(INLINE_MENU_CARD_INSET)
+            .finish()
     }
 }
+
+/// Uncaged: matches the input box's horizontal margin so the menu card lines up with it.
+const INLINE_MENU_CARD_INSET: f32 = 6.;
 
 enum ScanDirection {
     Forward,

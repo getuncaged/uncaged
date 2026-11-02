@@ -94,9 +94,15 @@ impl Input {
             add_input_suggestions_overlays(self, &mut stack, appearance, menu_positioning, app);
         }
 
-        let mut input_container = Container::new(stack.finish()).with_border(
-            Border::top(1.0).with_border_fill(internal_colors::fg_overlay_2(appearance.theme())),
-        );
+        // Uncaged: the same rounded, inset box as the main input, not a full-width strip under
+        // a rule.
+        let mut input_container = Container::new(stack.finish())
+            .with_border(
+                Border::all(1.0)
+                    .with_border_fill(internal_colors::fg_overlay_2(appearance.theme())),
+            )
+            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_uniform_margin(6.);
 
         // When an alt screen CLI agent (e.g. OpenCode) is running, match
         // the rich input background to the alt screen so it blends in.

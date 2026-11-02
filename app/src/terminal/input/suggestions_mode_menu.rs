@@ -41,12 +41,8 @@ impl Input {
         menu_positioning: MenuPositioning,
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
-        let radius = Radius::Pixels(6.);
-
-        let corner_radius = match menu_positioning {
-            MenuPositioning::AboveInputBox => CornerRadius::with_top(radius),
-            MenuPositioning::BelowInputBox => CornerRadius::with_bottom(radius),
-        };
+        // Uncaged: rounded on every side, floating just clear of the input, like the other menus.
+        let corner_radius = CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::MEDIUM));
 
         let input_suggestions_border = 2.0;
         let margin =

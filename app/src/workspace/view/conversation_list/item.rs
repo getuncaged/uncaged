@@ -324,9 +324,14 @@ pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
     let tooltip_text = truncate_from_end(&conversation.display.title, MAX_TOOLTIP_LENGTH);
     let overflow_button_state = state.overflow_button_state.clone();
     let hoverable = Hoverable::new(state.mouse_state.clone(), move |_| {
+        // Uncaged: the row keeps its height (the uniform list relies on it) but splits it so
+        // the text is centred in its highlight and adjacent highlights don't run together.
         let container = Container::new(row)
             .with_horizontal_padding(8.)
-            .with_padding_top(8.)
+            .with_padding_top(3.)
+            .with_padding_bottom(3.)
+            .with_margin_top(1.)
+            .with_margin_bottom(1.)
             .with_margin_left(4.)
             .with_margin_right(4.)
             .with_corner_radius(radius::small());

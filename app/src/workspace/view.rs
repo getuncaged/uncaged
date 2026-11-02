@@ -22212,7 +22212,6 @@ impl Workspace {
         let appearance = Appearance::as_ref(app);
 
         let mut col = Flex::column().with_main_axis_size(MainAxisSize::Max);
-        let mut contents = contents;
 
         let traffic_light_data = traffic_light_data(app, self.window_id);
         let vertical_tabs_active =
@@ -22227,9 +22226,6 @@ impl Workspace {
                     .with_height(TAB_BAR_HEIGHT)
                     .finish(),
             );
-            contents = Container::new(contents)
-                .with_border(Border::top(1.).with_border_fill(appearance.theme().surface_2()))
-                .finish();
         }
         col.add_child(Shrinkable::new(1.0, contents).finish());
 

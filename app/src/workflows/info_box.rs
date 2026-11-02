@@ -4,12 +4,12 @@ use std::ops::Range;
 use string_offset::CharOffset;
 use warp_core::features::FeatureFlag;
 use warp_core::settings::Setting;
+use warp_core::ui::radius;
 use warpui::color::ColorU;
 use warpui::elements::{
     self, Align, Border, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
-    Container, CornerRadius, CrossAxisAlignment, DropShadow, Flex, Highlight, Icon,
-    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, Shrinkable,
-    Stack, Text,
+    Container, CrossAxisAlignment, DropShadow, Flex, Highlight, Icon, MainAxisAlignment,
+    MainAxisSize, MouseStateHandle, ParentElement, Rect, Shrinkable, Stack, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::geometry::vector::Vector2F;
@@ -46,6 +46,8 @@ use crate::workflows::WorkflowType;
 use crate::workspace::WorkspaceAction;
 
 const INFO_BOX_PADDING: f32 = 20.;
+/// Uncaged: how far the card's inner bands (env vars, edited-command) sit in from its edges.
+const BAND_INSET: f32 = 4.;
 const ARGUMENT_PADDING: f32 = 10.;
 const KEYBOARD_SHORTCUT_PADDING: f32 = 15.;
 
@@ -478,10 +480,13 @@ impl WorkflowsMoreInfoView {
 
         Container::new(Shrinkable::new(1., contents.finish()).finish())
             .with_background(appearance.theme().dark_overlay())
-            .with_padding_left(INFO_BOX_PADDING)
-            .with_padding_right(INFO_BOX_PADDING)
+            .with_padding_left(INFO_BOX_PADDING - BAND_INSET)
+            .with_padding_right(INFO_BOX_PADDING - BAND_INSET)
             .with_padding_top(ARGUMENT_PADDING)
             .with_padding_bottom(ARGUMENT_PADDING)
+            .with_corner_radius(radius::small())
+            .with_horizontal_margin(BAND_INSET)
+            .with_margin_bottom(BAND_INSET)
             .finish()
     }
 
@@ -618,27 +623,33 @@ impl WorkflowsMoreInfoView {
             .finish();
 
         Some(
-            ConstrainedBox::new(
-                Stack::new()
-                    .with_child(
-                        Rect::new()
-                            .with_background_color(appearance.theme().surface_1().into())
-                            .finish(),
-                    )
-                    .with_child(
-                        Container::new(
-                            Flex::row()
-                                .with_main_axis_size(MainAxisSize::Max)
-                                .with_child(span)
-                                .with_child(env_var_dropdown)
+            Container::new(
+                ConstrainedBox::new(
+                    Stack::new()
+                        .with_child(
+                            Container::new(Rect::new().finish())
+                                .with_background_color(appearance.theme().surface_1().into())
+                                .with_corner_radius(radius::small())
                                 .finish(),
                         )
-                        .with_horizontal_margin(ENV_VAR_HORIZONTAL_MARGIN)
+                        .with_child(
+                            Container::new(
+                                Flex::row()
+                                    .with_main_axis_size(MainAxisSize::Max)
+                                    .with_child(span)
+                                    .with_child(env_var_dropdown)
+                                    .finish(),
+                            )
+                            .with_horizontal_margin(ENV_VAR_HORIZONTAL_MARGIN - BAND_INSET)
+                            .finish(),
+                        )
                         .finish(),
-                    )
-                    .finish(),
+                )
+                .with_height(ENV_VAR_ROW_HEIGHT)
+                .finish(),
             )
-            .with_height(ENV_VAR_ROW_HEIGHT)
+            .with_horizontal_margin(BAND_INSET)
+            .with_margin_bottom(BAND_INSET)
             .finish(),
         )
     }
@@ -1102,19 +1113,13 @@ impl View for WorkflowsMoreInfoView {
             self.render_collapsed_info_box(appearance)
         };
 
+        // Uncaged: a floating card, rounded on every side like the input below it. The card is
+        // drawn outside the scrollable so the scrollbar's gutter sits inside it instead of
+        // leaving the card short of the input's right edge.
         Container::new(
             ClippedScrollable::vertical(
                 self.scroll_state.clone(),
-                Container::new(info_box_element)
-                    .with_border(Border::all(1.).with_border_fill(appearance.theme().surface_2()))
-                    .with_background(appearance.theme().surface_2())
-                    .with_corner_radius(match input_mode {
-                        InputMode::PinnedToBottom => CornerRadius::with_top(Radius::Pixels(6.)),
-                        InputMode::PinnedToTop | InputMode::Waterfall => {
-                            CornerRadius::with_bottom(Radius::Pixels(6.))
-                        }
-                    })
-                    .finish(),
+                info_box_element,
                 Default::default(),
                 theme.disabled_text_color(theme.background()).into(),
                 theme.main_text_color(theme.background()).into(),
@@ -1122,6 +1127,9 @@ impl View for WorkflowsMoreInfoView {
             )
             .finish(),
         )
+        .with_border(Border::all(1.).with_border_fill(appearance.theme().surface_2()))
+        .with_background(appearance.theme().surface_2())
+        .with_corner_radius(radius::medium())
         .with_drop_shadow(DropShadow::new_with_standard_offset_and_spread(
             ColorU::new(0, 0, 0, 48),
         ))

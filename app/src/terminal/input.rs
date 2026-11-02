@@ -1196,7 +1196,8 @@ impl MenuPositioning {
 
     fn history_y_offset(&self) -> OffsetType {
         match *self {
-            MenuPositioning::AboveInputBox => OffsetType::Pixel(0.),
+            // Uncaged: a small gap so the menu floats instead of sitting on the input's border.
+            MenuPositioning::AboveInputBox => OffsetType::Pixel(-6.),
             MenuPositioning::BelowInputBox => OffsetType::Pixel(-11.),
         }
     }

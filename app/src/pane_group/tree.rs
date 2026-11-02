@@ -1417,16 +1417,30 @@ fn divider_mouse_down_action(
     }
 }
 
+/// Uncaged: how far a split divider stops short of the panes' outer edges. A rule that runs
+/// edge to edge reads as a hard fence through a rounded card; an inset one reads as a seam.
+const DIVIDER_END_INSET: f32 = 8.;
+
+fn divider_line(direction: SplitDirection, theme: &WarpTheme) -> Box<dyn Element> {
+    let line =
+        Container::new(Rect::new().finish()).with_background(theme.split_pane_border_color());
+    match direction {
+        SplitDirection::Horizontal => line
+            .with_margin_top(DIVIDER_END_INSET)
+            .with_margin_bottom(DIVIDER_END_INSET),
+        SplitDirection::Vertical => line
+            .with_margin_left(DIVIDER_END_INSET)
+            .with_margin_right(DIVIDER_END_INSET),
+    }
+    .finish()
+}
+
 fn create_divider(
     direction: SplitDirection,
     item: &Divider,
     theme: &WarpTheme,
 ) -> Box<dyn Element> {
-    let divider = ConstrainedBox::new(
-        Rect::new()
-            .with_background(theme.split_pane_border_color())
-            .finish(),
-    );
+    let divider = ConstrainedBox::new(divider_line(direction, theme));
 
     let cursor_shape = match direction {
         SplitDirection::Horizontal => Cursor::ResizeLeftRight,
@@ -1458,11 +1472,7 @@ fn create_minimalist_divider(
     item: &Divider,
     theme: &WarpTheme,
 ) -> Box<dyn Element> {
-    let divider = ConstrainedBox::new(
-        Rect::new()
-            .with_background(theme.split_pane_border_color())
-            .finish(),
-    );
+    let divider = ConstrainedBox::new(divider_line(direction, theme));
 
     let cursor_shape = match direction {
         SplitDirection::Horizontal => Cursor::ResizeLeftRight,

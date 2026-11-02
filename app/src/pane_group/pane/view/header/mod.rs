@@ -8,9 +8,9 @@ use warp_core::settings::Setting;
 use warpui::elements::{
     AcceptedByDropTarget, Align, Border, ChildAnchor, Clipped, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, Draggable, DraggableState, Empty, Flex, Hoverable,
-    Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds,
-    Radius, SavePosition, Shrinkable, Stack, Text,
+    Radius, Rect, SavePosition, Shrinkable, Stack, Text,
 };
 use warpui::presenter::ChildView;
 use warpui::{
@@ -963,20 +963,22 @@ impl<P: BackingView> TypedActionView for PaneHeader<P> {
 }
 
 /// Adds the active pane indicator to the stack.
+///
+/// Uncaged: a short rounded accent pill set in from the corner, instead of a triangle wedged
+/// into the pane's square corner.
 fn add_active_pane_indicator_to_stack(stack: &mut Stack, appearance: &Appearance) {
-    let indicator = Icon::new(
-        "bundled/svg/upper-left-triangle.svg",
-        appearance.theme().accent(),
-    )
-    .finish();
+    let indicator = Container::new(Rect::new().finish())
+        .with_background(appearance.theme().accent())
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(1.5)))
+        .finish();
     let child = ConstrainedBox::new(indicator)
-        .with_height(16.)
-        .with_width(16.)
+        .with_height(3.)
+        .with_width(20.)
         .finish();
     stack.add_positioned_child(
         child,
         OffsetPositioning::offset_from_parent(
-            vec2f(0., 0.),
+            vec2f(10., 4.),
             ParentOffsetBounds::ParentBySize,
             ParentAnchor::TopLeft,
             ChildAnchor::TopLeft,

@@ -32,6 +32,9 @@ use crate::workspace::tab_settings::{TabSettings, TabSettingsChangedEvent};
 use crate::workspace::view::TOGGLE_RIGHT_PANEL_BINDING_NAME;
 use crate::WorkspaceAction;
 
+/// Uncaged: matches the input box's horizontal margin so the card lines up with it.
+const CARD_INSET: f32 = 6.;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TerminalViewZeroStateAction {
     Dismiss,
@@ -269,20 +272,21 @@ impl View for TerminalViewZeroStateBlock {
 
         Stack::new()
             .with_child(
+                // Uncaged: a rounded card lined up with the input box, instead of a full-width
+                // band between two rules.
                 Container::new(content.finish())
-                    .with_horizontal_padding(*terminal::view::PADDING_LEFT)
+                    .with_horizontal_padding(*terminal::view::PADDING_LEFT - CARD_INSET)
                     .with_vertical_padding(styles::CONTAINER_VERTICAL_PADDING)
-                    .with_border(
-                        Border::new(1.)
-                            .with_sides(true, false, true, false)
-                            .with_border_fill(theme.outline()),
-                    )
+                    .with_border(Border::all(1.).with_border_fill(theme.outline()))
+                    .with_corner_radius(warp_core::ui::radius::medium())
+                    .with_horizontal_margin(CARD_INSET)
+                    .with_vertical_margin(CARD_INSET)
                     .finish(),
             )
             .with_positioned_child(
                 dismiss_button,
                 OffsetPositioning::offset_from_parent(
-                    vec2f(-8., -8.),
+                    vec2f(-8. - CARD_INSET, -8. - CARD_INSET),
                     ParentOffsetBounds::ParentBySize,
                     ParentAnchor::BottomRight,
                     ChildAnchor::BottomRight,

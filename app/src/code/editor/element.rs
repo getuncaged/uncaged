@@ -44,6 +44,9 @@ use crate::view_components::action_button::{ActionButtonTheme, SecondaryTheme};
 pub const GUTTER_WIDTH: f32 = 94.;
 const VERTICAL_DIFF_HUNK_INDICATOR_WIDTH: f32 = 3.;
 const VERTICAL_DIFF_HUNK_INDICATOR_HOVERED_WIDTH: f32 = 8.;
+/// Uncaged: how far line overlays (current line, diff bands) sit in from the pane edges, so
+/// they read as rounded bands rather than full-width bars.
+const LINE_OVERLAY_INSET: f32 = 4.;
 
 fn highlight_element(appearance: &Appearance) -> Box<dyn Element> {
     let border_color = appearance.theme().accent();
@@ -449,10 +452,16 @@ impl<V: EditorView> EditorWrapper<V> {
             };
             ctx.scene
                 .draw_rect_without_hit_recording(RectF::new(
-                    origin + vec2f(0., group.start_y),
-                    vec2f(wrapper_size.x(), group.end_y - group.start_y),
+                    origin + vec2f(LINE_OVERLAY_INSET, group.start_y),
+                    vec2f(
+                        wrapper_size.x() - LINE_OVERLAY_INSET * 2.,
+                        group.end_y - group.start_y,
+                    ),
                 ))
-                .with_background(group.overlay);
+                .with_background(group.overlay)
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::SMALL,
+                )));
         };
 
         for element in gutter_elements.iter() {
@@ -1392,10 +1401,16 @@ impl<V: EditorView> Element for EditorWrapper<V> {
                 let end_y = content.y_offset_at_line(decoration.end);
                 ctx.scene
                     .draw_rect_without_hit_recording(RectF::new(
-                        origin + vec2f(0., (start_y - y_adjustment).as_f32()),
-                        vec2f(wrapper_size.x(), (end_y - start_y).as_f32()),
+                        origin + vec2f(LINE_OVERLAY_INSET, (start_y - y_adjustment).as_f32()),
+                        vec2f(
+                            wrapper_size.x() - LINE_OVERLAY_INSET * 2.,
+                            (end_y - start_y).as_f32(),
+                        ),
                     ))
-                    .with_background(decoration.overlay);
+                    .with_background(decoration.overlay)
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        warp_core::ui::radius::SMALL,
+                    )));
             }
         }
 

@@ -391,15 +391,15 @@ impl View for AgentViewZeroStateBlock {
         }));
         let content = content.finish();
 
-        let show_bottom_border = true;
+        // Uncaged: a rounded card lined up with the input box, instead of a full-width band
+        // between two rules.
         let content = Container::new(content)
-            .with_horizontal_padding(*terminal::view::PADDING_LEFT)
+            .with_horizontal_padding(*terminal::view::PADDING_LEFT - 6.)
             .with_vertical_padding(styles::CONTAINER_VERTICAL_PADDING)
-            .with_border(
-                Border::new(1.)
-                    .with_sides(true, false, show_bottom_border, false)
-                    .with_border_fill(theme.outline()),
-            )
+            .with_border(Border::all(1.).with_border_fill(theme.outline()))
+            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_horizontal_margin(6.)
+            .with_vertical_margin(6.)
             .finish();
 
         if let Some(save_position_id) = self.save_position_id(app) {

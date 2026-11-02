@@ -61,7 +61,6 @@ use crate::quit_warning::UnsavedStateSummary;
 use crate::search::files::icon::icon_from_file_path;
 use crate::search::ItemHighlightState;
 use crate::server::telemetry::CodeContextDestination;
-use crate::tab::TAB_BAR_BORDER_HEIGHT;
 use crate::terminal::cli_agent::{
     build_selection_line_range_prompt, build_selection_substring_prompt,
 };
@@ -1722,14 +1721,23 @@ impl CodeView {
                             app,
                         ))
                         .with_horizontal_margin(TAB_HORIZONTAL_MARGIN)
-                        .with_padding(Padding::uniform(TAB_PADDING))
+                        .with_padding(Padding::uniform(TAB_PADDING).with_vertical(0.))
                         .finish(),
                     )
-                    .with_border(
-                        Border::new(TAB_BAR_BORDER_HEIGHT)
-                            .with_border_fill(theme.outline())
-                            .with_sides(false, false, !is_active, true),
-                    );
+                    // Uncaged: rounded tabs, filled when active and tinted on hover, instead of
+                    // boxes fenced by rules on their right and bottom edges.
+                    .with_corner_radius(warp_core::ui::radius::small())
+                    .with_vertical_margin(TAB_PADDING)
+                    .with_horizontal_margin(1.);
+                    let container = if is_active {
+                        container.with_background(theme.surface_overlay_1())
+                    } else if tab_handle.is_hovered() {
+                        container.with_background(
+                            warp_core::ui::theme::color::internal_colors::fg_overlay_1(theme),
+                        )
+                    } else {
+                        container
+                    };
 
                     // Renders a border to the left/right of a tab being dragged over to display the intended drop position.
                     let border = match &self.drag_position {
@@ -1821,9 +1829,7 @@ impl CodeView {
         }
 
         // Draggable spacer fills the gap between tabs and buttons and supports header dragging.
-        let spacer = Container::new(Empty::new().finish())
-            .with_border(Border::bottom(TAB_BAR_BORDER_HEIGHT).with_border_fill(theme.outline()))
-            .finish();
+        let spacer = Container::new(Empty::new().finish()).finish();
         let draggable_spacer = render_pane_header_draggable::<CodeView>(
             self.pane_configuration.clone(),
             spacer,
@@ -1833,7 +1839,11 @@ impl CodeView {
         tabs_row.add_child(if is_pane_dragging {
             draggable_spacer
         } else {
-            Expanded::new(1., draggable_spacer).finish()
+            // Uncaged: Flex hands out space in order, one share per unit of flex, and the spacer
+            // comes last. At flex 1 it reserved a full share, capping each tab at a fraction of
+            // the bar and clipping short names ("Untitled" -> "titled"). A near-zero share lets
+            // the tabs take their natural width; the spacer still fills whatever is left.
+            Expanded::new(0.001, draggable_spacer).finish()
         });
 
         // Clip tabs so overflow doesn't push the buttons off-screen.
@@ -1860,9 +1870,6 @@ impl CodeView {
         header_row.add_child(
             Container::new(Align::new(buttons).finish())
                 .with_padding_right(4.)
-                .with_border(
-                    Border::bottom(TAB_BAR_BORDER_HEIGHT).with_border_fill(theme.outline()),
-                )
                 .finish(),
         );
 

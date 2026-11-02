@@ -149,13 +149,13 @@ use warpui::elements::new_scrollable::{
 };
 use warpui::elements::shimmering_text::ShimmeringTextStateHandle;
 use warpui::elements::{
-    get_rich_content_position_id, Align, Border, ChildAnchor, ChildView, Clipped,
-    ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    DispatchEventResult, DropTarget, DropTargetData, Empty, EventHandler, Fill, Flex, Hoverable,
-    Icon, LiveElement, MouseStateHandle, NewScrollable, OffsetPositioning, ParentAnchor,
-    ParentElement, ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds,
-    Radius, Rect, SavePosition, ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth,
-    Shrinkable, Stack, Text,
+    get_rich_content_position_id, Align, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle,
+    ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, DropTarget,
+    DropTargetData, Empty, EventHandler, Fill, Flex, Hoverable, Icon, LiveElement,
+    MouseStateHandle, NewScrollable, OffsetPositioning, ParentAnchor, ParentElement,
+    ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Rect,
+    SavePosition, ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth, Shrinkable,
+    Stack, Text,
 };
 use warpui::event::ModifiersState;
 use warpui::fonts::{Cache as FontCache, FamilyId, Properties};
@@ -27552,22 +27552,21 @@ impl View for TerminalView {
             && self.can_show_conversation_details_ui_from_model(&model, app);
 
         if should_show_panel {
-            // Wrap panel with agent view background for visual consistency
-            let panel_with_background =
-                Container::new(ChildView::new(&self.conversation_details_panel).finish())
-                    .with_background(agent_view_bg_fill(app))
-                    .finish();
+            // Uncaged: the panel is a rounded card with the agent view background, like the
+            // other side panels, rather than a block fenced off by a rule along the top and a
+            // rule down its left edge.
+            let panel_with_background = crate::workspace::view::rounded_panel(
+                ChildView::new(&self.conversation_details_panel).finish(),
+                Some(agent_view_bg_fill(app)),
+                appearance,
+            );
 
-            Container::new(
-                Flex::row()
-                    .with_main_axis_size(warpui::elements::MainAxisSize::Max)
-                    .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-                    .with_child(Shrinkable::new(1., final_element).finish())
-                    .with_child(panel_with_background)
-                    .finish(),
-            )
-            .with_border(Border::top(1.0).with_border_fill(appearance.theme().outline()))
-            .finish()
+            Flex::row()
+                .with_main_axis_size(warpui::elements::MainAxisSize::Max)
+                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                .with_child(Shrinkable::new(1., final_element).finish())
+                .with_child(panel_with_background)
+                .finish()
         } else {
             final_element
         }

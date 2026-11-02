@@ -2040,7 +2040,8 @@ impl View for ConversationDetailsPanel {
             }
         }
 
-        if let Some(credits) = self.data.credits {
+        // Uncaged: local runs use no credits; a "0.0" row only adds noise.
+        if let Some(credits) = self.data.credits.filter(|credits| *credits > 0.) {
             let formatted = format!("{credits:.1}");
             content.add_child(
                 Container::new(self.render_simple_field("Credits used", &formatted, appearance))
@@ -2049,7 +2050,8 @@ impl View for ConversationDetailsPanel {
             );
         }
 
-        if let Some(duration) = self.data.run_time {
+        // Uncaged: likewise "0 ms" says nothing; show the run time only once there is one.
+        if let Some(duration) = self.data.run_time.filter(|duration| !duration.is_zero()) {
             let formatted = human_readable_precise_duration(duration);
             content.add_child(
                 Container::new(self.render_simple_field("Run time", &formatted, appearance))
@@ -2132,11 +2134,8 @@ impl View for ConversationDetailsPanel {
             .with_child(
                 Expanded::new(
                     1.,
-                    Container::new(scrollable_content)
-                        .with_border(
-                            Border::left(1.).with_border_fill(blended_colors::neutral_2(theme)),
-                        )
-                        .finish(),
+                    // Uncaged: the host draws the panel as a rounded card, so no left rule.
+                    Container::new(scrollable_content).finish(),
                 )
                 .finish(),
             )

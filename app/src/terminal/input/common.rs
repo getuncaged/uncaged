@@ -161,11 +161,14 @@ pub(super) fn add_workflow_info_overlay(
     pane_height_px: f32,
     menu_positioning: MenuPositioning,
 ) {
-    let workflows_info_view =
-        Container::new(ChildView::new(&selected_workflow_state.more_info_view).finish())
-            .with_margin_left(16.)
-            .with_margin_right(16.)
-            .finish();
+    // Uncaged: the overlay's parent already spans the input box, so the card lines up with it
+    // as is; leave a gap so the card floats instead of sitting on the input's border.
+    let gap = Container::new(ChildView::new(&selected_workflow_state.more_info_view).finish());
+    let workflows_info_view = match menu_positioning {
+        MenuPositioning::AboveInputBox => gap.with_margin_bottom(6.),
+        MenuPositioning::BelowInputBox => gap.with_margin_top(6.),
+    }
+    .finish();
 
     stack.add_positioned_overlay_child(
         ConstrainedBox::new(workflows_info_view)

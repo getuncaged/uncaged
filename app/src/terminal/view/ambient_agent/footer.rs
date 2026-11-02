@@ -62,11 +62,15 @@ fn build_centered_footer(
         .with_main_axis_alignment(MainAxisAlignment::Center)
         .finish();
 
+    // Uncaged: a rounded card in the input's place, matching the input box, instead of a
+    // full-width band under a rule.
     Container::new(content)
         .with_background(background)
-        .with_border(Border::top(BORDER_WIDTH).with_border_fill(border_color))
+        .with_border(Border::all(BORDER_WIDTH).with_border_fill(border_color))
+        .with_corner_radius(warp_core::ui::radius::medium())
         .with_horizontal_padding(HORIZONTAL_PADDING)
         .with_vertical_padding(VERTICAL_PADDING)
+        .with_uniform_margin(6.)
         .finish()
 }
 

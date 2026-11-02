@@ -246,14 +246,14 @@ impl View for PluginInstructionsBlock {
 
         let close_button = ChildView::new(&self.close_button).finish();
 
+        // Uncaged: a rounded card, not a full-width band between two rules.
         let body = Container::new(content.finish())
-            .with_horizontal_padding(*super::PADDING_LEFT)
+            .with_horizontal_padding(*super::PADDING_LEFT - 6.)
             .with_vertical_padding(16.)
-            .with_border(
-                Border::new(1.)
-                    .with_sides(true, false, true, false)
-                    .with_border_fill(theme.outline()),
-            )
+            .with_border(Border::all(1.).with_border_fill(theme.outline()))
+            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_horizontal_margin(6.)
+            .with_vertical_margin(6.)
             .finish();
 
         Stack::new()

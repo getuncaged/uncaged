@@ -243,13 +243,13 @@ pub fn render_agent_shortcuts_view(
             .with_children(shortcuts)
             .finish(),
     )
+    // Uncaged: a rounded card lined up with the input box, instead of a band between rules.
     .with_vertical_padding(16.)
-    .with_padding_left(*terminal::view::PADDING_LEFT)
-    .with_border(
-        Border::new(1.)
-            .with_sides(true, false, true, false)
-            .with_border_color(blended_colors::neutral_2(appearance.theme())),
-    )
+    .with_padding_left(*terminal::view::PADDING_LEFT - 6.)
+    .with_border(Border::all(1.).with_border_color(blended_colors::neutral_2(appearance.theme())))
+    .with_corner_radius(warp_core::ui::radius::medium())
+    .with_horizontal_margin(6.)
+    .with_margin_bottom(4.)
     .finish()
 }
 

@@ -4,8 +4,9 @@ use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
 use warp_core::ui::Icon;
 use warpui::elements::{
-    Border, CacheOption, Clipped, Container, CornerRadius, Element, FormattedTextElement,
-    Hoverable, Image, ParentElement, Radius, Wrap, WrapFill, DEFAULT_UI_LINE_HEIGHT_RATIO,
+    Axis, Border, CacheOption, Clipped, Container, CornerRadius, Element, FormattedTextElement,
+    Hoverable, Image, ParentElement, Radius, Shrinkable, Wrap, WrapFill,
+    DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
 use warpui::platform::Cursor;
 use warpui::prelude::{Align, ConstrainedBox, CrossAxisAlignment, Flex, MainAxisSize, Text};
@@ -62,11 +63,13 @@ pub fn render_standard_message_bar(
             .with_main_axis_size(MainAxisSize::Max)
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(render_message_bar_items(&left_items, app))
+            .with_child(
+                Shrinkable::new(1., render_hints_dropping_overflow(&left_items, app)).finish(),
+            )
             .with_child(right_element)
             .finish()
     } else {
-        Align::new(render_message_bar_items(&left_items, app))
+        Align::new(render_hints_dropping_overflow(&left_items, app))
             .left()
             .finish()
     };
@@ -126,6 +129,38 @@ pub fn render_wrapping_standard_message_bar(
     .with_horizontal_padding(*terminal::view::PADDING_LEFT)
     .with_vertical_padding(styles::VERTICAL_PADDING)
     .finish()
+}
+
+/// Uncaged: lays the hints out in a single-line `Wrap` so a hint that doesn't fit the bar is
+/// dropped whole (its run never gets laid out under the bar's fixed height) instead of being
+/// cut off mid-word. Each clickable or chip is one unit; plain items between them stay
+/// together as a phrase.
+fn render_hints_dropping_overflow(items: &[MessageItem], app: &AppContext) -> Box<dyn Element> {
+    let mut wrap = Wrap::new(Axis::Horizontal)
+        .with_spacing(8.)
+        .with_main_axis_size(MainAxisSize::Min)
+        .with_cross_axis_alignment(CrossAxisAlignment::Center);
+    let mut phrase_start = 0;
+    for (i, item) in items.iter().enumerate() {
+        if matches!(
+            item,
+            MessageItem::Clickable { .. } | MessageItem::Chip { .. }
+        ) {
+            if phrase_start < i {
+                wrap.add_child(render_message_bar_items(&items[phrase_start..i], app));
+            }
+            wrap.add_child(render_message_bar_items(&items[i..=i], app));
+            phrase_start = i + 1;
+        }
+    }
+    if phrase_start < items.len() {
+        wrap.add_child(render_message_bar_items(&items[phrase_start..], app));
+    }
+    // Room for one run but never two, so a second run is never laid out.
+    let line_height = standard_message_bar_height(app) - styles::VERTICAL_PADDING * 2.;
+    ConstrainedBox::new(wrap.finish())
+        .with_max_height(line_height * 1.5)
+        .finish()
 }
 
 pub fn render_standard_message(message: Message, app: &AppContext) -> Box<dyn Element> {

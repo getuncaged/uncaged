@@ -46,6 +46,8 @@ use crate::view_components::action_button::{
 };
 
 const FOOTER_HEIGHT: f32 = 24.;
+/// Gap between the footer strip and the pane edges.
+const FOOTER_INSET: f32 = 4.;
 /// Margin around the LSP icon container
 const ICON_MARGIN: f32 = 4.;
 const INDICATOR_SIZE: f32 = 8.;
@@ -1521,9 +1523,7 @@ impl CodeFooterView {
                 .and_then(|s| s.to_str())
                 .unwrap_or("this workspace");
             Some((
-                Some(format!(
-                    "Language support is not currently enabled for {root_name}"
-                )),
+                Some(format!("Language support is off for {root_name}")),
                 true,
             ))
         } else {
@@ -1597,7 +1597,7 @@ impl CodeFooterView {
                 LSPEnablementResultForFile::LSPNotEnabled { root_name } => match lsp_repo_status {
                     LspRepoStatus::CheckingForInstallation => (
                         Some(format!(
-                            "Language support is not currently enabled for {}",
+                            "Language support is off for {}",
                             root_name.unwrap_or("this codebase".to_string())
                         )),
                         false,
@@ -1609,7 +1609,7 @@ impl CodeFooterView {
                     LspRepoStatus::DisabledAndNotInstalled { .. }
                     | LspRepoStatus::DisabledAndInstalled { .. } => (
                         Some(format!(
-                            "Language support is not currently enabled for {}",
+                            "Language support is off for {}",
                             root_name.unwrap_or("this codebase".to_string())
                         )),
                         true,
@@ -1773,7 +1773,9 @@ impl View for CodeFooterView {
             }
         }
 
-        let mut container = Container::new(
+        // Uncaged: a rounded strip inset from the pane's edges instead of a full-width bar
+        // under a hard 2px rule.
+        let strip = Container::new(
             ConstrainedBox::new(
                 Container::new(footer_content.finish())
                     .with_padding(Padding::uniform(4.0))
@@ -1782,12 +1784,16 @@ impl View for CodeFooterView {
             .with_height(FOOTER_HEIGHT)
             .finish(),
         )
-        .with_background_color(theme.background().into());
+        .with_background(internal_colors::fg_overlay_1(theme))
+        .with_corner_radius(radius::small())
+        .finish();
+
+        let mut container = Container::new(strip)
+            .with_uniform_padding(FOOTER_INSET)
+            .with_background_color(theme.background().into());
 
         if self.show_border {
-            container = container
-                .with_border(Border::top(2.0).with_border_fill(internal_colors::neutral_2(theme)))
-                .with_corner_radius(CornerRadius::with_bottom(Radius::Pixels(8.)));
+            container = container.with_corner_radius(CornerRadius::with_bottom(Radius::Pixels(8.)));
         }
 
         container.finish()
