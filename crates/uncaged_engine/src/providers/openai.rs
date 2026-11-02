@@ -10,15 +10,12 @@ use std::collections::BTreeMap;
 use futures::StreamExt as _;
 use futures::channel::mpsc;
 use futures::stream::BoxStream;
-use serde_json::Value;
-use serde_json::json;
+use serde_json::{Value, json};
 
-use super::Provider;
-use super::ProviderEvent;
 use super::sse::SseDecoder;
+use super::{Provider, ProviderEvent};
 use crate::config::Effort;
-use crate::model::Conversation;
-use crate::model::NeutralMsg;
+use crate::model::{Conversation, NeutralMsg};
 
 #[derive(Clone)]
 pub struct OpenAiProvider {

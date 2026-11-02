@@ -4,14 +4,11 @@
 
 use serde_json::json;
 
-use crate::config::ProviderConfig;
-use crate::config::UncagedConfig;
+use crate::config::{ProviderConfig, UncagedConfig};
 use crate::model::NeutralMsg;
 use crate::proto::api;
-use crate::request_parse;
-use crate::tools::ToolRegistry;
-use crate::tools::decode_history_result;
-use crate::wire;
+use crate::tools::{ToolRegistry, decode_history_result};
+use crate::{request_parse, wire};
 
 // ---- config round-trips (must match what script/uncaged-setup writes) ----
 
@@ -183,8 +180,7 @@ fn passive_suggestion_request_prompts_for_a_tool_call() {
     // The client fires `GeneratePassiveSuggestions` after `git stat` fails. The
     // engine must (a) surface the command in a user turn that instructs the model
     // to call `suggest_prompt`, and (b) actually advertise that tool.
-    use api::request::input::GeneratePassiveSuggestions;
-    use api::request::input::generate_passive_suggestions as gps;
+    use api::request::input::{GeneratePassiveSuggestions, generate_passive_suggestions as gps};
 
     let request = api::Request {
         input: Some(api::request::Input {

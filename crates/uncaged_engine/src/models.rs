@@ -9,9 +9,8 @@ use std::time::Duration;
 
 use serde_json::Value;
 
-use crate::config;
-use crate::connections;
 use crate::connections::Connection;
+use crate::{config, connections};
 
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(10);
 

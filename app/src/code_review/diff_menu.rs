@@ -1,9 +1,9 @@
 //! Overlay menu for the code review diff selector: pinned search input and
 //! a filtered list of label-only rows with a left check slot.
 use std::cmp;
-use warp_core::ui::radius;
 
 use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
+use warp_core::ui::radius;
 use warp_core::ui::theme::Fill;
 use warp_editor::editor::NavigationKey;
 use warpui::color::ColorU;

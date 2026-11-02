@@ -7,12 +7,9 @@
 
 use std::collections::HashSet;
 
-use crate::model::Conversation;
-use crate::model::NeutralMsg;
+use crate::model::{Conversation, NeutralMsg};
 use crate::proto::api;
-use crate::tools::decode_history_result;
-use crate::tools::decode_input_result;
-use crate::tools::decode_tool_call;
+use crate::tools::{decode_history_result, decode_input_result, decode_tool_call};
 
 pub struct ParsedHistory {
     pub messages: Vec<NeutralMsg>,

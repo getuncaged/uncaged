@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use warp_core::ui::radius;
 
 use ai::index::full_source_code_embedding::manager::{
     CodebaseIndexManager, CodebaseIndexManagerEvent,
 };
 use settings::Setting;
+use warp_core::ui::radius;
 use warp_util::path::user_friendly_path;
 use warpui::elements::{
     Border, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable,

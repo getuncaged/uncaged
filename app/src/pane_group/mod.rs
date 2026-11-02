@@ -5589,6 +5589,53 @@ impl PaneGroup {
         self.focus_state.as_ref(ctx).is_focused_pane_maximized()
     }
 
+    /// Uncaged: takes every pane out of this group, in order, for another tab to adopt as splits.
+    /// Closed-pane undo history is dropped, as with any rearrange. Returns nothing if a pane is
+    /// hidden for a job or a child agent, since moving the rest would strand it in an empty tab.
+    /// Removing the last pane emits `Exited`, which closes this group's tab.
+    pub fn take_panes_for_merge(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) -> Vec<Box<dyn AnyPaneContent>> {
+        self.clear_hidden_closed_panes(ctx);
+        let pane_ids = self.visible_pane_ids();
+        if pane_ids.len() != self.pane_count() {
+            return Vec::new();
+        }
+        pane_ids
+            .into_iter()
+            .filter_map(|pane_id| self.remove_pane_for_move(&pane_id, ctx))
+            .collect()
+    }
+
+    /// Uncaged: adds a pane moved here from another tab as a visible split at the root on the
+    /// given side, and focuses it.
+    pub fn add_moved_pane(
+        &mut self,
+        pane: Box<dyn AnyPaneContent>,
+        direction: Direction,
+        ctx: &mut ViewContext<Self>,
+    ) -> Option<PaneId> {
+        self.add_pane_with_options(
+            pane,
+            AddPaneOptions {
+                direction,
+                base_pane_id: None,
+                focus_new_pane: true,
+                visibility: NewPaneVisibility::Visible,
+                emit_app_state_changed: true,
+            },
+            ctx,
+        )
+    }
+
+    /// Uncaged: true while the panes draw as separate rounded cards (a visible split that isn't
+    /// maximized), so the workspace shouldn't wrap the pane area in a card of its own.
+    pub fn renders_pane_cards(&self, ctx: &AppContext) -> bool {
+        let focus_state = self.focus_state.as_ref(ctx);
+        focus_state.is_in_split_pane() && !focus_state.is_focused_pane_maximized()
+    }
+
     pub fn focused_shell_indicator_type(&self, ctx: &AppContext) -> Option<ShellIndicatorType> {
         self.pane_contents
             .get(&self.focused_pane_id(ctx))

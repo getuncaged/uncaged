@@ -13,15 +13,10 @@
 
 use std::collections::HashMap;
 
-use serde_json::Value;
-use serde_json::json;
+use serde_json::{Value, json};
 
-use crate::model::ToolResult;
-use crate::model::ToolSpec;
-use crate::model::ToolUse;
-use crate::proto::api;
-use crate::proto::json_to_struct;
-use crate::proto::struct_to_json;
+use crate::model::{ToolResult, ToolSpec, ToolUse};
+use crate::proto::{api, json_to_struct, struct_to_json};
 
 /// Built-in tools Uncaged knows how to schema + encode. Other `ToolType`s
 /// the client advertises are simply not exposed to the model (the model can't

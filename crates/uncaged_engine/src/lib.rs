@@ -45,36 +45,18 @@ mod live_tests;
 #[cfg(test)]
 mod tests;
 
-pub use catalog::Group;
-pub use catalog::PRESETS;
-pub use catalog::Preset;
-pub use catalog::Wire;
-pub use catalog::preset_by_id;
-pub use catalog::presets_in;
-pub use config::ANTHROPIC_DEFAULT_BASE_URL;
-pub use config::Effort;
-pub use config::LMSTUDIO_DEFAULT_BASE_URL;
-pub use config::OLLAMA_DEFAULT_BASE_URL;
-pub use config::OPENAI_DEFAULT_BASE_URL;
-pub use config::OPENROUTER_DEFAULT_BASE_URL;
-pub use config::ProviderConfig;
-pub use config::UncagedConfig;
-pub use config::active;
-pub use config::config_path;
-pub use config::reload;
-pub use config::save;
-pub use connections::Connection;
-pub use connections::Roster;
-pub use connections::add as add_connection;
-pub use connections::connect_or_focus;
-pub use connections::load as load_roster;
-pub use connections::load_or_seed as roster;
-pub use connections::remove as remove_connection;
-pub use connections::set_active as set_active_connection;
-pub use connections::set_effort as set_connection_effort;
-pub use connections::update as update_connection;
-pub use engine::EngineStream;
-pub use engine::run_turn;
+pub use catalog::{Group, PRESETS, Preset, Wire, preset_by_id, presets_in};
+pub use config::{
+    ANTHROPIC_DEFAULT_BASE_URL, Effort, LMSTUDIO_DEFAULT_BASE_URL, OLLAMA_DEFAULT_BASE_URL,
+    OPENAI_DEFAULT_BASE_URL, OPENROUTER_DEFAULT_BASE_URL, ProviderConfig, UncagedConfig, active,
+    config_path, reload, save,
+};
+pub use connections::{
+    Connection, Roster, add as add_connection, connect_or_focus, load as load_roster,
+    load_or_seed as roster, remove as remove_connection, set_active as set_active_connection,
+    set_effort as set_connection_effort, update as update_connection,
+};
+pub use engine::{EngineStream, run_turn};
 pub use models::discover as discover_models;
 
 /// Whether the local engine is currently active (enabled with a valid backend).

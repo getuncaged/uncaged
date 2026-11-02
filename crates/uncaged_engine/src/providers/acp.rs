@@ -18,26 +18,19 @@
 //! protocol version; treat this as a starting point to adapt per agent.
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::LazyLock;
-use std::sync::Mutex as StdMutex;
+use std::sync::{Arc, LazyLock, Mutex as StdMutex};
 
 use futures::StreamExt as _;
 use futures::channel::mpsc;
 use futures::stream::BoxStream;
-use serde_json::Value;
-use serde_json::json;
-use tokio::io::AsyncBufReadExt as _;
-use tokio::io::AsyncWriteExt as _;
-use tokio::io::BufReader;
+use serde_json::{Value, json};
+use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::process::Command;
 use tokio::sync::Mutex as AsyncMutex;
 
-use super::Provider;
-use super::ProviderEvent;
+use super::{Provider, ProviderEvent};
 use crate::config::Effort;
-use crate::model::Conversation;
-use crate::model::NeutralMsg;
+use crate::model::{Conversation, NeutralMsg};
 
 /// A live CLI process plus the ACP session opened against it. Held across turns.
 struct AcpSession {

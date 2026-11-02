@@ -3,11 +3,11 @@ use std::ops::Deref;
 #[cfg(feature = "local_fs")]
 use std::path::PathBuf;
 use std::sync::Arc;
-use warp_core::ui::radius;
 
 use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
 use itertools::Itertools;
 use warp_core::ui::builder::UiBuilder;
+use warp_core::ui::radius;
 use warp_core::ui::theme::color::internal_colors;
 use warp_editor::editor::NavigationKey;
 use warp_workflows::workflows as global_workflows;

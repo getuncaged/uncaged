@@ -12,9 +12,9 @@
 //! Fully local — no cloud, no account.
 
 use std::path::{Path, PathBuf};
-use warp_core::ui::radius;
 
 use ai::skills::SKILL_PROVIDER_DEFINITIONS;
+use warp_core::ui::radius;
 use warpui::elements::{
     ClippedScrollStateHandle, ClippedScrollable, Container, CrossAxisAlignment, Element, Fill,
     Flex, Hoverable, MainAxisSize, MouseStateHandle, ParentElement, ScrollbarWidth, Text,

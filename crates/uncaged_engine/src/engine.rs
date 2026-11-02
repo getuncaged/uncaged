@@ -13,12 +13,9 @@ use futures::stream::BoxStream;
 use crate::config::UncagedConfig;
 use crate::model::Conversation;
 use crate::proto::api;
-use crate::providers;
 use crate::providers::ProviderEvent;
-use crate::request_parse;
-use crate::system_prompt;
 use crate::tools::ToolRegistry;
-use crate::wire;
+use crate::{providers, request_parse, system_prompt, wire};
 
 /// Output type matching the seam's expectation, minus the crate-specific error
 /// (the seam maps `anyhow::Error` into its own `Error`).

@@ -18,8 +18,7 @@
 use std::path::PathBuf;
 use std::sync::RwLock;
 
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// The default Anthropic API base. Uncaged only talks to the public
 /// Messages API; no Warp endpoint is involved.

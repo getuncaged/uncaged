@@ -14,8 +14,7 @@
 
 use futures::StreamExt as _;
 
-use crate::config::ProviderConfig;
-use crate::config::UncagedConfig;
+use crate::config::{ProviderConfig, UncagedConfig};
 use crate::proto::api;
 
 const BASE_URL: &str = "http://127.0.0.1:1234/v1";

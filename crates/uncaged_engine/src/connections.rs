@@ -13,16 +13,11 @@
 
 use std::path::PathBuf;
 
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::catalog;
-use crate::catalog::Preset;
-use crate::catalog::Wire;
-use crate::config;
-use crate::config::Effort;
-use crate::config::ProviderConfig;
-use crate::config::UncagedConfig;
+use crate::catalog::{Preset, Wire};
+use crate::config::{Effort, ProviderConfig, UncagedConfig};
+use crate::{catalog, config};
 
 const DEFAULT_MAX_TOKENS: u32 = 8192;
 

@@ -1,12 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::sync::{Arc, Mutex};
-use warp_core::ui::radius;
 
 use pathfinder_geometry::vector::Vector2F;
 use warp_core::features::FeatureFlag;
 use warp_core::send_telemetry_from_ctx;
-use warp_core::ui::Icon;
+use warp_core::ui::{radius, Icon};
 use warp_editor::editor::NavigationKey;
 use warpui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
@@ -52,7 +51,7 @@ use crate::workspace::view::conversation_list::item::{
     render_item, render_static_item, ItemProps, ItemState, OverflowMenuDisplay, StaticItemProps,
     STATIC_ITEM_MIN_HEIGHT,
 };
-use crate::workspace::{ToastStack, WorkspaceAction};
+use crate::workspace::{RestoreConversationLayout, ToastStack, WorkspaceAction};
 
 const VIEW_ALL_LABEL: &str = "View all";
 /// Maximum number of past items to show before the user toggles "view all".
@@ -132,6 +131,10 @@ pub enum ConversationListViewAction {
         conversation_id: AgentConversationEntryId,
     },
     OpenItem {
+        id: AgentConversationEntryId,
+    },
+    /// Uncaged: open the conversation in a new split pane beside the current one.
+    OpenItemInSplitPane {
         id: AgentConversationEntryId,
     },
     ArrowUp,
@@ -1094,7 +1097,16 @@ impl TypedActionView for ConversationListView {
                             None
                         };
 
-                    let mut items = Vec::new();
+                    let mut items = vec![
+                        MenuItemFields::new("Open in split pane")
+                            .with_on_select_action(
+                                ConversationListViewAction::OpenItemInSplitPane {
+                                    id: conversation_id,
+                                },
+                            )
+                            .into_item(),
+                        MenuItem::Separator,
+                    ];
                     if let Some(share_item) = share_item {
                         items.push(share_item);
                     }
@@ -1188,6 +1200,18 @@ impl TypedActionView for ConversationListView {
                 let Some(action) = AgentConversationsModel::resolve_open_action(
                     AgentConversationNavigationSubject::Entry(*id),
                     None,
+                    ctx,
+                ) else {
+                    return;
+                };
+
+                Self::send_open_telemetry(id, ctx);
+                ctx.dispatch_typed_action(&action);
+            }
+            ConversationListViewAction::OpenItemInSplitPane { id } => {
+                let Some(action) = AgentConversationsModel::resolve_open_action(
+                    AgentConversationNavigationSubject::Entry(*id),
+                    Some(RestoreConversationLayout::SplitPane),
                     ctx,
                 ) else {
                     return;

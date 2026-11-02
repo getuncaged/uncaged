@@ -1549,27 +1549,24 @@ impl CodeView {
             .finish(),
         );
 
+        // Uncaged: the close button (or its blank stand-in) keeps its own fixed width. In a flex
+        // slot of the same weight as the name it took half the tab, so names were cut off from
+        // the left ("eslint.config.js" -> "nt.config.js") beside an empty gap.
         let show_close = is_active || is_hovered;
-        row.add_child(
-            Shrinkable::new(
-                1.,
-                if show_close {
-                    Self::render_close_button(
-                        appearance,
-                        tab_data.mouse_state_handles.close_handle.clone(),
-                        index,
-                    )
-                } else {
-                    Container::new(
-                        ConstrainedBox::new(Empty::new().finish())
-                            .with_width(CLOSE_BUTTON_WIDTH)
-                            .with_height(CLOSE_BUTTON_WIDTH)
-                            .finish(),
-                    )
-                    .finish()
-                },
+        let close = if show_close {
+            Self::render_close_button(
+                appearance,
+                tab_data.mouse_state_handles.close_handle.clone(),
+                index,
             )
-            .finish(),
+        } else {
+            Empty::new().finish()
+        };
+        row.add_child(
+            ConstrainedBox::new(close)
+                .with_width(CLOSE_BUTTON_WIDTH)
+                .with_height(CLOSE_BUTTON_WIDTH)
+                .finish(),
         );
 
         let draggable = Draggable::new(

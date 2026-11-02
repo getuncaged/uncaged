@@ -17,6 +17,7 @@ use super::{ActivationReason, PaneGroup, PaneId};
 use crate::app_state;
 use crate::pane_group::{get_minimum_pane_size, DraggedBorder, PaneGroupAction};
 use crate::themes::theme::WarpTheme;
+use crate::workspace::view::PANEL_CARD_MARGIN;
 
 #[cfg(test)]
 #[path = "tree_tests.rs"]
@@ -32,11 +33,6 @@ pub fn get_divider_thickness() -> f32 {
         2.0
     }
 }
-
-// Extra padding for the divider to make it easier to resize.
-// This is added around each side of the divider. Only used
-// when minimalist UI is enabled.
-const DIVIDER_RESIZE_PADDING: f32 = 4.0;
 
 /// Tree for all of the split panes
 ///
@@ -1114,14 +1110,8 @@ impl PaneBranch {
         // Add actual dividers as positioned children anchored to their placeholders
         // (the reason we have to do it this way is explained in the large comment above)
         for (divider, position_id) in divider_positions {
-            let divider_element = if FeatureFlag::MinimalistUI.is_enabled() {
-                create_minimalist_divider(self.axis, divider, theme)
-            } else {
-                create_divider(self.axis, divider, theme)
-            };
-
             stack.add_positioned_child(
-                divider_element,
+                create_gap_divider(self.axis, divider, theme),
                 OffsetPositioning::offset_from_save_position_element(
                     position_id,
                     Vector2F::new(0., 0.),
@@ -1435,13 +1425,14 @@ fn divider_line(direction: SplitDirection, theme: &WarpTheme) -> Box<dyn Element
     .finish()
 }
 
-fn create_divider(
+/// Uncaged: split panes are separate rounded cards, so the divider is the gap between them. It
+/// is an invisible resize handle spanning that gap, and shows an inset seam only while hovered
+/// so you can see what you're about to drag.
+fn create_gap_divider(
     direction: SplitDirection,
     item: &Divider,
     theme: &WarpTheme,
 ) -> Box<dyn Element> {
-    let divider = ConstrainedBox::new(divider_line(direction, theme));
-
     let cursor_shape = match direction {
         SplitDirection::Horizontal => Cursor::ResizeLeftRight,
         SplitDirection::Vertical => Cursor::ResizeUpDown,
@@ -1449,50 +1440,26 @@ fn create_divider(
 
     let border_id = item.id;
     let mouse_state = item.mouse_state.clone();
-
-    Hoverable::new(item.mouse_state.clone(), |_| match direction {
-        SplitDirection::Horizontal => divider.with_width(get_divider_thickness()).finish(),
-        SplitDirection::Vertical => divider.with_height(get_divider_thickness()).finish(),
-    })
-    .on_mouse_down(move |ctx, _, position| {
-        ctx.dispatch_typed_action(divider_mouse_down_action(
-            &mouse_state,
-            border_id,
-            direction,
-            position,
-        ));
-    })
-    .with_cursor(cursor_shape)
-    .with_propagate_drag()
-    .finish()
-}
-
-fn create_minimalist_divider(
-    direction: SplitDirection,
-    item: &Divider,
-    theme: &WarpTheme,
-) -> Box<dyn Element> {
-    let divider = ConstrainedBox::new(divider_line(direction, theme));
-
-    let cursor_shape = match direction {
-        SplitDirection::Horizontal => Cursor::ResizeLeftRight,
-        SplitDirection::Vertical => Cursor::ResizeUpDown,
-    };
-
-    let border_id = item.id;
-    let mouse_state = item.mouse_state.clone();
-    let hoverable = Hoverable::new(item.mouse_state.clone(), |_| match direction {
-        SplitDirection::Horizontal => {
-            Container::new(divider.with_width(get_divider_thickness()).finish())
-                .with_padding_left(DIVIDER_RESIZE_PADDING)
-                .with_padding_right(DIVIDER_RESIZE_PADDING)
-                .finish()
-        }
-        SplitDirection::Vertical => {
-            Container::new(divider.with_height(get_divider_thickness()).finish())
-                .with_padding_top(DIVIDER_RESIZE_PADDING)
-                .with_padding_bottom(DIVIDER_RESIZE_PADDING)
-                .finish()
+    let hoverable = Hoverable::new(item.mouse_state.clone(), |state| {
+        let line = if state.is_hovered() || state.is_clicked() {
+            divider_line(direction, theme)
+        } else {
+            Empty::new().finish()
+        };
+        let divider = ConstrainedBox::new(line);
+        match direction {
+            SplitDirection::Horizontal => {
+                Container::new(divider.with_width(get_divider_thickness()).finish())
+                    .with_padding_left(PANEL_CARD_MARGIN)
+                    .with_padding_right(PANEL_CARD_MARGIN)
+                    .finish()
+            }
+            SplitDirection::Vertical => {
+                Container::new(divider.with_height(get_divider_thickness()).finish())
+                    .with_padding_top(PANEL_CARD_MARGIN)
+                    .with_padding_bottom(PANEL_CARD_MARGIN)
+                    .finish()
+            }
         }
     })
     .on_mouse_down(move |ctx, _, position| {
@@ -1520,7 +1487,7 @@ fn create_minimalist_divider(
         SplitDirection::Vertical => stack.add_positioned_child(
             hoverable.finish(),
             OffsetPositioning::offset_from_parent(
-                Vector2F::new(0., -DIVIDER_RESIZE_PADDING),
+                Vector2F::new(0., -PANEL_CARD_MARGIN),
                 ParentOffsetBounds::Unbounded,
                 ParentAnchor::TopLeft,
                 ChildAnchor::TopLeft,

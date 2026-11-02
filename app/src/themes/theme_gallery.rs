@@ -13,11 +13,11 @@ use std::time::Duration;
 
 use anyhow::{bail, Context as _, Result};
 use serde::Deserialize;
+use warp_core::ui::theme::WarpTheme;
 
 use crate::brand;
 use crate::themes::theme::{ThemeGroup, COMMUNITY_SUBFOLDER};
 use crate::themes::theme_background_image;
-use warp_core::ui::theme::WarpTheme;
 
 /// The branch the gallery reads from.
 ///

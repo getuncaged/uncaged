@@ -22,9 +22,7 @@ use warp_core::safe_error;
 use warpui::platform::TerminationMode;
 use warpui::{AppContext, ModelContext, SingletonEntity};
 
-use super::github_releases;
-use super::install_source;
-use super::{release_assets_directory_url, DownloadReady};
+use super::{github_releases, install_source, release_assets_directory_url, DownloadReady};
 use crate::appearance::AppearanceManager;
 use crate::autoupdate::{AutoupdateStage, AutoupdateState};
 use crate::channel::{Channel, ChannelState};

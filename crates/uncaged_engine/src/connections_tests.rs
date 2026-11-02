@@ -6,13 +6,10 @@
 
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU32, Ordering};
 
-use crate::config;
-use crate::config::ProviderConfig;
-use crate::config::UncagedConfig;
-use crate::connections;
+use crate::config::{ProviderConfig, UncagedConfig};
+use crate::{config, connections};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 static COUNTER: AtomicU32 = AtomicU32::new(0);

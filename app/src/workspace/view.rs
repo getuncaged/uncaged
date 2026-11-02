@@ -568,7 +568,7 @@ pub(crate) fn card_outline(appearance: &Appearance) -> Fill {
 }
 
 /// Uncaged: the gap around a side panel's rounded card.
-const PANEL_CARD_MARGIN: f32 = 4.;
+pub(crate) const PANEL_CARD_MARGIN: f32 = 4.;
 
 /// Uncaged: draw a side panel (tools sidebar, code review, vertical tabs) as a rounded,
 /// outlined card inset from the window and the terminal, instead of a full-height block
@@ -7561,6 +7561,7 @@ impl Workspace {
                 ctx,
             )
         };
+        let menu_items = self.with_move_into_active_tab_item(tab_index, menu_items);
         ctx.update_view(&self.tab_right_click_menu, |context_menu, view_ctx| {
             context_menu.set_items(menu_items, view_ctx);
         });
@@ -7645,6 +7646,7 @@ impl Workspace {
             Some(pane_name_target),
             ctx,
         );
+        let menu_items = self.with_move_into_active_tab_item(tab_index, menu_items);
 
         ctx.update_view(&self.tab_right_click_menu, |context_menu, view_ctx| {
             context_menu.set_items(menu_items, view_ctx);
@@ -13910,6 +13912,44 @@ impl Workspace {
     /// group so it never lands inside the group's contiguous run. Moving past an
     /// ungrouped tab, or reordering within the tab's own group, is an ordinary
     /// one-slot move.
+    /// Uncaged: brings the tab at `index` beside the active tab's panes as splits on the right,
+    /// so several chats (or a chat and its code) can be laid out side by side without dragging
+    /// pane headers one at a time. The source tab closes once its last pane has moved.
+    fn move_tab_into_active_tab(&mut self, index: usize, ctx: &mut ViewContext<Self>) {
+        if index == self.active_tab_index {
+            return;
+        }
+        let Some(source) = self.get_pane_group_view(index).cloned() else {
+            return;
+        };
+        let target = self.active_tab_pane_group().clone();
+        let panes = source.update(ctx, |pane_group, ctx| pane_group.take_panes_for_merge(ctx));
+        target.update(ctx, |pane_group, ctx| {
+            for pane in panes {
+                pane_group.add_moved_pane(pane, Direction::Right, ctx);
+            }
+        });
+    }
+
+    /// Uncaged: the tab menu's "Move into current tab" entry, offered on every tab but the
+    /// active one.
+    fn with_move_into_active_tab_item(
+        &self,
+        tab_index: usize,
+        mut menu_items: Vec<MenuItem<WorkspaceAction>>,
+    ) -> Vec<MenuItem<WorkspaceAction>> {
+        if tab_index != self.active_tab_index {
+            menu_items.insert(
+                0,
+                MenuItemFields::new("Move into current tab as split")
+                    .with_on_select_action(WorkspaceAction::MoveTabIntoActiveTab(tab_index))
+                    .into_item(),
+            );
+            menu_items.insert(1, MenuItem::Separator);
+        }
+        menu_items
+    }
+
     fn move_tab(&mut self, index: usize, direction: TabMovement, ctx: &mut ViewContext<Self>) {
         if !self.can_move_tab(index, direction) {
             return;
@@ -21593,6 +21633,10 @@ impl Workspace {
         let vertical_tabs_active =
             FeatureFlag::VerticalTabs.is_enabled() && *TabSettings::as_ref(app).use_vertical_tabs;
         let pane_group = self.active_tab_pane_group().as_ref(app);
+        // Uncaged: a split draws each pane as its own card, so the pane area isn't wrapped in one.
+        let panes_are_cards = !(FeatureFlag::AgentManagementView.is_enabled()
+            && self.current_workspace_state.is_agent_management_view_open)
+            && pane_group.renders_pane_cards(app);
         let is_right_open = pane_group.right_panel_open;
         let is_right_maximized = is_right_open && pane_group.is_right_panel_maximized;
 
@@ -21633,7 +21677,7 @@ impl Workspace {
             if !is_right_maximized {
                 // Uncaged: with a side panel open the terminal / pane area is a rounded card
                 // beside it, matching the panels; on its own it stays a plain full surface.
-                let terminal_content = if has_side_panel {
+                let terminal_content = if has_side_panel && !panes_are_cards {
                     rounded_panel(terminal_content, None, appearance)
                 } else {
                     terminal_content
@@ -22316,7 +22360,11 @@ impl Workspace {
         // The outer workspace container in `render` already paints the terminal
         // background fill, so don't paint it again here (see APP-4328). Uncaged: beside a side
         // panel the terminal area is a rounded card, matching the panels.
-        let terminal_view = if has_side_panel {
+        let panes_are_cards = self
+            .active_tab_pane_group()
+            .as_ref(app)
+            .renders_pane_cards(app);
+        let terminal_view = if has_side_panel && !panes_are_cards {
             rounded_panel(terminal_view, None, Appearance::as_ref(app))
         } else {
             terminal_view
@@ -23393,6 +23441,7 @@ impl TypedActionView for Workspace {
             MoveActiveTabRight => self.move_tab(self.active_tab_index, TabMovement::Right, ctx),
             MoveTabLeft(index) => self.move_tab(*index, TabMovement::Left, ctx),
             MoveTabRight(index) => self.move_tab(*index, TabMovement::Right, ctx),
+            MoveTabIntoActiveTab(index) => self.move_tab_into_active_tab(*index, ctx),
             RenameTab(index) => self.rename_tab(*index, ctx),
             ResetTabName(index) => self.clear_tab_name(*index, ctx),
             RenamePane(locator) => self.rename_pane(*locator, ctx),

@@ -12,8 +12,7 @@ mod sse;
 use futures::stream::BoxStream;
 use serde_json::Value;
 
-use crate::config::ProviderConfig;
-use crate::config::UncagedConfig;
+use crate::config::{ProviderConfig, UncagedConfig};
 use crate::model::Conversation;
 
 /// A normalized streaming event from any provider.

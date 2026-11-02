@@ -23,11 +23,10 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{bail, Context as _, Result};
-use futures_lite::{AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _};
-use sha2::{Digest as _, Sha256};
-
 use channel_versions::{ReleaseAsset, VersionInfo};
+use futures_lite::{AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _};
 use serde::Deserialize;
+use sha2::{Digest as _, Sha256};
 
 use crate::brand;
 

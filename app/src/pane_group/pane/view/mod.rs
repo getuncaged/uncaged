@@ -28,6 +28,7 @@ use crate::pane_group::{Direction, SplitPaneState, TabBarHoverIndex};
 use crate::server::telemetry::SharingDialogSource;
 use crate::settings::{PaneSettings, PaneSettingsChangedEvent};
 use crate::util::bindings::CustomAction;
+use crate::workspace::view::{card_outline, PANEL_CARD_MARGIN};
 
 const HAS_SHARED_OBJECT_CONTEXT_KEY: &str = "PaneView_HasSharedObject";
 
@@ -394,11 +395,24 @@ impl<P: BackingView> View for PaneView<P> {
         column.add_child(Shrinkable::new(1., ChildView::new(&active_child).finish()).finish());
 
         let mut container = Container::new(column.finish());
+        // Uncaged: in a visible split every pane is its own rounded card, set apart from its
+        // neighbours by a gap (the resize handle sits in the gap), like the side panels.
+        let is_card = split_pane_state.is_in_split_pane() && !split_pane_state.is_maximized();
+        if is_card {
+            container = container
+                .with_border(Border::all(1.).with_border_fill(card_outline(appearance)))
+                .with_corner_radius(warp_core::ui::radius::large())
+                .with_uniform_margin(PANEL_CARD_MARGIN);
+        }
         if pane_configuration.show_accent_border {
             let border = Border::all(2.).with_border_fill(appearance.theme().accent());
             container = container
                 .with_border(border)
-                .with_corner_radius(warp_core::ui::radius::medium());
+                .with_corner_radius(if is_card {
+                    warp_core::ui::radius::large()
+                } else {
+                    warp_core::ui::radius::medium()
+                });
         }
 
         // Dim inactive panes.

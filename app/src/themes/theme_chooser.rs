@@ -14,7 +14,8 @@ use warpui::fonts::{FamilyId, Weight};
 use warpui::geometry::vector::vec2f;
 use warpui::keymap::FixedBinding;
 use warpui::platform::{Cursor, SystemTheme};
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
+use warpui::ui_components::button::ButtonVariant;
+use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::windowing::{StateEvent, WindowManager};
 use warpui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, Tracked, TypedActionView,
@@ -33,9 +34,6 @@ use crate::resource_center::{
 };
 use crate::server::telemetry::TelemetryEvent;
 use crate::settings::{respect_system_theme, ThemeSettings};
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::Coords;
-
 use crate::themes::theme::{
     RespectSystemTheme, SelectedSystemThemes, ThemeGroup, ThemeKind, WarpTheme, WarpThemeConfig,
 };

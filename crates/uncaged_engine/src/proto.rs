@@ -4,13 +4,10 @@
 //! conversions between `serde_json::Value` (how providers express tool args)
 //! and `prost_types::Struct` (how Warp's `CallMCPTool.args` is typed).
 
-pub use warp_multi_agent_api as api;
-
-use prost_types::Struct as ProtoStruct;
-use prost_types::Value as ProtoValue;
 use prost_types::value::Kind;
-use serde_json::Map;
-use serde_json::Value as JsonValue;
+use prost_types::{Struct as ProtoStruct, Value as ProtoValue};
+use serde_json::{Map, Value as JsonValue};
+pub use warp_multi_agent_api as api;
 
 /// Convert a JSON object into a protobuf `Struct`. Non-object inputs are
 /// wrapped under a single `value` key so nothing is silently dropped.

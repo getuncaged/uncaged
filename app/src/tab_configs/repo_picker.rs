@@ -1,6 +1,6 @@
 use std::path::PathBuf;
-use warp_core::ui::radius;
 
+use warp_core::ui::radius;
 use warp_util::path::user_friendly_path;
 use warpui::elements::{Border, ChildView, Container, Hoverable, MouseStateHandle, Text};
 use warpui::platform::Cursor;

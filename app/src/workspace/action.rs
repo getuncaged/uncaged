@@ -136,6 +136,9 @@ pub enum WorkspaceAction {
     MoveActiveTabRight,
     MoveTabLeft(usize),
     MoveTabRight(usize),
+    /// Uncaged: move every pane of the tab at this index into the active tab, as splits on the
+    /// right, and close the emptied tab.
+    MoveTabIntoActiveTab(usize),
     RenameTab(usize),
     ResetTabName(usize),
     RenamePane(PaneViewLocator),
@@ -937,6 +940,7 @@ impl WorkspaceAction {
             | MoveActiveTabRight
             | MoveTabLeft(_)
             | MoveTabRight(_)
+            | MoveTabIntoActiveTab(_)
             | DropTab
             | DropGroup
             | RenameTab(_)
