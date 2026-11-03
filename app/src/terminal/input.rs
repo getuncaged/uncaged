@@ -1136,9 +1136,6 @@ pub enum InputAction {
     /// Clears the AI context menu search query back to the @ character and resets menu state.
     ClearAndResetAIContextMenuQuery,
 
-    /// Sets the hover state of the Universal Developer Input
-    SetUDIHovered(bool),
-
     /// Persist the completions menu width when the user resizes it.
     UpdateCompletionsMenuWidth(f32),
 
@@ -5760,6 +5757,15 @@ impl Input {
 
     pub fn set_focus_handle(&mut self, focus_handle: PaneFocusHandle, ctx: &mut ViewContext<Self>) {
         self.focus_handle = Some(focus_handle.clone());
+        // Uncaged: the mode toggle is lit only in the focused pane. Seed it now -- the
+        // subscription below only hears later focus changes, so a pane restored as the focused
+        // one would otherwise stay unlit until focus moved.
+        if self.should_show_universal_developer_input(ctx) {
+            let is_focused = focus_handle.is_focused(ctx);
+            self.input_mode_toggle.update(ctx, |toggle, ctx| {
+                toggle.set_is_in_active_terminal(is_focused, ctx);
+            });
+        }
         let focus_model = focus_handle.focus_state_handle().clone();
         ctx.subscribe_to_model(&focus_model, move |me, _, event, ctx| {
             if !focus_handle.is_affected(event) {
@@ -15431,11 +15437,6 @@ impl TypedActionView for Input {
             }
             InputAction::ClearAndResetAIContextMenuQuery => {
                 self.clear_and_reset_ai_context_menu_query(ctx);
-            }
-            InputAction::SetUDIHovered(is_hovered) => {
-                self.input_mode_toggle.update(ctx, |toggle, ctx| {
-                    toggle.set_udi_hovered(*is_hovered, ctx);
-                });
             }
             InputAction::UpdateCompletionsMenuWidth(width) => {
                 InputSettings::handle(ctx).update(ctx, |settings, ctx| {

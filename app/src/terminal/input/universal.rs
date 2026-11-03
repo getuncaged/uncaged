@@ -18,7 +18,7 @@ use crate::context_chips::spacing;
 use crate::features::FeatureFlag;
 use crate::settings::{AppEditorSettings, InputModeSettings};
 use crate::terminal::block_list_viewport::InputMode;
-use crate::terminal::input::{InputAction, InputDropTargetData};
+use crate::terminal::input::InputDropTargetData;
 use crate::terminal::settings::TerminalSettings;
 use crate::terminal::view::TerminalAction;
 use crate::themes::theme::color::internal_colors;
@@ -227,9 +227,6 @@ impl Input {
         .finish();
 
         let input = Hoverable::new(self.hoverable_handle.clone(), |_| drop_target)
-            .on_hover(|is_hovered, ctx, _app, _position| {
-                ctx.dispatch_typed_action(InputAction::SetUDIHovered(is_hovered));
-            })
             .on_middle_click(|ctx, _app, _position| {
                 ctx.dispatch_typed_action(TerminalAction::MiddleClickOnInput)
             })

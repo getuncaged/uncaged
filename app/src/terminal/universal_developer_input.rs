@@ -166,13 +166,12 @@ impl From<&BlocklistAIInputModel> for InputToggleMode {
 /// Kind of an 80/20 situation here.
 struct CachedUIState {
     is_input_empty: bool,
-    is_hovered: bool,
     is_in_active_terminal: bool,
 }
 
 impl CachedUIState {
     fn is_blurred(&self) -> bool {
-        !self.is_hovered && !self.is_in_active_terminal
+        !self.is_in_active_terminal
     }
 }
 
@@ -218,7 +217,6 @@ impl InputModeToggle {
 
         let cached_ui_state = Rc::new(RefCell::new(CachedUIState {
             is_input_empty: true,
-            is_hovered: false,
             is_in_active_terminal: false,
         }));
 
@@ -378,16 +376,6 @@ impl InputModeToggle {
         self.cached_ui_state.borrow_mut().is_in_active_terminal = is_in_active_terminal;
         self.notify_and_notify_children(ctx);
     }
-
-    /// Set the parent input hovered state.
-    /// Used to fade the toggle when the input is not in focus.
-    pub fn set_udi_hovered(&mut self, is_hovered: bool, ctx: &mut ViewContext<Self>) {
-        if self.cached_ui_state.borrow().is_hovered == is_hovered {
-            return;
-        }
-        self.cached_ui_state.borrow_mut().is_hovered = is_hovered;
-        self.notify_and_notify_children(ctx);
-    }
 }
 
 impl Entity for InputModeToggle {
@@ -513,12 +501,21 @@ fn build_renderable_option_config(
         }
     };
 
+    // Uncaged: only the focused pane's switch is lit. An unfocused pane drops the accent fill
+    // and tint; its mode stays readable as the one segment whose grey icon isn't faded.
     if ui_state.is_blurred() {
-        config.background = Fill::Solid(coloru_with_opacity(
-            config.background.start_color(),
-            BLURRED_OPACITY,
-        ));
-        config.icon_color = coloru_with_opacity(config.icon_color, BLURRED_OPACITY);
+        let is_current_mode = match option {
+            InputToggleMode::Terminal => current_input_type == InputType::Shell,
+            InputToggleMode::AgentMode => current_input_type == InputType::AI,
+            InputToggleMode::AutoDetection => false,
+        };
+        let icon_color = theme.sub_text_color(theme.surface_1()).into_solid();
+        config.background = Fill::Solid(ColorU::transparent_black());
+        config.icon_color = if is_current_mode {
+            icon_color
+        } else {
+            coloru_with_opacity(icon_color, BLURRED_OPACITY)
+        };
 
         if let Some(tooltip_config) = config.tooltip.as_mut() {
             tooltip_config.background_color =

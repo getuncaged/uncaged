@@ -12,7 +12,7 @@ use super::common::{
     add_input_suggestions_overlays, wrap_input_with_terminal_padding_and_focus_handler,
 };
 use super::{
-    Input, InputAction, InputDropTargetData, CLI_AGENT_RICH_INPUT_EDITOR_BOTTOM_PADDING,
+    Input, InputDropTargetData, CLI_AGENT_RICH_INPUT_EDITOR_BOTTOM_PADDING,
     CLI_AGENT_RICH_INPUT_EDITOR_MAX_HEIGHT, CLI_AGENT_RICH_INPUT_EDITOR_TOP_PADDING,
     TERMINAL_VIEW_PADDING_LEFT,
 };
@@ -123,9 +123,6 @@ impl Input {
 
         let input = SavePosition::new(
             Hoverable::new(self.hoverable_handle.clone(), |_| drop_target)
-                .on_hover(|is_hovered, ctx, _app, _position| {
-                    ctx.dispatch_typed_action(InputAction::SetUDIHovered(is_hovered));
-                })
                 .on_middle_click(|ctx, _app, _position| {
                     ctx.dispatch_typed_action(TerminalAction::MiddleClickOnInput)
                 })
@@ -137,7 +134,7 @@ impl Input {
         // Render inline menus (slash commands, prompts, skills) above the input,
         // matching the pattern used by the agent view input in agent.rs.
         // These must be outside the Hoverable so that mouse events on the menu
-        // don't trigger SetUDIHovered, which would cause layout jitter.
+        // don't count as hovering the input.
         let mut outer_column = Flex::column();
         if self.suggestions_mode_model.as_ref(app).is_slash_commands() {
             outer_column.add_child(ChildView::new(&self.inline_slash_commands_view).finish());
