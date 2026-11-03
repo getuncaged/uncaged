@@ -1792,7 +1792,10 @@ impl View for CodeFooterView {
             .with_background_color(theme.background().into());
 
         if self.show_border {
-            container = container.with_corner_radius(CornerRadius::with_bottom(Radius::Pixels(8.)));
+            // Uncaged: the pane is a rounded card; anything tighter than the card's own radius
+            // paints the footer's background over the card's curved bottom corners.
+            container = container
+                .with_corner_radius(CornerRadius::with_bottom(Radius::Pixels(radius::LARGE)));
         }
 
         container.finish()
