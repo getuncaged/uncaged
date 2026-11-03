@@ -30,7 +30,12 @@ jobs:
     name: Build & lint (macOS)
     runs-on: macos-latest
     # A cold LTO-free debug build of this large workspace is slow; give it room.
-    timeout-minutes: 90
+    #
+    # The advisory steps below carry their own, smaller budgets. Without those, a
+    # slow clippy or test step ran the whole job into this ceiling and GitHub
+    # cancelled it -- reported as a failed check even though fmt and the build had
+    # already passed. That cancelled every PR's macOS check and blocked merges.
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,11 +78,15 @@ jobs:
       # warnings for now (large fork, many upstream lints) — flip to -D warnings
       # once the tree is clean.
       - name: cargo clippy (warp-oss)
+        continue-on-error: true
+        timeout-minutes: 25
         run: cargo clippy --bin warp-oss || true
 
       # Run the fast, default-member unit tests. The heavy integration crate is
       # excluded from default members, so this stays reasonable.
       - name: cargo test (workspace, default members)
+        continue-on-error: true
+        timeout-minutes: 40
         run: cargo test --bins --lib || true
 
   # --- Best-effort cross-platform builds ----------------------------------
