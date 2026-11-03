@@ -5757,15 +5757,12 @@ impl Input {
 
     pub fn set_focus_handle(&mut self, focus_handle: PaneFocusHandle, ctx: &mut ViewContext<Self>) {
         self.focus_handle = Some(focus_handle.clone());
-        // Uncaged: the mode toggle is lit only in the focused pane. Seed it now -- the
-        // subscription below only hears later focus changes, so a pane restored as the focused
-        // one would otherwise stay unlit until focus moved.
-        if self.should_show_universal_developer_input(ctx) {
-            let is_focused = focus_handle.is_focused(ctx);
-            self.input_mode_toggle.update(ctx, |toggle, ctx| {
-                toggle.set_is_in_active_terminal(is_focused, ctx);
-            });
-        }
+        // Uncaged: the mode toggle is lit only in the focused pane, and reads that pane's focus
+        // from this handle each time it draws.
+        let toggle_focus_handle = focus_handle.clone();
+        self.input_mode_toggle.update(ctx, |toggle, ctx| {
+            toggle.set_focus_handle(toggle_focus_handle, ctx);
+        });
         let focus_model = focus_handle.focus_state_handle().clone();
         ctx.subscribe_to_model(&focus_model, move |me, _, event, ctx| {
             if !focus_handle.is_affected(event) {
@@ -5782,12 +5779,12 @@ impl Input {
 
             me.set_zero_state_hint_text(ctx);
 
-            // Update the mode toggle's blurred state when focus changes
-            if me.should_show_universal_developer_input(ctx) {
-                me.input_mode_toggle.update(ctx, |toggle, ctx| {
-                    toggle.set_is_in_active_terminal(is_focused, ctx);
-                });
-            }
+            // Redraw the mode toggle, and the input and footer around it, so the pane that
+            // lost focus dims as surely as the one that gained it lights up.
+            me.input_mode_toggle
+                .update(ctx, |toggle, ctx| toggle.on_pane_focus_changed(ctx));
+            me.agent_input_footer.update(ctx, |_, ctx| ctx.notify());
+            ctx.notify();
         });
     }
 

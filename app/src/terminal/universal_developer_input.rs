@@ -23,6 +23,7 @@ use warpui::{
 
 use crate::ai::blocklist::block::cli_controller::CLISubagentController;
 use crate::ai::blocklist::{BlocklistAIInputModel, InputConfig, InputType};
+use crate::pane_group::focus_state::PaneFocusHandle;
 #[cfg(not(target_family = "wasm"))]
 use crate::search::ai_context_menu::view::AIContextMenu;
 #[cfg(not(target_family = "wasm"))]
@@ -166,12 +167,18 @@ impl From<&BlocklistAIInputModel> for InputToggleMode {
 /// Kind of an 80/20 situation here.
 struct CachedUIState {
     is_input_empty: bool,
-    is_in_active_terminal: bool,
+    /// The pane this toggle's input lives in. Focus is read from it on every render rather than
+    /// cached, so the toggle can never show a stale focus state.
+    focus_handle: Option<PaneFocusHandle>,
 }
 
 impl CachedUIState {
-    fn is_blurred(&self) -> bool {
-        !self.is_in_active_terminal
+    /// Whether the toggle's pane is not the focused one. A toggle without a pane yet counts as
+    /// focused, like the input itself does.
+    fn is_blurred(&self, app: &AppContext) -> bool {
+        self.focus_handle
+            .as_ref()
+            .is_some_and(|focus_handle| !focus_handle.is_focused(app))
     }
 }
 
@@ -217,7 +224,7 @@ impl InputModeToggle {
 
         let cached_ui_state = Rc::new(RefCell::new(CachedUIState {
             is_input_empty: true,
-            is_in_active_terminal: false,
+            focus_handle: None,
         }));
 
         let ui_state_clone = cached_ui_state.clone();
@@ -364,16 +371,13 @@ impl InputModeToggle {
             });
     }
 
-    pub fn set_is_in_active_terminal(
-        &mut self,
-        is_in_active_terminal: bool,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if self.cached_ui_state.borrow().is_in_active_terminal == is_in_active_terminal {
-            return;
-        }
+    pub fn set_focus_handle(&mut self, focus_handle: PaneFocusHandle, ctx: &mut ViewContext<Self>) {
+        self.cached_ui_state.borrow_mut().focus_handle = Some(focus_handle);
+        self.notify_and_notify_children(ctx);
+    }
 
-        self.cached_ui_state.borrow_mut().is_in_active_terminal = is_in_active_terminal;
+    /// Redraws the toggle after its pane gained or lost focus.
+    pub fn on_pane_focus_changed(&mut self, ctx: &mut ViewContext<Self>) {
         self.notify_and_notify_children(ctx);
     }
 }
@@ -501,21 +505,24 @@ fn build_renderable_option_config(
         }
     };
 
-    // Uncaged: only the focused pane's switch is lit. An unfocused pane drops the accent fill
-    // and tint; its mode stays readable as the one segment whose grey icon isn't faded.
-    if ui_state.is_blurred() {
-        let is_current_mode = match option {
-            InputToggleMode::Terminal => current_input_type == InputType::Shell,
-            InputToggleMode::AgentMode => current_input_type == InputType::AI,
-            InputToggleMode::AutoDetection => false,
+    // Uncaged: only the focused pane's switch is lit. An unfocused pane drops the fill and
+    // tint but still says which mode it is in: that segment's icon keeps its accent colour,
+    // and the other icon fades.
+    if ui_state.is_blurred(app) {
+        let current_mode_accent = match option {
+            InputToggleMode::Terminal => (current_input_type == InputType::Shell)
+                .then(|| theme.terminal_colors().normal.blue.into()),
+            InputToggleMode::AgentMode => (current_input_type == InputType::AI)
+                .then(|| theme.terminal_colors().normal.yellow.into()),
+            InputToggleMode::AutoDetection => None,
         };
-        let icon_color = theme.sub_text_color(theme.surface_1()).into_solid();
         config.background = Fill::Solid(ColorU::transparent_black());
-        config.icon_color = if is_current_mode {
-            icon_color
-        } else {
-            coloru_with_opacity(icon_color, BLURRED_OPACITY)
-        };
+        config.icon_color = current_mode_accent.unwrap_or_else(|| {
+            coloru_with_opacity(
+                theme.sub_text_color(theme.surface_1()).into_solid(),
+                BLURRED_OPACITY,
+            )
+        });
 
         if let Some(tooltip_config) = config.tooltip.as_mut() {
             tooltip_config.background_color =

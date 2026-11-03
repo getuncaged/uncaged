@@ -100,8 +100,11 @@ const COMMAND_ALPHA: u8 = 255;
 
 const SEPARATOR_TO_MONOSPACE_FONT_SIZE_RATIO: f32 = 0.8;
 const SEPARATOR_LEFT_OFFSET: f32 = 20.;
-/// How far the restored-session band sits in from the pane's edges.
+/// How far the restored-session band sits in from the pane's top and bottom.
 const SEPARATOR_INSET: f32 = 4.;
+/// How far the restored-session band sits in from the pane's sides: the input box's margin, so
+/// the band lines up with it instead of overhanging it.
+const SEPARATOR_SIDE_INSET: f32 = 6.;
 
 /// Border widths for selected blocks
 #[derive(Debug, Clone, Copy)]
@@ -4278,7 +4281,7 @@ impl Element for BlockListElement {
 
                     // Uncaged: a rounded band inset from the pane's edges rather than a
                     // full-width strip under a hard rule.
-                    let inset = vec2f(SEPARATOR_INSET, SEPARATOR_INSET);
+                    let inset = vec2f(SEPARATOR_SIDE_INSET, SEPARATOR_INSET);
                     ctx.scene
                         .draw_rect_with_hit_recording(RectF::new(
                             grid_origin + inset,

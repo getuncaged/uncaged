@@ -959,6 +959,9 @@ impl BlockList {
                 is_hidden: false,
             },
         );
+        // Uncaged: settle the separator's visibility now -- a session can be restored after
+        // the agent view state was set, and nothing restored may be visible above it.
+        self.update_blocks_and_sumtree(None, None, |_| {}, |_| {});
     }
 
     /// Inserts an inline banner _before_ the provided block_index.
@@ -2264,7 +2267,10 @@ impl BlockList {
                             is_historical_conversation_restoration:
                                 *is_historical_conversation_restoration,
                             // Don't show restored block separators in the agent view.
-                            is_hidden: agent_view_state.is_fullscreen(),
+                            // Uncaged: nor when nothing visible sits above one -- a "Previous
+                            // session" band under an empty pane marks off nothing.
+                            is_hidden: agent_view_state.is_fullscreen()
+                                || new_sum_tree.summary().height.as_f64() <= 0.,
                         });
                     }
                     BlockHeightItem::InlineBanner {
