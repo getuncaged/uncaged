@@ -279,7 +279,9 @@ use crate::env_vars::CloudEnvVarCollection;
 use crate::experiments::{BlockOnboarding, Experiment};
 use crate::launch_configs::launch_config::WindowTemplate;
 use crate::launch_configs::save_modal::{LaunchConfigModalEvent, LaunchConfigSaveModal};
-use crate::menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields, MenuSelectionSource};
+use crate::menu::{
+    Event as MenuEvent, Menu, MenuItem, MenuItemFields, MenuSelectionSource, MenuTooltipPosition,
+};
 use crate::modal::{Modal, ModalEvent, ModalViewState};
 use crate::network::{NetworkStatus, NetworkStatusEvent};
 use crate::notebooks::manager::{NotebookManager, NotebookSource};
@@ -292,8 +294,8 @@ use crate::pane_group::FilePane;
 use crate::pane_group::{
     self, AIFactPane, AnyPaneContent, ChildAgentOrigin, CodeDiffPane, CodePane, CodeReviewPanelArg,
     CustomRouterEditorPane, Direction as PaneGroupDirection, Direction, EnvironmentManagementPane,
-    ExecutionProfileEditorPane, NetworkLogPane, NewTerminalOptions, PaneGroup, PaneId, PanesLayout,
-    TabBarHoverIndex, TerminalPaneId,
+    ExecutionProfileEditorPane, NetworkLogPane, NewTerminalOptions, PaneGroup, PaneId, PaneLayout,
+    PanesLayout, TabBarHoverIndex, TerminalPaneId,
 };
 use crate::persistence::ModelEvent;
 use crate::projects::ProjectManagementModel;
@@ -13977,51 +13979,118 @@ impl Workspace {
     /// Uncaged: split controls at the top of a tab's right-click menu. The active tab can split
     /// itself (and, once split, come apart again); any other tab can be brought into the active
     /// one as a split.
+    /// Uncaged: icon rows at the top of a tab's menu, after macOS's window tiling menu. On the
+    /// current tab they add a split on one side, and (once split) rearrange the panes or break
+    /// them back out into tabs; on another tab they bring that tab into the current one.
     fn with_split_tab_items(
         &self,
         tab_index: usize,
         mut menu_items: Vec<MenuItem<WorkspaceAction>>,
         ctx: &AppContext,
     ) -> Vec<MenuItem<WorkspaceAction>> {
+        let theme = Appearance::as_ref(ctx).theme();
+        let icon_color = theme.main_text_color(theme.background());
+        let header_color = theme.sub_text_color(theme.background()).into_solid();
+        let header = |title: &str| MenuItem::Header {
+            fields: MenuItemFields::new(title).with_override_text_color(header_color),
+            clickable: false,
+            right_side_fields: None,
+        };
+        let icon = |path: &'static str, label: &str, action: WorkspaceAction| {
+            MenuItemFields::new_with_icon(path, icon_color, label.to_owned())
+                .with_tooltip(label)
+                .with_tooltip_position(MenuTooltipPosition::Above)
+                .with_on_select_action(action)
+        };
+        const SIDES: [(Direction, &str); 4] = [
+            (Direction::Left, "bundled/svg/tab_layout_left.svg"),
+            (Direction::Right, "bundled/svg/tab_layout_right.svg"),
+            (Direction::Up, "bundled/svg/tab_layout_top.svg"),
+            (Direction::Down, "bundled/svg/tab_layout_bottom.svg"),
+        ];
+        const LAYOUTS: [(PaneLayout, &str, &str); 3] = [
+            (
+                PaneLayout::Columns,
+                "bundled/svg/tab_layout_columns.svg",
+                "Side by side",
+            ),
+            (
+                PaneLayout::MainAndStack,
+                "bundled/svg/tab_layout_main_stack.svg",
+                "One large, rest stacked",
+            ),
+            (PaneLayout::Grid, "bundled/svg/tab_layout_grid.svg", "Grid"),
+        ];
+        let side_label = |direction: Direction| match direction {
+            Direction::Left => "left",
+            Direction::Right => "right",
+            Direction::Up => "above",
+            Direction::Down => "below",
+        };
+
         let mut split_items = Vec::new();
         if tab_index == self.active_tab_index {
-            split_items.push(
-                MenuItemFields::new("Split right")
-                    .with_on_select_action(WorkspaceAction::SplitActiveTab(Direction::Right))
-                    .into_item(),
-            );
-            split_items.push(
-                MenuItemFields::new("Split down")
-                    .with_on_select_action(WorkspaceAction::SplitActiveTab(Direction::Down))
-                    .into_item(),
-            );
+            split_items.push(header("Split"));
+            split_items.push(MenuItem::ItemsRow {
+                items: SIDES
+                    .iter()
+                    .map(|(direction, path)| {
+                        icon(
+                            path,
+                            &format!("New pane {}", side_label(*direction)),
+                            WorkspaceAction::SplitActiveTab(*direction),
+                        )
+                    })
+                    .collect(),
+            });
             let is_split = self
                 .get_pane_group_view(tab_index)
                 .is_some_and(|pane_group| pane_group.as_ref(ctx).visible_pane_ids().len() > 1);
             if is_split {
-                split_items.push(
-                    MenuItemFields::new("Unsplit into tabs")
-                        .with_on_select_action(WorkspaceAction::SeparateTabPanes(tab_index))
-                        .into_item(),
-                );
+                split_items.push(header("Arrange"));
+                let mut items = vec![icon(
+                    "bundled/svg/tab_layout_fill.svg",
+                    "Unsplit into tabs",
+                    WorkspaceAction::SeparateTabPanes(tab_index),
+                )];
+                items.extend(LAYOUTS.iter().map(|(layout, path, label)| {
+                    icon(path, label, WorkspaceAction::ArrangeActiveTab(*layout))
+                }));
+                split_items.push(MenuItem::ItemsRow { items });
             }
         } else {
-            split_items.push(
-                MenuItemFields::new("Split right of current tab")
-                    .with_on_select_action(WorkspaceAction::MoveTabIntoActiveTab {
-                        index: tab_index,
-                        direction: Direction::Right,
+            split_items.push(header("Split into current tab"));
+            split_items.push(MenuItem::ItemsRow {
+                items: SIDES
+                    .iter()
+                    .map(|(direction, path)| {
+                        icon(
+                            path,
+                            &format!("Put {}", side_label(*direction)),
+                            WorkspaceAction::MoveTabIntoActiveTab {
+                                index: tab_index,
+                                direction: *direction,
+                            },
+                        )
                     })
-                    .into_item(),
-            );
-            split_items.push(
-                MenuItemFields::new("Split below current tab")
-                    .with_on_select_action(WorkspaceAction::MoveTabIntoActiveTab {
-                        index: tab_index,
-                        direction: Direction::Down,
+                    .collect(),
+            });
+            split_items.push(header("Join and arrange"));
+            split_items.push(MenuItem::ItemsRow {
+                items: LAYOUTS
+                    .iter()
+                    .map(|(layout, path, label)| {
+                        icon(
+                            path,
+                            label,
+                            WorkspaceAction::JoinActiveTab {
+                                index: tab_index,
+                                layout: *layout,
+                            },
+                        )
                     })
-                    .into_item(),
-            );
+                    .collect(),
+            });
         }
         split_items.push(MenuItem::Separator);
         split_items.append(&mut menu_items);
@@ -23538,6 +23607,17 @@ impl TypedActionView for Workspace {
                 });
             }
             SeparateTabPanes(index) => self.separate_tab_panes(*index, ctx),
+            ArrangeActiveTab(layout) => {
+                self.active_tab_pane_group().update(ctx, |pane_group, ctx| {
+                    pane_group.arrange_panes(*layout, ctx)
+                });
+            }
+            JoinActiveTab { index, layout } => {
+                self.move_tab_into_active_tab(*index, Direction::Right, None, ctx);
+                self.active_tab_pane_group().update(ctx, |pane_group, ctx| {
+                    pane_group.arrange_panes(*layout, ctx)
+                });
+            }
             RenameTab(index) => self.rename_tab(*index, ctx),
             ResetTabName(index) => self.clear_tab_name(*index, ctx),
             RenamePane(locator) => self.rename_pane(*locator, ctx),

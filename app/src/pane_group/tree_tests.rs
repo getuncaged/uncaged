@@ -782,3 +782,73 @@ fn test_hide_multiple_child_agent_panes() {
     assert_eq!(tree.visible_pane_ids(), vec![panes[0], panes[1]]);
     assert!(tree.is_pane_hidden(&panes[2]));
 }
+
+fn stacked_panes(count: usize) -> (PaneData, Vec<PaneId>) {
+    let panes = (0..count)
+        .map(|_| PaneId::dummy_pane_id())
+        .collect::<Vec<_>>();
+    let mut data = PaneData::new(panes[0]);
+    for pair in panes.windows(2) {
+        data.split(pair[0], pair[1], Direction::Down);
+    }
+    (data, panes)
+}
+
+/// The branch axis and child count at the root, and for each child that is a branch.
+fn shape(node: &PaneNode) -> (Option<SplitDirection>, Vec<usize>) {
+    match node {
+        PaneNode::Leaf(_) => (None, vec![]),
+        PaneNode::Branch(branch) => (
+            Some(branch.axis()),
+            branch
+                .nodes
+                .iter()
+                .map(|(_, child)| match child {
+                    PaneNode::Leaf(_) => 1,
+                    PaneNode::Branch(child) => child.nodes.len(),
+                })
+                .collect(),
+        ),
+    }
+}
+
+#[test]
+fn test_arrange_keeps_order_and_builds_layouts() {
+    let (mut data, panes) = stacked_panes(5);
+
+    assert!(data.arrange(PaneLayout::Columns));
+    assert_eq!(data.pane_ids(), panes);
+    assert_eq!(
+        shape(&data.root),
+        (Some(SplitDirection::Horizontal), vec![1, 1, 1, 1, 1])
+    );
+
+    assert!(data.arrange(PaneLayout::MainAndStack));
+    assert_eq!(data.pane_ids(), panes);
+    assert_eq!(
+        shape(&data.root),
+        (Some(SplitDirection::Horizontal), vec![1, 4])
+    );
+
+    assert!(data.arrange(PaneLayout::Grid));
+    assert_eq!(data.pane_ids(), panes);
+    assert_eq!(shape(&data.root), (Some(SplitDirection::Vertical), vec![3, 2]));
+}
+
+#[test]
+fn test_arrange_grid_of_four_is_two_by_two() {
+    let (mut data, panes) = stacked_panes(4);
+    assert!(data.arrange(PaneLayout::Grid));
+    assert_eq!(data.pane_ids(), panes);
+    assert_eq!(shape(&data.root), (Some(SplitDirection::Vertical), vec![2, 2]));
+}
+
+#[test]
+fn test_arrange_needs_two_visible_panes() {
+    let (mut single, _) = stacked_panes(1);
+    assert!(!single.arrange(PaneLayout::Grid));
+
+    let (mut data, panes) = stacked_panes(3);
+    data.hide_closed_pane(panes[2]);
+    assert!(!data.arrange(PaneLayout::Columns));
+}

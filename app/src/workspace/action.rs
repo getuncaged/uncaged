@@ -146,6 +146,13 @@ pub enum WorkspaceAction {
     SplitActiveTab(crate::pane_group::Direction),
     /// Uncaged: move every pane but the first of the tab at this index into tabs of their own.
     SeparateTabPanes(usize),
+    /// Uncaged: rearranges the current tab's panes into a layout.
+    ArrangeActiveTab(crate::pane_group::PaneLayout),
+    /// Uncaged: brings the tab at `index` into the current tab, then arranges all the panes.
+    JoinActiveTab {
+        index: usize,
+        layout: crate::pane_group::PaneLayout,
+    },
     RenameTab(usize),
     ResetTabName(usize),
     RenamePane(PaneViewLocator),
@@ -950,6 +957,8 @@ impl WorkspaceAction {
             | MoveTabIntoActiveTab { .. }
             | SplitActiveTab(_)
             | SeparateTabPanes(_)
+            | ArrangeActiveTab(_)
+            | JoinActiveTab { .. }
             | DropTab
             | DropGroup
             | RenameTab(_)

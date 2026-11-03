@@ -198,7 +198,7 @@ pub use pane::{
     AnyPaneContent, BackingView, PaneConfiguration, PaneConfigurationEvent, PaneContent, PaneEvent,
     PaneHeaderAction, PaneHeaderCustomAction, PaneId, PaneView, TerminalPaneId,
 };
-pub use tree::{Direction, PaneData, PaneFlex, PaneNode, SplitDirection};
+pub use tree::{Direction, PaneData, PaneFlex, PaneLayout, PaneNode, SplitDirection};
 pub use working_directories::{WorkingDirectoriesEvent, WorkingDirectoriesModel};
 
 use self::pane::{DetachType, PaneViewEvent};
@@ -5642,6 +5642,22 @@ impl PaneGroup {
             },
             ctx,
         )
+    }
+
+    /// Uncaged: rearranges this group's panes into `layout`, un-maximizing so the whole
+    /// arrangement shows. Closed-pane undo history is dropped, as with any rearrange.
+    pub fn arrange_panes(&mut self, layout: PaneLayout, ctx: &mut ViewContext<Self>) {
+        self.clear_hidden_closed_panes(ctx);
+        if !self.panes.arrange(layout) {
+            return;
+        }
+        self.focus_state.update(ctx, |focus_state, ctx| {
+            focus_state.set_focused_pane_maximized(false, ctx);
+        });
+        self.handle_pane_count_change(ctx);
+        ctx.notify();
+        ctx.emit(Event::TerminalViewStateChanged);
+        ctx.emit(Event::AppStateChanged);
     }
 
     /// Uncaged: true while the panes draw as separate rounded cards (a visible split that isn't

@@ -197,6 +197,17 @@ impl Divider {
     }
 }
 
+/// Uncaged: a whole-tab arrangement of the visible panes, offered as icons in the tab menu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaneLayout {
+    /// Every pane side by side, in one row.
+    Columns,
+    /// The first pane on the left, the rest stacked on the right.
+    MainAndStack,
+    /// As close to a square grid as the pane count allows, filled row by row.
+    Grid,
+}
+
 impl PaneData {
     /// Create a new `PaneData` with a Leaf as the root
     pub fn new(pane_id: PaneId) -> Self {
@@ -457,6 +468,43 @@ impl PaneData {
         successful_split
     }
 
+    /// Uncaged: rebuilds the tree so its panes, in their current reading order, sit in
+    /// `layout`. Sizes reset to even. Does nothing while any pane is hidden, since a hidden pane
+    /// would take up a slot in the new layout.
+    pub fn arrange(&mut self, layout: PaneLayout) -> bool {
+        let pane_ids = self.pane_ids();
+        if pane_ids.len() < 2 || !self.hidden_panes.is_empty() {
+            return false;
+        }
+        let leaves = pane_ids.into_iter().map(PaneNode::Leaf);
+        self.root = match layout {
+            PaneLayout::Columns => PaneNode::even_branch(SplitDirection::Horizontal, leaves),
+            PaneLayout::MainAndStack => {
+                let mut leaves = leaves;
+                let main = leaves.next().expect("at least two panes");
+                PaneNode::even_branch(
+                    SplitDirection::Horizontal,
+                    [
+                        main,
+                        PaneNode::even_branch(SplitDirection::Vertical, leaves),
+                    ],
+                )
+            }
+            PaneLayout::Grid => {
+                let leaves = leaves.collect::<Vec<_>>();
+                let columns = (leaves.len() as f32).sqrt().ceil() as usize;
+                let mut rows = Vec::new();
+                let mut leaves = leaves.into_iter().peekable();
+                while leaves.peek().is_some() {
+                    let row = leaves.by_ref().take(columns).collect::<Vec<_>>();
+                    rows.push(PaneNode::even_branch(SplitDirection::Horizontal, row));
+                }
+                PaneNode::even_branch(SplitDirection::Vertical, rows)
+            }
+        };
+        true
+    }
+
     /// Split the root of the pane tree, inserting `new_id` according to the given direction.
     pub fn split_root(&mut self, new_id: PaneId, direction: Direction) {
         self.root.insert(new_id, direction);
@@ -606,6 +654,25 @@ impl PaneData {
 }
 
 impl PaneNode {
+    /// Uncaged: a branch of evenly sized `nodes` along `axis`; a single node stands alone.
+    fn even_branch(axis: SplitDirection, nodes: impl IntoIterator<Item = PaneNode>) -> PaneNode {
+        let mut nodes = nodes
+            .into_iter()
+            .map(|node| (PaneFlex::default(), node))
+            .collect::<Vec<_>>();
+        if nodes.len() == 1 {
+            return nodes.pop().expect("one node").1;
+        }
+        let dividers = iter::repeat_with(Divider::new)
+            .take(nodes.len().saturating_sub(1))
+            .collect();
+        PaneNode::Branch(PaneBranch {
+            axis,
+            nodes,
+            dividers,
+        })
+    }
+
     fn has_visible_children(&self, hidden_panes: &[HiddenPane]) -> bool {
         match self {
             PaneNode::Leaf(pane_id) => {
