@@ -2,10 +2,10 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
-use pathfinder_geometry::vector::Vector2F;
+use pathfinder_geometry::vector::{vec2f, Vector2F};
 use warp_core::features::FeatureFlag;
 use warp_core::send_telemetry_from_ctx;
-use warp_core::ui::{radius, Icon};
+use warp_core::ui::Icon;
 use warp_editor::editor::NavigationKey;
 use warpui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
@@ -19,6 +19,7 @@ use warpui::keymap::macros::*;
 use warpui::keymap::FixedBinding;
 use warpui::platform::Cursor;
 use warpui::text_layout::TextAlignment;
+use warpui::ui_components::components::UiComponent;
 use warpui::{
     AppContext, BlurContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WindowId,
@@ -48,8 +49,7 @@ use crate::workspace::global_actions::ForkedConversationDestination;
 use crate::workspace::header_toolbar_item::HeaderToolbarItemKind;
 use crate::workspace::tab_settings::TabSettings;
 use crate::workspace::view::conversation_list::item::{
-    render_item, render_static_item, ItemProps, ItemState, OverflowMenuDisplay, StaticItemProps,
-    STATIC_ITEM_MIN_HEIGHT,
+    render_item, ItemProps, ItemState, OverflowMenuDisplay, LIST_ROW_HEIGHT,
 };
 use crate::workspace::{RestoreConversationLayout, ToastStack, WorkspaceAction};
 
@@ -62,7 +62,7 @@ struct StateHandles {
     list_state: UniformListState,
     scroll_state: ScrollStateHandle,
     item_states: HashMap<AgentConversationEntryId, ItemState>,
-    start_new_conversation_item: ItemState,
+    new_conversation_button: MouseStateHandle,
     list_hover: MouseStateHandle,
     zero_state_button: MouseStateHandle,
     active_header: MouseStateHandle,
@@ -75,7 +75,7 @@ impl Default for StateHandles {
             list_state: UniformListState::new(),
             scroll_state: Arc::new(Mutex::new(Default::default())),
             item_states: HashMap::new(),
-            start_new_conversation_item: ItemState::default(),
+            new_conversation_button: MouseStateHandle::default(),
             list_hover: MouseStateHandle::default(),
             zero_state_button: MouseStateHandle::default(),
             active_header: MouseStateHandle::default(),
@@ -99,8 +99,6 @@ enum ListItem {
         /// The section the conversation is rendered under.
         section: ConversationSection,
     },
-    /// The "+ New conversation" item at the end of the active section.
-    StartNewConversation,
     ToggleViewAllButton,
 }
 
@@ -409,7 +407,6 @@ impl ConversationListView {
         });
 
         let mut items = Vec::new();
-        let has_content = !active_items.is_empty() || !past_items.is_empty();
 
         // If the section is not empty, add the section header + items.
         if !active_items.is_empty() {
@@ -420,12 +417,6 @@ impl ConversationListView {
             {
                 items.extend(active_items);
             }
-        }
-
-        // Insert new conversation button between active and past sections if there are items
-        // (otherwise we show the "no matching conversations" state).
-        if has_content {
-            items.push(ListItem::StartNewConversation);
         }
 
         // We truncate the past section to INITIAL_MAX_PAST_ITEMS if the user has not selected "view all".
@@ -466,9 +457,7 @@ impl ConversationListView {
     ) -> Option<usize> {
         self.list_items.iter().position(|item| match item {
             ListItem::Conversation { entry, .. } => entry.id == conversation_id,
-            ListItem::SectionHeader(_)
-            | ListItem::StartNewConversation
-            | ListItem::ToggleViewAllButton => false,
+            ListItem::SectionHeader(_) | ListItem::ToggleViewAllButton => false,
         })
     }
 
@@ -531,7 +520,7 @@ impl ConversationListView {
 
     fn is_selectable(&self, index: usize) -> bool {
         self.get_list_item(index).is_some_and(|item| match item {
-            ListItem::Conversation { .. } | ListItem::StartNewConversation => true,
+            ListItem::Conversation { .. } => true,
             ListItem::SectionHeader(_) | ListItem::ToggleViewAllButton => false,
         })
     }
@@ -652,9 +641,6 @@ impl ConversationListView {
         };
 
         match list_item {
-            ListItem::StartNewConversation => {
-                ctx.emit(Event::NewConversationInNewTab);
-            }
             ListItem::Conversation { entry, .. } => {
                 if let Some(action) = AgentConversationsModel::resolve_open_action(
                     AgentConversationNavigationSubject::Entry(entry.id),
@@ -877,7 +863,13 @@ fn render_zero_state(
         .finish()
 }
 
-fn render_search_box(query_editor: &ViewHandle<EditorView>, app: &AppContext) -> Box<dyn Element> {
+/// Uncaged: the search field with a "+" for a new conversation beside it, so starting one
+/// doesn't sit as a row between the Active and Recent sections.
+fn render_search_box(
+    query_editor: &ViewHandle<EditorView>,
+    new_conversation_mouse_state: MouseStateHandle,
+    app: &AppContext,
+) -> Box<dyn Element> {
     let theme = Appearance::as_ref(app).theme();
 
     let search_row = Shrinkable::new(
@@ -894,10 +886,60 @@ fn render_search_box(query_editor: &ViewHandle<EditorView>, app: &AppContext) ->
         )))
         .finish();
 
-    Container::new(search_container)
-        .with_horizontal_padding(12.)
-        .with_vertical_padding(4.)
-        .finish()
+    let new_conversation_button = Hoverable::new(new_conversation_mouse_state, move |state| {
+        let mut button = Container::new(
+            ConstrainedBox::new(
+                Icon::Plus
+                    .to_warpui_icon(theme.main_text_color(theme.background()))
+                    .finish(),
+            )
+            .with_width(14.)
+            .with_height(14.)
+            .finish(),
+        )
+        .with_uniform_padding(7.)
+        .with_border(Border::all(1.).with_border_fill(theme.surface_3()))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+            warp_core::ui::radius::SMALL,
+        )));
+        if state.is_hovered() {
+            button = button.with_background(theme.surface_3());
+        }
+        let mut stack = Stack::new().with_child(button.finish());
+        if state.is_hovered() {
+            stack.add_positioned_overlay_child(
+                Appearance::as_ref(app)
+                    .ui_builder()
+                    .tool_tip("New conversation".to_owned())
+                    .build()
+                    .finish(),
+                OffsetPositioning::offset_from_parent(
+                    vec2f(0., 4.),
+                    ParentOffsetBounds::WindowByPosition,
+                    ParentAnchor::BottomMiddle,
+                    ChildAnchor::TopMiddle,
+                ),
+            );
+        }
+        stack.finish()
+    })
+    .with_cursor(Cursor::PointingHand)
+    .on_click(|ctx, _, _| {
+        ctx.dispatch_typed_action(ConversationListViewAction::NewConversationInNewTab);
+    })
+    .finish();
+
+    Container::new(
+        Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(6.)
+            .with_child(Shrinkable::new(1.0, search_container).finish())
+            .with_child(new_conversation_button)
+            .finish(),
+    )
+    .with_horizontal_padding(12.)
+    .with_vertical_padding(4.)
+    .finish()
 }
 
 fn render_section_header(
@@ -909,48 +951,51 @@ fn render_section_header(
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
 
-    let chevron_icon = if is_collapsed {
-        Icon::ChevronRight
-    } else {
-        Icon::ChevronDown
-    };
-    let chevron = ConstrainedBox::new(
-        chevron_icon
-            .to_warpui_icon(theme.sub_text_color(theme.background()))
-            .finish(),
-    )
-    .with_width(12.)
-    .with_height(12.);
-
-    let title_text = Text::new_inline(
-        match section {
-            ConversationSection::Active => "ACTIVE",
-            ConversationSection::Past => "PAST",
-        },
-        appearance.ui_font_family(),
-        11.,
-    )
-    .with_color(theme.sub_text_color(theme.background()).into());
-
-    let row = Flex::row()
-        .with_cross_axis_alignment(CrossAxisAlignment::Center)
-        .with_spacing(4.)
-        .with_child(chevron.finish())
-        .with_child(title_text.finish())
-        .finish();
-
+    // Uncaged: a plain sentence-case label sitting just above its rows, with the chevron after
+    // it; hovering brightens the label rather than drawing a box.
     ConstrainedBox::new(
         Hoverable::new(mouse_state, move |mouse_state| {
-            let mut container = Container::new(row)
-                .with_horizontal_padding(8.)
-                .with_vertical_padding(14.)
-                .with_margin_left(4.)
-                .with_margin_right(4.)
-                .with_corner_radius(radius::small());
-            if mouse_state.is_hovered() {
-                container = container.with_background(theme.surface_overlay_1());
-            }
-            container.finish()
+            let color = if mouse_state.is_hovered() {
+                theme.main_text_color(theme.background())
+            } else {
+                theme.sub_text_color(theme.background())
+            };
+            let chevron_icon = if is_collapsed {
+                Icon::ChevronRight
+            } else {
+                Icon::ChevronDown
+            };
+            let title_text = Text::new_inline(
+                match section {
+                    ConversationSection::Active => "Active",
+                    ConversationSection::Past => "Recent",
+                },
+                appearance.ui_font_family(),
+                appearance.ui_font_size() - 1.,
+            )
+            .with_style(Properties::default().weight(Weight::Semibold))
+            .with_color(color.into());
+            let row = Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_spacing(4.)
+                .with_child(title_text.finish())
+                .with_child(
+                    ConstrainedBox::new(chevron_icon.to_warpui_icon(color).finish())
+                        .with_width(10.)
+                        .with_height(10.)
+                        .finish(),
+                )
+                .finish();
+            Flex::column()
+                .with_main_axis_size(MainAxisSize::Max)
+                .with_main_axis_alignment(MainAxisAlignment::End)
+                .with_child(
+                    Container::new(row)
+                        .with_padding_left(12.)
+                        .with_padding_bottom(4.)
+                        .finish(),
+                )
+                .finish()
         })
         .with_cursor(Cursor::PointingHand)
         .on_hover(|_, ctx, _, _| {
@@ -963,21 +1008,25 @@ fn render_section_header(
         })
         .finish(),
     )
-    .with_min_height(STATIC_ITEM_MIN_HEIGHT)
+    .with_height(LIST_ROW_HEIGHT)
     .finish()
 }
 
 fn render_list_action_button(button: &ViewHandle<ActionButton>) -> Box<dyn Element> {
-    Flex::row()
-        .with_main_axis_size(MainAxisSize::Max)
-        .with_main_axis_alignment(MainAxisAlignment::Start)
-        .with_child(
-            Container::new(ChildView::new(button).finish())
-                .with_horizontal_padding(12.)
-                .with_vertical_padding(8.)
-                .finish(),
-        )
-        .finish()
+    ConstrainedBox::new(
+        Flex::row()
+            .with_main_axis_size(MainAxisSize::Max)
+            .with_main_axis_alignment(MainAxisAlignment::Start)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(
+                Container::new(ChildView::new(button).finish())
+                    .with_horizontal_padding(8.)
+                    .finish(),
+            )
+            .finish(),
+    )
+    .with_height(LIST_ROW_HEIGHT)
+    .finish()
 }
 
 impl Entity for ConversationListView {
@@ -1346,8 +1395,6 @@ impl View for ConversationListView {
         } else {
             let model_handle = self.view_model.downgrade();
             let item_states = self.state_handles.item_states.clone();
-            let start_new_conversation_state =
-                self.state_handles.start_new_conversation_item.clone();
             let selected_index = self.selected_index;
             let collapsed_sections = self.collapsed_sections.clone();
             let active_header_mouse_state = self.state_handles.active_header.clone();
@@ -1467,14 +1514,6 @@ impl View for ConversationListView {
                                         app,
                                     ))
                                 }
-                                ListItem::StartNewConversation => Some(render_static_item(
-                                    StaticItemProps {
-                                        is_selected,
-                                        index,
-                                        state: &start_new_conversation_state,
-                                    },
-                                    app,
-                                )),
                                 ListItem::ToggleViewAllButton => {
                                     Some(render_list_action_button(&toggle_view_all_button))
                                 }
@@ -1512,7 +1551,11 @@ impl View for ConversationListView {
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch);
 
         if has_conversations {
-            column = column.with_child(render_search_box(&self.query_editor, app));
+            column = column.with_child(render_search_box(
+                &self.query_editor,
+                self.state_handles.new_conversation_button.clone(),
+                app,
+            ));
         }
 
         let column_element = column

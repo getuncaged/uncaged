@@ -1,15 +1,17 @@
+use chrono::{DateTime, Utc};
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::color::coloru_with_opacity;
 use warp_core::ui::radius;
 use warp_core::ui::theme::color::internal_colors;
+use warp_core::ui::theme::WarpTheme;
 use warp_util::path::user_friendly_path;
+use warpui::color::ColorU;
 use warpui::elements::{
     AnchorPair, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
-    CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Fill as ElementFill, Flex,
-    Highlight, Hoverable, MainAxisAlignment, MainAxisSize, MouseInBehavior, MouseStateHandle,
-    OffsetPositioning, OffsetType, ParentAnchor, ParentElement, ParentOffsetBounds,
-    PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition, Shrinkable, Stack, Text,
-    XAxisAnchor, YAxisAnchor,
+    CrossAxisAlignment, DispatchEventResult, Element, Empty, EventHandler, Expanded,
+    Fill as ElementFill, Flex, Highlight, Hoverable, MainAxisAlignment, MainAxisSize,
+    MouseInBehavior, MouseStateHandle, OffsetPositioning, OffsetType, ParentAnchor, ParentElement,
+    ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition,
+    Shrinkable, Stack, Text, XAxisAnchor, YAxisAnchor,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::platform::Cursor;
@@ -19,19 +21,16 @@ use warpui::ui_components::text_input::TextInput;
 use warpui::{AppContext, SingletonEntity, ViewHandle};
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
+use crate::ai::agent::conversation::ConversationStatus;
 use crate::ai::agent_conversations_model::{
     AgentConversationEntry, AgentConversationEntryId, AgentConversationProvenance,
 };
-use crate::ai::conversation_status_ui::STATUS_ELEMENT_PADDING;
 use crate::appearance::Appearance;
 use crate::drive::sharing::dialog::SharingDialog;
 use crate::editor::EditorView;
 use crate::menu::Menu;
-use crate::ui_components::agent_icon::agent_conversation_entry_icon_variant;
-use crate::ui_components::icon_with_status::render_icon_with_status;
 use crate::ui_components::icons::Icon;
 use crate::ui_components::menu_button::{icon_button_with_context_menu, MenuDirection};
-use crate::util::time_format::format_approx_duration_from_now_utc;
 use crate::util::truncation::truncate_from_end;
 use crate::workspace::view::conversation_list::view::ConversationListViewAction;
 
@@ -41,17 +40,13 @@ const MAX_TOOLTIP_LENGTH: usize = 80;
 /// Spacing between icon and title
 const ICON_SPACING: f32 = 4.;
 
+/// Uncaged: diameter of the status dot, and the leading slot that keeps titles aligned whether
+/// or not a row has one.
+const STATUS_DOT_SIZE: f32 = 6.;
+const STATUS_SLOT_WIDTH: f32 = 14.;
+
 /// Offset for the sharing dialog from the item row
 const DIALOG_OFFSET_PIXELS: f32 = -16.;
-
-/// Total size of the agent icon-with-status component rendered in each conversation list
-/// row.
-const LIST_ITEM_AGENT_SIZE: f32 = 22.;
-/// Extra overhang past the default overlay position, as a fraction of
-/// `LIST_ITEM_AGENT_SIZE`. Pushes the badge all the way to the bounding box's BR corner;
-/// the conversation list reads better with the status sitting slightly further out than
-/// on the other surfaces.
-const LIST_ITEM_OVERLAY_EXTRA_OVERHANG: f32 = 0.05;
 
 /// Generate a position ID for a conversation list item
 fn conversation_item_position_id(id: &AgentConversationEntryId) -> String {
@@ -65,9 +60,9 @@ fn conversation_item_position_id(id: &AgentConversationEntryId) -> String {
     }
 }
 
-/// Minimum height for static list items (section headers, StartNewConversation).
-/// Ensures UniformList uses consistent item heights (and doesn't clip any items).
-pub const STATIC_ITEM_MIN_HEIGHT: f32 = 42.;
+/// Uncaged: every row in the list (conversations, section headers, "View all") is one line of
+/// this height. The uniform list sizes all rows from the first, so they have to match.
+pub const LIST_ROW_HEIGHT: f32 = 30.;
 
 #[derive(Clone, Default)]
 pub struct ItemState {
@@ -104,87 +99,6 @@ pub struct ItemProps<'a> {
     pub tooltip_opens_right: bool,
 }
 
-pub struct StaticItemProps<'a> {
-    pub is_selected: bool,
-    pub index: usize,
-    pub state: &'a ItemState,
-}
-
-pub fn render_static_item(props: StaticItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
-    let StaticItemProps {
-        is_selected,
-        index,
-        state,
-    } = props;
-    let appearance = Appearance::as_ref(app);
-    let theme = appearance.theme();
-
-    let icon_color = theme.main_text_color(theme.background());
-    let icon = Container::new(
-        ConstrainedBox::new(Icon::Plus.to_warpui_icon(icon_color).finish())
-            .with_width(appearance.ui_font_size())
-            .with_height(appearance.ui_font_size())
-            .finish(),
-    )
-    .with_uniform_padding(STATUS_ELEMENT_PADDING)
-    .with_background(coloru_with_opacity(icon_color.into(), 10))
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-        warp_core::ui::radius::SMALL,
-    )))
-    .finish();
-
-    let title_text = Text::new_inline(
-        "New conversation",
-        appearance.ui_font_family(),
-        appearance.ui_font_size() + 2.,
-    )
-    .with_color(theme.main_text_color(theme.background()).into())
-    .finish();
-
-    let row = Flex::row()
-        .with_cross_axis_alignment(CrossAxisAlignment::Center)
-        .with_spacing(ICON_SPACING)
-        .with_child(icon)
-        .with_child(title_text)
-        .finish();
-
-    let hoverable = Hoverable::new(state.mouse_state.clone(), move |_| {
-        let mut container = Container::new(row)
-            .with_horizontal_padding(8.)
-            .with_margin_left(4.)
-            .with_margin_right(4.)
-            .with_corner_radius(radius::small());
-        if is_selected {
-            container = container.with_background(theme.surface_overlay_1());
-        }
-        container.finish()
-    })
-    .with_cursor(Cursor::PointingHand)
-    .on_click(|ctx, _, _| {
-        ctx.dispatch_typed_action(ConversationListViewAction::NewConversationInNewTab);
-    });
-
-    EventHandler::new(
-        ConstrainedBox::new(hoverable.finish())
-            .with_min_height(STATIC_ITEM_MIN_HEIGHT)
-            .finish(),
-    )
-    .on_mouse_in(
-        move |ctx, _, _| {
-            ctx.dispatch_typed_action(ConversationListViewAction::SetSelectedIndex(index));
-            DispatchEventResult::PropagateToParent
-        },
-        Some(MouseInBehavior {
-            fire_on_synthetic_events: false,
-            // `fire_when_covered: false` makes hover ignore the row when it's
-            // covered by an overlay (e.g. a modal), so the selection/tooltip
-            // don't leak through — matching how clicks are already blocked.
-            fire_when_covered: false,
-        }),
-    )
-    .finish()
-}
-
 pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
     let ItemProps {
         conversation,
@@ -210,7 +124,7 @@ pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
     let font_family = appearance.ui_font_family();
     let font_size = appearance.ui_font_size();
 
-    let title_font_size = font_size + 2.;
+    let title_font_size = font_size + 1.;
     let mut title_text = Text::new_inline(
         conversation.display.title.clone(),
         font_family,
@@ -253,83 +167,83 @@ pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
         title_element
     };
 
-    let status_element_size = font_size + STATUS_ELEMENT_PADDING * 2.;
-    let icon_element = render_icon_with_status(
-        agent_conversation_entry_icon_variant(conversation),
-        LIST_ITEM_AGENT_SIZE,
-        LIST_ITEM_OVERLAY_EXTRA_OVERHANG,
-        theme,
-        theme.background(),
-    );
-
-    let icon_and_title_row = Shrinkable::new(
-        1.0,
+    // Uncaged: one line per conversation: a status dot only while something needs attention,
+    // the title, and a compact age on the right. The directory and status read out in the
+    // tooltip instead of a second line.
+    let status = conversation.display.status.to_conversation_status();
+    let status_dot = status_dot_color(&status, theme).map(|color| {
+        ConstrainedBox::new(
+            Container::new(Empty::new().finish())
+                .with_background(color)
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(STATUS_DOT_SIZE / 2.)))
+                .finish(),
+        )
+        .with_width(STATUS_DOT_SIZE)
+        .with_height(STATUS_DOT_SIZE)
+        .finish()
+    });
+    let status_slot = ConstrainedBox::new(
         Flex::row()
+            .with_main_axis_size(MainAxisSize::Max)
+            .with_main_axis_alignment(MainAxisAlignment::Start)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_spacing(ICON_SPACING)
-            .with_child(icon_element)
-            .with_child(Shrinkable::new(1.0, title_element).finish())
+            .with_children(status_dot)
             .finish(),
     )
+    .with_width(STATUS_SLOT_WIDTH)
     .finish();
 
-    let timestamp = Text::new_inline(
-        format_approx_duration_from_now_utc(conversation.display.last_updated),
-        font_family,
-        font_size - 2.,
-    )
-    .with_color(theme.sub_text_color(theme.background()).into())
-    .finish();
-
-    let bottom_row = if let Some(subtext) = format_item_subtext(conversation, app) {
-        let subtext_element = Shrinkable::new(
-            1.0,
-            Text::new_inline(subtext, font_family, title_font_size - 2.)
-                .with_color(theme.sub_text_color(theme.background()).into())
+    let mut row = Flex::row()
+        .with_main_axis_size(MainAxisSize::Max)
+        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(status_slot)
+        .with_child(Expanded::new(1.0, title_element).finish());
+    if is_cloud_run(conversation) {
+        row.add_child(
+            Container::new(
+                ConstrainedBox::new(
+                    Icon::Cloud
+                        .to_warpui_icon(theme.sub_text_color(theme.background()))
+                        .finish(),
+                )
+                .with_width(font_size)
+                .with_height(font_size)
                 .finish(),
-        )
-        .finish();
-
+            )
+            .with_margin_left(ICON_SPACING)
+            .finish(),
+        );
+    }
+    row.add_child(
         Container::new(
-            Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-                .with_cross_axis_alignment(CrossAxisAlignment::End)
-                .with_child(subtext_element)
-                .with_child(timestamp)
-                .finish(),
+            Text::new_inline(
+                compact_age(conversation.display.last_updated),
+                font_family,
+                font_size - 1.,
+            )
+            .with_color(theme.sub_text_color(theme.background()).into())
+            .finish(),
         )
-        .with_padding_left(status_element_size + ICON_SPACING)
-        .finish()
-    } else {
-        // If no subtext, still show timestamp in the bottom row
-        Container::new(
-            Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_main_axis_alignment(MainAxisAlignment::End)
-                .with_child(timestamp)
-                .finish(),
-        )
-        .with_padding_left(status_element_size + ICON_SPACING)
-        .finish()
-    };
-
-    let row = Flex::column()
-        .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-        .with_child(icon_and_title_row)
-        .with_child(bottom_row)
-        .finish();
+        .with_margin_left(8.)
+        .finish(),
+    );
+    let row = row.finish();
 
     let can_open = conversation.capabilities.can_open;
-    let tooltip_text = truncate_from_end(&conversation.display.title, MAX_TOOLTIP_LENGTH);
+    let mut tooltip_text = truncate_from_end(&conversation.display.title, MAX_TOOLTIP_LENGTH);
+    let details = format_item_subtext(conversation, app)
+        .into_iter()
+        .chain(status_dot_color(&status, theme).map(|_| status.to_string()))
+        .collect::<Vec<_>>();
+    if !details.is_empty() {
+        tooltip_text = format!("{tooltip_text}\n{}", details.join(" · "));
+    }
     let overflow_button_state = state.overflow_button_state.clone();
     let hoverable = Hoverable::new(state.mouse_state.clone(), move |_| {
         // Uncaged: the row keeps its height (the uniform list relies on it) but splits it so
         // the text is centred in its highlight and adjacent highlights don't run together.
         let container = Container::new(row)
             .with_horizontal_padding(8.)
-            .with_padding_top(3.)
-            .with_padding_bottom(3.)
             .with_margin_top(1.)
             .with_margin_bottom(1.)
             .with_margin_left(4.)
@@ -378,10 +292,10 @@ pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
             // side of the screen the conversation list panel is on; only the menu's open
             // direction (handled above) flips with `tooltip_opens_right`.
             let overflow_offset = OffsetPositioning::offset_from_parent(
-                vec2f(-8., 6.),
+                vec2f(-6., 0.),
                 ParentOffsetBounds::ParentByPosition,
-                ParentAnchor::TopRight,
-                ChildAnchor::TopRight,
+                ParentAnchor::MiddleRight,
+                ChildAnchor::MiddleRight,
             );
             // Use add_positioned_child (not overlay) so button stays within item bounds
             stack.add_positioned_child(overflow_button.finish(), overflow_offset);
@@ -480,7 +394,47 @@ pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
         );
     }
 
-    SavePosition::new(item_stack.finish(), &position_id).finish()
+    ConstrainedBox::new(SavePosition::new(item_stack.finish(), &position_id).finish())
+        .with_height(LIST_ROW_HEIGHT)
+        .finish()
+}
+
+/// Uncaged: the dot colour for statuses worth a glance; finished and cancelled get none.
+fn status_dot_color(status: &ConversationStatus, theme: &WarpTheme) -> Option<ColorU> {
+    match status {
+        ConversationStatus::InProgress | ConversationStatus::WaitingForEvents => {
+            Some(theme.ansi_fg_magenta())
+        }
+        ConversationStatus::TransientError | ConversationStatus::Blocked { .. } => {
+            Some(theme.ansi_fg_yellow())
+        }
+        ConversationStatus::Error => Some(theme.ansi_fg_red()),
+        ConversationStatus::Success | ConversationStatus::Cancelled => None,
+    }
+}
+
+fn is_cloud_run(conversation: &AgentConversationEntry) -> bool {
+    matches!(
+        conversation.provenance,
+        AgentConversationProvenance::AmbientRun
+    ) || conversation.backing.has_ambient_run
+        || conversation.identity.ambient_agent_task_id.is_some()
+}
+
+/// Uncaged: a short age for the right edge of a row ("now", "5m", "3h", "2d", "3w", "4mo", "1y").
+fn compact_age(datetime: DateTime<Utc>) -> String {
+    let minutes = (Utc::now() - datetime).num_minutes().max(0);
+    let hours = minutes / 60;
+    let days = hours / 24;
+    match () {
+        _ if minutes < 1 => "now".to_owned(),
+        _ if hours < 1 => format!("{minutes}m"),
+        _ if days < 1 => format!("{hours}h"),
+        _ if days < 7 => format!("{days}d"),
+        _ if days < 30 => format!("{}w", days / 7),
+        _ if days < 365 => format!("{}mo", days / 30),
+        _ => format!("{}y", days / 365),
+    }
 }
 
 fn render_inline_rename_editor(
@@ -493,7 +447,7 @@ fn render_inline_rename_editor(
             .set_background(ElementFill::None)
             .set_border_radius(CornerRadius::with_all(Radius::Pixels(0.)))
             .set_border_width(0.)
-            .set_font_size(appearance.ui_font_size() + 2.),
+            .set_font_size(appearance.ui_font_size() + 1.),
     )
     .build()
     .finish()
