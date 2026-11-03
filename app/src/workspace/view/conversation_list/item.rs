@@ -11,7 +11,7 @@ use warpui::elements::{
     Fill as ElementFill, Flex, Highlight, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseInBehavior, MouseStateHandle, OffsetPositioning, OffsetType, ParentAnchor, ParentElement,
     ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition,
-    Shrinkable, Stack, Text, XAxisAnchor, YAxisAnchor,
+    Stack, Text, XAxisAnchor, YAxisAnchor,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::platform::Cursor;

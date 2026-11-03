@@ -832,7 +832,10 @@ fn test_arrange_keeps_order_and_builds_layouts() {
 
     assert!(data.arrange(PaneLayout::Grid));
     assert_eq!(data.pane_ids(), panes);
-    assert_eq!(shape(&data.root), (Some(SplitDirection::Vertical), vec![3, 2]));
+    assert_eq!(
+        shape(&data.root),
+        (Some(SplitDirection::Vertical), vec![3, 2])
+    );
 }
 
 #[test]
@@ -840,7 +843,10 @@ fn test_arrange_grid_of_four_is_two_by_two() {
     let (mut data, panes) = stacked_panes(4);
     assert!(data.arrange(PaneLayout::Grid));
     assert_eq!(data.pane_ids(), panes);
-    assert_eq!(shape(&data.root), (Some(SplitDirection::Vertical), vec![2, 2]));
+    assert_eq!(
+        shape(&data.root),
+        (Some(SplitDirection::Vertical), vec![2, 2])
+    );
 }
 
 #[test]
