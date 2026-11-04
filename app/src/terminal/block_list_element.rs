@@ -99,12 +99,12 @@ const BOTTOM_VERTICAL_MARGIN: f32 = 10.0;
 const COMMAND_ALPHA: u8 = 255;
 
 const SEPARATOR_TO_MONOSPACE_FONT_SIZE_RATIO: f32 = 0.8;
-const SEPARATOR_LEFT_OFFSET: f32 = 20.;
-/// How far the restored-session band sits in from the pane's top and bottom.
-const SEPARATOR_INSET: f32 = 4.;
-/// How far the restored-session band sits in from the pane's sides: the input box's margin, so
-/// the band lines up with it instead of overhanging it.
-const SEPARATOR_SIDE_INSET: f32 = 6.;
+/// How far a restored block's card sits in from the pane's sides: the input box's margin, so
+/// the card lines up with it instead of overhanging it.
+const RESTORED_BLOCK_SIDE_INSET: f32 = 6.;
+/// How far a restored block's card sits in from the block's top and bottom, leaving a gap
+/// between consecutive restored blocks.
+const RESTORED_BLOCK_VERTICAL_INSET: f32 = 2.;
 
 /// Border widths for selected blocks
 #[derive(Debug, Clone, Copy)]
@@ -2391,15 +2391,20 @@ impl BlockListElement {
         app: &AppContext,
     ) {
         let block_height = block.height(agent_view_state).as_f64() as f32 * cell_size.y();
-        if block.is_restored()
-            && (!FeatureFlag::AgentView.is_enabled() || !agent_view_state.is_fullscreen())
+        let inset = vec2f(RESTORED_BLOCK_SIDE_INSET, RESTORED_BLOCK_VERTICAL_INSET);
+        if Self::draws_restored_block_card(block, agent_view_state) && block_height > inset.y() * 2.
         {
+            // Uncaged: restored blocks sit on a rounded card inset from the pane's edges, rather
+            // than a full-width tint under a hard rule.
             ctx.scene
                 .draw_rect_with_hit_recording(RectF::new(
-                    grid_origin,
-                    Vector2F::new(bounds.width(), block_height),
+                    grid_origin + inset,
+                    vec2f(bounds.width(), block_height) - inset * 2.,
                 ))
-                .with_background(warp_theme.restored_blocks_overlay());
+                .with_background(warp_theme.restored_blocks_overlay())
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    warp_core::ui::radius::MEDIUM,
+                )));
         }
 
         // Update the background for the current active long running command when the inline agent view is active.
@@ -2467,6 +2472,12 @@ impl BlockListElement {
         }
     }
 
+    /// Whether `block` is drawn on the restored-session card.
+    fn draws_restored_block_card(block: &Block, agent_view_state: &AgentViewState) -> bool {
+        block.is_restored()
+            && (!FeatureFlag::AgentView.is_enabled() || !agent_view_state.is_fullscreen())
+    }
+
     fn draw_border_between_blocks(
         grid_origin: Vector2F,
         block_grid_params: &BlockGridParams,
@@ -2525,7 +2536,11 @@ impl BlockListElement {
         let cell_size_height = block_grid_params.grid_render_params.cell_size.y();
         let block_banner_height = block.block_banner_height().as_f64() as f32 * cell_size_height;
 
-        if draw_border_between_blocks && block_borders_enabled {
+        // Uncaged: a restored block's card edges already separate it from its neighbours.
+        if draw_border_between_blocks
+            && block_borders_enabled
+            && !Self::draws_restored_block_card(block, agent_view_state)
+        {
             // The border belongs *above* the block banner, if there is one. The grid_origin has
             // already been updated to point to below that banner, so we do the subtraction to go
             // up and draw the border above it.
@@ -3440,8 +3455,8 @@ impl Element for BlockListElement {
                     let separator_text =
                         if let Some(ts) = (*model).block_list().restored_session_ts() {
                             format!(
-                                "{banner_intro_text} from {}",
-                                ts.format("%a %b %-d at %-I:%M %p")
+                                "{banner_intro_text} · {}",
+                                ts.format("%a %b %-d, %-I:%M %p")
                             )
                         } else {
                             banner_intro_text
@@ -3455,7 +3470,7 @@ impl Element for BlockListElement {
                         .with_style(Properties::default().weight(self.font_weight))
                         .with_color(
                             self.warp_theme
-                                .main_text_color(self.warp_theme.background())
+                                .sub_text_color(self.warp_theme.background())
                                 .into_solid(),
                         )
                         .finish(),
@@ -3535,11 +3550,15 @@ impl Element for BlockListElement {
             };
         }
         if let Some(restored_session_separator) = &mut self.restored_session_separator {
+            // Loose, so the label takes its own width and can be centered when painted.
             restored_session_separator.layout(
-                SizeConstraint::strict(vec2f(
-                    self.size_info.pane_width_px().as_f32(),
-                    BLOCK_HOVER_BUTTON_HEIGHT,
-                )),
+                SizeConstraint {
+                    min: Vector2F::zero(),
+                    max: vec2f(
+                        self.size_info.pane_width_px().as_f32(),
+                        BLOCK_HOVER_BUTTON_HEIGHT,
+                    ),
+                },
                 ctx,
                 app,
             );
@@ -3594,7 +3613,8 @@ impl Element for BlockListElement {
 
                     let total_lines = grid_storage_lines + flat_storage_lines;
                     let total_bytes = grid_storage_bytes + flat_storage_bytes;
-                    let text = format!("\
+                    let text = format!(
+                        "\
                             Lines: {total_lines} (grid: {grid_storage_lines}, flat: {flat_storage_lines}); \
                             Size: {:#.1} (grid: {:#.1}, flat: {:#.1})\
                         ",
@@ -4002,7 +4022,9 @@ impl Element for BlockListElement {
                                     - SPACE_BETWEEN_SELECTED_BLOCK_AVATARS,
                             );
                         } else {
-                            log::warn!("Should show avatar for shared session participant at selected block but avatar element was not found")
+                            log::warn!(
+                                "Should show avatar for shared session participant at selected block but avatar element was not found"
+                            )
                         }
                     }
 
@@ -4279,30 +4301,23 @@ impl Element for BlockListElement {
                 } => {
                     let bounds = self.bounds.expect("Bound should exist");
 
-                    // Uncaged: a rounded band inset from the pane's edges rather than a
-                    // full-width strip under a hard rule.
-                    let inset = vec2f(SEPARATOR_SIDE_INSET, SEPARATOR_INSET);
-                    ctx.scene
-                        .draw_rect_with_hit_recording(RectF::new(
-                            grid_origin + inset,
-                            vec2f(bounds.width(), *height) - inset * 2.,
-                        ))
-                        .with_background(self.warp_theme.restored_blocks_overlay())
-                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                            warp_core::ui::radius::MEDIUM,
-                        )));
-
-                    // Offset the text by the half of the remaining space between the separator height
-                    // and the font line height to center it vertically.
+                    // Uncaged: a quiet label centered under the restored blocks, rather than a
+                    // filled band. Offset the text by half of the remaining space between the
+                    // separator height and the font line height to center it vertically.
                     if let Some(restored_session_separator) = &mut self.restored_session_separator {
+                        let text_width = restored_session_separator
+                            .size()
+                            .map_or(0., |size| size.x());
                         let alignment_offset = vec2f(
-                            SEPARATOR_LEFT_OFFSET,
+                            ((bounds.width() - text_width) / 2.).max(0.),
                             (height - cell_size.y() * SEPARATOR_TO_MONOSPACE_FONT_SIZE_RATIO) / 2.,
                         );
                         restored_session_separator.paint(grid_origin + alignment_offset, ctx, app);
                     }
 
-                    draw_border_above_block = true;
+                    // No rule under the label: the gap around it already separates the history
+                    // from the live blocks.
+                    draw_border_above_block = false;
 
                     grid_origin += vec2f(0., *height);
                 }
