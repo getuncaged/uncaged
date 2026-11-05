@@ -623,6 +623,7 @@ pub fn init(app: &mut AppContext) {
                 .with_custom_description(bindings::MAC_MENUS_CONTEXT, "New Team Notebook"),
             WorkspaceAction::CreateTeamNotebook,
         )
+        .with_enabled(|| false) // Uncaged: needs a team or account; hide the binding.
         .with_custom_action(CustomAction::NewTeamNotebook)
         .with_context_predicate(
             id!("Workspace")
@@ -646,6 +647,7 @@ pub fn init(app: &mut AppContext) {
                 .with_custom_description(bindings::MAC_MENUS_CONTEXT, "New Team Workflow"),
             WorkspaceAction::CreateTeamWorkflow,
         )
+        .with_enabled(|| false) // Uncaged: needs a team or account; hide the binding.
         .with_custom_action(CustomAction::NewTeamWorkflow)
         .with_context_predicate(
             id!("Workspace")
@@ -669,6 +671,7 @@ pub fn init(app: &mut AppContext) {
                 .with_custom_description(bindings::MAC_MENUS_CONTEXT, "New Team Folder"),
             WorkspaceAction::CreateTeamFolder,
         )
+        .with_enabled(|| false) // Uncaged: needs a team or account; hide the binding.
         .with_context_predicate(
             id!("Workspace")
                 & id!(flags::ENABLE_WARP_DRIVE)
@@ -1303,6 +1306,7 @@ pub fn init(app: &mut AppContext) {
                 ),
             WorkspaceAction::CreateTeamEnvVarCollection,
         )
+        .with_enabled(|| false) // Uncaged: needs a team or account; hide the binding.
         .with_custom_action(CustomAction::NewTeamEnvVars)
         .with_context_predicate(
             id!("Workspace")
@@ -1340,6 +1344,7 @@ pub fn init(app: &mut AppContext) {
                 .with_custom_description(bindings::MAC_MENUS_CONTEXT, "New Team Prompt"),
             WorkspaceAction::CreateTeamAIPrompt,
         )
+        .with_enabled(|| false) // Uncaged: needs a team or account; hide the binding.
         .with_group(bindings::BindingGroup::WarpAi.as_str())
         .with_custom_action(CustomAction::NewTeamAIPrompt)
         .with_context_predicate(
@@ -1380,6 +1385,7 @@ pub fn init(app: &mut AppContext) {
             "Import To Team Drive",
             WorkspaceAction::ImportToTeamDrive,
         )
+        .with_enabled(|| false) // Uncaged: needs a team or account; hide the binding.
         .with_context_predicate(
             id!("Workspace") & id!(flags::ENABLE_WARP_DRIVE) & id!("WarpDrive_BelongsToTeam"),
         ),
@@ -1562,11 +1568,12 @@ fn add_overflow_menu_items_as_editable_binding(app: &mut AppContext) {
             "Invite People...",
             WorkspaceAction::ShowReferralSettingsPage,
         )
+        .with_enabled(|| false) // Uncaged: needs a team or account; hide the binding.
         .with_context_predicate(id!("Workspace"))
         .with_custom_action(CustomAction::ReferAFriend),
         EditableBinding::new(
             "workspace:link_to_slack",
-            "Join our Slack community (opens external link)",
+            "Open community discussions (opens external link)",
             WorkspaceAction::JoinSlack,
         )
         .with_context_predicate(id!("Workspace")),

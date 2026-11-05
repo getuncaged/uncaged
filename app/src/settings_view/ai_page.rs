@@ -1,31 +1,23 @@
-use ::ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent, ApiKeys};
+use ::ai::api_keys::{ApiKeyManager, ApiKeys};
 #[cfg(not(target_family = "wasm"))]
 use ::ai::grok_subscription::oauth::{self, ManualCodeExchange};
-use chrono::{DateTime, Local};
 use enum_iterator::all;
 use itertools::Itertools;
-use pathfinder_geometry::vector::vec2f;
 use regex::Regex;
 use settings::{Setting, ToggleableSetting};
 use strum::IntoEnumIterator;
 use warp_core::channel::ChannelState;
 use warp_core::context_flag::ContextFlag;
 use warp_core::features::FeatureFlag;
-use warp_core::ui::color::contrast::MinimumAllowedContrast;
-use warp_core::ui::color::ContrastingColor;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::theme::Fill as ThemeFill;
-use warp_editor::editor::NavigationKey;
 use warpui::elements::{
-    Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    Dismiss, Empty, Expanded, Fill, Flex, FormattedTextElement, HighlightedHyperlink, Hoverable,
-    HyperlinkLens, HyperlinkUrl, MainAxisAlignment, MainAxisSize, MouseStateHandle,
-    OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack,
-    Text,
+    Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Empty,
+    Expanded, Fill, Flex, FormattedTextElement, HighlightedHyperlink, HyperlinkLens, HyperlinkUrl,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::keymap::{ContextPredicate, Keystroke};
-use warpui::platform::Cursor;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::slider::SliderStateHandle;
 use warpui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
@@ -80,30 +72,24 @@ use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::GenericStringObjectFormat::Json;
 use crate::cloud_object::{JsonObjectType, ObjectType};
-use crate::editor::{
-    EditorOptions, InteractionState, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
-    TextColors,
-};
+use crate::editor::{EditorOptions, InteractionState, SingleLineEditorOptions, TextColors};
 use crate::modal::{Modal, ModalEvent, ModalViewState};
 use crate::settings::{
     AIAutoDetectionEnabled, AICommandDenylist, AISettingsChangedEvent,
     AgentModeCodingPermissionsType, AgentModeCommandExecutionDenylist,
     AgentModeCommandExecutionPredicate, AgentModeQuerySuggestionsEnabled, AgentTrigger,
-    AwsBedrockAutoLogin, AwsBedrockCredentialsEnabled, CanUseWarpCreditsForFallback, CodeSettings,
-    CodebaseContextEnabled, FileBasedMcpEnabled, GitOperationsAutogenEnabled,
-    IncludeAgentCommandsInHistory, InputSettings, IntelligentAutosuggestionsEnabled,
-    LongRunningCommandSubmissionMode, MemoryEnabled, NLDInTerminalEnabled,
-    NaturalLanguageAutosuggestionsEnabled, OrchestrationMessageDisplayMode,
+    AwsBedrockAutoLogin, AwsBedrockCredentialsEnabled, CodeSettings, CodebaseContextEnabled,
+    FileBasedMcpEnabled, GitOperationsAutogenEnabled, IncludeAgentCommandsInHistory, InputSettings,
+    IntelligentAutosuggestionsEnabled, LongRunningCommandSubmissionMode, MemoryEnabled,
+    NLDInTerminalEnabled, NaturalLanguageAutosuggestionsEnabled, OrchestrationMessageDisplayMode,
     PreferShellForKnownCommands, PromptSubmissionMode, RuleSuggestionsEnabled,
     SharedBlockTitleGenerationEnabled, ShouldRenderCLIAgentToolbar,
-    ShouldRenderUseAgentToolbarForUserCommands, ShowAgentTips, ShowConversationHistory,
-    ShowHintText, ThinkingDisplayMode, VoiceInputEnabled, WarpDriveContextEnabled,
+    ShouldRenderUseAgentToolbarForUserCommands, ShowAgentTips, ShowHintText, ThinkingDisplayMode,
+    VoiceInputEnabled, WarpDriveContextEnabled,
 };
 use crate::terminal::session_settings::{SessionSettings, SessionSettingsChangedEvent};
 use crate::terminal::CLIAgent;
-use crate::view_components::action_button::{
-    ActionButton, ButtonSize, DangerSecondaryTheme, SecondaryTheme,
-};
+use crate::view_components::action_button::{ActionButton, ButtonSize, SecondaryTheme};
 use crate::view_components::{
     render_warning_box, FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent,
     WarningBoxConfig,
@@ -139,7 +125,6 @@ impl AISubpage {
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -154,7 +139,6 @@ use crate::server::telemetry::{
     ToggleCodeSuggestionsSettingSource,
 };
 use crate::settings::{AISettings, VoiceInputToggleKey};
-use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
 use crate::util::bindings;
 use crate::view_components::dropdown::DropdownAction;
@@ -191,9 +175,6 @@ const SHARED_BLOCK_TITLE_GENERATION_DESCRIPTION: &str =
 const GIT_OPERATIONS_AUTOGEN_DESCRIPTION: &str =
     "Let AI generate commit messages and pull request titles and descriptions.";
 const WISPR_FLOW_URL: &str = "https://wisprflow.ai/";
-const CUSTOM_INFERENCE_LEARN_MORE_URL: &str = crate::brand::README_URL;
-const CUSTOM_INFERENCE_TERMS_URL: &str = crate::brand::HOME_URL;
-const CUSTOM_INFERENCE_INFO_TOOLTIP_MAX_WIDTH: f32 = 320.;
 
 pub fn init_actions_from_parent_view<T: Action + Clone>(
     app: &mut AppContext,
@@ -2991,9 +2972,7 @@ impl AISettingsPageView {
                 // Full page: all widgets (legacy behavior)
                 widgets.push(Box::new(GlobalAIWidget::default()));
                 widgets.push(Box::new(ConnectModelWidget));
-                if !FeatureFlag::UsageBasedPricing.is_enabled() {
-                    widgets.push(Box::new(UsageWidget::default()));
-                }
+                // Uncaged: no credits, plans or billing -- models are bring-your-own.
                 if ai_settings
                     .intelligent_autosuggestions_enabled_internal
                     .is_supported_on_current_platform()
@@ -3032,7 +3011,8 @@ impl AISettingsPageView {
                 }
                 widgets.push(Box::new(CloudHandoffWidget::default()));
                 widgets.push(Box::new(CLIAgentWidget::default()));
-                widgets.push(Box::new(ApiKeysWidget::new(ctx)));
+                // Uncaged: keys are entered under "Connect a model"; these account-gated
+                // fields could only render greyed out.
                 widgets.push(Box::new(AwsBedrockWidget::new(ctx)));
                 widgets.push(Box::new(AgentAttributionWidget::default()));
                 widgets.push(Box::new(OtherAIWidget::default()));
@@ -3081,7 +3061,8 @@ impl AISettingsPageView {
                     widgets.push(Box::new(VoiceWidget::default()));
                 }
                 widgets.push(Box::new(CloudHandoffWidget::default()));
-                widgets.push(Box::new(ApiKeysWidget::new(ctx)));
+                // Uncaged: keys are entered under "Connect a model"; these account-gated
+                // fields could only render greyed out.
                 widgets.push(Box::new(AwsBedrockWidget::new(ctx)));
                 if FeatureFlag::CustomModelRouters.is_enabled() {
                     widgets.push(Box::new(CustomModelRoutersWidget));
@@ -3100,9 +3081,7 @@ impl AISettingsPageView {
                 }
             }
             Some(AISubpage::Profiles) => {
-                if !FeatureFlag::UsageBasedPricing.is_enabled() {
-                    widgets.push(Box::new(UsageWidget::default()));
-                }
+                // Uncaged: no credits, plans or billing -- models are bring-your-own.
                 widgets.push(Box::new(AgentsWidget::default()));
             }
             Some(AISubpage::Knowledge) => {
@@ -5027,7 +5006,7 @@ impl SettingsWidget for GlobalAIWidget {
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
                 Text::new_inline(
-                    "AI Models",
+                    "Models",
                     appearance.ui_font_family(),
                     PRIMARY_HEADER_FONT_SIZE,
                 )
@@ -5075,294 +5054,6 @@ impl SettingsWidget for GlobalAIWidget {
 
         Container::new(row.finish())
             .with_padding_bottom(15.)
-            .finish()
-    }
-}
-
-#[derive(Default)]
-struct UsageWidget {
-    requests_highlight_index: HighlightedHyperlink,
-}
-
-impl UsageWidget {
-    fn render_request_usage_count(
-        &self,
-        used: usize,
-        limit: usize,
-        is_unlimited: bool,
-        workspace_is_delinquent_due_to_payment_issue: bool,
-        appearance: &Appearance,
-    ) -> Box<dyn warpui::Element> {
-        let mut row = Flex::row();
-        if used >= limit || workspace_is_delinquent_due_to_payment_issue {
-            row.add_child(
-                ConstrainedBox::new(
-                    Icon::AlertTriangle
-                        .to_warpui_icon(appearance.theme().ui_error_color().into())
-                        .finish(),
-                )
-                .with_height(16.)
-                .with_width(16.)
-                .finish(),
-            )
-        }
-
-        let request_count_label = if workspace_is_delinquent_due_to_payment_issue {
-            "Restricted due to billing issue".to_string()
-        } else if is_unlimited {
-            "Unlimited".to_string()
-        } else {
-            format!("{used}/{limit}")
-        };
-
-        row.add_child(
-            appearance
-                .ui_builder()
-                .paragraph(request_count_label)
-                .with_style(UiComponentStyles {
-                    font_color: {
-                        if used >= limit {
-                            Some(appearance.theme().ui_error_color())
-                        } else {
-                            Some(blended_colors::text_sub(
-                                appearance.theme(),
-                                appearance.theme().surface_1(),
-                            ))
-                        }
-                    },
-                    font_size: Some(16.),
-                    margin: Some(Coords {
-                        top: 0.,
-                        bottom: 0.,
-                        left: 8.,
-                        right: 0.,
-                    }),
-                    ..Default::default()
-                })
-                .build()
-                .finish(),
-        );
-
-        row.finish()
-    }
-
-    /// Renders a row of what is being limited, along with the current used/limit.
-    #[allow(clippy::too_many_arguments)]
-    fn render_ai_usage_limit_row(
-        &self,
-        header: impl Into<Cow<'static, str>>,
-        description: impl Into<Cow<'static, str>>,
-        used: usize,
-        limit: usize,
-        is_unlimited: bool,
-        workspace_is_delinquent_due_to_payment_issue: bool,
-        appearance: &Appearance,
-    ) -> Box<dyn warpui::Element> {
-        let request_usage_details = Flex::column()
-            .with_cross_axis_alignment(CrossAxisAlignment::End)
-            .with_child(self.render_request_usage_count(
-                used,
-                limit,
-                is_unlimited,
-                workspace_is_delinquent_due_to_payment_issue,
-                appearance,
-            ));
-
-        let request_usage_description = FormattedTextElement::from_str(
-            description,
-            appearance.ui_font_family(),
-            appearance.ui_font_size(),
-        )
-        .with_color(blended_colors::text_sub(
-            appearance.theme(),
-            appearance.theme().surface_1(),
-        ));
-
-        Flex::row()
-            .with_child(
-                Shrinkable::new(
-                    2.,
-                    Container::new(
-                        Flex::column()
-                            .with_child(
-                                appearance
-                                    .ui_builder()
-                                    .paragraph(header)
-                                    .with_style(UiComponentStyles {
-                                        font_color: Some(blended_colors::text_main(
-                                            appearance.theme(),
-                                            appearance.theme().surface_1(),
-                                        )),
-                                        margin: Some(Coords {
-                                            top: 0.,
-                                            bottom: 4.,
-                                            left: 0.,
-                                            right: 0.,
-                                        }),
-                                        ..Default::default()
-                                    })
-                                    .build()
-                                    .finish(),
-                            )
-                            .with_child(request_usage_description.finish())
-                            .finish(),
-                    )
-                    .with_margin_bottom(16.)
-                    .finish(),
-                )
-                .finish(),
-            )
-            .with_child(
-                Shrinkable::new(
-                    1.,
-                    Container::new(request_usage_details.finish())
-                        .with_margin_bottom(16.)
-                        .finish(),
-                )
-                .finish(),
-            )
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-            .with_main_axis_size(MainAxisSize::Max)
-            .finish()
-    }
-}
-
-impl SettingsWidget for UsageWidget {
-    type View = AISettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "a.i. ai usage limit plan"
-    }
-
-    fn render(
-        &self,
-        _view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let ai_request_usage_model = AIRequestUsageModel::as_ref(app);
-        let next_refresh_time = ai_request_usage_model.next_refresh_time();
-        let formatted_next_refresh_time = next_refresh_time.format("%b %d").to_string();
-        let workspace_is_delinquent_due_to_payment_issue = UserWorkspaces::as_ref(app)
-            .current_team()
-            .map(|team| team.billing_metadata.is_delinquent_due_to_payment_issue())
-            .unwrap_or_default();
-
-        let usage_header = Container::new(
-            Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(
-                    build_sub_header(
-                        appearance,
-                        "Usage",
-                        Some(styles::header_font_color(true, app)),
-                    )
-                    .finish(),
-                )
-                .with_child(
-                    appearance
-                        .ui_builder()
-                        .paragraph(format!("Resets {formatted_next_refresh_time}"))
-                        .with_style(UiComponentStyles {
-                            font_color: Some(blended_colors::text_sub(
-                                appearance.theme(),
-                                appearance.theme().surface_1(),
-                            )),
-                            ..Default::default()
-                        })
-                        .build()
-                        .finish(),
-                )
-                .finish(),
-        )
-        .with_padding_bottom(HEADER_PADDING)
-        .finish();
-
-        let request_limit_description = format!(
-            "This is the {} limit of AI credits for your account.",
-            ai_request_usage_model.refresh_duration_to_string()
-        );
-
-        let request_usage_row = self.render_ai_usage_limit_row(
-            "Credits",
-            request_limit_description,
-            ai_request_usage_model.requests_used(),
-            ai_request_usage_model.request_limit(),
-            ai_request_usage_model.is_unlimited(),
-            workspace_is_delinquent_due_to_payment_issue,
-            appearance,
-        );
-
-        let auth_state = AuthStateProvider::as_ref(app).get();
-        let upgrade_cta_text_fragments = if let Some(team) =
-            UserWorkspaces::as_ref(app).current_team()
-        {
-            let current_user_email = auth_state.user_email().unwrap_or_default();
-            let has_admin_permissions = team.has_admin_permissions(&current_user_email);
-            if team.billing_metadata.can_upgrade_to_higher_tier_plan() {
-                let upgrade_url = UserWorkspaces::upgrade_link_for_team(team.uid);
-                if has_admin_permissions {
-                    vec![
-                        FormattedTextFragment::hyperlink("Upgrade", upgrade_url),
-                        FormattedTextFragment::plain_text(" to get more AI usage."),
-                    ]
-                } else {
-                    // The /upgrade page says to contact their administrator.
-                    vec![
-                        FormattedTextFragment::hyperlink("Compare plans", upgrade_url),
-                        FormattedTextFragment::plain_text(" for more AI usage."),
-                    ]
-                }
-            } else {
-                vec![
-                    FormattedTextFragment::hyperlink("Contact support", "mailto:support@warp.dev"),
-                    FormattedTextFragment::plain_text(" for more AI usage."),
-                ]
-            }
-        } else {
-            let user_id = auth_state.user_id().unwrap_or_default();
-            let upgrade_url = UserWorkspaces::upgrade_link(user_id);
-            vec![
-                FormattedTextFragment::hyperlink("Upgrade", upgrade_url),
-                FormattedTextFragment::plain_text(" to get more AI usage."),
-            ]
-        };
-
-        let mut upgrade_cta = FormattedTextElement::new(
-            FormattedText::new([FormattedTextLine::Line(upgrade_cta_text_fragments)]),
-            appearance.ui_font_size(),
-            appearance.ui_font_family(),
-            appearance.ui_font_family(),
-            styles::description_font_color(true, app).into(),
-            self.requests_highlight_index.clone(),
-        )
-        .with_hyperlink_font_color(appearance.theme().accent().into_solid());
-
-        if AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
-        {
-            upgrade_cta = upgrade_cta.register_default_click_handlers(|_, ctx, _| {
-                ctx.dispatch_typed_action(AISettingsPageAction::AttemptLoginGatedUpgrade);
-            });
-        } else {
-            upgrade_cta = upgrade_cta.register_default_click_handlers(|url, ctx, _| {
-                ctx.dispatch_typed_action(AISettingsPageAction::HyperlinkClick(url));
-            })
-        }
-
-        Flex::column()
-            .with_children([
-                render_separator(appearance),
-                usage_header,
-                request_usage_row,
-                Container::new(upgrade_cta.finish())
-                    .with_margin_bottom(16.)
-                    .finish(),
-            ])
             .finish()
     }
 }
@@ -7438,7 +7129,6 @@ impl SettingsWidget for VoiceWidget {
 #[derive(Default)]
 struct OtherAIWidget {
     use_agent_footer_toggle: SwitchStateHandle,
-    show_conversation_history_toggle: SwitchStateHandle,
 }
 
 impl OtherAIWidget {
@@ -7589,15 +7279,7 @@ impl SettingsWidget for OtherAIWidget {
             column.add_child(agent_view_column.finish());
         }
 
-        column.add_child(render_ai_setting_toggle::<ShowConversationHistory>(
-            "Show conversation history in tools panel",
-            AISettingsPageAction::ToggleShowConversationHistory,
-            *ai_settings.show_conversation_history,
-            is_toggleable,
-            self.show_conversation_history_toggle.clone(),
-            &view.local_only_icon_tooltip_states,
-            app,
-        ));
+        // Uncaged: "Show conversation history in tools panel" lives on Settings > Interface.
 
         column.add_child(render_dropdown_item(
             appearance,
@@ -7728,7 +7410,7 @@ impl SettingsWidget for CLIAgentWidget {
             .with_child(
                 build_sub_header(
                     appearance,
-                    "Third party CLI agents",
+                    "CLI agents",
                     Some(styles::header_font_color(true, app)),
                 )
                 .with_padding_bottom(HEADER_PADDING)
@@ -8778,875 +8460,6 @@ impl SettingsWidget for ConnectModelWidget {
         }
 
         column.add_child(self.render_gallery(view, appearance, app, &connections));
-
-        column.finish()
-    }
-}
-
-struct ApiKeysWidget {
-    openai_api_key_editor: ViewHandle<EditorView>,
-    anthropic_api_key_editor: ViewHandle<EditorView>,
-    google_api_key_editor: ViewHandle<EditorView>,
-    /// Buttons for the SuperGrok (xAI) subscription row; which one renders
-    /// depends on whether OAuth tokens are stored or a connect attempt is in
-    /// progress.
-    grok_connect_button: ViewHandle<ActionButton>,
-    grok_connecting_button: ViewHandle<ActionButton>,
-    grok_disconnect_button: ViewHandle<ActionButton>,
-
-    can_use_warp_credits_for_fallback: SwitchStateHandle,
-    upgrade_highlight_index: HighlightedHyperlink,
-
-    custom_inference_info_tooltip: MouseStateHandle,
-    custom_inference_terms_index: HighlightedHyperlink,
-    description_learn_more_index: HighlightedHyperlink,
-}
-
-impl ApiKeysWidget {
-    fn new(ctx: &mut ViewContext<<Self as SettingsWidget>::View>) -> Self {
-        let ai_settings = AISettings::as_ref(ctx);
-        let workspace_handle = UserWorkspaces::handle(ctx);
-        let is_any_ai_enabled = ai_settings.is_any_ai_enabled(ctx);
-        let is_byo_enabled = workspace_handle.as_ref(ctx).is_byo_api_key_enabled(ctx);
-
-        let ApiKeys {
-            openai: openai_key,
-            anthropic: anthropic_key,
-            google: google_key,
-            ..
-        } = ApiKeyManager::as_ref(ctx).keys().clone();
-
-        // A helper macro to create and configure an API key editor.  This avoids a lot
-        // of code duplication and ensures consistency between the editors.
-        macro_rules! create_api_key_editor {
-            ($editor:ident, $key:ident, $set_func:ident, $placeholder:literal) => {
-                let $editor = ctx.add_typed_action_view(move |ctx| {
-                    let appearance = Appearance::handle(ctx).as_ref(ctx);
-                    let options = SingleLineEditorOptions {
-                        is_password: true,
-                        // Emit Tab/Shift-Tab as navigation events instead of
-                        // inserting whitespace, so focus can move between the
-                        // key fields (see the focus wiring below).
-                        propagate_and_no_op_vertical_navigation_keys:
-                            PropagateAndNoOpNavigationKeys::Always,
-                        text: TextOptions {
-                            font_size_override: Some(appearance.ui_font_size()),
-                            font_family_override: Some(appearance.monospace_font_family()),
-                            text_colors_override: Some(TextColors {
-                                default_color: appearance.theme().active_ui_text_color(),
-                                disabled_color: appearance.theme().disabled_ui_text_color(),
-                                hint_color: appearance.theme().disabled_ui_text_color(),
-                            }),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    };
-                    let mut editor = EditorView::single_line(options, ctx);
-                    editor.set_placeholder_text($placeholder, ctx);
-                    if let Some(key) = &$key {
-                        editor.set_buffer_text(key, ctx);
-                    }
-                    editor
-                });
-                AISettingsPageView::update_editor_interaction_state(
-                    $editor.clone(),
-                    is_any_ai_enabled && is_byo_enabled,
-                    ctx,
-                );
-                // The default-model prompt is driven off `KeysUpdated` (see the
-                // `ApiKeyManager` subscription), so this only needs to persist
-                // the key on commit.
-                ctx.subscribe_to_view(&$editor, |_, $editor, event, ctx| {
-                    if matches!(event, EditorEvent::Blurred | EditorEvent::Enter) {
-                        let buffer_text = $editor.as_ref(ctx).buffer_text(ctx);
-                        let key = buffer_text.is_empty().not().then_some(buffer_text);
-                        ApiKeyManager::handle(ctx).update(ctx, |model, ctx| {
-                            model.$set_func(key, ctx);
-                        });
-                    }
-                });
-                let editor_clone = $editor.clone();
-                ctx.subscribe_to_model(&workspace_handle, move |_, workspace, event, ctx| {
-                    if let UserWorkspacesEvent::TeamsChanged = event {
-                        let is_any_ai_enabled =
-                            AISettings::handle(ctx).as_ref(ctx).is_any_ai_enabled(ctx);
-                        let is_byo_enabled = workspace.as_ref(ctx).is_byo_api_key_enabled(ctx);
-                        let is_enabled = is_any_ai_enabled && is_byo_enabled;
-                        let has_key = !editor_clone.as_ref(ctx).is_empty(ctx);
-
-                        // If BYO is disabled, clear the API key from the editor and storage
-                        if !is_byo_enabled && has_key {
-                            editor_clone.update(ctx, |editor, ctx| {
-                                editor.set_buffer_text("", ctx);
-                            });
-                            ApiKeyManager::handle(ctx).update(ctx, |model, ctx| {
-                                model.$set_func(None, ctx);
-                            });
-                        }
-
-                        AISettingsPageView::update_editor_interaction_state(
-                            editor_clone.clone(),
-                            is_enabled,
-                            ctx,
-                        );
-                        ctx.notify();
-                    }
-                })
-            };
-        }
-
-        create_api_key_editor!(openai_api_key_editor, openai_key, set_openai_key, "sk-...");
-        create_api_key_editor!(
-            anthropic_api_key_editor,
-            anthropic_key,
-            set_anthropic_key,
-            "sk-ant-..."
-        );
-        create_api_key_editor!(
-            google_api_key_editor,
-            google_key,
-            set_google_key,
-            "AIzaSy..."
-        );
-
-        // Tab / Shift-Tab move focus between the provider key fields instead of
-        // inserting whitespace.
-        let provider_key_editors = [
-            openai_api_key_editor.clone(),
-            anthropic_api_key_editor.clone(),
-            google_api_key_editor.clone(),
-        ];
-        for (index, editor) in provider_key_editors.iter().enumerate() {
-            let next = provider_key_editors.get(index + 1).cloned();
-            let previous = index
-                .checked_sub(1)
-                .and_then(|prev_index| provider_key_editors.get(prev_index).cloned());
-            ctx.subscribe_to_view(editor, move |_, _, event, ctx| match event {
-                EditorEvent::Navigate(NavigationKey::Tab) => {
-                    if let Some(next) = &next {
-                        ctx.focus(next);
-                    }
-                }
-                EditorEvent::Navigate(NavigationKey::ShiftTab) => {
-                    if let Some(previous) = &previous {
-                        ctx.focus(previous);
-                    }
-                }
-                _ => {}
-            });
-        }
-
-        // Editor text colors are snapshotted at construction via
-        // `text_colors_override`, so refresh them whenever the theme changes.
-        let api_key_editors = [
-            openai_api_key_editor.clone(),
-            anthropic_api_key_editor.clone(),
-            google_api_key_editor.clone(),
-        ];
-        ctx.subscribe_to_model(&Appearance::handle(ctx), move |_, _, event, ctx| {
-            if let AppearanceEvent::ThemeChanged = event {
-                let text_colors = editor_text_colors(Appearance::as_ref(ctx));
-                for editor in &api_key_editors {
-                    let colors = text_colors.clone();
-                    editor.update(ctx, move |editor, ctx| {
-                        editor.set_text_colors(colors, ctx);
-                    });
-                }
-            }
-        });
-
-        let grok_connect_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Connect", SecondaryTheme)
-                .with_size(ButtonSize::Small)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(AISettingsPageAction::ConnectGrokSubscription);
-                })
-        });
-        let grok_connecting_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Connecting", SecondaryTheme).with_size(ButtonSize::Small)
-        });
-        grok_connecting_button.update(ctx, |button, ctx| {
-            button.set_disabled(true, ctx);
-        });
-        let grok_disconnect_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("Disconnect", DangerSecondaryTheme)
-                .with_size(ButtonSize::Small)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(AISettingsPageAction::DisconnectGrokSubscription);
-                })
-        });
-        for button in [&grok_connect_button, &grok_disconnect_button] {
-            button.update(ctx, |button, ctx| {
-                button.set_disabled(!(is_any_ai_enabled && is_byo_enabled), ctx);
-            });
-        }
-
-        // The Grok subscription is BYO auth, so keep the buttons' enablement
-        // in sync with the BYO API key policy, like the editors above.
-        let grok_buttons = [grok_connect_button.clone(), grok_disconnect_button.clone()];
-        ctx.subscribe_to_model(&workspace_handle, move |_, workspace, event, ctx| {
-            if let UserWorkspacesEvent::TeamsChanged = event {
-                let is_any_ai_enabled = AISettings::handle(ctx).as_ref(ctx).is_any_ai_enabled(ctx);
-                let is_byo_enabled = workspace.as_ref(ctx).is_byo_api_key_enabled(ctx);
-                for button in &grok_buttons {
-                    button.update(ctx, |button, ctx| {
-                        button.set_disabled(!(is_any_ai_enabled && is_byo_enabled), ctx);
-                    });
-                }
-                ctx.notify();
-            }
-        });
-
-        // Re-render the SuperGrok row whenever the stored tokens change (the
-        // connect flow completes, a disconnect, or a background refresh).
-        ctx.subscribe_to_model(&ApiKeyManager::handle(ctx), |_, _, event, ctx| {
-            if matches!(event, ApiKeyManagerEvent::KeysUpdated) {
-                ctx.notify();
-            }
-        });
-
-        Self {
-            openai_api_key_editor,
-            anthropic_api_key_editor,
-            google_api_key_editor,
-
-            grok_connect_button,
-            grok_connecting_button,
-            grok_disconnect_button,
-
-            can_use_warp_credits_for_fallback: Default::default(),
-            upgrade_highlight_index: Default::default(),
-
-            custom_inference_info_tooltip: Default::default(),
-            custom_inference_terms_index: Default::default(),
-            description_learn_more_index: Default::default(),
-        }
-    }
-
-    fn render_api_key_input(
-        &self,
-        appearance: &Appearance,
-        label: &'static str,
-        editor: ViewHandle<EditorView>,
-        is_enabled: bool,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let padding = Some(Coords {
-            top: 10.,
-            bottom: 10.,
-            left: 16.,
-            right: 16.,
-        });
-        let editor_style = UiComponentStyles {
-            padding,
-            background: Some(appearance.theme().surface_2().into()),
-            ..Default::default()
-        };
-
-        let label = Text::new_inline(label, appearance.ui_font_family(), CONTENT_FONT_SIZE)
-            .with_color(styles::header_font_color(is_enabled, app).into())
-            .finish();
-
-        let input = appearance
-            .ui_builder()
-            .text_input(editor)
-            .with_style(editor_style)
-            .build()
-            .finish();
-
-        Flex::column()
-            .with_spacing(8.)
-            .with_child(label)
-            .with_child(input)
-            .finish()
-    }
-
-    fn render_provider_key_editors(
-        &self,
-        appearance: &Appearance,
-        is_enabled: bool,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let mut column = Flex::column().with_spacing(16.);
-        column.add_child(self.render_api_key_input(
-            appearance,
-            "OpenAI API key",
-            self.openai_api_key_editor.clone(),
-            is_enabled,
-            app,
-        ));
-        column.add_child(self.render_api_key_input(
-            appearance,
-            "Anthropic API key",
-            self.anthropic_api_key_editor.clone(),
-            is_enabled,
-            app,
-        ));
-        column.add_child(self.render_api_key_input(
-            appearance,
-            "Google API key",
-            self.google_api_key_editor.clone(),
-            is_enabled,
-            app,
-        ));
-        column.finish()
-    }
-
-    fn render_custom_inference_description(&self, app: &AppContext) -> Box<dyn Element> {
-        let appearance = Appearance::as_ref(app);
-        let text_fragments = vec![
-            FormattedTextFragment::plain_text(
-                "Use your own API keys from model providers for the agent. You can also add custom endpoints to use third-party models. Custom endpoints must support the OpenAI-compatible Chat Completions API. API keys are stored only on your device, never on our servers. They're used to make requests to your chosen model provider. ",
-            ),
-            FormattedTextFragment::hyperlink("Learn more", CUSTOM_INFERENCE_LEARN_MORE_URL),
-        ];
-        let description = FormattedTextElement::new(
-            FormattedText::new([FormattedTextLine::Line(text_fragments)]),
-            CONTENT_FONT_SIZE,
-            appearance.ui_font_family(),
-            appearance.ui_font_family(),
-            blended_colors::text_sub(appearance.theme(), appearance.theme().surface_1()),
-            self.description_learn_more_index.clone(),
-        )
-        .with_hyperlink_font_color(appearance.theme().accent().into_solid())
-        .register_default_click_handlers(|url, ctx, _| {
-            ctx.dispatch_typed_action(AISettingsPageAction::HyperlinkClick(url));
-        });
-        Container::new(description.finish())
-            .with_margin_top(styles::DESCRIPTION_NEGATIVE_MARGIN_OFFSET)
-            .with_margin_bottom(styles::DESCRIPTION_MARGIN_BOTTOM)
-            .with_margin_right(styles::TOGGLE_WIDTH_MARGIN)
-            .finish()
-    }
-
-    fn render_custom_inference_info_icon(&self, appearance: &Appearance) -> Box<dyn Element> {
-        let icon = Container::new(
-            ConstrainedBox::new(
-                Icon::Info
-                    .to_warpui_icon(appearance.theme().active_ui_text_color())
-                    .finish(),
-            )
-            .with_width(13.)
-            .with_height(13.)
-            .finish(),
-        )
-        .finish();
-
-        let tooltip_text = FormattedText::new([FormattedTextLine::Line(vec![
-            FormattedTextFragment::plain_text(
-                "By using BYOK or custom endpoints, you agree to use them only as permitted by ",
-            ),
-            FormattedTextFragment::hyperlink("the Uncaged license", CUSTOM_INFERENCE_TERMS_URL),
-            FormattedTextFragment::plain_text(
-                ". Your API keys and requests are sent directly to the provider you configure — never to Uncaged.",
-            ),
-        ])]);
-        let tooltip_background = appearance.theme().tooltip_background();
-
-        let info_button =
-            Hoverable::new(self.custom_inference_info_tooltip.clone(), move |state| {
-                let mut stack = Stack::new().with_child(icon);
-                if state.is_hovered() {
-                    let tool_tip = ConstrainedBox::new(
-                        Container::new(
-                            FormattedTextElement::new(
-                                tooltip_text.clone(),
-                                10.,
-                                appearance.ui_font_family(),
-                                appearance.ui_font_family(),
-                                appearance.theme().background().into_solid(),
-                                self.custom_inference_terms_index.clone(),
-                            )
-                            .with_hyperlink_font_color(
-                                appearance
-                                    .theme()
-                                    .accent()
-                                    .on_background(
-                                        ThemeFill::Solid(tooltip_background),
-                                        MinimumAllowedContrast::Text,
-                                    )
-                                    .into(),
-                            )
-                            .register_default_click_handlers(|url, ctx, _| {
-                                ctx.dispatch_typed_action(AISettingsPageAction::HyperlinkClick(
-                                    url,
-                                ));
-                            })
-                            .finish(),
-                        )
-                        .with_background_color(tooltip_background)
-                        .with_vertical_padding(4.)
-                        .with_horizontal_padding(8.)
-                        .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
-                        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                            warp_core::ui::radius::SMALL,
-                        )))
-                        .finish(),
-                    )
-                    .with_max_width(CUSTOM_INFERENCE_INFO_TOOLTIP_MAX_WIDTH)
-                    .finish();
-                    stack.add_positioned_child(
-                        tool_tip,
-                        OffsetPositioning::offset_from_parent(
-                            vec2f(0., -3.),
-                            ParentOffsetBounds::WindowByPosition,
-                            ParentAnchor::TopMiddle,
-                            ChildAnchor::BottomMiddle,
-                        ),
-                    );
-                }
-                stack.finish()
-            })
-            .with_cursor(Cursor::PointingHand);
-
-        Container::new(Box::new(info_button))
-            .with_margin_left(4.)
-            .finish()
-    }
-
-    fn render_custom_endpoints_list(
-        &self,
-        view: &AISettingsPageView,
-        appearance: &Appearance,
-        is_enabled: bool,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let theme = appearance.theme();
-        let text_color = styles::header_font_color(is_enabled, app);
-        let endpoints = &ApiKeyManager::as_ref(app).keys().custom_endpoints;
-        let chip_border = internal_colors::fg_overlay_3(theme);
-
-        let mut list = Flex::column().with_spacing(12.);
-        for (index, endpoint) in endpoints.iter().enumerate() {
-            let model_labels = endpoint
-                .models
-                .iter()
-                .map(|model| model.alias.clone().unwrap_or_else(|| model.name.clone()))
-                .filter(|s| !s.trim().is_empty());
-
-            let chips = super::render_model_chips(model_labels, appearance, text_color);
-
-            let endpoint_name = Text::new_inline(
-                endpoint.name.clone(),
-                appearance.ui_font_family(),
-                appearance.ui_font_size(),
-            )
-            .with_style(Properties::default().weight(Weight::Semibold))
-            .with_color(text_color.into())
-            .finish();
-
-            let left = Flex::column()
-                .with_spacing(8.)
-                .with_child(endpoint_name)
-                .with_child(chips)
-                .finish();
-
-            let edit_button = view
-                .custom_endpoint_edit_buttons
-                .get(index)
-                .map(|button| button.as_ref(app).render(app))
-                .unwrap_or_else(|| Empty::new().finish());
-
-            let row = Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(Shrinkable::new(1., left).finish())
-                .with_child(edit_button)
-                .finish();
-
-            list.add_child(
-                Container::new(row)
-                    .with_uniform_padding(12.)
-                    .with_background(internal_colors::fg_overlay_1(theme))
-                    .with_border(Border::all(1.).with_border_fill(chip_border))
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(6.)))
-                    .finish(),
-            );
-        }
-        list.finish()
-    }
-
-    /// The "Connect SuperGrok subscription" row: label and description on the
-    /// left, a Connect/Disconnect button on the right, and a "Connected on
-    /// ..." status line underneath while a subscription is connected.
-    fn render_grok_subscription_row(
-        &self,
-        appearance: &Appearance,
-        is_enabled: bool,
-        is_connecting: bool,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let grok_tokens = ApiKeyManager::as_ref(app).grok_tokens();
-
-        let text_color = styles::header_font_color(is_enabled, app);
-        let label = Flex::row()
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_spacing(4.)
-            .with_child(
-                Text::new_inline("Use your", appearance.ui_font_family(), CONTENT_FONT_SIZE)
-                    .with_color(text_color.into())
-                    .finish(),
-            )
-            .with_child(
-                ConstrainedBox::new(Icon::XLogo.to_warpui_icon(text_color).finish())
-                    .with_width(14.)
-                    .with_height(14.)
-                    .finish(),
-            )
-            .with_child(
-                Text::new_inline(
-                    "Premium or SuperGrok subscription",
-                    appearance.ui_font_family(),
-                    CONTENT_FONT_SIZE,
-                )
-                .with_color(text_color.into())
-                .finish(),
-            )
-            .finish();
-
-        let button = if grok_tokens.is_some() {
-            &self.grok_disconnect_button
-        } else if is_connecting {
-            &self.grok_connecting_button
-        } else {
-            &self.grok_connect_button
-        };
-
-        let header_row = Flex::row()
-            .with_main_axis_size(MainAxisSize::Max)
-            .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(Shrinkable::new(1., label).finish())
-            .with_child(button.as_ref(app).render(app))
-            .finish();
-
-        let description = Container::new(
-            Text::new(
-                "Connect your SuperGrok subscription to use Grok models in the agent through your xAI account.",
-                appearance.ui_font_family(),
-                CONTENT_FONT_SIZE,
-            )
-            .with_color(styles::description_font_color(is_enabled, app).into())
-            .soft_wrap(true)
-            .finish(),
-        )
-        .with_margin_right(styles::TOGGLE_WIDTH_MARGIN)
-        .finish();
-
-        let mut column = Flex::column()
-            .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(header_row)
-            .with_child(description);
-
-        if let Some(tokens) = grok_tokens {
-            let connected_text = match tokens.connected_at.map(DateTime::<Local>::from) {
-                Some(connected_at) => format!(
-                    "Connected on {}.",
-                    connected_at.format("%m/%d/%Y at %-I:%M%P")
-                ),
-                // Tokens stored before the connection time was tracked.
-                None => "Connected.".to_string(),
-            };
-            let check = ConstrainedBox::new(
-                Icon::Check
-                    .to_warpui_icon(appearance.theme().ansi_fg_green().into())
-                    .finish(),
-            )
-            .with_width(12.)
-            .with_height(12.)
-            .finish();
-            let status_text = Text::new_inline(
-                connected_text,
-                appearance.ui_font_family(),
-                CONTENT_FONT_SIZE,
-            )
-            .with_color(styles::description_font_color(is_enabled, app).into())
-            .finish();
-            column.add_child(
-                Flex::row()
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_spacing(4.)
-                    .with_child(check)
-                    .with_child(status_text)
-                    .finish(),
-            );
-        }
-
-        column.finish()
-    }
-
-    /// Paste-the-code fallback for the current SuperGrok connect attempt.
-    #[cfg(not(target_family = "wasm"))]
-    fn render_grok_manual_code_entry(
-        &self,
-        view: &AISettingsPageView,
-        appearance: &Appearance,
-    ) -> Box<dyn Element> {
-        let theme = appearance.theme();
-
-        let editor_style = UiComponentStyles {
-            padding: Some(Coords {
-                top: 10.,
-                bottom: 10.,
-                left: 16.,
-                right: 16.,
-            }),
-            background: Some(theme.surface_2().into()),
-            ..Default::default()
-        };
-        let input = appearance
-            .ui_builder()
-            .text_input(view.grok_code_editor.clone())
-            .with_style(editor_style)
-            .build()
-            .finish();
-
-        let row = Flex::row()
-            .with_main_axis_size(MainAxisSize::Max)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_spacing(8.)
-            .with_child(Shrinkable::new(1., input).finish())
-            .finish();
-
-        Flex::column()
-            .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_spacing(8.)
-            .with_child(row)
-            .finish()
-    }
-
-    fn render_warp_credit_fallback_toggle(
-        &self,
-        view: &AISettingsPageView,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let ai_settings = AISettings::as_ref(app);
-
-        let toggle = render_ai_setting_toggle::<CanUseWarpCreditsForFallback>(
-            "Uncaged credit fallback",
-            AISettingsPageAction::ToggleCanUseWarpCreditsForFallback,
-            *ai_settings.can_use_warp_credits_for_fallback,
-            ai_settings.is_any_ai_enabled(app),
-            self.can_use_warp_credits_for_fallback.clone(),
-            &view.local_only_icon_tooltip_states,
-            app,
-        );
-
-        let description = render_ai_setting_description(
-            "When enabled, agent requests may be routed to one of Uncaged's provided models in the event of an error. Uncaged will prioritize using your API keys over your Uncaged credits.",
-            ai_settings.is_any_ai_enabled(app),
-            app,
-        );
-
-        Flex::column()
-            .with_child(toggle)
-            .with_child(description)
-            .finish()
-    }
-}
-
-impl SettingsWidget for ApiKeysWidget {
-    type View = AISettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "api keys bring your own byo openai anthropic google claude gemini gpt custom inference endpoint grok supergrok xai subscription"
-    }
-
-    fn render(
-        &self,
-        view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let ai_settings = AISettings::as_ref(app);
-        let is_any_ai_enabled = ai_settings.is_any_ai_enabled(app);
-        let is_byo_enabled = UserWorkspaces::as_ref(app).is_byo_api_key_enabled(app);
-        let is_custom_inference_enabled =
-            UserWorkspaces::as_ref(app).is_custom_inference_enabled(app);
-        let provider_keys_enabled = is_any_ai_enabled && is_byo_enabled;
-        let custom_inference_controls_enabled = is_any_ai_enabled && is_custom_inference_enabled;
-        let custom_inference_flag_on = FeatureFlag::CustomInferenceEndpoints.is_enabled();
-        let show_custom_inference = custom_inference_flag_on && is_custom_inference_enabled;
-
-        let mut column = Flex::column().with_child(render_separator(appearance));
-
-        if show_custom_inference {
-            // Header row: "Custom inference" + info icon on left, "+ Add custom model" on right
-            let header_left = Flex::row()
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(
-                    build_sub_header(
-                        appearance,
-                        "Custom inference",
-                        Some(styles::header_font_color(
-                            custom_inference_controls_enabled,
-                            app,
-                        )),
-                    )
-                    .with_margin_bottom(0.)
-                    .finish(),
-                )
-                .with_child(self.render_custom_inference_info_icon(appearance))
-                .finish();
-
-            let header_row = Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(header_left)
-                .with_child(view.custom_inference_add_button.as_ref(app).render(app))
-                .finish();
-
-            column.add_child(
-                Container::new(header_row)
-                    .with_padding_bottom(HEADER_PADDING)
-                    .finish(),
-            );
-
-            // Description with Learn more link
-            column.add_child(self.render_custom_inference_description(app));
-        } else {
-            // Fallback: old "API Keys" header only
-            column.add_child(
-                build_sub_header(
-                    appearance,
-                    "API Keys",
-                    Some(styles::header_font_color(is_any_ai_enabled, app)),
-                )
-                .with_padding_bottom(HEADER_PADDING)
-                .finish(),
-            );
-        }
-
-        // Provider key editors (always visible)
-        column.add_child(self.render_provider_key_editors(appearance, provider_keys_enabled, app));
-
-        // Custom endpoints sub-label + list (only when flag on and endpoints non-empty)
-        if show_custom_inference {
-            let endpoints = &ApiKeyManager::as_ref(app).keys().custom_endpoints;
-            if !endpoints.is_empty() {
-                column.add_child(
-                    Container::new(
-                        Text::new_inline(
-                            "Custom endpoints",
-                            appearance.ui_font_family(),
-                            CONTENT_FONT_SIZE,
-                        )
-                        .with_color(
-                            styles::header_font_color(custom_inference_controls_enabled, app)
-                                .into(),
-                        )
-                        .with_style(Properties::default().weight(Weight::Semibold))
-                        .finish(),
-                    )
-                    .with_margin_top(16.)
-                    .with_margin_bottom(8.)
-                    .finish(),
-                );
-                column.add_child(self.render_custom_endpoints_list(
-                    view,
-                    appearance,
-                    custom_inference_controls_enabled,
-                    app,
-                ));
-            }
-        }
-
-        // Entrypoint for connecting a SuperGrok (xAI) subscription via OAuth.
-        if FeatureFlag::SuperGrok.is_enabled() {
-            #[cfg(not(target_family = "wasm"))]
-            let grok_tokens = ApiKeyManager::as_ref(app).grok_tokens();
-            #[cfg(not(target_family = "wasm"))]
-            let has_grok_oauth_attempt = view.grok_oauth_attempt.is_some();
-            #[cfg(not(target_family = "wasm"))]
-            let is_grok_connecting = grok_tokens.is_none() && has_grok_oauth_attempt;
-            #[cfg(target_family = "wasm")]
-            let is_grok_connecting = false;
-            column.add_child(
-                Container::new(self.render_grok_subscription_row(
-                    appearance,
-                    provider_keys_enabled,
-                    is_grok_connecting,
-                    app,
-                ))
-                .with_margin_top(16.)
-                .finish(),
-            );
-
-            #[cfg(not(target_family = "wasm"))]
-            if has_grok_oauth_attempt {
-                column.add_child(
-                    Container::new(self.render_grok_manual_code_entry(view, appearance))
-                        .with_margin_top(8.)
-                        .finish(),
-                );
-            }
-        }
-
-        // Upgrade CTA if BYOK not enabled
-        if !is_byo_enabled {
-            let auth_state = AuthStateProvider::as_ref(app).get();
-            let upgrade_text_fragments = if let Some(team) =
-                UserWorkspaces::as_ref(app).current_team()
-            {
-                if team.billing_metadata.customer_type == CustomerType::Enterprise {
-                    vec![
-                        FormattedTextFragment::hyperlink("Contact sales", "mailto:sales@warp.dev"),
-                        FormattedTextFragment::plain_text(
-                            " to enable bringing your own API keys on your Enterprise plan.",
-                        ),
-                    ]
-                } else {
-                    let current_user_email = auth_state.user_email().unwrap_or_default();
-                    let has_admin_permissions = team.has_admin_permissions(&current_user_email);
-                    let upgrade_url = UserWorkspaces::upgrade_link_for_team(team.uid);
-                    if has_admin_permissions {
-                        vec![
-                            FormattedTextFragment::hyperlink(
-                                "Upgrade to the Build plan",
-                                upgrade_url,
-                            ),
-                            FormattedTextFragment::plain_text(" to use your own API keys."),
-                        ]
-                    } else {
-                        vec![FormattedTextFragment::plain_text(
-                            "Ask your team's admin to upgrade to the Build plan to use your own API keys.",
-                        )]
-                    }
-                }
-            } else {
-                // Uncaged: bringing your own API key is free and needs no
-                // account or paid plan, so there's nothing to upgrade to.
-                Vec::new()
-            };
-
-            let upgrade_text_element = FormattedTextElement::new(
-                FormattedText::new([FormattedTextLine::Line(upgrade_text_fragments)]),
-                appearance.ui_font_size(),
-                appearance.ui_font_family(),
-                appearance.ui_font_family(),
-                blended_colors::text_sub(appearance.theme(), appearance.theme().surface_1()),
-                self.upgrade_highlight_index.clone(),
-            )
-            .with_hyperlink_font_color(appearance.theme().accent().into_solid())
-            .register_default_click_handlers_with_action_support(|hyperlink_lens, event, ctx| {
-                match hyperlink_lens {
-                    HyperlinkLens::Url(url) => {
-                        ctx.open_url(url);
-                    }
-                    HyperlinkLens::Action(action_ref) => {
-                        if let Some(action) =
-                            action_ref.as_any().downcast_ref::<AISettingsPageAction>()
-                        {
-                            event.dispatch_typed_action(action.clone());
-                        }
-                    }
-                }
-            });
-
-            column.add_child(Container::new(upgrade_text_element.finish()).finish());
-        }
 
         column.finish()
     }

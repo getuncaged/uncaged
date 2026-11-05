@@ -19,9 +19,9 @@ use warpui::windowing::WindowManager;
 use warpui::{AppContext, SingletonEntity};
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
-use crate::auth::AuthStateProvider;
 use crate::default_terminal::DefaultTerminal;
 use crate::features::{runtime_flags_menu_items, FeatureFlag};
+use crate::report_if_error;
 use crate::root_view::OpenLaunchConfigArg;
 use crate::server::telemetry::LaunchConfigUiLocation;
 use crate::settings::{
@@ -35,7 +35,6 @@ use crate::user_config::WarpConfig;
 use crate::util::bindings::{self, trigger_to_keystroke, CustomAction};
 use crate::util::links;
 use crate::workspace::sync_inputs::SyncedInputState;
-use crate::{auth, report_if_error};
 
 type CheckmarkStatusGetter = dyn 'static + Fn(&mut AppContext) -> bool;
 
@@ -150,11 +149,8 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
         ))
     }
 
-    menu_items.extend([
-        MenuItem::Separator,
-        updateable_custom_item_without_checkmark(CustomAction::ReferAFriend, ctx),
-        MenuItem::Separator,
-    ]);
+    // Uncaged: no "Invite People..." (referrals need an account).
+    menu_items.push(MenuItem::Separator);
 
     let preferences_menu_items = vec![
         updateable_custom_item_without_checkmark(CustomAction::ShowSettings, ctx),
@@ -227,22 +223,8 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
         },
         None,
     )));
+    // Uncaged: no "Log out" -- there is no account to sign out of.
     menu_items.push(MenuItem::Separator);
-    menu_items.push(MenuItem::Custom(CustomMenuItem::new(
-        "Log out",
-        auth::maybe_log_out,
-        move |_, ctx| {
-            let is_anonymous = AuthStateProvider::handle(ctx)
-                .as_ref(ctx)
-                .get()
-                .is_anonymous_or_logged_out();
-            MenuItemPropertyChanges {
-                disabled: Some(is_anonymous),
-                ..Default::default()
-            }
-        },
-        None,
-    )));
     menu_items.push(MenuItem::Standard(StandardAction::Quit));
     Menu::new("Uncaged", menu_items)
 }

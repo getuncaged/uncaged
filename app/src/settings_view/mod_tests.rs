@@ -28,9 +28,9 @@ fn theme_editor_and_gallery_are_reachable_from_the_sidebar() {
 
     let pages: Vec<SettingsSection> = base_nav_items()
         .into_iter()
-        .filter_map(|item| match item {
-            SettingsNavItem::Page(section) => Some(section),
-            SettingsNavItem::Umbrella(_) => None,
+        .flat_map(|item| match item {
+            SettingsNavItem::Page(section) => vec![section],
+            SettingsNavItem::Umbrella(group) => group.subpages,
         })
         .collect();
 
@@ -202,13 +202,13 @@ fn match_data_countable_zero_is_not_truthy() {
 
 #[test]
 fn subpage_display_names_are_correct() {
-    assert_eq!(SettingsSection::WarpAgent.to_string(), "AI Models");
+    assert_eq!(SettingsSection::WarpAgent.to_string(), "Models");
     assert_eq!(SettingsSection::AgentProfiles.to_string(), "Profiles");
     assert_eq!(SettingsSection::AgentMCPServers.to_string(), "MCP servers");
     assert_eq!(SettingsSection::Knowledge.to_string(), "Knowledge");
     assert_eq!(
         SettingsSection::ThirdPartyCLIAgents.to_string(),
-        "Third party CLI agents"
+        "CLI agents"
     );
     assert_eq!(
         SettingsSection::CodeIndexing.to_string(),
@@ -216,7 +216,7 @@ fn subpage_display_names_are_correct() {
     );
     assert_eq!(
         SettingsSection::EditorAndCodeReview.to_string(),
-        "Editor and Code Review"
+        "Editor and code review"
     );
     assert_eq!(
         SettingsSection::CloudEnvironments.to_string(),

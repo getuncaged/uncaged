@@ -306,16 +306,16 @@ impl Display for SettingsSection {
             SettingsSection::MCPServers => write!(f, "MCP Servers"),
             SettingsSection::Scripting => write!(f, "Scripting"),
             SettingsSection::WarpDrive => write!(f, "Warp Drive"),
-            SettingsSection::CustomizeUi => write!(f, "Customize UI"),
-            SettingsSection::ThemeCreator => write!(f, "Create your own custom theme"),
-            SettingsSection::ThemeGallery => write!(f, "Explore themes"),
-            SettingsSection::WarpAgent => write!(f, "AI Models"),
+            SettingsSection::CustomizeUi => write!(f, "Interface"),
+            SettingsSection::ThemeCreator => write!(f, "Theme creator"),
+            SettingsSection::ThemeGallery => write!(f, "Theme gallery"),
+            SettingsSection::WarpAgent => write!(f, "Models"),
             SettingsSection::AgentProfiles => write!(f, "Profiles"),
             SettingsSection::AgentMCPServers => write!(f, "MCP servers"),
             SettingsSection::Knowledge => write!(f, "Knowledge"),
-            SettingsSection::ThirdPartyCLIAgents => write!(f, "Third party CLI agents"),
+            SettingsSection::ThirdPartyCLIAgents => write!(f, "CLI agents"),
             SettingsSection::CodeIndexing => write!(f, "Indexing and projects"),
-            SettingsSection::EditorAndCodeReview => write!(f, "Editor and Code Review"),
+            SettingsSection::EditorAndCodeReview => write!(f, "Editor and code review"),
             SettingsSection::CloudEnvironments => write!(f, "Environments"),
             SettingsSection::OzCloudAPIKeys => write!(f, "Oz Cloud API Keys"),
             _ => write!(f, "{self:?}"),
@@ -410,14 +410,18 @@ impl FromStr for SettingsSection {
             "Teams" => Ok(Self::Teams),
             "Warpify" => Ok(Self::Warpify),
             "WarpDrive" | "Warp Drive" => Ok(Self::WarpDrive),
-            // Past display names ("Oz", "Warp Agent") kept for backward compatibility.
-            "AI Models" | "Oz" | "Warp Agent" => Ok(Self::WarpAgent),
+            // Past display names ("AI Models", "Oz", "Warp Agent") kept for backward compatibility.
+            "Models" | "AI Models" | "Oz" | "Warp Agent" => Ok(Self::WarpAgent),
             "Profiles" | "AgentProfiles" => Ok(Self::AgentProfiles),
             "MCP servers" | "AgentMCPServers" => Ok(Self::AgentMCPServers),
             "Knowledge" => Ok(Self::Knowledge),
-            "Third party CLI agents" | "ThirdPartyCLIAgents" => Ok(Self::ThirdPartyCLIAgents),
+            "CLI agents" | "Third party CLI agents" | "ThirdPartyCLIAgents" => {
+                Ok(Self::ThirdPartyCLIAgents)
+            }
             "Indexing and projects" | "CodeIndexing" => Ok(Self::CodeIndexing),
-            "Editor and Code Review" | "EditorAndCodeReview" => Ok(Self::EditorAndCodeReview),
+            "Editor and code review" | "Editor and Code Review" | "EditorAndCodeReview" => {
+                Ok(Self::EditorAndCodeReview)
+            }
             "CloudEnvironments" => Ok(Self::CloudEnvironments),
             "Oz Cloud API Keys" | "OzCloudAPIKeys" => Ok(Self::OzCloudAPIKeys),
             _ => Err(()),
@@ -988,33 +992,46 @@ enum NavStop {
     },
 }
 
+/// The label of the sidebar group that holds app-wide pages (and Scripting, when enabled).
+const APP_GROUP_LABEL: &str = "App";
+
 /// The Uncaged settings sidebar, in order — the single source of truth for
-/// which sections are reachable from the nav. AI/Code subpages are grouped under
-/// umbrellas; everything else is a direct page. Kept as a standalone builder so
+/// which sections are reachable from the nav. Every page sits in an always-open,
+/// labelled group, so the whole sidebar is visible at a glance. Kept as a standalone builder so
 /// the reachable set — notably the theme editor (`ThemeCreator`) and the theme
 /// gallery (`ThemeGallery`) — is trivial to unit-test and hard to drop by
 /// accident. The cloud/account-era sections (Account, Billing, Teams, …) are
 /// omitted on purpose: Uncaged is account-free and fully local.
 fn base_nav_items() -> Vec<SettingsNavItem> {
     vec![
-        SettingsNavItem::Umbrella(SettingsUmbrella::new(
+        SettingsNavItem::Umbrella(SettingsUmbrella::group(
             "Agents",
             SettingsSection::ai_subpages().to_vec(),
         )),
-        SettingsNavItem::Umbrella(SettingsUmbrella::new(
+        SettingsNavItem::Umbrella(SettingsUmbrella::group(
             "Code",
             vec![
                 SettingsSection::CodeIndexing,
                 SettingsSection::EditorAndCodeReview,
             ],
         )),
-        SettingsNavItem::Page(SettingsSection::Appearance),
-        SettingsNavItem::Page(SettingsSection::CustomizeUi),
-        SettingsNavItem::Page(SettingsSection::ThemeGallery),
-        SettingsNavItem::Page(SettingsSection::ThemeCreator),
-        SettingsNavItem::Page(SettingsSection::Features),
-        SettingsNavItem::Page(SettingsSection::Keybindings),
-        SettingsNavItem::Page(SettingsSection::About),
+        SettingsNavItem::Umbrella(SettingsUmbrella::group(
+            "Look & feel",
+            vec![
+                SettingsSection::Appearance,
+                SettingsSection::ThemeGallery,
+                SettingsSection::ThemeCreator,
+                SettingsSection::CustomizeUi,
+            ],
+        )),
+        SettingsNavItem::Umbrella(SettingsUmbrella::group(
+            APP_GROUP_LABEL,
+            vec![
+                SettingsSection::Features,
+                SettingsSection::Keybindings,
+                SettingsSection::About,
+            ],
+        )),
     ]
 }
 
@@ -1048,7 +1065,7 @@ where
                     .collect();
                 if visible.is_empty() {
                     vec![]
-                } else if umbrella.expanded {
+                } else if umbrella.is_open() {
                     visible.into_iter().map(NavStop::Section).collect()
                 } else {
                     let first_subpage = visible[0];
@@ -1375,21 +1392,24 @@ impl SettingsView {
         let mut nav_items = base_nav_items();
 
         if FeatureFlag::WarpControlCli.is_enabled() {
-            let shared_blocks_index = nav_items
-                .iter()
-                .position(|item| {
-                    matches!(item, SettingsNavItem::Page(SettingsSection::SharedBlocks))
-                })
-                .unwrap_or(nav_items.len());
-            nav_items.insert(
-                shared_blocks_index,
-                SettingsNavItem::Page(SettingsSection::Scripting),
-            );
+            // Scripting sits in the App group, just above About.
+            for item in &mut nav_items {
+                if let SettingsNavItem::Umbrella(group) = item {
+                    if group.label == APP_GROUP_LABEL {
+                        let about_index = group
+                            .subpages
+                            .iter()
+                            .position(|section| *section == SettingsSection::About)
+                            .unwrap_or(group.subpages.len());
+                        group.insert_subpage(about_index, SettingsSection::Scripting);
+                    }
+                }
+            }
         }
 
         // Resolve the initial page: map internal backing-page sections to their default subpage.
         // Uncaged has no Account page in the nav, so anything that used to fall
-        // back to Account lands on the "AI Models" page instead.
+        // back to Account lands on the "Models" page instead.
         let initial_page = match page {
             Some(SettingsSection::AI) => SettingsSection::WarpAgent,
             Some(SettingsSection::Code) => SettingsSection::CodeIndexing,
@@ -2530,21 +2550,25 @@ impl View for SettingsView {
                         continue;
                     }
 
-                    // Render umbrella header row. The whole row is a single
-                    // Hoverable so hover styling + pointing-hand cursor apply
-                    // across the full clickable area, not just the text.
-                    buttons.add_child(
-                        umbrella
-                            .render_umbrella_row(appearance)
-                            .on_click(move |ctx, _, _| {
-                                ctx.dispatch_typed_action(SettingsAction::ToggleUmbrella(
-                                    nav_index,
-                                ));
-                            })
-                            .finish(),
-                    );
+                    if umbrella.collapsible {
+                        // Render umbrella header row. The whole row is a single
+                        // Hoverable so hover styling + pointing-hand cursor apply
+                        // across the full clickable area, not just the text.
+                        buttons.add_child(
+                            umbrella
+                                .render_umbrella_row(appearance)
+                                .on_click(move |ctx, _, _| {
+                                    ctx.dispatch_typed_action(SettingsAction::ToggleUmbrella(
+                                        nav_index,
+                                    ));
+                                })
+                                .finish(),
+                        );
+                    } else {
+                        buttons.add_child(umbrella.render_group_label(appearance));
+                    }
                     // Render subpage items when expanded.
-                    if umbrella.expanded {
+                    if umbrella.is_open() {
                         for (sub_idx, subpage_section) in umbrella.subpages.iter().enumerate() {
                             let subpage_section = *subpage_section;
                             // Use per-subpage filter if available, otherwise backing page.

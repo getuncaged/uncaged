@@ -2736,10 +2736,7 @@ impl SettingsWidget for CreateCustomThemeWidget {
         Align::new(
             appearance
                 .ui_builder()
-                .paragraph(
-                    "Build your own theme in \"Create your own custom theme\" in the sidebar."
-                        .to_string(),
-                )
+                .paragraph("Build your own theme in \"Theme creator\" in the sidebar.".to_string())
                 .build()
                 .with_margin_bottom(10.)
                 .finish(),

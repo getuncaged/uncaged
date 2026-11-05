@@ -21385,12 +21385,18 @@ impl Workspace {
                 if !state.is_clicked() {
                     container = container.with_background(appearance.theme().surface_2());
                 }
-                // On hover, show tooltip of user's display name (if it exists)
-                if !self.is_user_menu_open && !is_anonymous {
+                // On hover, show tooltip of user's display name (if it exists), or what the
+                // gear does for Uncaged's account-free user.
+                if !self.is_user_menu_open {
+                    let tooltip = if is_anonymous {
+                        "Settings".to_owned()
+                    } else {
+                        display_name.clone()
+                    };
                     stack.add_positioned_overlay_child(
                         appearance
                             .ui_builder()
-                            .tool_tip(display_name.clone())
+                            .tool_tip(tooltip)
                             .with_style(UiComponentStyles {
                                 background: Some(appearance.theme().tooltip_background().into()),
                                 font_color: Some(appearance.theme().background().into_solid()),
@@ -21410,8 +21416,14 @@ impl Workspace {
             stack.add_child(container.finish());
             stack.finish()
         })
+        // Uncaged: there's no account behind the gear, so it opens Settings directly; the
+        // menu's other entries live in the menu bar (Uncaged and Help menus).
         .on_click(move |ctx, _, _| {
-            ctx.dispatch_typed_action(WorkspaceAction::ToggleUserMenu);
+            ctx.dispatch_typed_action(if is_anonymous {
+                WorkspaceAction::ShowSettings
+            } else {
+                WorkspaceAction::ToggleUserMenu
+            });
         })
         .with_cursor(Cursor::PointingHand)
         .finish();

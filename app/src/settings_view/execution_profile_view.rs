@@ -369,15 +369,8 @@ impl View for ExecutionProfileView {
                             ));
                         }
 
-                        permissions_column.add_child(with_standard_vertical_margin(
-                            render_bool_permission_line_with_icon(
-                                Icon::Compass,
-                                "Auto-sync plans to Warp Drive:",
-                                profile.autosync_plans_to_warp_drive,
-                                appearance,
-                                is_any_ai_enabled,
-                            ),
-                        ));
+                        // Uncaged: no "Auto-sync plans to Warp Drive" -- there's no cloud
+                        // Drive to sync to.
 
                         permissions_column.finish()
                     })

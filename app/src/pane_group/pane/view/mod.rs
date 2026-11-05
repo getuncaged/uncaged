@@ -40,6 +40,7 @@ pub fn init(app: &mut AppContext) {
         "Share pane",
         PaneAction::ShareContents,
     )
+    .with_enabled(|| false) // Uncaged: needs a team or account; hide the binding.
     .with_custom_action(CustomAction::SharePaneContents)
     .with_context_predicate(id!("PaneView") & id!(HAS_SHARED_OBJECT_CONTEXT_KEY))]);
 }

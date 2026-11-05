@@ -33,7 +33,6 @@ use crate::workspace::tab_settings::TabSettings;
 
 #[derive(Debug, Clone)]
 pub enum CustomizeUiSettingsPageAction {
-    ToggleVerticalTabs,
     ToggleProjectExplorer,
     ToggleConversationHistory,
     ToggleGlobalSearch,
@@ -50,16 +49,13 @@ pub struct CustomizeUiSettingsPageView {
 
 impl CustomizeUiSettingsPageView {
     pub fn new(_ctx: &mut ViewContext<Self>) -> Self {
-        // Mirrors the three cards on the onboarding "Customize your Uncaged"
-        // slide — Tab styling, Tools panel, Code review — so the setup choices
-        // are all findable in one dedicated place.
+        // Mirrors the onboarding "Customize your Uncaged" slide's Tools panel and
+        // Code review cards, so those choices are findable in one dedicated place.
+        // Its Tab styling card lives in Appearance > Tabs, beside the options that
+        // depend on it.
         Self {
             page: PageType::new_categorized(
                 vec![
-                    Category::new("Tab styling", vec![Box::new(VerticalTabsWidget::default())])
-                        .with_subtitle(
-                            "Stack tabs vertically in a side panel, or horizontally along the top.",
-                        ),
                     Category::new(
                         "Tools panel",
                         vec![
@@ -90,14 +86,6 @@ impl TypedActionView for CustomizeUiSettingsPageView {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            CustomizeUiSettingsPageAction::ToggleVerticalTabs => {
-                let tab_settings = TabSettings::handle(ctx);
-                let new_value = !*tab_settings.as_ref(ctx).use_vertical_tabs.value();
-                ctx.update_model(&tab_settings, move |tab_settings, ctx| {
-                    report_if_error!(tab_settings.use_vertical_tabs.set_value(new_value, ctx));
-                });
-                ctx.notify();
-            }
             CustomizeUiSettingsPageAction::ToggleProjectExplorer => {
                 CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings.show_project_explorer.toggle_and_save_value(ctx));
@@ -181,49 +169,6 @@ impl From<ViewHandle<CustomizeUiSettingsPageView>> for SettingsPageViewHandle {
 // Labels match the onboarding "Customize UI" cards/chips and the tools-panel tab
 // tooltips ("Project explorer", "Global search", "Drive"). Each toggle reads
 // the live `Setting` value and dispatches the page action that persists it.
-
-#[derive(Default)]
-struct VerticalTabsWidget {
-    switch_state: SwitchStateHandle,
-}
-
-impl SettingsWidget for VerticalTabsWidget {
-    type View = CustomizeUiSettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "customize ui tab styling vertical horizontal tabs side panel top"
-    }
-
-    fn render(
-        &self,
-        _view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let tab_settings = TabSettings::as_ref(app);
-
-        render_body_item::<CustomizeUiSettingsPageAction>(
-            "Vertical tabs".into(),
-            None,
-            LocalOnlyIconState::Hidden,
-            ToggleState::Enabled,
-            appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*tab_settings.use_vertical_tabs)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::ToggleVerticalTabs);
-                })
-                .finish(),
-            Some(
-                "Stack tabs vertically in a side panel instead of horizontally along the top."
-                    .into(),
-            ),
-        )
-    }
-}
 
 #[derive(Default)]
 struct ProjectExplorerWidget {

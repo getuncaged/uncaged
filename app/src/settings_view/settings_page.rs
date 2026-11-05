@@ -185,21 +185,13 @@ impl SettingsPage {
     ) -> Hoverable {
         appearance
             .ui_builder()
-            .button(
-                if clicked {
-                    ButtonVariant::Accent
-                } else {
-                    ButtonVariant::Text
-                },
-                self.button_state_handle.clone(),
-            )
+            .button(ButtonVariant::Text, self.button_state_handle.clone())
             .with_text_label(self.section.to_string() + &match_data.to_string())
-            .with_style(
-                UiComponentStyles::default()
-                    .set_border_width(0.)
-                    .set_margin(Coords::default().left(NAV_ITEM_LEFT_MARGIN))
-                    .set_padding(Coords::uniform(8.)),
-            )
+            .with_style(super::nav::nav_item_styles(
+                appearance,
+                clicked,
+                NAV_ITEM_LEFT_MARGIN,
+            ))
             .build()
     }
 }

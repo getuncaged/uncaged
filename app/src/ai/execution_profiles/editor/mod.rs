@@ -271,7 +271,6 @@ pub struct ExecutionProfileEditorView {
     profile_name_editor: ViewHandle<EditorView>,
     delete_button: ViewHandle<ActionButton>,
     tooltip_mouse_state_handles: TooltipMouseStateHandles,
-    plan_auto_sync_switch: SwitchStateHandle,
     web_search_switch: SwitchStateHandle,
     upgrade_footer_mouse_state: MouseStateHandle,
 }
@@ -681,7 +680,6 @@ impl ExecutionProfileEditorView {
             profile_name_editor,
             delete_button,
             tooltip_mouse_state_handles: Default::default(),
-            plan_auto_sync_switch: Default::default(),
             web_search_switch: Default::default(),
             upgrade_footer_mouse_state: Default::default(),
         };

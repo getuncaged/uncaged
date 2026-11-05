@@ -80,7 +80,7 @@ const LSP_STATUS_INDICATOR_SIZE: f32 = 8.;
 const CODE_FEATURE_NAME: &str = "Code";
 const INITIALIZATION_SETTINGS_HEADER: &str = "Initialization Settings";
 const CODEBASE_INDEXING_LABEL: &str = "Codebase indexing";
-const CODEBASE_INDEX_DESCRIPTION: &str = "Uncaged can automatically index code repositories as you navigate them, helping agents quickly understand context and provide solutions. Code is never stored on the server. If a codebase is unable to be indexed, Uncaged can still navigate your codebase and gain insights via grep and find tool calling.";
+const CODEBASE_INDEX_DESCRIPTION: &str = "Uncaged can automatically index code repositories as you navigate them, helping agents quickly understand context and provide solutions. If a codebase is unable to be indexed, Uncaged can still navigate your codebase and gain insights via grep and find tool calling.";
 const WARP_INDEXING_IGNORE_DESCRIPTION: &str = "To exclude specific files or directories from indexing, add them to the .warpindexingignore file in your repository directory. These files will still be accessible to AI features, but they won't be included in codebase embeddings.";
 const AUTO_INDEX_FEATURE_NAME: &str = "Index new folders by default";
 const AUTO_INDEX_DESCRIPTION: &str = "When set to true, Uncaged will automatically index code repositories as you navigate them - helping agents quickly understand context and provide targeted solutions.";
@@ -88,7 +88,7 @@ const INDEXING_DISABLED_ADMIN_TEXT: &str = "Team admins have disabled codebase i
 const INDEXING_WORKSPACE_ENABLED_ADMIN_TEXT: &str = "Team admins have enabled codebase indexing.";
 const INDEXING_DISABLED_GLOBAL_AI_TEXT: &str =
     "AI Features must be enabled to use codebase indexing.";
-const CODEBASE_INDEX_LIMIT_REACHED: &str = "You have reached the maximum number of codebase indices for your plan. Delete existing indices to auto-index new codebases.";
+const CODEBASE_INDEX_LIMIT_REACHED: &str = "You have reached the maximum number of codebase indices. Delete existing indices to auto-index new codebases.";
 #[cfg(not(target_family = "wasm"))]
 const REMOTE_CODEBASE_INDEX_LIMIT_REACHED_FAILURE: &str =
     "maximum number of codebase indexes has been reached";
@@ -114,7 +114,7 @@ impl CodeSubpage {
     pub fn title(&self) -> &'static str {
         match self {
             Self::Indexing => "Codebase Indexing",
-            Self::EditorAndCodeReview => "Editor and Code Review",
+            Self::EditorAndCodeReview => "Editor and code review",
         }
     }
 }
@@ -367,10 +367,7 @@ impl CodeSettingsPageView {
             code_editor_review_widgets.extend([
                 Box::new(AutoOpenCodeReviewPaneCodeWidget::default())
                     as Box<dyn SettingsWidget<View = Self>>,
-                Box::new(CodeReviewPanelToggleWidget::default()),
                 Box::new(CodeReviewDiffStatsToggleWidget::default()),
-                Box::new(ProjectExplorerToggleWidget::default()),
-                Box::new(GlobalSearchToggleWidget::default()),
                 Box::new(ShowHiddenFilesToggleWidget::default()),
                 Box::new(FormatOnSaveToggleWidget::default()),
             ]);
@@ -452,10 +449,7 @@ impl CodeSettingsPageView {
                         widgets.extend([
                             Box::new(AutoOpenCodeReviewPaneCodeWidget::default())
                                 as Box<dyn SettingsWidget<View = Self>>,
-                            Box::new(CodeReviewPanelToggleWidget::default()),
                             Box::new(CodeReviewDiffStatsToggleWidget::default()),
-                            Box::new(ProjectExplorerToggleWidget::default()),
-                            Box::new(GlobalSearchToggleWidget::default()),
                             Box::new(ShowHiddenFilesToggleWidget::default()),
                             Box::new(FormatOnSaveToggleWidget::default()),
                         ]);
@@ -503,10 +497,7 @@ impl CodeSettingsPageView {
             code_editor_review_widgets.extend([
                 Box::new(AutoOpenCodeReviewPaneCodeWidget::default())
                     as Box<dyn SettingsWidget<View = Self>>,
-                Box::new(CodeReviewPanelToggleWidget::default()),
                 Box::new(CodeReviewDiffStatsToggleWidget::default()),
-                Box::new(ProjectExplorerToggleWidget::default()),
-                Box::new(GlobalSearchToggleWidget::default()),
                 Box::new(ShowHiddenFilesToggleWidget::default()),
                 Box::new(FormatOnSaveToggleWidget::default()),
             ]);
@@ -2714,49 +2705,6 @@ impl From<ViewHandle<CodeSettingsPageView>> for SettingsPageViewHandle {
 }
 
 #[derive(Default)]
-struct CodeReviewPanelToggleWidget {
-    switch_state: SwitchStateHandle,
-}
-
-impl SettingsWidget for CodeReviewPanelToggleWidget {
-    type View = CodeSettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "code review panel right side diff git"
-    }
-
-    fn render(
-        &self,
-        _view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let tab_settings = TabSettings::as_ref(app);
-
-        render_body_item::<CodeSettingsPageAction>(
-            "Show code review button".into(),
-            None,
-            LocalOnlyIconState::Hidden,
-            ToggleState::Enabled,
-            appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*tab_settings.show_code_review_button)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(CodeSettingsPageAction::ToggleCodeReviewPanel);
-                })
-                .finish(),
-            Some(
-                "Show a button in the top right of the window to toggle the code review panel."
-                    .into(),
-            ),
-        )
-    }
-}
-
-#[derive(Default)]
 struct CodeReviewDiffStatsToggleWidget {
     switch_state: SwitchStateHandle,
 }
@@ -2794,89 +2742,6 @@ impl SettingsWidget for CodeReviewDiffStatsToggleWidget {
                 })
                 .finish(),
             Some("Show lines added and removed counts on the code review button.".into()),
-        )
-    }
-}
-
-#[derive(Default)]
-struct ProjectExplorerToggleWidget {
-    switch_state: SwitchStateHandle,
-}
-
-impl SettingsWidget for ProjectExplorerToggleWidget {
-    type View = CodeSettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "project explorer file tree left panel tools"
-    }
-
-    fn render(
-        &self,
-        _view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let code_settings = CodeSettings::as_ref(app);
-
-        render_body_item::<CodeSettingsPageAction>(
-            "Project explorer".into(),
-            None,
-            LocalOnlyIconState::Hidden,
-            ToggleState::Enabled,
-            appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*code_settings.show_project_explorer)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(CodeSettingsPageAction::ToggleProjectExplorer);
-                })
-                .finish(),
-            Some(
-                "Adds an IDE-style project explorer / file tree to the left side tools panel."
-                    .into(),
-            ),
-        )
-    }
-}
-
-#[derive(Default)]
-struct GlobalSearchToggleWidget {
-    switch_state: SwitchStateHandle,
-}
-
-impl SettingsWidget for GlobalSearchToggleWidget {
-    type View = CodeSettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "global search file search left panel tools"
-    }
-
-    fn render(
-        &self,
-        _view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let code_settings = CodeSettings::as_ref(app);
-
-        render_body_item::<CodeSettingsPageAction>(
-            "Global file search".into(),
-            None,
-            LocalOnlyIconState::Hidden,
-            ToggleState::Enabled,
-            appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*code_settings.show_global_search)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(CodeSettingsPageAction::ToggleGlobalSearch);
-                })
-                .finish(),
-            Some("Adds global file search to the left side tools panel.".into()),
         )
     }
 }

@@ -71,10 +71,10 @@ use crate::settings::{
     InputSettingsChangedEvent, LinuxSelectionClipboard, MiddleClickPasteEnabled,
     MouseScrollMultiplier, OutlineCodebaseSymbolsForAtContextMenu, PreferLowPowerGPU,
     PreferredGraphicsBackend, QuakeModeSettings, ScrollSettings, ScrollSettingsChangedEvent,
-    SelectionSettings, ShowAutosuggestionIgnoreButton, ShowChangelogAfterUpdate,
-    ShowTerminalInputMessageBar, SshSettings, SyntaxHighlighting, TabBehavior,
-    UserNativeRedirectPreference, VimModeEnabled, VimStatusBar, VimUnnamedSystemClipboard,
-    DEFAULT_QUAKE_MODE_SIZE_PERCENTAGES, QUAKE_WINDOW_AUTOHIDE_SUPPORTED,
+    SelectionSettings, ShowAutosuggestionIgnoreButton, ShowTerminalInputMessageBar, SshSettings,
+    SyntaxHighlighting, TabBehavior, UserNativeRedirectPreference, VimModeEnabled, VimStatusBar,
+    VimUnnamedSystemClipboard, DEFAULT_QUAKE_MODE_SIZE_PERCENTAGES,
+    QUAKE_WINDOW_AUTOHIDE_SUPPORTED,
 };
 use crate::terminal::alt_screen_reporting::{
     AltScreenReporting, FocusReportingEnabled, MouseReportingEnabled, ScrollReportingEnabled,
@@ -2719,13 +2719,8 @@ impl FeaturesPageView {
             general_widgets.push(Box::new(LoginItemWidget::default()));
         }
 
-        let changelog_settings = ChangelogSettings::as_ref(ctx);
-        if changelog_settings
-            .show_changelog_after_update
-            .is_supported_on_current_platform()
-        {
-            general_widgets.push(Box::new(ShowChangelogWidget::default()));
-        }
+        // Uncaged: no "Show changelog toast after updates" -- Uncaged has no changelog feed for
+        // the toast to show.
 
         let scroll_settings = ScrollSettings::as_ref(ctx);
         if scroll_settings
@@ -3642,6 +3637,8 @@ impl FeaturesPageView {
                 let docker_sandbox_enabled = FeatureFlag::LocalDockerSandbox.is_enabled();
                 let mut items: Vec<DropdownItem<FeaturesPageAction>> = DefaultSessionMode::iter()
                     .filter(|val| *val != DefaultSessionMode::TabConfig)
+                    // Uncaged has no cloud agents to start a session in.
+                    .filter(|val| *val != DefaultSessionMode::CloudAgent)
                     .filter(|val| {
                         *val != DefaultSessionMode::DockerSandbox || docker_sandbox_enabled
                     })
@@ -4890,53 +4887,6 @@ impl SettingsWidget for QuitWhenAllWindowsClosedWidget {
                 .build()
                 .on_click(move |ctx, _, _| {
                     ctx.dispatch_typed_action(FeaturesPageAction::ToggleQuitOnLastWindowClosed);
-                })
-                .finish(),
-            None,
-        )
-    }
-}
-
-#[derive(Default)]
-struct ShowChangelogWidget {
-    switch_state: SwitchStateHandle,
-}
-
-impl SettingsWidget for ShowChangelogWidget {
-    type View = FeaturesPageView;
-
-    fn search_terms(&self) -> &str {
-        "changelog updates"
-    }
-
-    fn render(
-        &self,
-        view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let changelog_settings = ChangelogSettings::as_ref(app);
-        let ui_builder = appearance.ui_builder();
-        render_body_item::<FeaturesPageAction>(
-            "Show changelog toast after updates".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                ShowChangelogAfterUpdate::storage_key(),
-                ShowChangelogAfterUpdate::sync_to_cloud(),
-                &mut view
-                    .button_mouse_states
-                    .local_only_icon_tooltip_states
-                    .borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
-            appearance,
-            ui_builder
-                .switch(self.switch_state.clone())
-                .check(*changelog_settings.show_changelog_after_update)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(FeaturesPageAction::ToggleShowChangelogAfterUpdate);
                 })
                 .finish(),
             None,

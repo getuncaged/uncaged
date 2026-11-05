@@ -912,6 +912,7 @@ pub fn init(app: &mut AppContext) {
                 source: SharedSessionActionSource::CommandPalette,
             },
         )
+        .with_enabled(|| false) // Uncaged: needs a team or account; hide the binding.
         .with_context_predicate(
             id!("Terminal") & id!(SharedSessionStatus::ActiveSharer.as_keymap_context()),
         ),
