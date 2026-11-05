@@ -501,13 +501,16 @@ fn spec_read_files() -> ToolSpec {
 fn spec_search_codebase() -> ToolSpec {
     ToolSpec {
         name: BUILTIN_SEARCH_CODEBASE.into(),
-        description:
-            "Semantically search the codebase for relevant files given a natural-language query."
-                .into(),
+        description: "Search the local codebase index for the code most relevant to a query. \
+            Matching is by keyword, so include the words the code itself would use: likely \
+            function, type or file names, and domain terms (\"tab drag reorder\" rather than \
+            \"how do tabs move\"). Returns the best-matching chunks with their line ranges; \
+            use grep for exact strings."
+            .into(),
         schema: json!({
             "type": "object",
             "properties": {
-                "query": { "type": "string", "description": "What to look for." },
+                "query": { "type": "string", "description": "Keywords and identifiers to look for." },
                 "path_filters": { "type": "array", "items": { "type": "string" } },
                 "codebase_path": { "type": "string", "description": "Absolute path to the codebase to search. Optional." }
             },

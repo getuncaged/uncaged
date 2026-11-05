@@ -1,4 +1,5 @@
 mod file_outline;
+pub mod lexical;
 pub mod locations;
 pub const DEFAULT_SYNC_REQUESTS_PER_MIN: u32 = 600;
 
@@ -7,7 +8,7 @@ pub mod full_source_code_embedding;
 
 #[cfg(feature = "local_fs")]
 pub use file_outline::build_outline;
-pub use file_outline::{Outline, Symbol};
+pub use file_outline::{FileSymbols, Outline, Symbol};
 pub use repo_metadata::{BuildTreeError, DirectoryEntry, Entry, FileId, FileMetadata};
 
 cfg_if::cfg_if! {

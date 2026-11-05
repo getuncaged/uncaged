@@ -6,7 +6,9 @@ use ai::index::full_source_code_embedding::manager::{
     CodebaseIndexManager, CodebaseIndexManagerEvent,
 };
 use ai::index::full_source_code_embedding::RetrievalID;
+use ai::index::lexical::{self, Document, Query, Vocab};
 use ai::index::locations::CodeContextLocation;
+use ai::index::FileSymbols;
 use anyhow::anyhow;
 use futures_util::stream::AbortHandle;
 use instant::Instant;
@@ -17,9 +19,7 @@ use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 use crate::ai::agent::SearchCodebaseFailureReason;
 use crate::ai::agent::{AIAgentActionId, SearchCodebaseResult};
 use crate::ai::blocklist::SessionContext;
-use crate::ai::get_relevant_files::api::{FileContext as FileContextRequest, GetRelevantFiles};
 use crate::ai::outline::{OutlineStatus, RepoOutlines};
-use crate::server::server_api::{AIApiError, ServerApiProvider};
 use crate::{report_error, send_telemetry_from_ctx, TelemetryEvent};
 #[cfg_attr(not(target_family = "wasm"), path = "remote_search/native.rs")]
 #[cfg_attr(target_family = "wasm", path = "remote_search/wasm.rs")]
@@ -237,7 +237,7 @@ impl GetRelevantFilesController {
         action_id: AIAgentActionId,
         ctx: &mut ModelContext<Self>,
     ) -> Result<(), GetRelevantFilesError> {
-        const MINIMUM_FILE_COUNT_FOR_API_CALL: usize = 2;
+        const MINIMUM_FILE_COUNT_FOR_RANKING: usize = 2;
 
         if FeatureFlag::FullSourceCodeEmbedding.is_enabled() {
             let codebase_mgr = CodebaseIndexManager::handle(ctx);
@@ -270,71 +270,22 @@ impl GetRelevantFilesController {
 
         match RepoOutlines::as_ref(ctx).get_outline(directory) {
             Some((OutlineStatus::Complete(outline), base_path)) => {
-                let server_api = ServerApiProvider::as_ref(ctx).get();
-
+                // Uncaged: rank files on this machine by how well their path and
+                // symbol names match the query. Warp sent the outline to its
+                // servers for this.
                 let file_outlines = outline.to_file_symbols(partial_path_segments);
-                if file_outlines.len() < MINIMUM_FILE_COUNT_FOR_API_CALL {
-                    ctx.emit(GetRelevantFilesControllerEvent::Success {
-                        action_id,
-                        result: GetRelevantFilesControllerResult::Locations(Arc::new(
-                            file_outlines
-                                .into_iter()
-                                .map(|file| {
-                                    CodeContextLocation::WholeFile(PathBuf::from(file.path))
-                                })
-                                .collect(),
-                        )),
-                    });
+                let locations = if file_outlines.len() < MINIMUM_FILE_COUNT_FOR_RANKING {
+                    file_outlines
+                        .into_iter()
+                        .map(|file| CodeContextLocation::WholeFile(base_path.join(file.path)))
+                        .collect()
                 } else {
-                    let outline_request = GetRelevantFiles {
-                        query,
-                        files: file_outlines
-                            .into_iter()
-                            .map(|outline| FileContextRequest {
-                                path: outline.path,
-                                symbols: outline.symbols,
-                            })
-                            .collect(),
-                    };
-                    let action_id_clone = action_id.clone();
-                    let request_abort_handle = ctx
-                        .spawn(
-                            async move {
-                                let response =
-                                    server_api.get_relevant_files(&outline_request).await?;
-                                Ok(Arc::new(
-                                    response
-                                        .relevant_file_paths
-                                        .into_iter()
-                                        .filter_map(|path| {
-                                            let file_path = base_path.join(path);
-                                            // Validate the returned file paths.
-                                            if file_path.exists() {
-                                                Some(CodeContextLocation::WholeFile(file_path))
-                                            } else {
-                                                None
-                                            }
-                                        })
-                                        .collect(),
-                                ))
-                            },
-                            move |me,
-                                  relevant_file_paths: Result<
-                                Arc<HashSet<CodeContextLocation>>,
-                                AIApiError,
-                            >,
-                                  ctx| {
-                                me.handle_relevant_file_paths_result(
-                                    relevant_file_paths.map_err(|e| anyhow!(e)),
-                                    action_id_clone,
-                                    ctx,
-                                )
-                            },
-                        )
-                        .abort_handle();
-                    self.pending_requests
-                        .insert(action_id, RequestHandle::AbortHandle(request_abort_handle));
-                }
+                    rank_outline_files(&query, file_outlines, &base_path)
+                };
+                ctx.emit(GetRelevantFilesControllerEvent::Success {
+                    action_id,
+                    result: GetRelevantFilesControllerResult::Locations(Arc::new(locations)),
+                });
                 Ok(())
             }
             Some((OutlineStatus::Pending, _)) => Err(GetRelevantFilesError::Pending),
@@ -454,4 +405,34 @@ impl GetRelevantFilesController {
 
 impl Entity for GetRelevantFilesController {
     type Event = GetRelevantFilesControllerEvent;
+}
+
+/// Files the outline fallback returns at most.
+const OUTLINE_RESULT_LIMIT: usize = 10;
+
+/// Ranks outline files by keyword match against their path and symbol names.
+fn rank_outline_files(
+    query: &str,
+    files: Vec<FileSymbols>,
+    base_path: &Path,
+) -> HashSet<CodeContextLocation> {
+    let mut vocab = Vocab::default();
+    let documents: Vec<(PathBuf, Document)> = files
+        .into_iter()
+        .map(|file| {
+            let path = base_path.join(&file.path);
+            let document = Document::new(&file.symbols, Some(Path::new(&file.path)), &mut vocab);
+            (path, document)
+        })
+        .collect();
+    let Some(query) = Query::new(query, &vocab) else {
+        return HashSet::new();
+    };
+    let docs: Vec<(&PathBuf, &Document)> =
+        documents.iter().map(|(path, doc)| (path, doc)).collect();
+    lexical::rank(&query, &docs, OUTLINE_RESULT_LIMIT)
+        .into_iter()
+        .filter(|(path, _)| path.exists())
+        .map(|(path, _)| CodeContextLocation::WholeFile(path.clone()))
+        .collect()
 }

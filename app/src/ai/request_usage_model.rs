@@ -118,6 +118,11 @@ impl RequestLimitInfo {
     }
 }
 
+/// Largest repository Uncaged's local index will take on.
+const UNCAGED_MAX_FILES_PER_REPO: usize = 30_000;
+/// Chunks indexed per step; keyword indexing is cheap, so steps can be big.
+const UNCAGED_INDEX_BATCH_SIZE: usize = 500;
+
 pub struct CodebaseContextUsageLimit {
     pub max_files_per_repo: usize,
     pub max_indices_allowed: Option<usize>,
@@ -469,17 +474,13 @@ impl AIRequestUsageModel {
     /// Returns the number of indices the user's tier allows them to create and the number of files
     /// the user's tier allows them to index. If the user is allowed unlimited indices, then the
     /// max_indices_allowed is None.
+    /// Uncaged indexes on this machine, so Warp's plan limits (3 folders,
+    /// 5,000 files) don't apply. The file cap only keeps memory in check.
     pub fn codebase_context_limits(&self) -> CodebaseContextUsageLimit {
         CodebaseContextUsageLimit {
-            max_files_per_repo: self.request_limit_info.max_files_per_repo,
-            max_indices_allowed: if self.request_limit_info.is_unlimited_codebase_indices {
-                None
-            } else {
-                Some(self.request_limit_info.max_codebase_indices)
-            },
-            embedding_generation_batch_size: self
-                .request_limit_info
-                .embedding_generation_batch_size,
+            max_files_per_repo: UNCAGED_MAX_FILES_PER_REPO,
+            max_indices_allowed: None,
+            embedding_generation_batch_size: UNCAGED_INDEX_BATCH_SIZE,
         }
     }
 

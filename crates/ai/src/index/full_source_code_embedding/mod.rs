@@ -2,6 +2,7 @@ mod changed_files;
 mod chunker;
 mod codebase_index;
 mod fragment_metadata;
+pub mod local_store;
 pub mod manager;
 mod merkle_tree;
 mod priority_queue;
@@ -16,6 +17,7 @@ use std::time::Duration;
 
 pub use codebase_index::{CodebaseIndex, RetrievalID, SyncProgress};
 pub use fragment_metadata::{FragmentLocation as FragmentMetadataLocation, FragmentMetadata};
+pub use local_store::LocalStoreClient;
 pub use merkle_tree::{ContentHash, NodeHash};
 pub use snapshot::SnapshotStorage;
 use string_offset::ByteOffset;

@@ -23,7 +23,8 @@ define_settings_group!(CodeSettings, settings: [
     },
     auto_indexing_enabled: AutoIndexingEnabled {
         type: bool,
-        default: false,
+        // Uncaged: indexing is local and cheap, so repos are indexed as you open them.
+        default: true,
         supported_platforms: SupportedPlatforms::DESKTOP,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
