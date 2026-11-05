@@ -40,9 +40,8 @@ use warpui::{
 #[cfg(feature = "local_fs")]
 use super::features::external_editor::ExternalEditorView;
 use super::settings_page::{
-    build_sub_header, render_body_item, render_separator, Category, MatchData, PageType,
-    SettingsPageMeta, SettingsPageViewHandle, SettingsWidget, HEADER_PADDING,
-    TOGGLE_BUTTON_RIGHT_PADDING,
+    render_body_item, render_separator, Category, MatchData, PageType, SettingsPageMeta,
+    SettingsPageViewHandle, SettingsWidget, TOGGLE_BUTTON_RIGHT_PADDING,
 };
 use super::{
     flags, LocalOnlyIconState, SettingsAction, SettingsSection, ToggleSettingActionPair,
@@ -429,10 +428,9 @@ impl CodeSettingsPageView {
                             ctx.dispatch_typed_action(CodeSettingsPageAction::ManualAddDirectory);
                         })
                 });
-                let mut widgets: Vec<Box<dyn SettingsWidget<View = Self>>> =
-                    vec![Box::new(CodeSubpageHeaderWidget {
-                        title: subpage.title(),
-                    })];
+                // The settings view draws the page title above every page, so
+                // subpages don't add their own header.
+                let mut widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = Vec::new();
                 match subpage {
                     CodeSubpage::Indexing => {
                         widgets.push(Box::new(CodebaseIndexingCategorizedWidget {
@@ -2452,30 +2450,6 @@ impl CodePageWidget {
             }
             None => (theme.disabled_ui_text_color().into_solid(), "Not running"),
         }
-    }
-}
-
-/// A simple widget that renders a subheader title for a Code subpage.
-struct CodeSubpageHeaderWidget {
-    title: &'static str,
-}
-
-impl SettingsWidget for CodeSubpageHeaderWidget {
-    type View = CodeSettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        self.title
-    }
-
-    fn render(
-        &self,
-        _view: &Self::View,
-        appearance: &Appearance,
-        _app: &AppContext,
-    ) -> Box<dyn Element> {
-        build_sub_header(appearance, self.title, None)
-            .with_padding_bottom(HEADER_PADDING)
-            .finish()
     }
 }
 

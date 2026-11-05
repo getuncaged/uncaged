@@ -21,8 +21,9 @@ use referrals_page::{ReferralsPageEvent, ReferralsPageView};
 use scripting_page::ScriptingSettingsPageView;
 use settings_file_footer::{render_footer, SettingsFooterKind, SettingsFooterMouseStates};
 use settings_page::{
-    MatchData, SettingsPage, SettingsPageEvent, SettingsPageMeta, SettingsPageViewHandle,
-    HEADER_PADDING,
+    render_page_title, settings_card, settings_description_color, MatchData, SettingsPage,
+    SettingsPageEvent, SettingsPageMeta, SettingsPageViewHandle, HEADER_FONT_SIZE, HEADER_PADDING,
+    MAX_PAGE_WIDTH, PAGE_PADDING, PAGE_TOP_PADDING,
 };
 use show_blocks_view::{ShowBlocksEvent, ShowBlocksView};
 use teams_page::{TeamsPageView, TeamsPageViewEvent};
@@ -37,9 +38,9 @@ use warpify_page::{WarpifyPageAction, WarpifyPageView};
 use warpui::elements::{
     Align, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty,
-    EventHandler, Expanded, Fill, Flex, MainAxisSize, OffsetPositioning, ParentAnchor,
-    ParentElement, ParentOffsetBounds, Radius, SavePosition, ScrollbarWidth, Shrinkable, Stack,
-    Text,
+    EventHandler, Expanded, Fill, Flex, MainAxisAlignment, MainAxisSize, OffsetPositioning,
+    ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition, ScrollbarWidth,
+    Shrinkable, Stack, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::keymap::{ContextPredicate, EnabledPredicate, FixedBinding};
@@ -991,6 +992,9 @@ enum NavStop {
         last_subpage: SettingsSection,
     },
 }
+
+/// The space above the settings page's title.
+const PAGE_TITLE_TOP_PADDING: f32 = 24.;
 
 /// The label of the sidebar group that holds app-wide pages (and Scripting, when enabled).
 const APP_GROUP_LABEL: &str = "App";
@@ -2443,36 +2447,75 @@ impl SettingsView {
         .finish()
     }
 
-    fn render_search_zero_state(&self, appearance: &Appearance) -> Box<dyn Element> {
-        let theme = appearance.theme();
+    /// Uncaged: a settings page's column -- the width every page's cards (and the title above
+    /// them) share, centred in the pane with the same inset on every page.
+    fn page_column(content: Box<dyn Element>) -> Container {
         Container::new(
             Align::new(
-                Flex::column()
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_children([
-                        Text::new(
-                            "No settings match your search.",
-                            appearance.ui_font_family(),
-                            appearance.ui_font_size(),
-                        )
-                        .with_style(Properties::default().weight(Weight::Medium))
-                        .with_color(theme.sub_text_color(theme.background()).into_solid())
-                        .finish(),
-                        Text::new(
-                            "You may want to try using different keywords or checking for any possible typos.",
-                            appearance.ui_font_family(),
-                            appearance.ui_font_size(),
-                        )
-                        .with_color(theme.disabled_ui_text_color().into_solid())
-                        .finish(),
-                    ])
+                ConstrainedBox::new(content)
+                    .with_max_width(MAX_PAGE_WIDTH)
                     .finish(),
             )
+            .top_center()
             .finish(),
         )
-            .with_uniform_margin(16.)
-        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL)))
-        .with_background(internal_colors::fg_overlay_1(appearance.theme()))
+        .with_horizontal_padding(PAGE_PADDING)
+    }
+
+    /// Uncaged: the title at the top of every settings page, in one style for every page. It
+    /// sits above the page's scrolling content, so it stays put while the page scrolls. While
+    /// searching, the page below shows only the matching settings, under the same title.
+    fn render_page_title(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let title = self.current_settings_page.to_string();
+        Self::page_column(render_page_title(&title, HEADER_FONT_SIZE, appearance))
+            .with_padding_top(PAGE_TITLE_TOP_PADDING)
+            .finish()
+    }
+
+    fn render_search_zero_state(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let message = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_children([
+                Text::new(
+                    "No settings match your search.",
+                    appearance.ui_font_family(),
+                    appearance.ui_font_size(),
+                )
+                .with_style(Properties::default().weight(Weight::Medium))
+                .with_color(theme.main_text_color(theme.surface_1()).into_solid())
+                .finish(),
+                Container::new(
+                    Text::new(
+                        "Try different keywords, or check for typos.",
+                        appearance.ui_font_family(),
+                        appearance.ui_font_size(),
+                    )
+                    .with_color(settings_description_color(appearance))
+                    .finish(),
+                )
+                .with_margin_top(4.)
+                .finish(),
+            ])
+            .finish();
+        let card = settings_card(
+            Flex::row()
+                .with_main_axis_size(MainAxisSize::Max)
+                .with_main_axis_alignment(MainAxisAlignment::Center)
+                .with_child(message)
+                .finish(),
+            appearance,
+        )
+        .with_padding_bottom(HEADER_PADDING)
+        .with_margin_top(PAGE_TOP_PADDING)
+        .finish();
+        Self::page_column(
+            Flex::column()
+                .with_child(render_page_title("Search", HEADER_FONT_SIZE, appearance))
+                .with_child(card)
+                .finish(),
+        )
+        .with_padding_top(PAGE_TITLE_TOP_PADDING)
         .finish()
     }
 }
@@ -2651,6 +2694,17 @@ impl View for SettingsView {
         ))
         .with_width(sidebar_width())
         .finish();
+
+        // Uncaged: every page (and the search results) opens with the same title, above the
+        // page's own scrolling content.
+        let page = if current_page_handle.is_some() {
+            Flex::column()
+                .with_child(self.render_page_title(appearance))
+                .with_child(Expanded::new(1., page).finish())
+                .finish()
+        } else {
+            page
+        };
 
         let row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)

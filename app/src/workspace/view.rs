@@ -21323,23 +21323,46 @@ impl Workspace {
     }
 
     fn render_avatar_button(&self, appearance: &Appearance, ctx: &AppContext) -> Box<dyn Element> {
+        // The subtle autoupdate UI shows when autoupdate is ready and there is no incoming
+        // prominent update version.
+        let autoupdate_stage = autoupdate::get_update_state(ctx);
+        let show_update_dot = FeatureFlag::AutoupdateUIRevamp.is_enabled()
+            && autoupdate_stage.ready_for_update()
+            && autoupdate_stage
+                .available_new_version()
+                .map(|version| {
+                    !is_incoming_version_past_current(version.last_prominent_update.as_deref())
+                })
+                .unwrap_or(false);
+
         let is_anonymous = self.auth_state.is_anonymous_or_logged_out();
+        if is_anonymous {
+            // Uncaged: there's no account behind this button, so it is a plain gear that opens
+            // Settings, drawn like the title bar's other icon buttons rather than as an avatar.
+            let mut gear = self.render_settings_button(appearance);
+            if show_update_dot {
+                gear = RedNotificationDot::render_with_offset(
+                    gear,
+                    &RedNotificationDot::default_styles(appearance),
+                    (-4., 4.),
+                );
+            }
+            return SavePosition::new(gear, USER_AVATAR_BUTTON_POSITION_ID).finish();
+        }
+
         let display_name = self
             .auth_state
             .username_for_display()
             .unwrap_or(DEFAULT_USER_DISPLAY_NAME.to_owned());
 
-        let avatar_content = if self.auth_state.is_anonymous_or_logged_out() {
-            AvatarContent::Icon(icons::Icon::Gear)
-        } else {
-            self.auth_state
-                .user_photo_url()
-                .map(|url| AvatarContent::Image {
-                    url,
-                    display_name: display_name.clone(),
-                })
-                .unwrap_or(AvatarContent::DisplayName(display_name.clone()))
-        };
+        let avatar_content = self
+            .auth_state
+            .user_photo_url()
+            .map(|url| AvatarContent::Image {
+                url,
+                display_name: display_name.clone(),
+            })
+            .unwrap_or(AvatarContent::DisplayName(display_name.clone()));
 
         let mut avatar = Avatar::new(
             avatar_content,
@@ -21356,17 +21379,7 @@ impl Workspace {
             },
         );
 
-        // Render the subtle autoupdate UI if autoupdate is ready and there is no incoming prominent update version.
-        let autoupdate_stage = autoupdate::get_update_state(ctx);
-        if FeatureFlag::AutoupdateUIRevamp.is_enabled()
-            && autoupdate_stage.ready_for_update()
-            && autoupdate_stage
-                .available_new_version()
-                .map(|version| {
-                    !is_incoming_version_past_current(version.last_prominent_update.as_deref())
-                })
-                .unwrap_or(false)
-        {
+        if show_update_dot {
             avatar = avatar.with_status_element(
                 StatusElementTypes::Circle,
                 RedNotificationDot::default_styles(appearance),
@@ -21385,18 +21398,12 @@ impl Workspace {
                 if !state.is_clicked() {
                     container = container.with_background(appearance.theme().surface_2());
                 }
-                // On hover, show tooltip of user's display name (if it exists), or what the
-                // gear does for Uncaged's account-free user.
+                // On hover, show tooltip of user's display name (if it exists).
                 if !self.is_user_menu_open {
-                    let tooltip = if is_anonymous {
-                        "Settings".to_owned()
-                    } else {
-                        display_name.clone()
-                    };
                     stack.add_positioned_overlay_child(
                         appearance
                             .ui_builder()
-                            .tool_tip(tooltip)
+                            .tool_tip(display_name.clone())
                             .with_style(UiComponentStyles {
                                 background: Some(appearance.theme().tooltip_background().into()),
                                 font_color: Some(appearance.theme().background().into_solid()),
@@ -21416,14 +21423,8 @@ impl Workspace {
             stack.add_child(container.finish());
             stack.finish()
         })
-        // Uncaged: there's no account behind the gear, so it opens Settings directly; the
-        // menu's other entries live in the menu bar (Uncaged and Help menus).
         .on_click(move |ctx, _, _| {
-            ctx.dispatch_typed_action(if is_anonymous {
-                WorkspaceAction::ShowSettings
-            } else {
-                WorkspaceAction::ToggleUserMenu
-            });
+            ctx.dispatch_typed_action(WorkspaceAction::ToggleUserMenu);
         })
         .with_cursor(Cursor::PointingHand)
         .finish();

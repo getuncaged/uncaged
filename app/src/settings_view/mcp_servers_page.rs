@@ -50,7 +50,6 @@ pub enum InstallOrigin {
     Deeplink,
 }
 
-const PAGE_TITLE_TEXT: &str = "MCP Servers";
 #[derive(Debug, Default, Copy, Clone)]
 pub enum MCPServersSettingsPage {
     #[default]
@@ -102,7 +101,8 @@ impl MCPServersSettingsPageView {
         Self {
             page: PageType::new_monolith(
                 MCPServersSettingsWidget::default(),
-                Some(PAGE_TITLE_TEXT),
+                // The settings view titles the page; repeating "MCP Servers" here would double it.
+                None,
                 true,
             ),
             current_page: MCPServersSettingsPage::default(),

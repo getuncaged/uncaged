@@ -1111,15 +1111,22 @@ impl SettingsWidget for KeybindingsWidget {
             None
         };
 
-        let subheader = render_sub_header(
-            appearance,
-            "Configure keyboard shortcuts",
-            local_only_icon_state,
-        );
+        // Uncaged: the settings view titles the page "Keyboard shortcuts", so the sub-header
+        // only shows when it has the not-synced icon to carry.
+        let subheader = local_only_icon_state.map(|local_only_icon_state| {
+            render_sub_header(
+                appearance,
+                "Configure keyboard shortcuts",
+                Some(local_only_icon_state),
+            )
+        });
         let description = self.render_description(view.bindings.as_ref(), appearance);
 
-        Flex::column()
-            .with_child(subheader)
+        let mut column = Flex::column();
+        if let Some(subheader) = subheader {
+            column.add_child(subheader);
+        }
+        column
             .with_child(description)
             .with_child(render_columns(
                 Container::new(render_text(

@@ -149,7 +149,6 @@ use crate::{
 };
 
 const CONTENT_FONT_SIZE: f32 = 12.;
-const PRIMARY_HEADER_FONT_SIZE: f32 = 24.;
 
 /// Upper bound on how many saved Uncaged connections get pre-allocated
 /// per-row action buttons (Use / Edit). Rows beyond this render without those
@@ -3095,9 +3094,10 @@ impl AISettingsPageView {
         }
 
         // Subpage widgets render their own subheader-sized titles internally,
-        // so we don't pass a page-level title to PageType.
+        // so we don't pass a page-level title to PageType. Each widget is a whole section
+        // with its own header, so each gets its own card.
         let title: Option<&str> = None;
-        PageType::new_uncategorized(widgets, title)
+        PageType::new_uncategorized_sections(widgets, title)
     }
 
     fn handle_context_window_editor_event(
@@ -4859,10 +4859,10 @@ fn render_ai_setting_description(
     is_setting_toggleable: bool,
     app: &AppContext,
 ) -> Box<dyn Element> {
-    let default_font_size = Appearance::as_ref(app).ui_font_size();
+    // Uncaged: the same size as every other settings description.
     render_ai_setting_description_with_font_size(
         description,
-        default_font_size,
+        CONTENT_FONT_SIZE,
         is_setting_toggleable,
         app,
     )
@@ -4975,7 +4975,6 @@ fn render_ai_list(
 #[derive(Default)]
 struct GlobalAIWidget {
     switch_state: SwitchStateHandle,
-    sign_up_button: MouseStateHandle,
 }
 
 impl SettingsWidget for GlobalAIWidget {
@@ -5000,61 +4999,36 @@ impl SettingsWidget for GlobalAIWidget {
             .get()
             .is_anonymous_or_logged_out();
 
-        let mut row = Flex::row()
-            .with_main_axis_size(MainAxisSize::Max)
-            .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_child(
-                Text::new_inline(
-                    "Models",
-                    appearance.ui_font_family(),
-                    PRIMARY_HEADER_FONT_SIZE,
-                )
-                .with_style(Properties::default().weight(Weight::Bold))
-                .with_color(appearance.theme().active_ui_text_color().into())
-                .finish(),
-            );
-
-        if is_ai_disabled_due_to_remote_session_org_policy {
-            row.add_child(
-                ConstrainedBox::new(
-                    Container::new(
-                        Text::new("Your organization disallows AI when the active pane contains content from a remote session", appearance.ui_font_family(), 12.)
-                            .with_color(appearance.theme().ui_warning_color())
-                            .finish()
-                    )
-                    .with_padding_left(8.)
-                    .with_padding_right(8.)
-                    .finish()
-                )
-                .with_max_width(400.)
-                .finish()
-            );
-        }
-
-        // Show sign-up button for anonymous users, toggle for logged-in users.
-        // Uncaged: never nag to create an account when the local engine powers AI.
-        // Uncaged has no accounts — AI is always available via the local engine,
-        // so this is just the global AI on/off toggle, never a sign-up nag.
+        // Uncaged: the settings view titles the page "Models", so the global switch is an
+        // ordinary row in its own card rather than a second, larger "Models" heading.
+        // Uncaged has no accounts -- AI is always available via the local engine, so this is
+        // just the global AI on/off toggle, never a sign-up nag.
         let _ = is_anonymous;
-        row.add_child(
-            Container::new(
-                ui_builder
-                    .switch(self.switch_state.clone())
-                    .check(AISettings::as_ref(app).is_any_ai_enabled(app))
-                    .build()
-                    .on_click(move |ctx, _, _| {
-                        ctx.dispatch_typed_action(AISettingsPageAction::ToggleGlobalAI);
-                    })
-                    .finish(),
-            )
-            .with_padding_right(TOGGLE_BUTTON_RIGHT_PADDING)
-            .finish(),
-        );
-
-        Container::new(row.finish())
-            .with_padding_bottom(15.)
-            .finish()
+        let description = if is_ai_disabled_due_to_remote_session_org_policy {
+            "Your organization disallows AI when the active pane contains content from a remote session"
+        } else {
+            "Turn off to disable every AI feature, from agents to suggestions."
+        };
+        build_toggle_element(
+            render_body_item_label::<AISettingsPageAction>(
+                "AI features".to_string(),
+                None,
+                None,
+                LocalOnlyIconState::Hidden,
+                ToggleState::Enabled,
+                appearance,
+            ),
+            ui_builder
+                .switch(self.switch_state.clone())
+                .check(AISettings::as_ref(app).is_any_ai_enabled(app))
+                .build()
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(AISettingsPageAction::ToggleGlobalAI);
+                })
+                .finish(),
+            appearance,
+            Some(description.to_string()),
+        )
     }
 }
 
@@ -6987,14 +6961,6 @@ impl SettingsWidget for AIFactWidget {
         let ai_settings = AISettings::as_ref(app);
         let is_any_ai_enabled = ai_settings.is_any_ai_enabled(app);
 
-        let header = build_sub_header(
-            appearance,
-            "Knowledge",
-            Some(styles::header_font_color(is_any_ai_enabled, app)),
-        )
-        .with_margin_bottom(HEADER_PADDING)
-        .finish();
-
         let button = render_full_pane_width_ai_button(
             "Manage rules",
             is_any_ai_enabled,
@@ -7003,9 +6969,9 @@ impl SettingsWidget for AIFactWidget {
             appearance,
         );
 
-        let mut column = Flex::column()
-            .with_child(header)
-            .with_child(self.render_rules_toggle(view, ai_settings, appearance, app));
+        // Uncaged: no "Knowledge" header -- the settings view already titles the page so.
+        let mut column =
+            Flex::column().with_child(self.render_rules_toggle(view, ai_settings, appearance, app));
 
         if FeatureFlag::SuggestedRules.is_enabled() {
             column.add_child(self.render_rule_suggestions_toggle(view, ai_settings, app));
@@ -7406,16 +7372,8 @@ impl SettingsWidget for CLIAgentWidget {
 
         let is_footer_enabled = *ai_settings.should_render_cli_agent_footer;
 
+        // Uncaged: no "CLI agents" header -- the settings view already titles the page so.
         let mut column = Flex::column()
-            .with_child(
-                build_sub_header(
-                    appearance,
-                    "CLI agents",
-                    Some(styles::header_font_color(true, app)),
-                )
-                .with_padding_bottom(HEADER_PADDING)
-                .finish(),
-            )
             .with_child(cli_agent_footer_toggle)
             .with_child(
                 Container::new(description.finish())
@@ -7524,7 +7482,11 @@ impl SettingsWidget for CLIAgentWidget {
                 );
             }
 
-            column.add_child(detected.finish());
+            column.add_child(
+                Container::new(detected.finish())
+                    .with_margin_bottom(HEADER_PADDING)
+                    .finish(),
+            );
         }
 
         if is_footer_enabled {
@@ -9013,10 +8975,11 @@ mod styles {
 
     // Apply a negative margin to the description text so it appears closer to the main
     // settings option text.
-    pub const DESCRIPTION_NEGATIVE_MARGIN_OFFSET: f32 = -12.;
+    pub const DESCRIPTION_NEGATIVE_MARGIN_OFFSET: f32 = -11.;
 
-    /// The space between a description and the next toggle.
-    pub const DESCRIPTION_MARGIN_BOTTOM: f32 = 12.;
+    /// The space between a description and the next toggle -- the same as under any other
+    /// settings row.
+    pub const DESCRIPTION_MARGIN_BOTTOM: f32 = super::HEADER_PADDING;
 
     /// Margin to leave for switch toggle to the right of the description subtext.
     pub const TOGGLE_WIDTH_MARGIN: f32 = 48.;

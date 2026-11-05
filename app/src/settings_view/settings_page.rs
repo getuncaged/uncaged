@@ -10,14 +10,14 @@ use warp_core::settings::SyncToCloud;
 use warp_core::ui::color::blend::Blend;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::new_scrollable::{
-    ClippedAxisConfiguration, DualAxisConfig, SingleAxisConfig,
+    ClippedAxisConfiguration, DualAxisConfig, ScrollableAppearance, SingleAxisConfig,
 };
 use warpui::elements::{
     Align, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Element, Empty, Expanded, Flex, Hoverable, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, NewScrollable, OffsetPositioning, ParentAnchor, ParentElement,
-    ParentOffsetBounds, Radius, SavePosition, ScrollTarget, ScrollToPositionMode, Shrinkable,
-    SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
+    ParentOffsetBounds, Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth,
+    Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::platform::Cursor;
@@ -50,26 +50,39 @@ use super::SettingsSection;
 use crate::appearance::Appearance;
 use crate::settings::CloudPreferencesSettings;
 use crate::themes::theme::Fill;
-use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
+use crate::view_components::dropdown::DROPDOWN_PADDING;
 use crate::view_components::{Dropdown, DropdownItemAction, SubmittableTextInput};
 
-pub const TOGGLE_BUTTON_RIGHT_PADDING: f32 = 5.;
-pub const HEADER_PADDING: f32 = 15.;
+pub const TOGGLE_BUTTON_RIGHT_PADDING: f32 = 0.;
+/// The space under a settings row (and under a section header), which sets the vertical
+/// rhythm of every settings card.
+pub const HEADER_PADDING: f32 = 14.;
 pub const CONTENT_FONT_SIZE: f32 = 12.;
-pub const SUBHEADER_MARGIN_BOTTOM: f32 = 4.;
+pub const SUBHEADER_MARGIN_BOTTOM: f32 = 2.;
 pub const PAGE_TITLE_MARGIN_BOTTOM: f32 = 4.;
+/// The page's horizontal inset, and the space under its last card.
 pub(super) const PAGE_PADDING: f32 = 28.;
-pub(super) const HEADER_FONT_SIZE: f32 = 23.;
-pub const SUBHEADER_FONT_SIZE: f32 = 16.;
-/// Uncaged: the inner padding of, and the gap after, a settings category's card.
-const CATEGORY_CARD_PADDING: f32 = 16.;
-const CATEGORY_CARD_SPACING: f32 = 24.;
+/// The space between the page title (rendered by the settings view, above the scrolling page)
+/// and the page's first card.
+pub(super) const PAGE_TOP_PADDING: f32 = 12.;
+pub(super) const HEADER_FONT_SIZE: f32 = 20.;
+pub const SUBHEADER_FONT_SIZE: f32 = 14.;
+/// The font size of a setting's label; its description stays at [`CONTENT_FONT_SIZE`].
+const LABEL_FONT_SIZE: f32 = 13.;
+/// Uncaged: a settings section's card -- its inner padding, and the gap to the next card. Rows
+/// carry their own bottom padding ([`HEADER_PADDING`]), so the card adds none below them.
+const SETTINGS_CARD_HORIZONTAL_PADDING: f32 = 16.;
+const SETTINGS_CARD_TOP_PADDING: f32 = 14.;
+const SETTINGS_CARD_SPACING: f32 = 16.;
+/// The gap between a setting's label and description column and its control.
+const ROW_CONTROL_GAP: f32 = 24.;
 const ALTERNATING_LIST_CLOSE_BUTTON_DIAMETER: f32 = 20.0;
 const ALTERNATING_LIST_ITEM_PADDING: f32 = 8.0;
 const GREY_TEXT_OPACITY: u8 = 60;
 const MIN_PAGE_WIDTH: f32 = 520.;
-const MAX_PAGE_WIDTH: f32 = 800.;
+/// The widest the page's column of cards (and the title above it) grows.
+pub(super) const MAX_PAGE_WIDTH: f32 = 760.;
 const INFO_TOOLTIP_MAX_WIDTH: f32 = 320.;
 
 /// Left margin for top-level sidebar nav items (pages and umbrella labels).
@@ -288,7 +301,7 @@ pub fn build_sub_header(
     Container::new(
         Align::new(
             Text::new_inline(text_name, appearance.ui_font_family(), SUBHEADER_FONT_SIZE)
-                .with_style(Properties::default().weight(Weight::Bold))
+                .with_style(Properties::default().weight(Weight::Semibold))
                 .with_color(color.into())
                 .finish(),
         )
@@ -309,7 +322,7 @@ pub fn render_sub_header_with_description(
             .with_child(
                 Align::new(
                     Text::new(description, appearance.ui_font_family(), CONTENT_FONT_SIZE)
-                        .with_color(appearance.theme().nonactive_ui_text_color().into())
+                        .with_color(settings_description_color(appearance))
                         .finish(),
                 )
                 .left()
@@ -331,7 +344,7 @@ pub fn render_sub_sub_header(
         Container::new(
             Align::new(
                 Text::new_inline(text_name, appearance.ui_font_family(), CONTENT_FONT_SIZE)
-                    .with_style(Properties::default().weight(Weight::Bold))
+                    .with_style(Properties::default().weight(Weight::Semibold))
                     .with_color(appearance.theme().active_ui_text_color().into())
                     .finish(),
             )
@@ -383,11 +396,28 @@ pub fn render_custom_size_header(
         .finish()
 }
 
-pub fn render_separator(appearance: &Appearance) -> Box<dyn Element> {
-    Container::new(Empty::new().finish())
-        .with_border(Border::bottom(2.).with_border_fill(appearance.theme().outline()))
-        .with_margin_bottom(HEADER_PADDING)
-        .finish()
+/// Uncaged: sections are separated by their cards (see [`settings_card`]), so the hard rule
+/// that used to divide them is gone; this renders nothing.
+pub fn render_separator(_appearance: &Appearance) -> Box<dyn Element> {
+    Empty::new().finish()
+}
+
+/// Uncaged: the colour of a setting's description -- the quiet sub-text colour, measured
+/// against the card it sits on.
+pub fn settings_description_color(appearance: &Appearance) -> ColorU {
+    let theme = appearance.theme();
+    theme.sub_text_color(theme.surface_1()).into_solid()
+}
+
+/// Uncaged: a settings section's card -- a quiet raised fill with rounded corners and no
+/// outline, matching the app's other cards. The section's rows go inside, separated by
+/// spacing rather than rules.
+pub fn settings_card(content: Box<dyn Element>, appearance: &Appearance) -> Container {
+    Container::new(content)
+        .with_background(appearance.theme().surface_1())
+        .with_corner_radius(warp_core::ui::radius::medium())
+        .with_horizontal_padding(SETTINGS_CARD_HORIZONTAL_PADDING)
+        .with_padding_top(SETTINGS_CARD_TOP_PADDING)
 }
 
 pub fn render_full_pane_width_ai_button(
@@ -680,7 +710,7 @@ pub fn render_body_item_label_internal<T: Clone + Action>(
             ToggleState::Disabled => appearance.theme().disabled_ui_text_color(),
         },
     };
-    let label_text = Text::new_inline(label_text, appearance.ui_font_family(), CONTENT_FONT_SIZE)
+    let label_text = Text::new_inline(label_text, appearance.ui_font_family(), LABEL_FONT_SIZE)
         .with_color(label_color.into());
     if let Some(icon) = label_icon {
         label.add_child(
@@ -710,7 +740,7 @@ pub fn render_body_item_label_internal<T: Clone + Action>(
                         .with_style(UiComponentStyles {
                             font_color: Some(
                                 warp_theme
-                                    .sub_text_color(warp_theme.surface_2())
+                                    .sub_text_color(warp_theme.surface_1())
                                     .into_solid(),
                             ),
                             margin: Some(Coords {
@@ -768,7 +798,7 @@ pub fn render_page_title(text: &str, size: f32, appearance: &Appearance) -> Box<
     Container::new(
         Align::new(
             Text::new_inline(text.to_string(), appearance.ui_font_family(), size)
-                .with_style(Properties::default().weight(Weight::Bold))
+                .with_style(Properties::default().weight(Weight::Semibold))
                 .with_color(appearance.theme().active_ui_text_color().into())
                 .finish(),
         )
@@ -777,6 +807,55 @@ pub fn render_page_title(text: &str, size: f32, appearance: &Appearance) -> Box<
     )
     .with_margin_bottom(PAGE_TITLE_MARGIN_BOTTOM)
     .finish()
+}
+
+/// Uncaged: a quiet line of description under the page's title.
+fn render_page_description(text: &str, appearance: &Appearance) -> Box<dyn Element> {
+    Container::new(
+        Align::new(
+            Text::new(
+                text.to_string(),
+                appearance.ui_font_family(),
+                LABEL_FONT_SIZE,
+            )
+            .with_color(
+                appearance
+                    .theme()
+                    .sub_text_color(appearance.theme().background())
+                    .into_solid(),
+            )
+            .finish(),
+        )
+        .left()
+        .finish(),
+    )
+    .with_margin_bottom(SETTINGS_CARD_SPACING)
+    .finish()
+}
+
+/// Uncaged: one section of a settings page -- its header (and description), if it has one,
+/// then its rows, all inside one card -- with the gap to the next section below it.
+fn render_section_card(
+    header: Option<(&'static str, Option<&'static str>)>,
+    rows: Vec<Box<dyn Element>>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+    match header {
+        Some((title, Some(subtitle))) => {
+            column.add_child(render_sub_header_with_description(
+                appearance, title, subtitle,
+            ));
+        }
+        Some((title, None)) => {
+            column.add_child(render_sub_header(appearance, title, None));
+        }
+        None => {}
+    }
+    column.add_children(rows);
+    settings_card(column.finish(), appearance)
+        .with_margin_bottom(SETTINGS_CARD_SPACING)
+        .finish()
 }
 
 /// Renders a toggle with a label on the left and a toggle on the right,
@@ -805,62 +884,51 @@ pub fn render_body_item<T: Clone + Action>(
     )
 }
 
-/// Builds a custom toggle with a label on the left and a toggle on the right.
+/// Builds a settings row: the label, with its description under it in the quiet sub-text
+/// colour, on the left; the control (toggle, dropdown, button) on the right, vertically centred
+/// against the label and description together.
 pub fn build_toggle_element(
     name_element: Box<dyn Element>,
     toggle_element: Box<dyn Element>,
     appearance: &Appearance,
     description_text: Option<String>,
 ) -> Box<dyn Element> {
-    let mut column = Flex::column();
-    let header = Shrinkable::new(
-        1.0,
-        Container::new(Align::new(name_element).left().finish()).finish(),
-    )
-    .finish();
-    let toggle = Container::new(toggle_element)
-        .with_padding_right(TOGGLE_BUTTON_RIGHT_PADDING)
-        .finish();
-
-    let mut header_row = Container::new(
-        Flex::row()
-            .with_child(header)
-            .with_child(toggle)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .finish(),
-    );
-    if description_text.is_none() {
-        header_row = header_row.with_padding_bottom(HEADER_PADDING);
-    }
-    column.add_child(header_row.finish());
+    let mut text_column = Flex::column()
+        .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+        .with_child(Align::new(name_element).left().finish());
     if let Some(description_text) = description_text {
-        let description = appearance
-            .ui_builder()
-            .paragraph(description_text)
-            .with_style(UiComponentStyles {
-                font_color: Some(blended_colors::text_sub(
-                    appearance.theme(),
-                    appearance.theme().surface_1(),
-                )),
-                font_size: Some(12.),
-                margin: Some(Coords {
-                    top: 4.,
-                    bottom: 0.,
-                    left: 0.,
-                    right: 0.,
-                }),
-                ..Default::default()
-            })
-            .build()
-            .finish();
-        column.add_child(
-            Container::new(description)
-                .with_margin_right(100.)
-                .with_padding_bottom(HEADER_PADDING)
-                .finish(),
-        );
+        text_column.add_child(render_settings_description(description_text, appearance));
     }
-    column.finish()
+
+    Container::new(
+        Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(Shrinkable::new(1.0, text_column.finish()).finish())
+            .with_child(
+                Container::new(toggle_element)
+                    .with_margin_left(ROW_CONTROL_GAP)
+                    .with_padding_right(TOGGLE_BUTTON_RIGHT_PADDING)
+                    .finish(),
+            )
+            .finish(),
+    )
+    .with_padding_bottom(HEADER_PADDING)
+    .finish()
+}
+
+/// Uncaged: a setting's description, in the quiet sub-text colour, for under its label.
+pub fn render_settings_description(text: String, appearance: &Appearance) -> Box<dyn Element> {
+    appearance
+        .ui_builder()
+        .paragraph(text)
+        .with_style(UiComponentStyles {
+            font_color: Some(settings_description_color(appearance)),
+            font_size: Some(CONTENT_FONT_SIZE),
+            margin: Some(Coords::default().top(3.)),
+            ..Default::default()
+        })
+        .build()
+        .finish()
 }
 
 pub fn render_dropdown_item_label(
@@ -870,7 +938,7 @@ pub fn render_dropdown_item_label(
     color_override: Option<Fill>,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
-    let label = Text::new(label_text, appearance.ui_font_family(), CONTENT_FONT_SIZE)
+    let label = Text::new(label_text, appearance.ui_font_family(), LABEL_FONT_SIZE)
         .with_color(
             color_override
                 .unwrap_or(appearance.theme().active_ui_text_color())
@@ -878,18 +946,18 @@ pub fn render_dropdown_item_label(
         )
         .finish();
     let label = if let Some(secondary_text) = secondary_text {
-        let warp_theme = appearance.theme();
         let secondary_text_child = appearance
             .ui_builder()
             .span(secondary_text)
             .with_style(UiComponentStyles {
                 font_color: Some(
                     color_override
-                        .unwrap_or(warp_theme.sub_text_color(warp_theme.surface_2()))
-                        .into_solid(),
+                        .map(Fill::into_solid)
+                        .unwrap_or_else(|| settings_description_color(appearance)),
                 ),
+                font_size: Some(CONTENT_FONT_SIZE),
                 margin: Some(Coords {
-                    top: 4.,
+                    top: 3.,
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -951,18 +1019,22 @@ pub(crate) fn render_dropdown_item<T: DropdownItemAction>(
         dropdown.add_child(dropdown_subtext);
     }
 
-    row.with_child(
-        Shrinkable::new(
-            1.0,
-            Container::new(dropdown_item_label)
-                .with_margin_bottom(4.)
-                .with_padding_right(16.)
-                .finish(),
+    // The dropdown carries its own vertical margin; the padding below tops it up to the space
+    // under the other rows.
+    let row = row
+        .with_child(
+            Shrinkable::new(
+                1.0,
+                Container::new(dropdown_item_label)
+                    .with_padding_right(ROW_CONTROL_GAP)
+                    .finish(),
+            )
+            .finish(),
         )
-        .finish(),
-    )
-    .with_child(dropdown.finish())
-    .finish()
+        .with_child(dropdown.finish());
+    Container::new(row.finish())
+        .with_padding_bottom(HEADER_PADDING - DROPDOWN_PADDING)
+        .finish()
 }
 
 pub(crate) fn render_settings_info_banner(
@@ -1273,6 +1345,7 @@ pub(super) enum PageType<V: warpui::View> {
     Uncategorized {
         widgets: Vec<Box<dyn SettingsWidget<View = V>>>,
         title: Option<&'static str>,
+        layout: UncategorizedLayout,
         filter: Vec<usize>,
         vertical_scroll_state: ClippedScrollStateHandle,
         horizontal_scroll_state: ClippedScrollStateHandle,
@@ -1289,6 +1362,15 @@ pub(super) enum PageType<V: warpui::View> {
         highlighted_widget_id: Option<&'static str>,
         min_page_width: f32,
     },
+}
+
+/// Uncaged: how an uncategorized page's widgets are grouped into cards.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum UncategorizedLayout {
+    /// The widgets are rows of one section, so they share one card.
+    OneCard,
+    /// Each widget is a whole section (with its own header), so each gets its own card.
+    CardPerWidget,
 }
 
 /// Some settings pages break down into a collection of smaller widgets while others are
@@ -1363,14 +1445,33 @@ impl<V: warpui::View> PageType<V> {
     }
 
     /// A page which is a series of [`SettingsWidget`]s that don't fall under sub-categories.
+    /// The widgets are rows of one section, drawn together in one card.
     pub(super) fn new_uncategorized(
         widgets: Vec<Box<dyn SettingsWidget<View = V>>>,
         title: Option<&'static str>,
+    ) -> Self {
+        Self::new_uncategorized_with_layout(widgets, title, UncategorizedLayout::OneCard)
+    }
+
+    /// A page which is a series of [`SettingsWidget`]s that are each a whole section, with its
+    /// own header; each is drawn in its own card.
+    pub(super) fn new_uncategorized_sections(
+        widgets: Vec<Box<dyn SettingsWidget<View = V>>>,
+        title: Option<&'static str>,
+    ) -> Self {
+        Self::new_uncategorized_with_layout(widgets, title, UncategorizedLayout::CardPerWidget)
+    }
+
+    fn new_uncategorized_with_layout(
+        widgets: Vec<Box<dyn SettingsWidget<View = V>>>,
+        title: Option<&'static str>,
+        layout: UncategorizedLayout,
     ) -> Self {
         Self::Uncategorized {
             filter: widgets.iter().enumerate().map(|(i, _)| i).collect(),
             widgets,
             title,
+            layout,
             vertical_scroll_state: Default::default(),
             horizontal_scroll_state: Default::default(),
             highlighted_widget_id: Default::default(),
@@ -1545,6 +1646,7 @@ impl<V: warpui::View> PageType<V> {
                 widgets,
                 filter,
                 title,
+                layout,
                 vertical_scroll_state,
                 horizontal_scroll_state,
                 highlighted_widget_id,
@@ -1552,6 +1654,7 @@ impl<V: warpui::View> PageType<V> {
             } => FilteredPageType::Uncategorized {
                 widgets: filter.iter().map(|i| widgets[*i].as_ref()).collect(),
                 title: *title,
+                layout: *layout,
                 vertical_scroll_state: vertical_scroll_state.clone(),
                 horizontal_scroll_state: horizontal_scroll_state.clone(),
                 highlighted_widget_id: *highlighted_widget_id,
@@ -1635,6 +1738,9 @@ impl<V: warpui::View> PageType<V> {
 
     pub(super) fn render_page(&self, view: &V, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
+        // Uncaged: the page's name is drawn by the settings view, above the scrolling page, in
+        // the same style on every page (see `SettingsView::render_page_title`). A page's own
+        // `title` reads as a quiet line of description under it.
         let page = match self.get_filtered() {
             FilteredPageType::Monolith { widget, title, .. } => {
                 let mut page = Empty::new().finish();
@@ -1642,7 +1748,7 @@ impl<V: warpui::View> PageType<V> {
                     if widget.should_render(app) {
                         if let Some(title) = title {
                             let col = Flex::column()
-                                .with_child(render_page_title(title, HEADER_FONT_SIZE, appearance))
+                                .with_child(render_page_description(title, appearance))
                                 .with_child(widget.render_widget(view, false, appearance, app));
                             page = col.finish();
                         } else {
@@ -1655,18 +1761,33 @@ impl<V: warpui::View> PageType<V> {
             FilteredPageType::Uncategorized {
                 widgets,
                 title,
+                layout,
                 highlighted_widget_id,
                 ..
             } => {
                 let mut page = Flex::column();
                 if let Some(title) = title {
-                    page.add_child(render_page_title(title, HEADER_FONT_SIZE, appearance));
+                    page.add_child(render_page_description(title, appearance));
                 }
-                for widget in widgets {
-                    let highlighted =
-                        highlighted_widget_id.is_some_and(|id| id == widget.widget_id());
-                    if widget.should_render(app) {
-                        page.add_child(widget.render_widget(view, highlighted, appearance, app));
+                let rendered = widgets
+                    .into_iter()
+                    .filter(|widget| widget.should_render(app))
+                    .map(|widget| {
+                        let highlighted =
+                            highlighted_widget_id.is_some_and(|id| id == widget.widget_id());
+                        widget.render_widget(view, highlighted, appearance, app)
+                    })
+                    .collect_vec();
+                match layout {
+                    UncategorizedLayout::OneCard => {
+                        if !rendered.is_empty() {
+                            page.add_child(render_section_card(None, rendered, appearance));
+                        }
+                    }
+                    UncategorizedLayout::CardPerWidget => {
+                        for widget in rendered {
+                            page.add_child(render_section_card(None, vec![widget], appearance));
+                        }
                     }
                 }
                 page.finish()
@@ -1679,53 +1800,25 @@ impl<V: warpui::View> PageType<V> {
             } => {
                 let mut page = Flex::column();
                 if let Some(title) = title {
-                    page.add_child(render_page_title(title, HEADER_FONT_SIZE, appearance));
+                    page.add_child(render_page_description(title, appearance));
                 }
-                let num_categories = categories.len();
-                for (i, category) in categories.into_iter().enumerate() {
-                    if !category.title.is_empty() {
-                        if let Some(subtitle) = category.subtitle {
-                            page.add_child(render_sub_header_with_description(
-                                appearance,
-                                category.title,
-                                subtitle,
-                            ));
-                        } else {
-                            page.add_child(render_sub_header(appearance, category.title, None));
-                        }
+                for category in categories {
+                    let rendered = category
+                        .widgets
+                        .iter()
+                        .filter(|widget| widget.should_render(app))
+                        .map(|widget| {
+                            let highlighted =
+                                highlighted_widget_id.is_some_and(|id| id == widget.widget_id());
+                            widget.render_widget(view, highlighted, appearance, app)
+                        })
+                        .collect_vec();
+                    if rendered.is_empty() {
+                        continue;
                     }
-                    // Uncaged: a category's widgets sit in one rounded, outlined card (titled
-                    // from above, like grouped settings on macOS and Windows), instead of a flat
-                    // run of rows divided from the next category by a rule.
-                    let mut card = Flex::column();
-                    let mut has_widgets = false;
-                    for widget in &category.widgets {
-                        let highlighted =
-                            highlighted_widget_id.is_some_and(|id| id == widget.widget_id());
-                        if widget.should_render(app) {
-                            card.add_child(widget.render_widget(
-                                view,
-                                highlighted,
-                                appearance,
-                                app,
-                            ));
-                            has_widgets = true;
-                        }
-                    }
-                    if has_widgets {
-                        let mut card =
-                            Container::new(card.finish())
-                                .with_border(Border::all(1.).with_border_fill(
-                                    crate::workspace::view::card_outline(appearance),
-                                ))
-                                .with_corner_radius(warp_core::ui::radius::large())
-                                .with_horizontal_padding(CATEGORY_CARD_PADDING)
-                                .with_padding_top(CATEGORY_CARD_PADDING);
-                        if i < num_categories - 1 {
-                            card = card.with_margin_bottom(CATEGORY_CARD_SPACING);
-                        }
-                        page.add_child(card.finish());
-                    }
+                    let header =
+                        (!category.title.is_empty()).then_some((category.title, category.subtitle));
+                    page.add_child(render_section_card(header, rendered, appearance));
                 }
                 page.finish()
             }
@@ -1740,7 +1833,9 @@ impl<V: warpui::View> PageType<V> {
             .top_center()
             .finish(),
         )
-        .with_uniform_padding(PAGE_PADDING)
+        .with_horizontal_padding(PAGE_PADDING)
+        .with_padding_top(PAGE_TOP_PADDING)
+        .with_padding_bottom(PAGE_PADDING)
         .finish()
     }
 
@@ -1774,6 +1869,9 @@ impl<V: warpui::View> PageType<V> {
                 theme.active_ui_detail().into(),
                 warpui::elements::Fill::None,
             )
+            // Uncaged: the scrollbar floats in the page's side padding rather than taking width
+            // from it, so the page's column stays centred under the title above it.
+            .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, true))
             .finish(),
             vec![(
                 SizeConstraintCondition::WidthLessThan(min_width),
@@ -1833,6 +1931,7 @@ pub(super) enum FilteredPageType<'a, V: warpui::View> {
     Uncategorized {
         widgets: Vec<&'a dyn SettingsWidget<View = V>>,
         title: Option<&'static str>,
+        layout: UncategorizedLayout,
         vertical_scroll_state: ClippedScrollStateHandle,
         horizontal_scroll_state: ClippedScrollStateHandle,
         highlighted_widget_id: Option<&'static str>,
@@ -1914,7 +2013,9 @@ pub(super) trait SettingsWidget {
             content = Container::new(content)
                 .with_border(Border::all(1.).with_border_fill(appearance.theme().accent()))
                 .with_background(internal_colors::accent_overlay_1(appearance.theme()))
+                .with_corner_radius(warp_core::ui::radius::small())
                 .with_horizontal_padding(8.)
+                .with_padding_top(8.)
                 .finish()
         }
         SavePosition::new(content, self.widget_id()).finish()

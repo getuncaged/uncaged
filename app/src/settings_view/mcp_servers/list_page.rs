@@ -12,9 +12,9 @@ use warp_core::ui::appearance::AppearanceEvent;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::Icon;
 use warpui::elements::{
-    Align, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    Expanded, Fill, Flex, FormattedTextElement, HighlightedHyperlink, MainAxisAlignment,
-    MainAxisSize, ParentElement, Radius, Text,
+    Align, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Expanded, Fill,
+    Flex, FormattedTextElement, HighlightedHyperlink, MainAxisAlignment, MainAxisSize,
+    ParentElement, Radius, Text,
 };
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::switch::SwitchStateHandle;
@@ -1503,9 +1503,9 @@ impl MCPServersListPageView {
             .with_height(style::EMPTY_STATE_HEIGHT)
             .finish(),
         )
-        .with_border(
-            Border::all(1.).with_border_color(internal_colors::neutral_2(appearance.theme())),
-        )
+        // Uncaged: a quiet rounded card, like the other settings sections, not a 1px box.
+        .with_background(appearance.theme().surface_1())
+        .with_corner_radius(warp_core::ui::radius::medium())
         .with_margin_bottom(style::SECTION_MARGIN)
         .finish()
     }

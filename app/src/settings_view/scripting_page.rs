@@ -71,7 +71,8 @@ impl ScriptingSettingsPageView {
             vec![Box::new(LocalControlModeWidget)];
 
         Self {
-            page: PageType::new_uncategorized(widgets, Some("Scripting")),
+            // The settings view titles the page; repeating "Scripting" here would double it.
+            page: PageType::new_uncategorized(widgets, None),
             local_only_icon_tooltip_states: RefCell::new(HashMap::new()),
             local_control_mode_dropdown,
             #[cfg(target_os = "macos")]
