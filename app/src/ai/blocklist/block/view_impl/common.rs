@@ -3495,28 +3495,46 @@ pub fn render_user_avatar(
 ) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
-    let background = avatar_color.unwrap_or_else(|| blended_colors::accent(theme).into());
-    let avatar = Avatar::new(
-        profile_image_path
-            .map(|url| AvatarContent::Image {
+    let accent: ColorU = avatar_color.unwrap_or_else(|| blended_colors::accent(theme).into());
+    let size = icon_size(app);
+
+    if let Some(url) = profile_image_path {
+        return Avatar::new(
+            AvatarContent::Image {
                 url: url.to_owned(),
                 display_name: user_display_name.to_owned(),
-            })
-            // Uncaged has no accounts, so a name initial is meaningless — show a
-            // neutral "you" glyph for the human turn instead of a stray letter.
-            .unwrap_or(AvatarContent::Icon(Icon::User)),
-        UiComponentStyles {
-            width: Some(icon_size(app)),
-            height: Some(icon_size(app)),
-            font_family_id: Some(appearance.ui_font_family()),
-            font_size: Some(appearance.monospace_font_size() - 2.),
-            background: Some(background.into()),
-            font_color: Some(blended_colors::text_main(theme, background)),
-            border_radius: Some(CornerRadius::with_all(Radius::Percentage(50.))),
-            ..Default::default()
-        },
-    );
-    avatar.build().finish()
+            },
+            UiComponentStyles {
+                width: Some(size),
+                height: Some(size),
+                font_family_id: Some(appearance.ui_font_family()),
+                font_size: Some(appearance.monospace_font_size() - 2.),
+                background: Some(accent.into()),
+                font_color: Some(blended_colors::text_main(theme, accent)),
+                border_radius: Some(CornerRadius::with_all(Radius::Percentage(50.))),
+                ..Default::default()
+            },
+        )
+        .build()
+        .finish();
+    }
+
+    // Uncaged has no accounts or profile pictures. Your turn is marked with a
+    // prompt chevron in the accent colour instead of a filled "person" circle;
+    // it keeps the avatar's slot so the agent's reply stays aligned beneath it.
+    let mark = size * 0.8;
+    ConstrainedBox::new(
+        Align::new(
+            ConstrainedBox::new(Icon::ChevronRight.to_warpui_icon(accent.into()).finish())
+                .with_width(mark)
+                .with_height(mark)
+                .finish(),
+        )
+        .finish(),
+    )
+    .with_width(size)
+    .with_height(size)
+    .finish()
 }
 
 pub struct UserQueryProps<'a> {

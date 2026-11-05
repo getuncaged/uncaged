@@ -80,9 +80,11 @@ const ROW_CONTROL_GAP: f32 = 24.;
 const ALTERNATING_LIST_CLOSE_BUTTON_DIAMETER: f32 = 20.0;
 const ALTERNATING_LIST_ITEM_PADDING: f32 = 8.0;
 const GREY_TEXT_OPACITY: u8 = 60;
-const MIN_PAGE_WIDTH: f32 = 520.;
-/// The widest the page's column of cards (and the title above it) grows.
-pub(super) const MAX_PAGE_WIDTH: f32 = 760.;
+/// Below this width a page scrolls sideways; above it, rows reflow to fit.
+const MIN_PAGE_WIDTH: f32 = 340.;
+/// The widest the page's column of cards (and the title above it) grows; below this it fills the panel, so pages follow the
+/// window instead of sitting in a fixed column.
+pub(super) const MAX_PAGE_WIDTH: f32 = 1080.;
 const INFO_TOOLTIP_MAX_WIDTH: f32 = 320.;
 
 /// Left margin for top-level sidebar nav items (pages and umbrella labels).

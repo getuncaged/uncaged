@@ -2705,6 +2705,9 @@ impl View for SettingsView {
         } else {
             page
         };
+        // Uncaged: the page sits in the same rounded, outlined panel as the sidebar, so
+        // Settings reads as two bubbles side by side, like split panes.
+        let page = crate::workspace::view::rounded_panel(page, None, appearance);
 
         let row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)

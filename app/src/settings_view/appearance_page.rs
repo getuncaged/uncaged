@@ -2911,21 +2911,11 @@ impl SettingsWidget for ThemeSelectWidget {
                         ctx.dispatch_typed_action(AppearancePageAction::ToggleRespectSystemTheme);
                     })
                     .finish(),
-                None,
+                Some(
+                    "Automatically switch between light and dark themes when your system does."
+                        .to_string(),
+                ),
             ))
-            .with_child(
-                appearance
-                    .ui_builder()
-                    .span(
-                        "Automatically switch between light and dark themes when your system does."
-                            .to_string(),
-                    )
-                    .with_style(
-                        UiComponentStyles::default().set_margin(Coords::default().bottom(10.)),
-                    )
-                    .build()
-                    .finish(),
-            )
             .with_child(
                 Container::new(theme_picker)
                     .with_margin_bottom(25.)
