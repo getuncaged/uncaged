@@ -106,7 +106,9 @@ use warpui::geometry::vector::{vec2f, Vector2F};
 use warpui::keymap::Context;
 use warpui::modals::{AlertDialogWithCallbacks, AppModalCallback, ModalButton};
 use warpui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
-use warpui::platform::{Cursor, FilePickerConfiguration, FullscreenState, TerminationMode};
+use warpui::platform::{
+    Cursor, FilePickerConfiguration, FullscreenState, SystemTheme, TerminationMode,
+};
 use warpui::text_layout::ClipConfig;
 use warpui::ui_components::button::{Button, ButtonVariant};
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
@@ -18356,6 +18358,19 @@ impl Workspace {
             );
             ctx.notify();
         });
+        // Browsing is never picking, even if a pick was left half-done in a closed Settings tab.
+        self.settings_pane.update(ctx, |settings_pane, ctx| {
+            settings_pane.set_theme_gallery_picking(None, ctx);
+        });
+        self.show_settings_with_section(Some(SettingsSection::ThemeGallery), ctx);
+    }
+
+    /// Opens the theme gallery in picking mode, to choose the theme "Sync with OS" shows while
+    /// the system is in `slot`'s appearance. Choosing or cancelling comes back to Appearance.
+    pub fn show_theme_gallery_to_pick(&mut self, slot: SystemTheme, ctx: &mut ViewContext<Self>) {
+        self.settings_pane.update(ctx, |settings_pane, ctx| {
+            settings_pane.set_theme_gallery_picking(Some(slot), ctx);
+        });
         self.show_settings_with_section(Some(SettingsSection::ThemeGallery), ctx);
     }
 
@@ -23843,6 +23858,7 @@ impl TypedActionView for Workspace {
                 self.open_prompt_suggestions_unavailable_modal(ctx)
             }
             ShowThemeGallery => self.show_theme_gallery(ctx),
+            ShowThemeGalleryToPick(slot) => self.show_theme_gallery_to_pick(*slot, ctx),
             IncreaseFontSize => self.increase_font_size(ctx),
             DecreaseFontSize => self.decrease_font_size(ctx),
             ResetFontSize => self.reset_font_size(ctx),

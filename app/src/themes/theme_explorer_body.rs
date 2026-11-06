@@ -158,7 +158,88 @@ impl PreviewImage {
 }
 
 pub enum ThemeExplorerBodyEvent {
-    ShowErrorToast { message: String },
+    ShowErrorToast {
+        message: String,
+    },
+    /// Picking mode is over — a theme was chosen for the slot, or the pick was cancelled. The host
+    /// takes the user back to where the pick started.
+    PickFinished,
+}
+
+/// What a card's right-hand control says, which is what clicking the card does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CardControl {
+    /// Not on this machine yet: clicking installs it.
+    Get,
+    Installing,
+    /// The theme already in the place being chosen for — in use, or the light or dark theme
+    /// while picking.
+    Current(&'static str),
+    /// Clicking selects it, for the place the label names.
+    Use(&'static str),
+}
+
+impl CardControl {
+    /// Which control a card shows. `is_current` means the card is the theme already in the place
+    /// being chosen for: the active theme normally, the slot's theme while picking.
+    fn for_card(
+        origin: Origin,
+        installing: bool,
+        is_current: bool,
+        picking: Option<SystemTheme>,
+    ) -> Self {
+        match (origin, picking) {
+            (Origin::Available, _) if installing => CardControl::Installing,
+            (Origin::Available, _) => CardControl::Get,
+            (Origin::System | Origin::Downloaded | Origin::Mine, None) if is_current => {
+                CardControl::Current("In use")
+            }
+            (Origin::System | Origin::Downloaded | Origin::Mine, None) => CardControl::Use("Use"),
+            (Origin::System | Origin::Downloaded | Origin::Mine, Some(SystemTheme::Light))
+                if is_current =>
+            {
+                CardControl::Current("Light theme")
+            }
+            (Origin::System | Origin::Downloaded | Origin::Mine, Some(SystemTheme::Dark))
+                if is_current =>
+            {
+                CardControl::Current("Dark theme")
+            }
+            (Origin::System | Origin::Downloaded | Origin::Mine, Some(SystemTheme::Light)) => {
+                CardControl::Use("Use for light")
+            }
+            (Origin::System | Origin::Downloaded | Origin::Mine, Some(SystemTheme::Dark)) => {
+                CardControl::Use("Use for dark")
+            }
+        }
+    }
+
+    /// Whether clicking the card does anything. The theme already in use is inert, but while
+    /// picking, choosing the slot's current theme again is a fine way to keep it and go back.
+    fn is_clickable(&self, picking: Option<SystemTheme>) -> bool {
+        match self {
+            CardControl::Get | CardControl::Use(_) => true,
+            CardControl::Installing => false,
+            CardControl::Current(_) => picking.is_some(),
+        }
+    }
+}
+
+/// The line at the top of the gallery while it is choosing a theme for `slot`.
+fn picking_banner(slot: SystemTheme) -> String {
+    let system = if cfg!(target_os = "macos") {
+        "your Mac"
+    } else {
+        "your system"
+    };
+    match slot {
+        SystemTheme::Light => {
+            format!("Choose your light theme — shown when {system} is in light mode.")
+        }
+        SystemTheme::Dark => {
+            format!("Choose your dark theme — shown when {system} is in dark mode.")
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -170,6 +251,8 @@ pub enum ThemeExplorerBodyAction {
     ConfirmDelete(PathBuf),
     Delete(PathBuf),
     CancelDelete,
+    /// Leave picking mode without changing anything.
+    CancelPick,
 }
 
 pub struct ThemeExplorerBody {
@@ -206,6 +289,10 @@ pub struct ThemeExplorerBody {
     pending_delete: Option<PathBuf>,
     filter_states: [MouseStateHandle; 5],
     retry_state: MouseStateHandle,
+    /// The "Sync with OS" slot being chosen, when the gallery was opened to pick the light or dark
+    /// theme. `None` is the ordinary gallery, where Use sets the theme in effect.
+    picking: Option<SystemTheme>,
+    cancel_pick_state: MouseStateHandle,
 }
 
 impl ThemeExplorerBody {
@@ -255,11 +342,23 @@ impl ThemeExplorerBody {
             pending_delete: None,
             filter_states: Default::default(),
             retry_state: Default::default(),
+            picking: None,
+            cancel_pick_state: Default::default(),
         };
         // Local themes are already in memory, so the cards for them cost nothing to build. Their
         // images and the community catalogue wait until the gallery is shown.
         body.rebuild_entries(ctx);
         body
+    }
+
+    /// Starts or ends picking mode — choosing the theme for one "Sync with OS" slot rather than
+    /// the theme in effect.
+    pub fn set_picking(&mut self, picking: Option<SystemTheme>, ctx: &mut ViewContext<Self>) {
+        if self.picking != picking {
+            self.picking = picking;
+            self.pending_delete = None;
+            ctx.notify();
+        }
     }
 
     /// Called when the gallery is shown. The first time, it starts listening to the shared
@@ -498,22 +597,17 @@ impl ThemeExplorerBody {
         let selected = settings.selected_system_themes.value().clone();
         let system_theme = ctx.system_theme();
 
-        ThemeSettings::handle(ctx).update(ctx, |theme_settings, ctx| {
-            if syncing_with_os {
-                let updated = match system_theme {
-                    SystemTheme::Light => SelectedSystemThemes {
-                        light: kind.clone(),
-                        dark: selected.dark.clone(),
-                    },
-                    SystemTheme::Dark => SelectedSystemThemes {
-                        light: selected.light.clone(),
-                        dark: kind.clone(),
-                    },
-                };
+        // Picking fills the slot it was opened for, whatever the OS is showing right now.
+        let picked_slot = self.picking.take();
+        let slot = picked_slot.or(syncing_with_os.then_some(system_theme));
+
+        ThemeSettings::handle(ctx).update(ctx, |theme_settings, ctx| match slot {
+            Some(slot) => {
                 report_if_error!(theme_settings
                     .selected_system_themes
-                    .set_value(updated, ctx));
-            } else {
+                    .set_value(selected.with_theme_for(slot, kind.clone()), ctx));
+            }
+            None => {
                 report_if_error!(theme_settings.theme_kind.set_value(kind.clone(), ctx));
             }
         });
@@ -527,6 +621,9 @@ impl ThemeExplorerBody {
         AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
             appearance_manager.clear_transient_theme(ctx);
         });
+        if picked_slot.is_some() {
+            ctx.emit(ThemeExplorerBodyEvent::PickFinished);
+        }
         ctx.notify();
     }
 
@@ -689,7 +786,7 @@ impl ThemeExplorerBody {
     fn render_card(
         &self,
         entry: &Entry,
-        is_active: bool,
+        is_current: bool,
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
@@ -709,25 +806,29 @@ impl ThemeExplorerBody {
         .finish();
 
         // The right-hand control says what this card will do if you click it.
-        let action: Box<dyn Element> = if entry.origin == Origin::Available {
-            let label = if installing { "Installing…" } else { "Get" };
-            pill(
-                label,
+        let control = CardControl::for_card(entry.origin, installing, is_current, self.picking);
+        let action: Box<dyn Element> = match control {
+            CardControl::Get | CardControl::Installing => pill(
+                if control == CardControl::Installing {
+                    "Installing…"
+                } else {
+                    "Get"
+                },
                 theme.accent(),
                 theme.background().into_solid(),
                 appearance,
-            )
-        } else if is_active {
-            pill(
-                "In use",
+            ),
+            CardControl::Current(label) => pill(
+                label,
                 theme.surface_3(),
                 theme.main_text_color(theme.surface_3()).into_solid(),
                 appearance,
-            )
-        } else {
-            Text::new_inline("Use".to_string(), appearance.ui_font_family(), 11.)
-                .with_color(theme.accent().into_solid())
-                .finish()
+            ),
+            CardControl::Use(label) => {
+                Text::new_inline(label.to_string(), appearance.ui_font_family(), 11.)
+                    .with_color(theme.accent().into_solid())
+                    .finish()
+            }
         };
 
         let footer = Flex::row()
@@ -844,7 +945,7 @@ impl ThemeExplorerBody {
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(10.)))
             .with_background(theme.surface_2())
             .with_border(
-                Border::all(if is_active { 2. } else { 1. }).with_border_fill(if is_active {
+                Border::all(if is_current { 2. } else { 1. }).with_border_fill(if is_current {
                     theme.accent()
                 } else {
                     theme.outline()
@@ -854,7 +955,7 @@ impl ThemeExplorerBody {
 
         // Clicking the card does the obvious thing: install it if it is not here, use it if it is.
         let element: Box<dyn Element> = match (&entry.kind, &entry.slug) {
-            _ if installing || is_active => body,
+            _ if !control.is_clickable(self.picking) => body,
             (Some(kind), _) => {
                 let kind = kind.clone();
                 EventHandler::new(body)
@@ -877,6 +978,53 @@ impl ThemeExplorerBody {
         };
 
         ConstrainedBox::new(element).with_width(CARD_WIDTH).finish()
+    }
+}
+
+impl ThemeExplorerBody {
+    /// The strip across the top of the gallery while it is choosing a light or dark theme: what is
+    /// being chosen, and the way out.
+    fn render_picking_banner(
+        &self,
+        slot: SystemTheme,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let cancel = appearance
+            .ui_builder()
+            .button(ButtonVariant::Secondary, self.cancel_pick_state.clone())
+            .with_style(UiComponentStyles {
+                font_size: Some(12.),
+                padding: Some(Coords::uniform(6.).left(12.).right(12.)),
+                ..Default::default()
+            })
+            .with_centered_text_label("Cancel".into())
+            .build()
+            .with_cursor(Cursor::PointingHand)
+            .on_click(|ctx, _, _| ctx.dispatch_typed_action(ThemeExplorerBodyAction::CancelPick))
+            .finish();
+
+        Container::new(
+            Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(
+                    Shrinkable::new(
+                        1.,
+                        Text::new(picking_banner(slot), appearance.ui_font_family(), 13.)
+                            .with_color(theme.active_ui_text_color().into())
+                            .finish(),
+                    )
+                    .finish(),
+                )
+                .with_child(Container::new(cancel).with_margin_left(12.).finish())
+                .finish(),
+        )
+        .with_uniform_padding(12.)
+        .with_background(theme.surface_2())
+        .with_border(Border::all(1.).with_border_fill(theme.accent()))
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))
+        .with_margin_bottom(14.)
+        .finish()
     }
 }
 
@@ -936,6 +1084,10 @@ impl TypedActionView for ThemeExplorerBody {
                 self.pending_delete = None;
                 ctx.notify();
             }
+            ThemeExplorerBodyAction::CancelPick => {
+                self.set_picking(None, ctx);
+                ctx.emit(ThemeExplorerBodyEvent::PickFinished);
+            }
         }
     }
 }
@@ -949,10 +1101,22 @@ impl View for ThemeExplorerBody {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
         let theme_settings = ThemeSettings::as_ref(app);
-        // What is genuinely in effect, which is not `theme_kind` when syncing with the OS.
-        let active = active_theme_kind(theme_settings, app);
+        // The card to mark: the slot's theme while picking, otherwise what is genuinely in
+        // effect — which is not `theme_kind` when syncing with the OS.
+        let current = match self.picking {
+            Some(slot) => theme_settings
+                .selected_system_themes
+                .value()
+                .for_appearance(slot)
+                .clone(),
+            None => active_theme_kind(theme_settings, app),
+        };
 
         let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+
+        if let Some(slot) = self.picking {
+            column.add_child(self.render_picking_banner(slot, appearance));
+        }
 
         column.add_child(
             Container::new(
@@ -1001,7 +1165,7 @@ impl View for ThemeExplorerBody {
 
         // With Sync with OS on, "Use" fills the slot for the appearance the OS is in right now —
         // say so, or picking a theme in light mode and then seeing another at night is a mystery.
-        if *theme_settings.use_system_theme.value() {
+        if self.picking.is_none() && *theme_settings.use_system_theme.value() {
             let slot = match app.system_theme() {
                 SystemTheme::Light => "light",
                 SystemTheme::Dark => "dark",
@@ -1071,8 +1235,8 @@ impl View for ThemeExplorerBody {
                 .with_cross_axis_alignment(CrossAxisAlignment::Start);
             grid.extend(self.visible.iter().map(|&index| {
                 let entry = &self.entries[index];
-                let is_active = entry.kind.as_ref() == Some(&active);
-                self.render_card(entry, is_active, appearance)
+                let is_current = entry.kind.as_ref() == Some(&current);
+                self.render_card(entry, is_current, appearance)
             }));
             column.add_child(grid.finish());
         }
@@ -1142,3 +1306,7 @@ fn path_is_within(path: &Path, base: &Path) -> bool {
         _ => false,
     }
 }
+
+#[cfg(test)]
+#[path = "theme_explorer_body_tests.rs"]
+mod tests;

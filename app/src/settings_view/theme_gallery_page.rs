@@ -6,6 +6,7 @@
 //! Settings and to raise toasts, which belong to the window rather than the view.
 
 use warpui::elements::Element;
+use warpui::platform::SystemTheme;
 use warpui::presenter::ChildView;
 use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
 
@@ -16,7 +17,7 @@ use super::SettingsSection;
 use crate::appearance::Appearance;
 use crate::themes::theme_explorer_body::{ThemeExplorerBody, ThemeExplorerBodyEvent};
 use crate::view_components::DismissibleToast;
-use crate::workspace::ToastStack;
+use crate::workspace::{ToastStack, WorkspaceAction};
 
 pub enum ThemeGalleryPageEvent {}
 
@@ -44,15 +45,37 @@ impl ThemeGalleryPageView {
         }
     }
 
+    /// Opens or closes picking mode: choosing the light or dark theme for "Sync with OS"
+    /// instead of the theme in effect.
+    pub fn set_picking(&mut self, picking: Option<SystemTheme>, ctx: &mut ViewContext<Self>) {
+        self.body
+            .update(ctx, |body, ctx| body.set_picking(picking, ctx));
+    }
+
     fn handle_body_event(&mut self, event: &ThemeExplorerBodyEvent, ctx: &mut ViewContext<Self>) {
         // The explorer applies, installs and deletes on its own — it holds the state those need.
-        // What it cannot do is raise a toast, which belongs to the window.
-        let ThemeExplorerBodyEvent::ShowErrorToast { message } = event;
-        let window_id = ctx.window_id();
-        let message = message.clone();
-        ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-            toast_stack.add_ephemeral_toast(DismissibleToast::error(message), window_id, ctx);
-        });
+        // What it cannot do is raise a toast, which belongs to the window, or navigate.
+        match event {
+            ThemeExplorerBodyEvent::ShowErrorToast { message } => {
+                let window_id = ctx.window_id();
+                let message = message.clone();
+                ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
+                    toast_stack.add_ephemeral_toast(
+                        DismissibleToast::error(message),
+                        window_id,
+                        ctx,
+                    );
+                });
+            }
+            // A pick only ever starts from Appearance's Theme card, so that is where it ends —
+            // where the newly chosen theme shows in its slot. Deferred, because this runs while
+            // the explorer is still mid-update and navigating updates the settings view above it.
+            ThemeExplorerBodyEvent::PickFinished => {
+                ctx.dispatch_typed_action_deferred(WorkspaceAction::ShowSettingsPage(
+                    SettingsSection::Appearance,
+                ));
+            }
+        }
     }
 }
 

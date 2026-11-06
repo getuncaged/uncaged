@@ -8,7 +8,7 @@ use warp_util::path::LineAndColumnArg;
 use warpui::accessibility::AccessibilityVerbosity;
 use warpui::geometry::rect::RectF;
 use warpui::geometry::vector::Vector2F;
-use warpui::platform::Cursor;
+use warpui::platform::{Cursor, SystemTheme};
 use warpui::{EntityId, WeakViewHandle, WindowId};
 
 use super::global_actions::{ForkFromExchange, ForkedConversationDestination};
@@ -311,6 +311,9 @@ pub enum WorkspaceAction {
     },
     /// Opens Settings on the theme gallery — the one place to browse and switch themes.
     ShowThemeGallery,
+    /// Opens the theme gallery to choose the theme "Sync with OS" shows in one system
+    /// appearance (Appearance's Light and Dark tiles).
+    ShowThemeGalleryToPick(SystemTheme),
     IncreaseFontSize,
     DecreaseFontSize,
     ResetFontSize,
@@ -1040,6 +1043,7 @@ impl WorkspaceAction {
             | ShowSettingsPage(_)
             | ShowSettingsPageWithSearch { .. }
             | ShowThemeGallery
+            | ShowThemeGalleryToPick(_)
             | IncreaseFontSize
             | DecreaseFontSize
             | ResetFontSize

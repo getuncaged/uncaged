@@ -14,6 +14,7 @@ use warpui::elements::{
     Shrinkable, Stack, Text,
 };
 use warpui::fonts::FamilyId;
+use warpui::platform::SystemTheme;
 
 use super::default_themes::*;
 use super::theme_creator::{pick_accent_color_from_options, top_colors_for_image};
@@ -627,6 +628,30 @@ impl RespectSystemTheme {
         match self {
             RespectSystemTheme::Off => None,
             RespectSystemTheme::On(selected) => Some(selected),
+        }
+    }
+}
+
+impl SelectedSystemThemes {
+    /// The theme shown while the system is in `appearance`.
+    pub fn for_appearance(&self, appearance: SystemTheme) -> &ThemeKind {
+        match appearance {
+            SystemTheme::Light => &self.light,
+            SystemTheme::Dark => &self.dark,
+        }
+    }
+
+    /// These themes, with the one for `appearance` replaced by `theme`.
+    pub fn with_theme_for(&self, appearance: SystemTheme, theme: ThemeKind) -> Self {
+        match appearance {
+            SystemTheme::Light => Self {
+                light: theme,
+                dark: self.dark.clone(),
+            },
+            SystemTheme::Dark => Self {
+                light: self.light.clone(),
+                dark: theme,
+            },
         }
     }
 }

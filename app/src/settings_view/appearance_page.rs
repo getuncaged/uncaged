@@ -65,7 +65,7 @@ use crate::terminal::model::ObfuscateSecrets;
 use crate::terminal::session_settings::SessionSettings;
 use crate::terminal::settings::{AltScreenPaddingMode, SpacingMode, TerminalSettings};
 use crate::terminal::{BlockListSettings, SizeInfo};
-use crate::themes::theme::{self, RespectSystemTheme, SelectedSystemThemes, ThemeGroup, ThemeKind};
+use crate::themes::theme::{self, RespectSystemTheme, ThemeKind};
 use crate::ui_components::color_dot::{render_color_dot, TAB_COLOR_OPTIONS};
 use crate::ui_components::icons::Icon;
 use crate::user_config::{WarpConfig, WarpConfigUpdateEvent};
@@ -91,6 +91,13 @@ const DROPDOWN_WIDTH: f32 = TOP_MENU_BAR_MAX_WIDTH;
 const NUMBER_INPUT_WIDTH: f32 = 64.;
 /// The current-theme preview on the Theme card, as a fraction of a full preview card.
 const CURRENT_THEME_PREVIEW_SCALE: f32 = 0.45;
+/// The light and dark "Sync with OS" tiles: each preview at this fraction of a full preview card
+/// (190 × 100), inside this much padding, so a tile is the preview's width plus its padding.
+const SYSTEM_THEME_PREVIEW_SCALE: f32 = 1.1;
+const SYSTEM_THEME_TILE_PADDING: f32 = 10.;
+const SYSTEM_THEME_TILE_WIDTH: f32 =
+    190. * SYSTEM_THEME_PREVIEW_SCALE + 2. * SYSTEM_THEME_TILE_PADDING;
+const SYSTEM_THEME_TILE_GAP: f32 = 12.;
 const MIN_FONT_SIZE: usize = 1;
 const MAX_FONT_SIZE: usize = 120;
 const MIN_LINE_SPACING: f32 = 0.1;
@@ -519,11 +526,6 @@ pub enum AppearancePageAction {
     ToggleBlurTexture,
     ToggleLeftPanelVisibility,
     SetEnforceMinimumContrast(EnforceMinimumContrast),
-    /// The theme used while the system is in `appearance`, when "Sync with OS" is on.
-    SetSystemTheme {
-        appearance: SystemTheme,
-        theme: ThemeKind,
-    },
     ToggleFocusPaneOnHover,
     ToggleInputMode,
     ToggleAltScreenPadding,
@@ -560,9 +562,6 @@ pub struct AppearanceSettingsPageView {
     thin_strokes_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     enforce_min_contrast_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     input_mode_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
-    /// The themes for light and dark system appearance, shown while "Sync with OS" is on.
-    light_theme_dropdown: ViewHandle<FilterableDropdown<AppearancePageAction>>,
-    dark_theme_dropdown: ViewHandle<FilterableDropdown<AppearancePageAction>>,
     workspace_decorations_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     tab_close_button_position_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     zoom_level_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
@@ -654,9 +653,6 @@ impl TypedActionView for AppearanceSettingsPageView {
             SetCursorType(cursor_display_type) => self.set_cursor_type(*cursor_display_type, ctx),
             OpacitySliderDragged(val) => self.set_opacity(*val, false, ctx),
             BlurSliderDragged(val) => self.set_blur(*val, false, ctx),
-            SetSystemTheme { appearance, theme } => {
-                self.set_system_theme(*appearance, theme.clone(), ctx)
-            }
             ToggleTabIndicators => self.toggle_tab_indicators(ctx),
             ToggleShowCodeReviewButton => self.toggle_show_code_review_button(ctx),
             TogglePreserveActiveTabColor => self.toggle_preserve_active_tab_color(ctx),
@@ -937,15 +933,11 @@ impl AppearanceSettingsPageView {
             }
         });
         ctx.subscribe_to_model(&AppIconSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
-        // The light and dark theme pickers follow the theme settings (changed from the gallery or
-        // the command palette too) and the set of installed themes.
-        ctx.subscribe_to_model(&ThemeSettings::handle(ctx), |me, _, _, ctx| {
-            me.refresh_system_theme_dropdowns(ctx);
-            ctx.notify();
-        });
-        ctx.subscribe_to_model(&WarpConfig::handle(ctx), |me, _, event, ctx| {
+        // The Theme card shows the current, light and dark themes, which change from the gallery
+        // and the command palette too, and whose files can change on disk.
+        ctx.subscribe_to_model(&ThemeSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
+        ctx.subscribe_to_model(&WarpConfig::handle(ctx), |_, _, event, ctx| {
             if let WarpConfigUpdateEvent::Themes = event {
-                me.refresh_system_theme_dropdowns(ctx);
                 ctx.notify();
             }
         });
@@ -1250,19 +1242,6 @@ impl AppearanceSettingsPageView {
             me.handle_alt_screen_padding_editor_event(event, ctx);
         });
 
-        let light_theme_dropdown = Self::build_system_theme_dropdown(SystemTheme::Light, ctx);
-        let dark_theme_dropdown = Self::build_system_theme_dropdown(SystemTheme::Dark, ctx);
-        // A searchable dropdown shows whichever item the search or arrow keys highlighted, even
-        // when it closes without a choice. Snap both back to the saved themes when they close, so
-        // what they show is what's set. A real choice has already been saved by then.
-        for dropdown in [&light_theme_dropdown, &dark_theme_dropdown] {
-            ctx.subscribe_to_view(dropdown, |me, _, event, ctx| {
-                if matches!(event, FilterableDropdownEvent::Close) {
-                    me.refresh_system_theme_dropdowns(ctx);
-                }
-            });
-        }
-
         let header_toolbar_inline_editor =
             ctx.add_typed_action_view(HeaderToolbarInlineEditor::new);
 
@@ -1283,8 +1262,6 @@ impl AppearanceSettingsPageView {
             font_weight_dropdown,
             thin_strokes_dropdown,
             input_mode_dropdown,
-            light_theme_dropdown,
-            dark_theme_dropdown,
             enforce_min_contrast_dropdown,
             workspace_decorations_dropdown: Self::build_workspace_decoration_visibility_dropdown(
                 ctx,
@@ -1482,127 +1459,6 @@ impl AppearanceSettingsPageView {
         }
 
         PageType::new_categorized(categories, None)
-    }
-
-    /// A light or dark theme picker for "Sync with OS".
-    fn build_system_theme_dropdown(
-        appearance: SystemTheme,
-        ctx: &mut ViewContext<Self>,
-    ) -> ViewHandle<FilterableDropdown<AppearancePageAction>> {
-        // Searchable, like the font pickers: with every built-in theme plus downloads and the
-        // user's own, the list is long, and the plain dropdown couldn't scroll to its end — so the
-        // user's themes, which sort last, were out of reach.
-        ctx.add_typed_action_view(|ctx| {
-            let mut dropdown = FilterableDropdown::new(ctx);
-            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
-            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
-            let selected = Self::system_theme_for(appearance, ctx);
-            dropdown.set_items(Self::system_theme_items(appearance, &selected, ctx), ctx);
-            dropdown.set_selected_by_action(
-                AppearancePageAction::SetSystemTheme {
-                    appearance,
-                    theme: selected,
-                },
-                ctx,
-            );
-            dropdown
-        })
-    }
-
-    /// The theme set for `appearance` under "Sync with OS".
-    fn system_theme_for(appearance: SystemTheme, app: &AppContext) -> ThemeKind {
-        let selected = ThemeSettings::as_ref(app).selected_system_themes.value();
-        match appearance {
-            SystemTheme::Light => selected.light.clone(),
-            SystemTheme::Dark => selected.dark.clone(),
-        }
-    }
-
-    /// Every installed theme, in the gallery's order: the ones that ship, then downloads, then
-    /// the user's own, each alphabetically. The referral reward themes are left out — Uncaged has
-    /// no referrals — unless one is somehow already the selection.
-    fn system_theme_items(
-        appearance: SystemTheme,
-        selected: &ThemeKind,
-        app: &AppContext,
-    ) -> Vec<DropdownItem<AppearancePageAction>> {
-        let group_order = |group: ThemeGroup| match group {
-            ThemeGroup::System => 0,
-            ThemeGroup::Community => 1,
-            ThemeGroup::Mine => 2,
-        };
-        let mut themes: Vec<(u8, String, ThemeKind)> = WarpConfig::as_ref(app)
-            .theme_config()
-            .theme_items()
-            .filter(|(kind, _)| {
-                !matches!(
-                    kind,
-                    ThemeKind::SentReferralReward | ThemeKind::ReceivedReferralReward
-                ) || *kind == selected
-            })
-            .map(|(kind, _)| (group_order(kind.group()), kind.to_string(), kind.clone()))
-            .collect();
-        themes.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
-        themes
-            .into_iter()
-            .map(|(_, name, theme)| {
-                DropdownItem::new(
-                    name,
-                    AppearancePageAction::SetSystemTheme { appearance, theme },
-                )
-            })
-            .collect()
-    }
-
-    /// Brings the light and dark theme pickers in line with the installed themes and the
-    /// current selection.
-    fn refresh_system_theme_dropdowns(&mut self, ctx: &mut ViewContext<Self>) {
-        for (appearance, dropdown) in [
-            (SystemTheme::Light, self.light_theme_dropdown.clone()),
-            (SystemTheme::Dark, self.dark_theme_dropdown.clone()),
-        ] {
-            dropdown.update(ctx, |dropdown, ctx| {
-                let selected = Self::system_theme_for(appearance, ctx);
-                dropdown.set_items(Self::system_theme_items(appearance, &selected, ctx), ctx);
-                dropdown.set_selected_by_action(
-                    AppearancePageAction::SetSystemTheme {
-                        appearance,
-                        theme: selected,
-                    },
-                    ctx,
-                );
-            });
-        }
-    }
-
-    /// Sets the theme for one system appearance. The AppearanceManager follows the theme
-    /// settings, so if the system is in that appearance now the window changes straight away.
-    fn set_system_theme(
-        &mut self,
-        appearance: SystemTheme,
-        theme: ThemeKind,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let current = ThemeSettings::as_ref(ctx)
-            .selected_system_themes
-            .value()
-            .clone();
-        let updated = match appearance {
-            SystemTheme::Light => SelectedSystemThemes {
-                light: theme,
-                dark: current.dark,
-            },
-            SystemTheme::Dark => SelectedSystemThemes {
-                light: current.light,
-                dark: theme,
-            },
-        };
-        ThemeSettings::handle(ctx).update(ctx, |theme_settings, ctx| {
-            report_if_error!(theme_settings
-                .selected_system_themes
-                .set_value(updated, ctx));
-        });
-        ctx.notify();
     }
 
     fn set_alt_screen_padding_editor_text(&mut self, ctx: &mut ViewContext<Self>) {
@@ -3046,55 +2902,160 @@ impl SettingsWidget for CurrentThemeWidget {
     }
 }
 
-/// "Sync with OS", and — while it is on — the theme for each system appearance.
+/// "Sync with OS", and — while it is on — the theme for each system appearance, shown as it
+/// looks, with the way to change it in the gallery.
 #[derive(Default)]
 struct SyncThemeWithOsWidget {
     switch_state: SwitchStateHandle,
+    light_change_state: MouseStateHandle,
+    dark_change_state: MouseStateHandle,
 }
 
 impl SettingsWidget for SyncThemeWithOsWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "sync with os system theme themes light dark mode appearance automatic switch"
+        "sync with os system theme themes light theme dark theme mode appearance automatic \
+         switch change"
     }
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let syncing = matches!(
-            respect_system_theme(ThemeSettings::as_ref(app)),
-            RespectSystemTheme::On(_)
-        );
+        let selected = match respect_system_theme(ThemeSettings::as_ref(app)) {
+            RespectSystemTheme::On(selected) => Some(selected),
+            RespectSystemTheme::Off => None,
+        };
         let mut column = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
             .with_child(switch_row(
                 "Sync with OS",
                 Some("Switch between a light and a dark theme when your system does."),
                 &self.switch_state,
-                syncing,
+                selected.is_some(),
                 AppearancePageAction::ToggleRespectSystemTheme,
                 appearance,
             ));
-        if syncing {
-            column.add_child(dropdown_like_row(
-                "Light theme",
-                None,
-                ChildView::new(&view.light_theme_dropdown).finish(),
-                appearance,
-            ));
-            column.add_child(dropdown_like_row(
-                "Dark theme",
-                None,
-                ChildView::new(&view.dark_theme_dropdown).finish(),
-                appearance,
-            ));
+        if let Some(selected) = selected {
+            // Side by side, stacking when the pane is too narrow for both.
+            column.add_child(
+                Container::new(
+                    Wrap::row()
+                        .with_spacing(SYSTEM_THEME_TILE_GAP)
+                        .with_run_spacing(SYSTEM_THEME_TILE_GAP)
+                        .with_child(system_theme_tile(
+                            SystemTheme::Light,
+                            selected.for_appearance(SystemTheme::Light),
+                            &self.light_change_state,
+                            appearance,
+                            app,
+                        ))
+                        .with_child(system_theme_tile(
+                            SystemTheme::Dark,
+                            selected.for_appearance(SystemTheme::Dark),
+                            &self.dark_change_state,
+                            appearance,
+                            app,
+                        ))
+                        .finish(),
+                )
+                .with_padding_bottom(HEADER_PADDING)
+                .finish(),
+            );
         }
         column.finish()
     }
+}
+
+/// One "Sync with OS" slot: which appearance it is for, a preview of its theme, the theme's name,
+/// and "Change…", which opens the gallery to pick that slot's theme.
+fn system_theme_tile(
+    slot: SystemTheme,
+    kind: &ThemeKind,
+    change_state: &MouseStateHandle,
+    appearance: &Appearance,
+    app: &AppContext,
+) -> Box<dyn Element> {
+    let theme = appearance.theme();
+    let definition = WarpConfig::as_ref(app).theme_config().theme(kind);
+    let slot_name = match slot {
+        SystemTheme::Light => "Light",
+        SystemTheme::Dark => "Dark",
+    };
+    let heading = if app.system_theme() == slot {
+        format!("{slot_name} · showing now")
+    } else {
+        slot_name.to_string()
+    };
+
+    let change = appearance
+        .ui_builder()
+        .button(ButtonVariant::Secondary, change_state.clone())
+        .with_style(UiComponentStyles {
+            font_size: Some(CONTENT_FONT_SIZE),
+            padding: Some(Coords::uniform(5.).left(12.).right(12.)),
+            ..Default::default()
+        })
+        .with_centered_text_label("Change…".into())
+        .build()
+        .with_cursor(Cursor::PointingHand)
+        .on_click(move |ctx, _, _| {
+            ctx.dispatch_typed_action(WorkspaceAction::ShowThemeGalleryToPick(slot))
+        })
+        .finish();
+
+    let footer = Flex::row()
+        .with_main_axis_size(MainAxisSize::Max)
+        .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
+        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(
+            Shrinkable::new(
+                1.,
+                Text::new_inline(kind.to_string(), appearance.ui_font_family(), 13.)
+                    .with_color(theme.active_ui_text_color().into())
+                    .finish(),
+            )
+            .finish(),
+        )
+        .with_child(Container::new(change).with_margin_left(8.).finish())
+        .finish();
+
+    let content = Flex::column()
+        .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+        .with_child(
+            Container::new(
+                Text::new_inline(heading, appearance.ui_font_family(), CONTENT_FONT_SIZE)
+                    .with_color(theme.sub_text_color(theme.surface_2()).into_solid())
+                    .with_style(Properties::default().weight(Weight::Semibold))
+                    .finish(),
+            )
+            .with_margin_bottom(8.)
+            .finish(),
+        )
+        .with_child(
+            Container::new(theme::render_preview(
+                &definition,
+                appearance.monospace_font_family(),
+                Some(SYSTEM_THEME_PREVIEW_SCALE),
+            ))
+            .with_corner_radius(warp_core::ui::radius::small())
+            .finish(),
+        )
+        .with_child(Container::new(footer).with_margin_top(8.).finish())
+        .finish();
+
+    ConstrainedBox::new(
+        Container::new(content)
+            .with_uniform_padding(SYSTEM_THEME_TILE_PADDING)
+            .with_background(theme.surface_2())
+            .with_corner_radius(warp_core::ui::radius::medium())
+            .finish(),
+    )
+    .with_width(SYSTEM_THEME_TILE_WIDTH)
+    .finish()
 }
 
 // ── Dock ─────────────────────────────────────────────────────────────────────

@@ -44,6 +44,7 @@ use warpui::elements::{
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::keymap::{ContextPredicate, EnabledPredicate, FixedBinding};
+use warpui::platform::SystemTheme;
 use warpui::{
     id, Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView,
     UpdateView as _, View, ViewContext, ViewHandle,
@@ -2099,6 +2100,13 @@ impl SettingsView {
         if should_clear_query {
             self.clear_search_query(ctx);
         }
+        // Picking a light or dark theme in the gallery ends however the gallery is left — by
+        // choosing, cancelling, or simply going somewhere else in the sidebar.
+        if previous_section == SettingsSection::ThemeGallery
+            && section != SettingsSection::ThemeGallery
+        {
+            self.set_theme_gallery_picking(None, ctx);
+        }
         self.current_settings_page = section;
         if previous_section != section && section == SettingsSection::CloudEnvironments {
             send_telemetry_from_ctx!(SettingsTelemetryEvent::EnvironmentsPageOpened, ctx);
@@ -2224,6 +2232,20 @@ impl SettingsView {
                         view.autoinstall_from_gallery(title, ctx);
                     }
                 })
+            }
+        }
+    }
+
+    /// Puts the theme gallery into picking mode for one "Sync with OS" slot, or (with `None`) back
+    /// to choosing the theme in effect. Call before navigating to the gallery.
+    pub fn set_theme_gallery_picking(
+        &mut self,
+        picking: Option<SystemTheme>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if let Some(gallery) = self.settings_page(SettingsSection::ThemeGallery) {
+            if let SettingsPageViewHandle::ThemeGallery(view) = &gallery.view_handle {
+                view.update(ctx, |view, ctx| view.set_picking(picking, ctx));
             }
         }
     }

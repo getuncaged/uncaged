@@ -485,3 +485,30 @@ fn in_memory_theme_generation_test() {
         )
     );
 }
+
+/// Setting the theme for one system appearance leaves the other one alone — the light and dark
+/// slots are chosen separately, from the gallery's picking mode or anywhere else.
+#[test]
+fn setting_one_system_theme_keeps_the_other() {
+    let selected = SelectedSystemThemes {
+        light: ThemeKind::Light,
+        dark: ThemeKind::Dark,
+    };
+
+    let light_changed = selected.with_theme_for(SystemTheme::Light, ThemeKind::Snowy);
+    assert_eq!(light_changed.light, ThemeKind::Snowy);
+    assert_eq!(light_changed.dark, ThemeKind::Dark);
+
+    let dark_changed = selected.with_theme_for(SystemTheme::Dark, ThemeKind::Midnight);
+    assert_eq!(dark_changed.light, ThemeKind::Light);
+    assert_eq!(dark_changed.dark, ThemeKind::Midnight);
+
+    assert_eq!(
+        dark_changed.for_appearance(SystemTheme::Dark),
+        &ThemeKind::Midnight
+    );
+    assert_eq!(
+        dark_changed.for_appearance(SystemTheme::Light),
+        &ThemeKind::Light
+    );
+}
