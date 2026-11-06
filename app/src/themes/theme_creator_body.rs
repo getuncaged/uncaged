@@ -1644,8 +1644,9 @@ impl ThemeCreatorBody {
         .finish()
     }
 
-    /// The right-aligned action row under everything: secondary actions, then the one primary
-    /// action — saving — last.
+    /// The right-aligned action row under everything. In the custom editor, sharing with the
+    /// community is the highlighted action on the far right, so people are nudged to contribute
+    /// their themes; saving sits beside it as a secondary button.
     fn render_footer(&self, appearance: &Appearance) -> Box<dyn Element> {
         let cancel = SavePosition::new(
             action_button(
@@ -1662,19 +1663,19 @@ impl ThemeCreatorBody {
         let mut buttons: Vec<Box<dyn Element>> = Vec::new();
         match self.mode {
             ThemeCreatorMode::Manual => {
-                buttons.push(action_button(
-                    "Share to gallery",
-                    ButtonVariant::Secondary,
-                    self.share_mouse_state.clone(),
-                    ThemeCreatorBodyAction::ShareTheme,
-                    appearance,
-                ));
                 buttons.push(cancel);
                 buttons.push(action_button(
                     "Save theme",
-                    ButtonVariant::Accent,
+                    ButtonVariant::Secondary,
                     self.button_mouse_states.create_mouse_state.clone(),
                     ThemeCreatorBodyAction::Create,
+                    appearance,
+                ));
+                buttons.push(action_button(
+                    "Share with the community",
+                    ButtonVariant::Accent,
+                    self.share_mouse_state.clone(),
+                    ThemeCreatorBodyAction::ShareTheme,
                     appearance,
                 ));
             }
