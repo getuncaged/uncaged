@@ -410,6 +410,10 @@ impl CustomTheme {
     }
 }
 
+/// How much of the picture shows through in a theme generated from an image, matching the
+/// built-in photo themes.
+pub const IMAGE_THEME_BACKGROUND_OPACITY: u8 = 30;
+
 #[derive(
     Debug,
     Clone,
@@ -439,6 +443,17 @@ impl InMemoryThemeOptions {
             possible_bg_colors: top_colors,
             chosen_bg_color_index: 0,
         })
+    }
+
+    /// Options with an already-extracted palette, so tests needn't decode an image.
+    #[cfg(test)]
+    pub fn new_for_test(name: String, path: PathBuf, possible_bg_colors: Vec<ColorU>) -> Self {
+        InMemoryThemeOptions {
+            name,
+            path,
+            possible_bg_colors,
+            chosen_bg_color_index: 0,
+        }
     }
 
     pub fn chosen_bg_color(&self) -> ColorU {
@@ -474,6 +489,12 @@ impl InMemoryThemeOptions {
     }
 
     pub fn theme(&self) -> WarpTheme {
+        self.theme_with_background_image(Some(IMAGE_THEME_BACKGROUND_OPACITY))
+    }
+
+    /// The generated theme, with the image as its background picture at `image_opacity` (0–100),
+    /// or with no background picture at all when that is `None`.
+    pub fn theme_with_background_image(&self, image_opacity: Option<u8>) -> WarpTheme {
         let bg_color = self.chosen_bg_color();
         let fg_color = pick_foreground_color(bg_color);
         let possible_accent_colors: Vec<ColorU> = self
@@ -499,13 +520,13 @@ impl InMemoryThemeOptions {
             None,
             Some(details),
             terminal_colors,
-            Some(Image {
+            image_opacity.map(|opacity| Image {
                 // Note that, as an invariant, in-memory themes come from local files.
                 source: AssetSource::LocalFile {
                     path: self.path().to_str().unwrap_or_default().to_owned(),
                     content_version: None,
                 },
-                opacity: 30,
+                opacity,
             }),
             Some(self.name()),
         )

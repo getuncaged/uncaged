@@ -11,15 +11,15 @@ use settings::Setting as _;
 use warp_core::ui::color::hex_color::{coloru_from_hex_string, coloru_to_hex_string};
 use warp_core::ui::radius;
 use warp_core::ui::theme::{
-    AnsiColors, Details, Fill as ThemeFill, Image as ThemeImage, TerminalColors, VerticalGradient,
-    WarpTheme,
+    AnsiColors, ColorScheme, Details, Fill as ThemeFill, Image as ThemeImage, TerminalColors,
+    VerticalGradient, WarpTheme,
 };
 use warpui::assets::asset_cache::AssetSource;
 use warpui::elements::{
-    Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    DispatchEventResult, EventHandler, Expanded, Fill, Flex, Hoverable, Icon, MainAxisAlignment,
-    MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, SavePosition, Shrinkable,
-    SizeConstraintCondition, SizeConstraintSwitch, Stack, Text, Wrap,
+    Align, Border, CacheOption, Clipped, ConstrainedBox, Container, CornerRadius,
+    CrossAxisAlignment, DispatchEventResult, EventHandler, Expanded, Fill, Flex, Hoverable, Icon,
+    Image, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect,
+    SavePosition, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack, Text, Wrap,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::platform::Cursor;
@@ -33,13 +33,13 @@ use warpui::{
     ViewHandle,
 };
 
-use crate::appearance::{Appearance, AppearanceManager};
+use crate::appearance::Appearance;
 use crate::editor::{EditOrigin, EditorView, Event as EditorEvent};
 use crate::server::telemetry::TelemetryEvent;
 use crate::settings_view::settings_page::{
     build_toggle_element, render_settings_description, render_sub_header,
     render_sub_header_with_description, settings_card, settings_description_color,
-    CONTENT_FONT_SIZE, HEADER_PADDING,
+    CONTENT_FONT_SIZE, HEADER_PADDING, SUBHEADER_FONT_SIZE,
 };
 use crate::themes::theme::{CustomTheme, InMemoryThemeOptions, ThemeKind};
 use crate::themes::theme_background_image;
@@ -104,11 +104,9 @@ pub enum ThemeCreatorMode {
     FromImage,
 }
 
-const MODAL_SUBHEADER: &str =
-    "Automatically generate a theme based on extracted colors from an image (.png, .jpg).";
-const IMAGE_PICKER_BUTTON_PRE_SELECT_TEXT: &str = "Select an image";
-const IMAGE_PICKER_BUTTON_SELECTING_TEXT: &str = "Selecting image...";
-const IMAGE_PICKER_BUTTON_POST_SELECT_TEXT: &str = "Select a new image";
+const IMAGE_PICKER_BUTTON_PRE_SELECT_TEXT: &str = "Choose image…";
+const IMAGE_PICKER_BUTTON_SELECTING_TEXT: &str = "Reading image…";
+const IMAGE_PICKER_BUTTON_POST_SELECT_TEXT: &str = "Change image…";
 const CANCEL_BUTTON_TEXT: &str = "Cancel";
 const CREATE_BUTTON_TEXT: &str = "Create theme";
 
@@ -167,6 +165,18 @@ pub struct ThemeCreatorBody {
     picker_dragging: bool,
     share_mouse_state: MouseStateHandle,
     pick_image_mouse_state: MouseStateHandle,
+    remove_image_mouse_state: MouseStateHandle,
+
+    // "From image" state, beyond the processed image itself (`theme_options`).
+    /// Whether the generated theme keeps the picked image as its background picture.
+    image_as_background: bool,
+    /// How much of the picked image shows through when it is the background, 0–100.
+    image_background_opacity: u8,
+    image_background_switch_state: SwitchStateHandle,
+    image_background_opacity_slider: SliderStateHandle,
+    /// One per background candidate tile in step 2.
+    candidate_mouse_states: [MouseStateHandle; MAX_BACKGROUND_CANDIDATES],
+    customize_mouse_state: MouseStateHandle,
 }
 
 #[derive(Debug, Clone)]
@@ -203,7 +213,15 @@ pub enum ThemeCreatorBodyAction {
     /// Apply a preset swatch (0xRRGGBB) to the slot whose picker is open.
     SetPresetColor(u32),
     PickBackgroundImage,
+    /// Drop the custom theme's background picture.
+    RemoveBackgroundImage,
     ShareTheme,
+    // "From image" actions.
+    /// Keep or drop the picked image as the generated theme's background picture.
+    ToggleImageAsBackground,
+    SetImageBackgroundOpacity(f32),
+    /// Open the generated theme in the custom editor, every colour pre-filled, to fine-tune it.
+    CustomizeGeneratedTheme,
 }
 
 pub enum ThemeCreatorBodyEvent {
@@ -249,7 +267,8 @@ impl ThemeCreatorBody {
             color_editor.update(ctx, |e, ctx| e.system_reset_buffer_text(default_hex, ctx));
             ctx.subscribe_to_view(&color_editor, move |me, _, event, ctx| {
                 // Initialization events are queued and can arrive after this subscription is
-                // registered, even while the editor is hidden. Only user edits start a preview.
+                // registered, even while the editor is hidden. Only user edits are read back: the
+                // editor's own resets set `manual_colors` themselves.
                 if let EditorEvent::Edited(EditOrigin::UserTyped | EditOrigin::UserInitiated) =
                     event
                 {
@@ -289,6 +308,13 @@ impl ThemeCreatorBody {
             picker_dragging: false,
             share_mouse_state: Default::default(),
             pick_image_mouse_state: Default::default(),
+            remove_image_mouse_state: Default::default(),
+            image_as_background: true,
+            image_background_opacity: DEFAULT_BG_IMAGE_OPACITY,
+            image_background_switch_state: Default::default(),
+            image_background_opacity_slider: Default::default(),
+            candidate_mouse_states: Default::default(),
+            customize_mouse_state: Default::default(),
         }
     }
 
@@ -306,20 +332,22 @@ impl ThemeCreatorBody {
     }
 
     pub fn handle_editor_event(&mut self, event: &EditorEvent, ctx: &mut ViewContext<Self>) {
-        if let EditorEvent::Edited(_) = event {
-            if self.mode == ThemeCreatorMode::Manual {
-                self.on_manual_edit(ctx);
-                return;
-            }
-            if let Some(theme_options) = &mut self.theme_options {
-                self.editor.update(ctx, |editor, ctx| {
-                    theme_options.set_name(editor.buffer_text(ctx));
-
-                    let theme_kind = ThemeKind::InMemory(theme_options.clone());
-                    AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-                        appearance_manager.set_transient_theme(theme_kind, ctx);
-                    });
-                });
+        // Only the user's own typing counts. The editor also fills this field itself — resetting
+        // it, or naming a theme after its image — and those values are already where they belong.
+        if let EditorEvent::Edited(origin) = event {
+            if origin.is_user() {
+                match self.mode {
+                    ThemeCreatorMode::Manual => {
+                        self.on_manual_edit(ctx);
+                        return;
+                    }
+                    ThemeCreatorMode::FromImage => {
+                        let name = self.editor.as_ref(ctx).buffer_text(ctx);
+                        if let Some(theme_options) = &mut self.theme_options {
+                            theme_options.set_name(name);
+                        }
+                    }
+                }
             }
         }
         ctx.notify();
@@ -332,11 +360,10 @@ impl ThemeCreatorBody {
         ctx.emit(ThemeCreatorBodyEvent::Close);
     }
 
-    /// Called when the modal is shown: reset to a fresh editor so each "New theme" starts clean,
-    /// then kick off the live preview so the terminal immediately reflects the default theme.
+    /// Called when the modal is shown: reset to a fresh editor so each "New theme" starts clean.
     pub fn on_shown(&mut self, ctx: &mut ViewContext<Self>) {
         self.reset_manual_state(ctx);
-        self.refresh_manual_preview(ctx);
+        ctx.notify();
     }
 
     /// Resets the manual editor back to its defaults (colors, gradient/appearance toggles,
@@ -344,17 +371,30 @@ impl ThemeCreatorBody {
     /// session's edits don't linger.
     fn reset_manual_state(&mut self, ctx: &mut ViewContext<Self>) {
         self.mode = ThemeCreatorMode::Manual;
+        self.reset_editor_state(ctx);
+    }
+
+    /// Puts every field back to its default — colours, toggles, opacities, the background image,
+    /// the name, and any image being turned into a theme — while staying in the current mode.
+    ///
+    /// The fields are refilled with system edits, which the editor subscriptions ignore, so a
+    /// reset arriving late can't overwrite anything the user does next.
+    fn reset_editor_state(&mut self, ctx: &mut ViewContext<Self>) {
         self.use_gradient = true;
         self.is_light = false;
         self.bg_opacity = 100;
         self.bg_image = None;
         self.bg_image_opacity = DEFAULT_BG_IMAGE_OPACITY;
         self.advanced_expanded = false;
+        self.open_picker = None;
+        self.picker_dragging = false;
         self.theme_options = None;
         self.image_state = ThemeCreatorImageState::Empty;
+        self.image_as_background = true;
+        self.image_background_opacity = DEFAULT_BG_IMAGE_OPACITY;
 
         self.editor
-            .update(ctx, |editor, ctx| editor.set_buffer_text("", ctx));
+            .update(ctx, |editor, ctx| editor.system_reset_buffer_text("", ctx));
         for (i, &(_label, default_hex)) in COLOR_SLOTS.iter().enumerate() {
             self.manual_colors[i] =
                 coloru_from_hex_string(default_hex).unwrap_or_else(|_| ColorU::black());
@@ -364,11 +404,14 @@ impl ThemeCreatorBody {
         }
     }
 
+    /// Discards everything in progress, in either mode. On the settings page the editor stays
+    /// open, so it starts over from a clean slate rather than keeping the half-made theme — or the
+    /// name of the last one — around. The app's theme was never touched, so there is nothing to
+    /// put back.
     pub fn cancel(&mut self, ctx: &mut ViewContext<Self>) {
-        AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-            appearance_manager.clear_transient_theme(ctx);
-        });
+        self.reset_editor_state(ctx);
         self.close(ctx);
+        ctx.notify();
     }
 
     pub fn open_file_picker(&mut self, ctx: &mut ViewContext<Self>) {
@@ -387,43 +430,68 @@ impl ThemeCreatorBody {
     }
 
     pub fn create_theme(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(theme_options) = self.theme_options.as_mut() {
-            let theme_name = theme_options.name();
-            // Sanitize the name before it becomes a filename — a name can contain path separators
-            // or `..`. The display name is preserved in the theme itself; only the on-disk paths
-            // use the slug. This matches how the manual editor saves.
-            let slug = slugify(&theme_name);
-            let theme_yaml_file_name = format!("{slug}.yaml");
-            let original_theme_image_path = theme_options.path();
-            let original_theme_image_path_clone = original_theme_image_path.clone();
+        let Some(mut theme_options) = self.theme_options.clone() else {
+            return;
+        };
+        let theme_name = self.image_theme_name(&theme_options, ctx);
+        theme_options.set_name(theme_name.clone());
+        // Sanitize the name before it becomes a filename — a name can contain path separators
+        // or `..`. The display name is preserved in the theme itself; only the on-disk paths
+        // use the slug. This matches how the manual editor saves.
+        let slug = slugify(&theme_name);
+        let theme_yaml_file_name = format!("{slug}.yaml");
+        let original_theme_image_path = theme_options.path();
 
-            let dir = user_config::themes_dir();
+        let dir = user_config::themes_dir();
 
-            // The import re-encodes to JPEG whatever the source was, so the saved name is fixed.
+        // The picture only travels with the theme when it is the background. The import
+        // re-encodes to JPEG whatever the source was, so the saved name is fixed.
+        let image_option = if self.image_as_background {
             theme_options.set_path(dir.join(format!(
                 "{slug}.{}",
                 theme_background_image::IMPORTED_EXTENSION
             )));
-            let mut errored = true;
-            ThemeCreatorBody::write_theme(
-                &theme_options.theme(),
-                dir,
-                theme_yaml_file_name,
-                Some((original_theme_image_path_clone, slug.clone())),
-                |path| {
-                    send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
-                    ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
-                        theme: ThemeKind::Custom(CustomTheme::new(theme_name, path)),
-                    });
-                    errored = false;
-                    self.close(ctx);
-                    ctx.notify();
-                },
-            );
-            if errored {
-                self.send_error_toast("Something went wrong".to_string(), ctx);
-            }
+            Some((original_theme_image_path, slug.clone()))
+        } else {
+            None
+        };
+        let theme = self.generated_theme(&theme_options);
+        let mut errored = true;
+        ThemeCreatorBody::write_theme(&theme, dir, theme_yaml_file_name, image_option, |path| {
+            send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
+            ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
+                theme: ThemeKind::Custom(CustomTheme::new(theme_name, path)),
+            });
+            errored = false;
+            // Start the next theme from a clean slate, still in this mode.
+            self.reset_editor_state(ctx);
+            self.close(ctx);
+            ctx.notify();
+        });
+        if errored {
+            self.send_error_toast("Something went wrong".to_string(), ctx);
         }
+    }
+
+    /// The name a theme made from an image is saved under: whatever is in the name field, or
+    /// the image's file name when the field is empty.
+    fn image_theme_name(&self, theme_options: &InMemoryThemeOptions, app: &AppContext) -> String {
+        let typed = self.editor.as_ref(app).buffer_text(app);
+        let typed = typed.trim();
+        if typed.is_empty() {
+            theme_options.name()
+        } else {
+            typed.to_string()
+        }
+    }
+
+    /// The theme made from the processed image, with the picked background colour and — if it
+    /// is switched on — the image itself as the background picture.
+    fn generated_theme(&self, theme_options: &InMemoryThemeOptions) -> WarpTheme {
+        theme_options.theme_with_background_image(
+            self.image_as_background
+                .then_some(self.image_background_opacity),
+        )
     }
 
     /// Writes a theme to the filesystem. Calls the success callback if successful.
@@ -472,17 +540,15 @@ impl ThemeCreatorBody {
             move |theme_creator_body, theme_options, ctx| {
                 match theme_options {
                     Ok(theme_options) => {
-                        AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-                            appearance_manager.clear_transient_theme(ctx);
-                        });
-
                         theme_creator_body.theme_options = Some(theme_options);
                         theme_creator_body.editor.update(ctx, |editor, ctx| {
-                            editor.set_buffer_text(&file_stem_string, ctx);
+                            editor.system_reset_buffer_text(&file_stem_string, ctx);
                         });
                         theme_creator_body.image_state = ThemeCreatorImageState::Uploaded;
+                        ctx.notify();
                     },
                     Err(e) => {
+                        theme_creator_body.handle_file_picker_cancelled(ctx);
                         theme_creator_body.send_error_toast(
                             format!("Failed to process selected image due to error: {e}. Please try again with a different image."),
                             ctx,
@@ -496,13 +562,82 @@ impl ThemeCreatorBody {
     pub fn set_background_color(&mut self, index: usize, ctx: &mut ViewContext<Self>) {
         if let Some(theme_options) = &mut self.theme_options {
             theme_options.set_chosen_bg_color_index(index);
+        }
+        ctx.notify();
+    }
 
-            let theme_kind = ThemeKind::InMemory(theme_options.clone());
-            AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-                appearance_manager.set_transient_theme(theme_kind, ctx);
+    fn toggle_image_as_background(&mut self, ctx: &mut ViewContext<Self>) {
+        self.image_as_background = !self.image_as_background;
+        ctx.notify();
+    }
+
+    fn set_image_background_opacity(&mut self, value: f32, ctx: &mut ViewContext<Self>) {
+        self.image_background_opacity = value.round().clamp(0.0, 100.0) as u8;
+        ctx.notify();
+    }
+
+    /// Step 3 of "From image": moves the generated theme into the custom editor — name, every
+    /// colour including the 16 terminal colours, and the image if it is the background — so it
+    /// can be fine-tuned, saved and shared like any custom theme.
+    ///
+    /// The processed image stays put, so going back to "From image" picks up where it left off.
+    fn customize_generated_theme(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some(theme_options) = self.theme_options.clone() else {
+            return;
+        };
+        let name = self.image_theme_name(&theme_options, ctx);
+        let theme = self.generated_theme(&theme_options);
+        let background = theme.background().into_solid();
+        let terminal_colors = theme.terminal_colors();
+        let normal = &terminal_colors.normal;
+        let bright = &terminal_colors.bright;
+
+        let mut colors = vec![
+            background,
+            // The generated background is a flat colour, so the gradient starts switched off; its
+            // bottom colour starts as the same colour in case it is switched on.
+            background,
+            theme.foreground().into_solid(),
+            theme.accent().into_solid(),
+            theme.cursor().into_solid(),
+        ];
+        for ansi in [normal, bright] {
+            colors.extend(
+                [
+                    ansi.black,
+                    ansi.red,
+                    ansi.green,
+                    ansi.yellow,
+                    ansi.blue,
+                    ansi.magenta,
+                    ansi.cyan,
+                    ansi.white,
+                ]
+                .map(ColorU::from),
+            );
+        }
+        debug_assert_eq!(colors.len(), NUM_COLOR_SLOTS);
+
+        for (index, color) in colors.into_iter().enumerate().take(NUM_COLOR_SLOTS) {
+            self.manual_colors[index] = color;
+            let hex = coloru_to_hex_string(&color);
+            self.color_editors[index].update(ctx, |editor, ctx| {
+                editor.system_reset_buffer_text(&hex, ctx)
             });
         }
+        self.editor.update(ctx, |editor, ctx| {
+            editor.system_reset_buffer_text(&name, ctx)
+        });
 
+        self.use_gradient = false;
+        self.is_light = matches!(theme.inferred_color_scheme(), ColorScheme::DarkOnLight);
+        self.bg_opacity = 100;
+        self.bg_image = self.image_as_background.then(|| theme_options.path());
+        self.bg_image_opacity = self.image_background_opacity;
+        // The generated terminal colours live under Advanced, so open it to show them.
+        self.advanced_expanded = true;
+        self.open_picker = None;
+        self.mode = ThemeCreatorMode::Manual;
         ctx.notify();
     }
 
@@ -512,7 +647,7 @@ impl ThemeCreatorBody {
 
     // ── Manual editor ──────────────────────────────────────────────────────────
 
-    /// Re-reads every color input and refreshes the live preview from the manually-edited theme.
+    /// Re-reads every color input so the preview card shows the manually-edited theme.
     fn on_manual_edit(&mut self, ctx: &mut ViewContext<Self>) {
         for i in 0..self.color_editors.len() {
             let text = self.color_editors[i].as_ref(ctx).buffer_text(ctx);
@@ -524,14 +659,6 @@ impl ThemeCreatorBody {
         if let Some(index) = self.open_picker {
             self.resync_picker_from_slot(index);
         }
-        self.refresh_manual_preview(ctx);
-    }
-
-    fn refresh_manual_preview(&mut self, ctx: &mut ViewContext<Self>) {
-        let theme = self.build_manual_theme(ctx, self.bg_image.as_deref());
-        AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-            appearance_manager.set_transient_warp_theme(theme, ctx);
-        });
         ctx.notify();
     }
 
@@ -747,39 +874,26 @@ impl ThemeCreatorBody {
         );
     }
 
+    /// Switches between the custom editor and "From image". Only the editor changes: the app's
+    /// theme is left alone, and the preview card shows whichever theme the new mode is making.
     fn set_mode(&mut self, mode: ThemeCreatorMode, ctx: &mut ViewContext<Self>) {
         self.mode = mode;
-        match mode {
-            ThemeCreatorMode::Manual => self.refresh_manual_preview(ctx),
-            ThemeCreatorMode::FromImage => {
-                if let Some(theme_options) = &self.theme_options {
-                    let theme_kind = ThemeKind::InMemory(theme_options.clone());
-                    AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-                        appearance_manager.set_transient_theme(theme_kind, ctx);
-                    });
-                } else {
-                    AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-                        appearance_manager.clear_transient_theme(ctx);
-                    });
-                }
-            }
-        }
         ctx.notify();
     }
 
     fn toggle_gradient(&mut self, ctx: &mut ViewContext<Self>) {
         self.use_gradient = !self.use_gradient;
-        self.refresh_manual_preview(ctx);
+        ctx.notify();
     }
 
     /// Sets the theme's UI details to light or dark. Clicking the segment that is already
-    /// selected changes nothing, so it doesn't re-apply the preview either.
+    /// selected changes nothing.
     fn set_light_appearance(&mut self, is_light: bool, ctx: &mut ViewContext<Self>) {
         if self.is_light == is_light {
             return;
         }
         self.is_light = is_light;
-        self.refresh_manual_preview(ctx);
+        ctx.notify();
     }
 
     fn toggle_advanced(&mut self, ctx: &mut ViewContext<Self>) {
@@ -789,12 +903,12 @@ impl ThemeCreatorBody {
 
     fn set_background_opacity(&mut self, value: f32, ctx: &mut ViewContext<Self>) {
         self.bg_opacity = value.round().clamp(0.0, 100.0) as u8;
-        self.refresh_manual_preview(ctx);
+        ctx.notify();
     }
 
     fn set_background_image_opacity(&mut self, value: f32, ctx: &mut ViewContext<Self>) {
         self.bg_image_opacity = value.round().clamp(0.0, 100.0) as u8;
-        self.refresh_manual_preview(ctx);
+        ctx.notify();
     }
 
     /// Expands the colour wheel for `index`, collapsing whichever one was open, and seeds the
@@ -844,7 +958,7 @@ impl ThemeCreatorBody {
     }
 
     /// Writes `color` into the slot whose picker is open, keeping the hex field in sync so the two
-    /// inputs never disagree, and refreshes the live preview.
+    /// inputs never disagree, and refreshes the preview card.
     fn apply_color_to_open_slot(&mut self, color: ColorU, ctx: &mut ViewContext<Self>) {
         let Some(index) = self.open_picker else {
             return;
@@ -854,7 +968,7 @@ impl ThemeCreatorBody {
         self.color_editors[index].update(ctx, |editor, ctx| {
             editor.set_buffer_text(&hex, ctx);
         });
-        self.refresh_manual_preview(ctx);
+        ctx.notify();
     }
 
     /// Re-seeds the wheel from the open slot's colour after that colour was changed by something
@@ -899,7 +1013,7 @@ impl ThemeCreatorBody {
         match self.mode {
             ThemeCreatorMode::Manual => self.build_manual_theme(app, self.bg_image.as_deref()),
             ThemeCreatorMode::FromImage => match &self.theme_options {
-                Some(theme_options) => theme_options.theme(),
+                Some(theme_options) => self.generated_theme(theme_options),
                 None => Appearance::as_ref(app).theme().clone(),
             },
         }
@@ -936,6 +1050,16 @@ impl ThemeCreatorBody {
     /// (which opens the picker) beside the hex field. Every colour row puts these two in the same
     /// right-aligned column, so they line up with each other and with the sliders.
     fn color_field_row(&self, index: usize, appearance: &Appearance) -> Box<dyn Element> {
+        self.color_field_row_with_caption(index, None, appearance)
+    }
+
+    /// A colour row with a muted caption under its label, saying where the colour shows up.
+    fn color_field_row_with_caption(
+        &self,
+        index: usize,
+        caption: Option<&str>,
+        appearance: &Appearance,
+    ) -> Box<dyn Element> {
         let (label, _) = COLOR_SLOTS[index];
         let color = self.manual_colors[index];
         let theme = appearance.theme();
@@ -984,7 +1108,12 @@ impl ThemeCreatorBody {
             .with_child(input)
             .finish();
 
-        let row = build_toggle_element(row_label(label, appearance), control, appearance, None);
+        let row = build_toggle_element(
+            row_label(label, appearance),
+            control,
+            appearance,
+            caption.map(str::to_string),
+        );
         if !is_open {
             return row;
         }
@@ -1249,8 +1378,8 @@ impl ThemeCreatorBody {
         }
         // Background transparency. Hidden once there's a background image: the fill is forced
         // opaque in that case (see `build_manual_theme`), so leaving the slider on screen would
-        // offer a control that silently does nothing. Image opacity and window opacity are the
-        // two that still bite, and both are shown elsewhere on this page.
+        // offer a control that silently does nothing. With a picture, the background colour
+        // becomes the veil over it, and Image opacity below is the knob that matters.
         if self.bg_image.is_none() {
             background_rows.push(slider_row(
                 "Opacity",
@@ -1264,15 +1393,25 @@ impl ThemeCreatorBody {
                 },
                 appearance,
             ));
-        } else {
-            background_rows.push(
-                Container::new(render_settings_description(
-                    "Opacity follows the background image's opacity, under Advanced.".into(),
-                    appearance,
-                ))
-                .with_padding_bottom(HEADER_PADDING)
-                .finish(),
-            );
+        }
+        background_rows.push(self.render_background_image_row(appearance));
+        if self.bg_image.is_some() {
+            background_rows.push(slider_row(
+                "Image opacity",
+                Some(
+                    "How much of the picture shows through. The background color covers the \
+                     rest, which keeps text readable."
+                        .into(),
+                ),
+                SliderRow {
+                    state: self.bg_image_opacity_slider.clone(),
+                    value: self.bg_image_opacity,
+                    range: 0.0..100.0,
+                    value_label: format!("{}%", self.bg_image_opacity),
+                    make_action: ThemeCreatorBodyAction::SetBackgroundImageOpacity,
+                },
+                appearance,
+            ));
         }
         column.add_child(section_card(
             "Background",
@@ -1353,8 +1492,73 @@ impl ThemeCreatorBody {
         column.finish()
     }
 
+    /// The Background card's picture row: a thumbnail and file name once a picture is set, with
+    /// buttons to change or remove it; otherwise a line saying what a picture does and a button to
+    /// add one.
+    fn render_background_image_row(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let mut buttons = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        let label: Box<dyn Element> = match &self.bg_image {
+            Some(path) => {
+                buttons.add_child(
+                    Container::new(action_button(
+                        "Remove",
+                        ButtonVariant::Secondary,
+                        self.remove_image_mouse_state.clone(),
+                        ThemeCreatorBodyAction::RemoveBackgroundImage,
+                        appearance,
+                    ))
+                    .with_margin_right(8.)
+                    .finish(),
+                );
+                let file_name = path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                Flex::row()
+                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                    .with_child(
+                        Container::new(image_thumbnail(path))
+                            .with_margin_right(10.)
+                            .finish(),
+                    )
+                    .with_child(
+                        Shrinkable::new(
+                            1.,
+                            Flex::column()
+                                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                                .with_child(row_label("Image", appearance))
+                                .with_child(render_settings_description(file_name, appearance))
+                                .finish(),
+                        )
+                        .finish(),
+                    )
+                    .finish()
+            }
+            None => Flex::column()
+                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                .with_child(row_label("Image", appearance))
+                .with_child(render_settings_description(
+                    "A picture behind the terminal, under the background color.".into(),
+                    appearance,
+                ))
+                .finish(),
+        };
+        buttons.add_child(action_button(
+            if self.bg_image.is_some() {
+                "Change…"
+            } else {
+                "Add image…"
+            },
+            ButtonVariant::Secondary,
+            self.pick_image_mouse_state.clone(),
+            ThemeCreatorBodyAction::PickBackgroundImage,
+            appearance,
+        ));
+        build_toggle_element(label, buttons.finish(), appearance, None)
+    }
+
     /// The Advanced card: a clickable header row with a chevron, and — when expanded — the 16
-    /// terminal colours and the background image.
+    /// terminal colours, each normal one captioned with where programs use it.
     fn render_advanced_card(&self, appearance: &Appearance) -> Box<dyn Element> {
         let expanded = self.advanced_expanded;
         let header = Hoverable::new(self.advanced_header_state.clone(), |state| {
@@ -1386,7 +1590,8 @@ impl ThemeCreatorBody {
                         render_sub_header_with_description(
                             appearance,
                             "Advanced",
-                            "Terminal colors and a background image.",
+                            "The 16 colors programs use in the terminal: errors, git status, ls, \
+                             prompts.",
                         ),
                     )
                     .finish(),
@@ -1408,51 +1613,26 @@ impl ThemeCreatorBody {
 
         if expanded {
             column.add_child(group_label("Normal colors", appearance));
-            for i in SLOT_NORMAL_START..SLOT_BRIGHT_START {
-                column.add_child(self.color_field_row(i, appearance));
-            }
-            column.add_child(group_label("Bright colors", appearance));
-            for i in SLOT_BRIGHT_START..SLOT_BRIGHT_START + 8 {
-                column.add_child(self.color_field_row(i, appearance));
-            }
-
-            column.add_child(group_label("Background image", appearance));
-            let image_description = match &self.bg_image {
-                Some(path) => path
-                    .file_name()
-                    .map(|name| name.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
-                None => "Shown behind the terminal, under the background color.".to_string(),
-            };
-            column.add_child(build_toggle_element(
-                row_label("Image", appearance),
-                action_button(
-                    if self.bg_image.is_some() {
-                        "Change…"
-                    } else {
-                        "Add image…"
-                    },
-                    ButtonVariant::Secondary,
-                    self.pick_image_mouse_state.clone(),
-                    ThemeCreatorBodyAction::PickBackgroundImage,
-                    appearance,
-                ),
-                appearance,
-                Some(image_description),
-            ));
-            if self.bg_image.is_some() {
-                column.add_child(slider_row(
-                    "Image opacity",
-                    None,
-                    SliderRow {
-                        state: self.bg_image_opacity_slider.clone(),
-                        value: self.bg_image_opacity,
-                        range: 0.0..100.0,
-                        value_label: format!("{}%", self.bg_image_opacity),
-                        make_action: ThemeCreatorBodyAction::SetBackgroundImageOpacity,
-                    },
+            for (offset, usage) in ANSI_COLOR_USES.iter().enumerate() {
+                column.add_child(self.color_field_row_with_caption(
+                    SLOT_NORMAL_START + offset,
+                    Some(usage),
                     appearance,
                 ));
+            }
+            column.add_child(group_label("Bright colors", appearance));
+            column.add_child(
+                Container::new(render_settings_description(
+                    "Bold or highlighted versions of the same colors, e.g. bold red errors or \
+                     bright green success."
+                        .into(),
+                    appearance,
+                ))
+                .with_padding_bottom(HEADER_PADDING)
+                .finish(),
+            );
+            for i in SLOT_BRIGHT_START..SLOT_BRIGHT_START + 8 {
+                column.add_child(self.color_field_row(i, appearance));
             }
         }
 
@@ -1461,12 +1641,23 @@ impl ThemeCreatorBody {
             .finish()
     }
 
-    /// The left-hand column of the "From image" flow: pick an image, then name the theme and
-    /// choose which extracted colour becomes its background.
+    /// The left-hand column of the "From image" flow: three numbered steps. Choose an image; pick
+    /// which of its colours is the background (and whether the picture itself stays behind the
+    /// terminal); then name it, or open it in the custom editor to fine-tune every colour.
+    ///
+    /// Steps 2 and 3 are shown from the start, greyed out with a hint, so the whole flow reads at
+    /// a glance before anything is picked.
     fn render_from_image_controls(&self, appearance: &Appearance) -> Box<dyn Element> {
-        let theme = appearance.theme();
         let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        column.add_child(self.render_choose_image_step(appearance));
+        column.add_child(self.render_pick_background_step(appearance));
+        column.add_child(self.render_fine_tune_step(appearance));
+        column.finish()
+    }
 
+    /// Step 1: the image, with a thumbnail and its file name once it has been read.
+    fn render_choose_image_step(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
         let picker_button = {
             let button = appearance
                 .ui_builder()
@@ -1505,74 +1696,213 @@ impl ThemeCreatorBody {
                     .finish()
             }
         };
-        let image_description = self.theme_options.as_ref().and_then(|theme_options| {
-            theme_options
-                .path()
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-        });
-        column.add_child(section_card(
-            "Image",
-            Some(MODAL_SUBHEADER),
+
+        let image_label: Box<dyn Element> = match &self.theme_options {
+            Some(theme_options) => {
+                let path = theme_options.path();
+                let file_name = path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                let thumbnail = image_thumbnail(&path);
+                Flex::row()
+                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                    .with_child(Container::new(thumbnail).with_margin_right(10.).finish())
+                    .with_child(Shrinkable::new(1., row_label(&file_name, appearance)).finish())
+                    .finish()
+            }
+            None => Text::new_inline(
+                "No image yet (.png or .jpg)".to_string(),
+                appearance.ui_font_family(),
+                CONTROL_FONT_SIZE,
+            )
+            .with_color(settings_description_color(appearance))
+            .finish(),
+        };
+
+        step_card(
+            1,
+            "Choose an image",
+            "Uncaged pulls a background, text, accent and the 16 terminal colors out of the \
+             image. You can tweak every color afterwards.",
+            true,
             vec![build_toggle_element(
-                row_label("Image", appearance),
+                image_label,
                 picker_button,
                 appearance,
-                image_description,
+                None,
             )],
             appearance,
-        ));
+        )
+    }
 
-        if let Some(theme_options) = &self.theme_options {
-            column.add_child(self.render_name_card(appearance));
+    /// Step 2: the background candidates as tiles, and the switch that keeps the picture itself
+    /// behind the terminal.
+    fn render_pick_background_step(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let Some(theme_options) = &self.theme_options else {
+            return step_card(
+                2,
+                "Pick a background",
+                "Choose an image first. Its main colors show up here to pick from.",
+                false,
+                Vec::new(),
+                appearance,
+            );
+        };
+        let theme = appearance.theme();
 
-            let chosen = theme_options.chosen_bg_color_index();
-            let mut swatches = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
-            for (bg_color_index, bg_color) in
-                theme_options.possible_bg_colors().into_iter().enumerate()
-            {
-                // The chosen colour gets a ring in the text colour, which reads on any swatch.
-                let border = if bg_color_index == chosen {
+        let chosen = theme_options.chosen_bg_color_index();
+        let mut tiles = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        for (index, color) in theme_options
+            .possible_bg_colors()
+            .into_iter()
+            .enumerate()
+            .take(MAX_BACKGROUND_CANDIDATES)
+        {
+            let selected = index == chosen;
+            let tile = Hoverable::new(self.candidate_mouse_states[index].clone(), |state| {
+                // The chosen tile gets a ring in the text colour (which reads on any card) and a
+                // check mark in whichever of black or white stands out on the tile itself.
+                let border = if selected {
                     Border::all(2.).with_border_fill(theme.main_text_color(theme.surface_1()))
+                } else if state.is_hovered() {
+                    Border::all(1.).with_border_fill(theme.active_ui_text_color())
                 } else {
                     Border::all(1.).with_border_fill(theme.outline())
                 };
-                let swatch = EventHandler::new(
-                    ConstrainedBox::new(
-                        Rect::new()
-                            .with_background_color(bg_color)
-                            .with_corner_radius(radius::small())
-                            .with_border(border)
+                let mut tile = Stack::new();
+                tile.add_child(
+                    Rect::new()
+                        .with_background_color(color)
+                        .with_corner_radius(radius::small())
+                        .with_border(border)
+                        .finish(),
+                );
+                if selected {
+                    tile.add_child(
+                        Align::new(
+                            ConstrainedBox::new(
+                                Icon::new("bundled/svg/check.svg", contrasting_mark_color(color))
+                                    .finish(),
+                            )
+                            .with_width(16.)
+                            .with_height(16.)
                             .finish(),
-                    )
-                    .with_height(36.)
-                    .finish(),
-                )
-                .on_left_mouse_down(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(ThemeCreatorBodyAction::SetBackgroundColor(
-                        bg_color_index,
-                    ));
-                    DispatchEventResult::StopPropagation
-                })
-                .finish();
-                let swatch = if bg_color_index == 0 {
-                    swatch
-                } else {
-                    Container::new(swatch).with_margin_left(6.).finish()
-                };
-                swatches.add_child(Expanded::new(1., swatch).finish());
-            }
-            column.add_child(section_card(
-                "Background color",
-                Some("Pick which of the image's colors fills the background."),
-                vec![Container::new(swatches.finish())
-                    .with_padding_bottom(HEADER_PADDING)
-                    .finish()],
+                        )
+                        .finish(),
+                    );
+                }
+                ConstrainedBox::new(tile.finish())
+                    .with_height(CANDIDATE_TILE_HEIGHT)
+                    .finish()
+            })
+            .with_cursor(Cursor::PointingHand)
+            .on_click(move |ctx, _, _| {
+                ctx.dispatch_typed_action(ThemeCreatorBodyAction::SetBackgroundColor(index))
+            })
+            .finish();
+            let tile = if index == 0 {
+                tile
+            } else {
+                Container::new(tile).with_margin_left(6.).finish()
+            };
+            tiles.add_child(Expanded::new(1., tile).finish());
+        }
+
+        let mut rows = vec![Container::new(tiles.finish())
+            .with_padding_bottom(HEADER_PADDING)
+            .finish()];
+
+        let image_switch = appearance
+            .ui_builder()
+            .switch(self.image_background_switch_state.clone())
+            .check(self.image_as_background)
+            .build()
+            .on_click(|ctx, _, _| {
+                ctx.dispatch_typed_action(ThemeCreatorBodyAction::ToggleImageAsBackground)
+            })
+            .finish();
+        rows.push(build_toggle_element(
+            row_label("Use the image as the background", appearance),
+            image_switch,
+            appearance,
+            Some("Shows the picture behind the terminal, under the background color.".into()),
+        ));
+        if self.image_as_background {
+            rows.push(slider_row(
+                "Image opacity",
+                None,
+                SliderRow {
+                    state: self.image_background_opacity_slider.clone(),
+                    value: self.image_background_opacity,
+                    range: 0.0..100.0,
+                    value_label: format!("{}%", self.image_background_opacity),
+                    make_action: ThemeCreatorBodyAction::SetImageBackgroundOpacity,
+                },
                 appearance,
             ));
         }
 
-        column.finish()
+        step_card(
+            2,
+            "Pick a background",
+            "The main colors in your image. The one you pick fills the background; the text and \
+             accent are chosen to stand out on it.",
+            true,
+            rows,
+            appearance,
+        )
+    }
+
+    /// Step 3: the name, and the way into the custom editor for everything else.
+    fn render_fine_tune_step(&self, appearance: &Appearance) -> Box<dyn Element> {
+        if self.theme_options.is_none() {
+            return step_card(
+                3,
+                "Fine-tune",
+                "Once your image is read, name the theme or change any of its colors.",
+                false,
+                Vec::new(),
+                appearance,
+            );
+        }
+
+        let name_input = ConstrainedBox::new(
+            TextInput::new(self.editor.clone(), name_input_styles(appearance))
+                .build()
+                .finish(),
+        )
+        .with_width(NAME_INPUT_WIDTH)
+        .finish();
+        let customize = action_button(
+            "Customize colors",
+            ButtonVariant::Secondary,
+            self.customize_mouse_state.clone(),
+            ThemeCreatorBodyAction::CustomizeGeneratedTheme,
+            appearance,
+        );
+
+        step_card(
+            3,
+            "Fine-tune",
+            "Happy with it? Create the theme. Or open it in the custom editor to change any color.",
+            true,
+            vec![
+                build_toggle_element(row_label("Name", appearance), name_input, appearance, None),
+                build_toggle_element(
+                    row_label("Every color", appearance),
+                    customize,
+                    appearance,
+                    Some(
+                        "Opens the Custom tab with this theme filled in — background, text, \
+                         accent, cursor, the 16 terminal colors and the image — ready to edit, \
+                         save or share."
+                            .into(),
+                    ),
+                ),
+            ],
+            appearance,
+        )
     }
 
     /// The preview card: a small terminal drawn in the theme being edited.
@@ -1582,26 +1912,18 @@ impl ThemeCreatorBody {
         let description = match self.mode {
             ThemeCreatorMode::Manual => "Updates as you edit.",
             ThemeCreatorMode::FromImage if self.theme_options.is_some() => {
-                "The theme made from your image."
+                "The theme made from your image. Updates as you pick."
             }
-            ThemeCreatorMode::FromImage => "Select an image to see the theme it makes.",
+            ThemeCreatorMode::FromImage => {
+                "Choose an image to see the theme it makes. Until then, this is your current look."
+            }
         };
 
-        let mut rows = vec![
+        let rows = vec![
             Container::new(render_terminal_preview(&preview_theme, appearance))
                 .with_padding_bottom(HEADER_PADDING)
                 .finish(),
         ];
-        if self.mode == ThemeCreatorMode::Manual && self.bg_image.is_some() {
-            rows.push(
-                Container::new(render_settings_description(
-                    "Your background image shows in the app, not in this preview.".into(),
-                    appearance,
-                ))
-                .with_padding_bottom(HEADER_PADDING)
-                .finish(),
-            );
-        }
         section_card("Preview", Some(description), rows, appearance)
     }
 
@@ -1613,15 +1935,23 @@ impl ThemeCreatorBody {
         }
     }
 
-    /// Controls and preview side by side when there's room, and the preview stacked above the
-    /// controls when there isn't (a narrow window, or the modal).
+    /// Controls on the left; on the right, the preview with the actions right under it, so the
+    /// two read as one "result" panel and the buttons sit near the top of the page instead of
+    /// under a long scroll. When there isn't room for two columns (a narrow window, or the
+    /// modal), everything stacks: preview, controls, then the actions at the bottom.
     fn render_columns(&self, app: &AppContext) -> Box<dyn Element> {
+        let appearance = Appearance::as_ref(app);
+        let result_panel = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(self.render_preview_card(app))
+            .with_child(self.render_footer(appearance))
+            .finish();
         let wide = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_child(Expanded::new(1., self.render_controls(app)).finish())
             .with_child(
                 Container::new(
-                    ConstrainedBox::new(self.render_preview_card(app))
+                    ConstrainedBox::new(result_panel)
                         .with_width(PREVIEW_COLUMN_WIDTH)
                         .finish(),
                 )
@@ -1633,6 +1963,7 @@ impl ThemeCreatorBody {
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
             .with_child(self.render_preview_card(app))
             .with_child(self.render_controls(app))
+            .with_child(self.render_footer(appearance))
             .finish();
         SizeConstraintSwitch::new(
             wide,
@@ -1644,9 +1975,10 @@ impl ThemeCreatorBody {
         .finish()
     }
 
-    /// The right-aligned action row under everything. In the custom editor, sharing with the
-    /// community is the highlighted action on the far right, so people are nudged to contribute
-    /// their themes; saving sits beside it as a secondary button.
+    /// The right-aligned action row. In the custom editor, sharing with the community is the
+    /// highlighted action on the far right, so people are nudged to contribute their themes;
+    /// saving sits beside it as a secondary button. If the row is wider than its column, the
+    /// buttons wrap onto a second line rather than spill past the preview's edge.
     fn render_footer(&self, appearance: &Appearance) -> Box<dyn Element> {
         let cancel = SavePosition::new(
             action_button(
@@ -1681,6 +2013,8 @@ impl ThemeCreatorBody {
             }
             ThemeCreatorMode::FromImage => {
                 buttons.push(cancel);
+                // Saving straight from here skips the custom editor for anyone happy with the
+                // generated theme as it is.
                 let create = appearance
                     .ui_builder()
                     .button(
@@ -1707,18 +2041,14 @@ impl ThemeCreatorBody {
             }
         }
 
-        let mut row = Flex::row()
+        Wrap::row()
             .with_main_axis_size(MainAxisSize::Max)
             .with_main_axis_alignment(MainAxisAlignment::End)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center);
-        for (index, button) in buttons.into_iter().enumerate() {
-            row.add_child(if index == 0 {
-                button
-            } else {
-                Container::new(button).with_margin_left(8.).finish()
-            });
-        }
-        row.finish()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_spacing(8.)
+            .with_run_spacing(8.)
+            .with_children(buttons)
+            .finish()
     }
 }
 
@@ -2018,9 +2348,20 @@ fn hsv_to_coloru(hue: f32, saturation: f32, value: f32) -> ColorU {
 // ── Page layout ──────────────────────────────────────────────────────────────
 
 /// Below this width the preview stacks above the controls instead of sitting beside them.
-const TWO_COLUMN_MIN_WIDTH: f32 = 720.;
-/// The preview's column when it sits beside the controls.
-const PREVIEW_COLUMN_WIDTH: f32 = 340.;
+const TWO_COLUMN_MIN_WIDTH: f32 = 760.;
+/// The preview's column when it sits beside the controls. Wide enough for the custom editor's
+/// three actions on one line under the preview.
+const PREVIEW_COLUMN_WIDTH: f32 = 380.;
+/// The terminal in the preview has a fixed height, so a background picture (which fills
+/// whatever room it is given) has a box to fill.
+const PREVIEW_TERMINAL_HEIGHT: f32 = 264.;
+/// Background candidates offered in step 2 of "From image" (the image is reduced to this many
+/// colours).
+const MAX_BACKGROUND_CANDIDATES: usize = 5;
+const CANDIDATE_TILE_HEIGHT: f32 = 40.;
+const THUMBNAIL_WIDTH: f32 = 48.;
+const THUMBNAIL_HEIGHT: f32 = 32.;
+const NAME_INPUT_WIDTH: f32 = 220.;
 const COLUMN_GAP: f32 = 16.;
 /// The gap under each card, matching the rest of Settings.
 const CARD_SPACING: f32 = 16.;
@@ -2033,6 +2374,7 @@ const CONTROL_FONT_SIZE: f32 = 13.;
 /// The inset between a segmented control's track and its segments.
 const SEGMENT_TRACK_PADDING: f32 = 2.;
 const PREVIEW_FONT_SIZE: f32 = 12.;
+const STEP_BADGE_SIZE: f32 = 20.;
 const PREVIEW_LINE_GAP: f32 = 3.;
 
 /// What a [`slider_row`] edits and how it shows its value.
@@ -2203,6 +2545,138 @@ fn segmented_control(segments: Vec<Segment>, appearance: &Appearance) -> Box<dyn
         .with_background(theme.surface_2())
         .with_corner_radius(radius::small())
         .finish()
+}
+
+/// One step of the "From image" flow: a settings card headed by its number, title and a line
+/// saying what the step does. A step that isn't available yet is greyed out and shows only its
+/// hint.
+fn step_card(
+    number: u8,
+    title: &'static str,
+    description: &'static str,
+    enabled: bool,
+    rows: Vec<Box<dyn Element>>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let theme = appearance.theme();
+    let title_color = if enabled {
+        theme.active_ui_text_color()
+    } else {
+        theme.disabled_ui_text_color()
+    };
+    let description_color = if enabled {
+        settings_description_color(appearance)
+    } else {
+        theme.disabled_ui_text_color().into_solid()
+    };
+
+    let badge = ConstrainedBox::new(
+        Container::new(
+            Align::new(
+                Text::new_inline(number.to_string(), appearance.ui_font_family(), 12.)
+                    .with_color(title_color.into())
+                    .with_style(Properties::default().weight(Weight::Semibold))
+                    .finish(),
+            )
+            .finish(),
+        )
+        .with_background(if enabled {
+            theme.surface_3()
+        } else {
+            theme.surface_2()
+        })
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(STEP_BADGE_SIZE / 2.)))
+        .finish(),
+    )
+    .with_width(STEP_BADGE_SIZE)
+    .with_height(STEP_BADGE_SIZE)
+    .finish();
+
+    let text = Flex::column()
+        .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+        .with_child(
+            Text::new_inline(title, appearance.ui_font_family(), SUBHEADER_FONT_SIZE)
+                .with_color(title_color.into())
+                .with_style(Properties::default().weight(Weight::Semibold))
+                .finish(),
+        )
+        .with_child(
+            Container::new(
+                Text::new(description, appearance.ui_font_family(), CONTENT_FONT_SIZE)
+                    .with_color(description_color)
+                    .finish(),
+            )
+            .with_margin_top(2.)
+            .finish(),
+        )
+        .finish();
+
+    let header = Container::new(
+        Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(badge)
+            .with_child(
+                Shrinkable::new(1., Container::new(text).with_margin_left(10.).finish()).finish(),
+            )
+            .finish(),
+    )
+    .with_padding_bottom(HEADER_PADDING)
+    .finish();
+
+    let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+    column.add_child(header);
+    if enabled {
+        column.add_children(rows);
+    }
+    settings_card(column.finish(), appearance)
+        .with_margin_bottom(CARD_SPACING)
+        .finish()
+}
+
+/// Where programs commonly use each of the 8 normal terminal colours, in slot order (black, red,
+/// green, yellow, blue, magenta, cyan, white). Shown under each colour in Advanced so people know
+/// what they're changing. Kept to one short line each.
+const ANSI_COLOR_USES: [&str; 8] = [
+    "Dim text, unselected items, some prompt backgrounds",
+    "Errors, failed commands, deleted lines in diffs",
+    "Success, added lines in diffs, git branch names",
+    "Warnings, modified files, search matches",
+    "Directories in ls, links, info messages",
+    "Prompt accents, keywords in some tools",
+    "Paths, symlinks in ls, hints",
+    "Regular output in many programs",
+];
+
+/// A small rounded thumbnail of a local picture.
+fn image_thumbnail(path: &Path) -> Box<dyn Element> {
+    ConstrainedBox::new(
+        Image::new(
+            AssetSource::LocalFile {
+                path: path.to_string_lossy().into_owned(),
+                content_version: None,
+            },
+            CacheOption::BySize,
+        )
+        .cover()
+        .with_corner_radius(radius::small())
+        .finish(),
+    )
+    .with_width(THUMBNAIL_WIDTH)
+    .with_height(THUMBNAIL_HEIGHT)
+    .finish()
+}
+
+/// Black or white, whichever stands out more on `background` — for the check mark on the
+/// chosen background tile.
+fn contrasting_mark_color(background: ColorU) -> ColorU {
+    // Rec. 601 luma is plenty to tell a light tile from a dark one.
+    let luma =
+        0.299 * background.r as f32 + 0.587 * background.g as f32 + 0.114 * background.b as f32;
+    if luma > 150. {
+        ColorU::black()
+    } else {
+        ColorU::white()
+    }
 }
 
 /// One section of the editor: a settings card with a small title (and optional description),
@@ -2405,13 +2879,42 @@ fn render_terminal_preview(theme: &WarpTheme, appearance: &Appearance) -> Box<dy
             .finish(),
     );
 
-    Container::new(column.finish())
-        .with_background(theme.background())
+    // A background picture is drawn underneath, with the theme's background over it as a veil
+    // at `100 - opacity` — the same way the app and the gallery thumbnails paint it. A picture
+    // whose file is missing is skipped, along with its veil, rather than washing the preview out.
+    let picture = theme.background_image().and_then(|image| {
+        let source = image.source();
+        let loadable = match &source {
+            AssetSource::LocalFile { path, .. } => Path::new(path).exists(),
+            _ => true,
+        };
+        loadable.then_some((source, image.opacity))
+    });
+    let veil_opacity = picture
+        .as_ref()
+        .map_or(100, |(_, opacity)| 100u8.saturating_sub(*opacity));
+
+    let terminal = Container::new(Clipped::new(column.finish()).finish())
+        .with_background(theme.background().with_opacity(veil_opacity))
         .with_corner_radius(radius::small())
         .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
         .with_horizontal_padding(12.)
         .with_padding_top(8.)
         .with_padding_bottom(10.)
+        .finish();
+
+    let mut layers = Stack::new();
+    if let Some((source, _)) = picture {
+        layers.add_child(
+            Image::new(source, CacheOption::BySize)
+                .cover()
+                .with_corner_radius(radius::small())
+                .finish(),
+        );
+    }
+    layers.add_child(terminal);
+    ConstrainedBox::new(layers.finish())
+        .with_height(PREVIEW_TERMINAL_HEIGHT)
         .finish()
 }
 
@@ -2456,7 +2959,6 @@ impl View for ThemeCreatorBody {
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
             .with_child(self.mode_tabs(appearance))
             .with_child(self.render_columns(app))
-            .with_child(self.render_footer(appearance))
             .finish()
     }
 }
@@ -2481,7 +2983,7 @@ impl TypedActionView for ThemeCreatorBody {
             ThemeCreatorBodyAction::HandleImageSelected(path) => {
                 if self.mode == ThemeCreatorMode::Manual {
                     self.bg_image = Some(path.clone());
-                    self.refresh_manual_preview(ctx);
+                    ctx.notify();
                 } else {
                     self.set_theme_from_image_path(path.clone(), ctx);
                     ctx.notify();
@@ -2518,10 +3020,19 @@ impl TypedActionView for ThemeCreatorBody {
                     self.resync_picker_from_slot(index);
                 }
             }
+            ThemeCreatorBodyAction::RemoveBackgroundImage => {
+                self.bg_image = None;
+                ctx.notify();
+            }
             ThemeCreatorBodyAction::PickBackgroundImage => {
                 ctx.emit(ThemeCreatorBodyEvent::OpenFilePicker);
             }
             ThemeCreatorBodyAction::ShareTheme => self.share_theme(ctx),
+            ThemeCreatorBodyAction::ToggleImageAsBackground => self.toggle_image_as_background(ctx),
+            ThemeCreatorBodyAction::SetImageBackgroundOpacity(value) => {
+                self.set_image_background_opacity(*value, ctx)
+            }
+            ThemeCreatorBodyAction::CustomizeGeneratedTheme => self.customize_generated_theme(ctx),
         }
     }
 }
