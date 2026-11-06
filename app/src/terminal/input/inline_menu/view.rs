@@ -393,7 +393,6 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> InlineMenuView<A, T> {
         ctx.subscribe_to_model(&agent_view_controller, |_, _, event, ctx| match event {
             AgentViewControllerEvent::EnteredAgentView { .. }
             | AgentViewControllerEvent::ExitedAgentView { .. } => ctx.notify(),
-            _ => (),
         });
 
         ctx.subscribe_to_model(
@@ -1145,11 +1144,7 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> View for InlineMenuView<A, T
                             !is_rendering_below_input || has_header,
                             false,
                         )
-                        .with_border_fill(if self.agent_view_controller.as_ref(app).is_active() {
-                            input::agent::styles::default_border_color(theme)
-                        } else {
-                            input::agent::styles::default_border_color(theme)
-                        }),
+                        .with_border_fill(input::agent::styles::default_border_color(theme)),
                 )
                 .finish(),
         )

@@ -12,7 +12,7 @@ use super::settings_page::{
     MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget, HEADER_PADDING,
 };
 use super::SettingsSection;
-use crate::auth::{AuthManager, AuthStateProvider};
+use crate::auth::AuthManager;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::workspaces::workspace::Workspace;
 
@@ -102,11 +102,9 @@ impl SettingsPageMeta for BillingAndUsageDispatchView {
         SettingsSection::BillingAndUsage
     }
 
-    fn should_render(&self, ctx: &AppContext) -> bool {
-        return false; // Uncaged: hidden in the free, no-account fork
-        !AuthStateProvider::as_ref(ctx)
-            .get()
-            .is_anonymous_or_logged_out()
+    fn should_render(&self, _ctx: &AppContext) -> bool {
+        // Uncaged: hidden in the free, no-account fork
+        false
     }
 
     fn on_page_selected(&mut self, allow_steal_focus: bool, ctx: &mut ViewContext<Self>) {

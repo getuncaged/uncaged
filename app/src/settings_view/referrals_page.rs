@@ -404,8 +404,8 @@ impl SettingsPageMeta for ReferralsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        return false; // Uncaged: hidden in the free, no-account fork
-        true
+        // Uncaged: hidden in the free, no-account fork
+        false
     }
 
     fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {

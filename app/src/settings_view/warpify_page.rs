@@ -450,8 +450,8 @@ impl SettingsPageMeta for WarpifyPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        return false; // Uncaged: Warpify is Warp-specific
-        true
+        // Uncaged: Warpify is Warp-specific
+        false
     }
 
     fn update_filter(&mut self, query: &str, ctx: &mut ViewContext<Self>) -> MatchData {

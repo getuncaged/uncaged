@@ -17,7 +17,6 @@ use crate::ai::blocklist::{
 use crate::terminal::model::session::Sessions;
 use crate::terminal::TerminalModel;
 use crate::ui_components::blended_colors;
-use crate::ui_components::icons::Icon;
 
 const AGENT_PROMPT_TO_INTERACT_MESSAGE: &str = "Prompt agent to interact with";
 const AGENT_WAITING_ON_INSTRUCTIONS_MESSAGE: &str = "Agent is waiting on instructions";

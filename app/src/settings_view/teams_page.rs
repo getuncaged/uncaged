@@ -1844,8 +1844,8 @@ impl SettingsPageMeta for TeamsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        return false; // Uncaged: hidden in the free, no-account fork
-        true
+        // Uncaged: hidden in the free, no-account fork
+        false
     }
 
     fn on_tab_pressed(&mut self, ctx: &mut ViewContext<Self>) {

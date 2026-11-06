@@ -22,7 +22,6 @@ use tokio::fs;
 use toolbar_item::AgentToolbarItemKind;
 #[cfg(feature = "voice_input")]
 use voice_input::{StartListeningError, VoiceSessionResult};
-use warp_cli::agent::Harness;
 use warp_core::context_flag::ContextFlag;
 use warp_core::report_if_error;
 use warp_core::ui::color::blend::Blend;
@@ -55,7 +54,6 @@ use crate::ai::blocklist::prompt::prompt_alert::{PromptAlertEvent, PromptAlertVi
 use crate::ai::blocklist::usage::icon_for_context_window_usage;
 use crate::ai::blocklist::{BlocklistAIInputModel, InputType};
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
-use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::ai::AIRequestUsageModel;
 use crate::appearance::Appearance;
 use crate::auth::{AuthManager, AuthStateProvider};

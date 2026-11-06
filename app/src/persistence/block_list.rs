@@ -267,7 +267,7 @@ pub(super) fn get_all_restored_blocks_v2(
         // Un-indexed leftovers (flag-off writes, legacy rows): keep them, in
         // rowid order, after the indexed timeline -- but only when the pane was
         // never cleared, since a cleared pane's leftovers predate the clear.
-        if watermarks.get(&pane_uuid).is_none() {
+        if !watermarks.contains_key(&pane_uuid) {
             let mut leftovers: Vec<Block> = by_block_id.into_values().collect();
             leftovers.sort_by_key(|block| block.id);
             ordered.extend(leftovers.into_iter().map(Into::into));

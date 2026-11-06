@@ -17,7 +17,7 @@ use crate::auth::AuthStateProvider;
 use crate::network::NetworkStatus;
 use crate::root_view::CreateEnvironmentArg;
 use crate::server::cloud_objects::update_manager::UpdateManager;
-use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::server::ids::{ClientId, SyncId};
 use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
 use crate::settings::PrivacySettings;
@@ -738,7 +738,7 @@ fn test_render_list_page_with_personal_and_team_environments_shows_section_heade
             let team_id = SyncId::ClientId(ClientId::new());
             let mut team_permissions = crate::cloud_object::CloudObjectPermissions::mock_personal();
             team_permissions.owner = Owner::Team {
-                team_uid: ServerId::from(789),
+                team_uid: crate::server::ids::ServerId::from(789),
             };
             let team_object = CloudAmbientAgentEnvironment::new(
                 team_id,

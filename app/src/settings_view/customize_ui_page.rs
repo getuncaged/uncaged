@@ -33,11 +33,11 @@ use crate::workspace::tab_settings::TabSettings;
 
 #[derive(Debug, Clone)]
 pub enum CustomizeUiSettingsPageAction {
-    ToggleProjectExplorer,
-    ToggleConversationHistory,
-    ToggleGlobalSearch,
-    ToggleWarpDrive,
-    ToggleCodeReviewButton,
+    ProjectExplorer,
+    ConversationHistory,
+    GlobalSearch,
+    WarpDrive,
+    CodeReviewButton,
 }
 
 /// This page emits no events; the empty enum satisfies the `Entity` bound.
@@ -86,13 +86,13 @@ impl TypedActionView for CustomizeUiSettingsPageView {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            CustomizeUiSettingsPageAction::ToggleProjectExplorer => {
+            CustomizeUiSettingsPageAction::ProjectExplorer => {
                 CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings.show_project_explorer.toggle_and_save_value(ctx));
                 });
                 ctx.notify();
             }
-            CustomizeUiSettingsPageAction::ToggleConversationHistory => {
+            CustomizeUiSettingsPageAction::ConversationHistory => {
                 AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings
                         .show_conversation_history
@@ -100,19 +100,19 @@ impl TypedActionView for CustomizeUiSettingsPageView {
                 });
                 ctx.notify();
             }
-            CustomizeUiSettingsPageAction::ToggleGlobalSearch => {
+            CustomizeUiSettingsPageAction::GlobalSearch => {
                 CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings.show_global_search.toggle_and_save_value(ctx));
                 });
                 ctx.notify();
             }
-            CustomizeUiSettingsPageAction::ToggleWarpDrive => {
+            CustomizeUiSettingsPageAction::WarpDrive => {
                 WarpDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings.enable_warp_drive.toggle_and_save_value(ctx));
                 });
                 ctx.notify();
             }
-            CustomizeUiSettingsPageAction::ToggleCodeReviewButton => {
+            CustomizeUiSettingsPageAction::CodeReviewButton => {
                 let tab_settings = TabSettings::handle(ctx);
                 let new_value = !*tab_settings.as_ref(ctx).show_code_review_button.value();
                 ctx.update_model(&tab_settings, move |tab_settings, ctx| {
@@ -202,7 +202,7 @@ impl SettingsWidget for ProjectExplorerWidget {
                 .check(*code_settings.show_project_explorer)
                 .build()
                 .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::ToggleProjectExplorer);
+                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::ProjectExplorer);
                 })
                 .finish(),
             Some("Adds an IDE-style project explorer / file tree to the left tools panel.".into()),
@@ -242,9 +242,7 @@ impl SettingsWidget for ConversationHistoryWidget {
                 .check(*ai_settings.show_conversation_history)
                 .build()
                 .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(
-                        CustomizeUiSettingsPageAction::ToggleConversationHistory,
-                    );
+                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::ConversationHistory);
                 })
                 .finish(),
             Some("Show past agent conversations in the left tools panel.".into()),
@@ -284,7 +282,7 @@ impl SettingsWidget for GlobalSearchWidget {
                 .check(*code_settings.show_global_search)
                 .build()
                 .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::ToggleGlobalSearch);
+                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::GlobalSearch);
                 })
                 .finish(),
             Some("Adds global file search to the left tools panel.".into()),
@@ -324,7 +322,7 @@ impl SettingsWidget for DriveWidget {
                 .check(*settings.enable_warp_drive)
                 .build()
                 .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::ToggleWarpDrive);
+                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::WarpDrive);
                 })
                 .finish(),
             Some(
@@ -367,9 +365,7 @@ impl SettingsWidget for CodeReviewButtonWidget {
                 .check(*tab_settings.show_code_review_button)
                 .build()
                 .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(
-                        CustomizeUiSettingsPageAction::ToggleCodeReviewButton,
-                    );
+                    ctx.dispatch_typed_action(CustomizeUiSettingsPageAction::CodeReviewButton);
                 })
                 .finish(),
             Some("Adds a code review button to the tab bar.".into()),

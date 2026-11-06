@@ -829,14 +829,9 @@ impl AgentViewController {
             return;
         }
 
-        let AgentViewState::Active {
-            conversation_id,
-            original_conversation_length,
-            ..
-        } = self.agent_view_state
-        else {
+        if !matches!(self.agent_view_state, AgentViewState::Active { .. }) {
             return;
-        };
+        }
         let mut old_state = AgentViewState::Inactive;
         std::mem::swap(&mut self.agent_view_state, &mut old_state);
         let AgentViewState::Active {

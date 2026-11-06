@@ -45,8 +45,7 @@ use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model::terminal_model::BlockIndex;
 use crate::terminal::model_events::ModelEventDispatcher;
 use crate::terminal::view::{
-    AIBlockMetadata, Event, RichContent, RichContentInsertionPosition, RichContentMetadata,
-    TerminalView,
+    AIBlockMetadata, Event, RichContent, RichContentMetadata, TerminalView,
 };
 use crate::terminal::TerminalModel;
 use crate::util::bindings::keybinding_name_to_keystroke;
@@ -1013,7 +1012,7 @@ impl TerminalView {
             false,
         );
         item.should_hide = item.should_hide_for_agent_view_state(
-            &self.agent_view_controller.as_ref(ctx).agent_view_state(),
+            self.agent_view_controller.as_ref(ctx).agent_view_state(),
         );
         if let Some(cmd_block_index) = command_block_index {
             self.model

@@ -8,10 +8,10 @@
 //! by accident. Uses the system `tar`; nothing leaves the machine.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Context, Result};
+use command::blocking::Command;
 
 /// Portable, non-secret items to include (only those that exist).
 const WHITELIST: &[&str] = &[

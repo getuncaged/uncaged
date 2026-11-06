@@ -217,7 +217,6 @@ impl ActiveAgentViewsModel {
                     conversation_id: *conversation_id,
                 });
             }
-            _ => {}
         });
     }
 

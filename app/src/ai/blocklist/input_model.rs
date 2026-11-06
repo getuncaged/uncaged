@@ -393,7 +393,6 @@ impl BlocklistAIInputModel {
                         );
                     }
                 }
-                _ => (),
             });
         }
 

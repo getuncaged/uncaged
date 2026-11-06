@@ -27,7 +27,6 @@ use super::settings_page::{
 };
 use super::SettingsSection;
 use crate::appearance::Appearance;
-use crate::auth::AuthStateProvider;
 use crate::editor::{
     EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
     TextOptions,
@@ -909,13 +908,9 @@ impl SettingsPageMeta for PlatformPageView {
         SettingsSection::OzCloudAPIKeys
     }
 
-    fn should_render(&self, ctx: &AppContext) -> bool {
-        return false; // Uncaged: hidden in the free, no-account fork
-        let is_anonymous = AuthStateProvider::as_ref(ctx)
-            .get()
-            .is_anonymous_or_logged_out();
-
-        !is_anonymous && FeatureFlag::APIKeyManagement.is_enabled()
+    fn should_render(&self, _ctx: &AppContext) -> bool {
+        // Uncaged: hidden in the free, no-account fork
+        false
     }
 
     fn on_page_selected(&mut self, _allow_steal_focus: bool, ctx: &mut ViewContext<Self>) {

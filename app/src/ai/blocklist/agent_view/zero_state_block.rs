@@ -16,7 +16,6 @@ use warpui::fonts::{Properties, Weight};
 use warpui::keymap::Keystroke;
 use warpui::prelude::{ConstrainedBox, Cursor, Empty, Hoverable, SavePosition};
 use warpui::scene::Border;
-use warpui::ui_components::components::UiComponent as _;
 use warpui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
@@ -372,7 +371,6 @@ impl View for AgentViewZeroStateBlock {
         let active_session = self.active_session(app);
         let body = render_body(
             ZeroStateBodyProps {
-                origin: self.origin.clone(),
                 should_show_init_callout: self.should_show_init_callout,
                 recent_conversations: &self.cached_recent_conversations,
                 active_session: active_session.as_deref(),
@@ -558,7 +556,6 @@ fn render_title_and_description(props: HeaderProps, app: &AppContext) -> Vec<Box
 }
 
 struct ZeroStateBodyProps<'a> {
-    origin: AgentViewEntryOrigin,
     should_show_init_callout: bool,
     recent_conversations: &'a [ConversationNavigationData],
     active_session: Option<&'a Session>,
@@ -568,7 +565,6 @@ struct ZeroStateBodyProps<'a> {
 
 fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn Element>> {
     let ZeroStateBodyProps {
-        origin,
         should_show_init_callout,
         recent_conversations,
         active_session,

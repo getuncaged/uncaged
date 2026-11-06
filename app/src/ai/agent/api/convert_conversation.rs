@@ -1845,7 +1845,7 @@ fn create_exchange_from_messages(
                 );
                 AIAgentExchangeId::from(uuid::Uuid::new_v5(&namespace, message_id.as_bytes()))
             })
-            .unwrap_or_else(AIAgentExchangeId::new)
+            .unwrap_or_default()
     } else {
         AIAgentExchangeId::new()
     };

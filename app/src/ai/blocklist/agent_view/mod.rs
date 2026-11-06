@@ -170,7 +170,7 @@ pub fn render_block_container(
     appearance: &crate::appearance::Appearance,
     are_block_dividers_enabled: bool,
 ) -> Box<dyn warpui::elements::Element> {
-    use warpui::elements::{Container, CornerRadius, Element as _, ParentElement, Radius};
+    use warpui::elements::{Container, CornerRadius, Element as _, Radius};
     use warpui::scene::Border;
 
     let border = if are_block_dividers_enabled {

@@ -1157,7 +1157,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         // Uncaged: scan for installed third-party CLI agents (Claude Code, Codex,
         // Gemini, …) so the "Third party CLI agents" settings page can list which
         // ones you have. Local PATH scan only — no network, no subprocess.
-        ctx.add_singleton_model(|ctx| crate::terminal::cli_agent::CLIAgentInstallModel::new(ctx));
+        ctx.add_singleton_model(crate::terminal::cli_agent::CLIAgentInstallModel::new);
 
         #[cfg(enable_crash_recovery)]
         ctx.add_singleton_model(move |_ctx| crash_recovery);

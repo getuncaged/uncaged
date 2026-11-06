@@ -1,18 +1,6 @@
 /// Common functionality used across different AI Assistant components.
 use markdown_parser::{parse_markdown, CodeBlockText, FormattedText, FormattedTextLine};
-use pathfinder_color::ColorU;
-use warpui::elements::{
-    ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, HighlightedHyperlink, Icon,
-    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
-};
-use warpui::platform::Cursor;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, ModelHandle};
-
-use super::requests::Requests;
-use crate::appearance::Appearance;
-use crate::ui_components::blended_colors;
+use warpui::elements::{HighlightedHyperlink, MouseStateHandle};
 
 const PREPARED_RESPONSE_FONT_SIZE: f32 = 11.;
 const REQUEST_LIMIT_INFO_FONT_SIZE: f32 = 11.;

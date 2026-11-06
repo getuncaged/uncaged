@@ -9,7 +9,6 @@ use warpui::fonts::{Properties, Weight};
 use warpui::keymap::Keystroke;
 use warpui::prelude::{vec2f, ConstrainedBox, Cursor, Empty, Hoverable, MouseStateHandle};
 use warpui::scene::Border;
-use warpui::ui_components::components::UiComponent;
 use warpui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
@@ -117,7 +116,6 @@ impl TerminalViewZeroStateBlock {
             }
         });
 
-        let ai_settings = AISettings::as_ref(ctx);
         Self {
             should_hide: false,
             state_handles: Default::default(),

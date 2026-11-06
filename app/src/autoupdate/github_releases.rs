@@ -107,9 +107,7 @@ pub fn host_is_allowed(url: &reqwest::Url) -> bool {
     let Some(host) = url.host_str() else {
         return false;
     };
-    brand::RELEASE_DOWNLOAD_HOSTS
-        .iter()
-        .any(|allowed| host == *allowed)
+    brand::RELEASE_DOWNLOAD_HOSTS.contains(&host)
 }
 
 /// Fetches the newest published release and returns it as a [`VersionInfo`]

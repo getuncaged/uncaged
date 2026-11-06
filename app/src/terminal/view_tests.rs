@@ -24,7 +24,7 @@ use crate::ai::agent::{
 };
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::toolbar_item::AgentToolbarItemKind;
-use crate::ai::blocklist::agent_view::{AgentViewEntryOrigin, AgentViewState, ExitAgentViewError};
+use crate::ai::blocklist::agent_view::{AgentViewEntryOrigin, AgentViewState};
 use crate::ai::blocklist::block::cli_controller::UserTakeOverReason;
 use crate::ai::blocklist::{
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, InputConfig, InputType, ResponseStream,
@@ -73,7 +73,6 @@ use crate::test_util::terminal::{
 use crate::test_util::{add_window_with_terminal, assert_eventually};
 use crate::view_components::find::FindWithinBlockState;
 use crate::workspace::ToastStack;
-use crate::ActiveAgentViewsModel;
 
 fn add_window_with_cloud_mode_terminal(app: &mut App) -> ViewHandle<TerminalView> {
     let tips_model = app.add_model(|_| Default::default());
@@ -666,7 +665,7 @@ fn default_entry_is_chronological_and_hides_no_blocks() {
             let model = view.model.lock();
             for block in model.block_list().blocks() {
                 assert_eq!(
-                    block.should_hide_block(&state),
+                    block.should_hide_block(state),
                     block.should_hide_block(&AgentViewState::Inactive),
                     "a chronological conversation must not change any block's visibility"
                 );
@@ -754,7 +753,7 @@ fn block_typed_during_chronological_conversation_is_terminal_visibility() {
                     "commands typed during a chronological conversation must not be Agent-visibility"
                 );
                 assert_eq!(
-                    block.should_hide_block(&state),
+                    block.should_hide_block(state),
                     block.should_hide_block(&AgentViewState::Inactive),
                 );
             }
@@ -800,7 +799,7 @@ fn clear_buffer_action_in_chronological_conversation_closes_it_without_restart()
 
         let terminal = add_window_with_terminal(&mut app, None);
 
-        let original_conversation_id = terminal.update(&mut app, |view, ctx| {
+        terminal.update(&mut app, |view, ctx| {
             view.agent_view_controller().update(ctx, |controller, ctx| {
                 controller
                     .try_enter_agent_view(
@@ -811,7 +810,7 @@ fn clear_buffer_action_in_chronological_conversation_closes_it_without_restart()
                         },
                         ctx,
                     )
-                    .expect("Should be able to enter agent view")
+                    .expect("Should be able to enter agent view");
             })
         });
 

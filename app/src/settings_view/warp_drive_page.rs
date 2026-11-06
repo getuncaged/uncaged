@@ -117,8 +117,8 @@ impl SettingsPageMeta for WarpDriveSettingsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        return false; // Uncaged: hidden in the free, no-account fork
-        FeatureFlag::OpenWarpNewSettingsModes.is_enabled()
+        // Uncaged: hidden in the free, no-account fork
+        false
     }
 
     fn update_filter(&mut self, query: &str, ctx: &mut ViewContext<Self>) -> MatchData {
@@ -152,12 +152,9 @@ impl SettingsWidget for WarpDriveHeaderWidget {
         "warp drive sign up"
     }
 
-    fn should_render(&self, app: &AppContext) -> bool {
-        return false; // Uncaged: hidden in the free, no-account fork
-        FeatureFlag::SkipFirebaseAnonymousUser.is_enabled()
-            && AuthStateProvider::as_ref(app)
-                .get()
-                .is_anonymous_or_logged_out()
+    fn should_render(&self, _app: &AppContext) -> bool {
+        // Uncaged: hidden in the free, no-account fork
+        false
     }
 
     fn render(

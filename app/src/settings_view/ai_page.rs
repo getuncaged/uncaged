@@ -6360,16 +6360,8 @@ impl SettingsWidget for AIInputWidget {
         .with_padding_bottom(HEADER_PADDING)
         .finish();
 
-        let natural_language_detection_section = Self::render_natural_language_detection_section(
-            self.incorrect_autodetection_highlight_index.clone(),
-            self.autodetection_toggle.clone(),
-            self.prefer_shell_toggle.clone(),
-            self.nld_in_terminal_toggle.clone(),
-            view,
-            ai_settings,
-            appearance,
-            app,
-        );
+        let natural_language_detection_section =
+            self.render_natural_language_detection_section(view, ai_settings, appearance, app);
 
         let show_input_hint_text = render_ai_setting_toggle::<ShowHintText>(
             "Show input hint text",
@@ -6465,15 +6457,17 @@ impl SettingsWidget for AIInputWidget {
 
 impl AIInputWidget {
     fn render_natural_language_detection_section(
-        incorrect_autodetection_highlight_index: HighlightedHyperlink,
-        autodetection_toggle: SwitchStateHandle,
-        prefer_shell_toggle: SwitchStateHandle,
-        nld_in_terminal_toggle: SwitchStateHandle,
+        &self,
         view: &AISettingsPageView,
         ai_settings: &AISettings,
         appearance: &Appearance,
         app: &warpui::AppContext,
     ) -> Box<dyn warpui::Element> {
+        let incorrect_autodetection_highlight_index =
+            self.incorrect_autodetection_highlight_index.clone();
+        let autodetection_toggle = self.autodetection_toggle.clone();
+        let prefer_shell_toggle = self.prefer_shell_toggle.clone();
+        let nld_in_terminal_toggle = self.nld_in_terminal_toggle.clone();
         let is_toggleable = ai_settings.is_any_ai_enabled(app);
         let is_nld_enabled = *ai_settings.ai_autodetection_enabled_internal.value();
 

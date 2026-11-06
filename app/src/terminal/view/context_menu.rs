@@ -8,7 +8,7 @@ use super::{
     EntityId, FeatureFlag, ForkAIConversationParams, ForkFromExchange,
     ForkedConversationDestination, MenuItem, MenuItemFields, RichContentLink,
     ServerConversationToken, ServerOutputId, ShareableObject, TelemetryEvent, TerminalAction,
-    TerminalModel, TerminalView, Tip, TipHint, Vector2F, ViewContext, CONTEXT_MENU_WIDTH,
+    TerminalModel, TerminalView, Tip, TipHint, ViewContext, CONTEXT_MENU_WIDTH,
 };
 
 impl TerminalView {
