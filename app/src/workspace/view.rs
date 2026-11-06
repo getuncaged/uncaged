@@ -4930,12 +4930,11 @@ impl Workspace {
                 self.reset_focused_index_in_warp_drive(true, ctx);
             }
         }
-        // Starts from a left panel: Warp Drive
-        else if self.is_warp_drive_view_focused(ctx) {
-            self.focus_active_tab(ctx);
-        }
-        // Starts from a right panel: resource center (keyboard shortcuts page only)
-        else if self.resource_center_view.is_self_or_child_focused(ctx) {
+        // Starts from a left panel: Warp Drive, or from a right panel: resource center
+        // (keyboard shortcuts page only)
+        else if self.is_warp_drive_view_focused(ctx)
+            || self.resource_center_view.is_self_or_child_focused(ctx)
+        {
             self.focus_active_tab(ctx);
         }
 
