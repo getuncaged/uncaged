@@ -143,6 +143,15 @@ pub struct ChipResult {
 }
 
 impl ChipResult {
+    #[cfg(test)]
+    pub(crate) fn new_for_test(kind: ContextChipKind, value: Option<ChipValue>) -> Self {
+        Self {
+            kind,
+            value,
+            on_click_values: Vec::new(),
+        }
+    }
+
     pub fn kind(&self) -> &ContextChipKind {
         &self.kind
     }

@@ -546,13 +546,15 @@ pub struct TerminalSpacing {
 
 impl TerminalSpacing {
     pub fn normal(line_height_ratio: f32, ctx: &AppContext) -> Self {
+        // Uncaged: about two thirds of Warp's spacing, so a run of short commands reads like a
+        // terminal session rather than a stack of cards.
         Self {
             block_padding: BlockPadding {
-                padding_top: 1.1 * (DEFAULT_UI_LINE_HEIGHT_RATIO / line_height_ratio).min(1.0),
+                padding_top: 0.7 * (DEFAULT_UI_LINE_HEIGHT_RATIO / line_height_ratio).min(1.0),
                 command_padding_top: 0.19
                     * (DEFAULT_UI_LINE_HEIGHT_RATIO / line_height_ratio).min(1.0),
-                middle: 0.5 * (DEFAULT_UI_LINE_HEIGHT_RATIO / line_height_ratio).min(1.0),
-                bottom: 1. * (DEFAULT_UI_LINE_HEIGHT_RATIO / line_height_ratio).min(1.0),
+                middle: 0.35 * (DEFAULT_UI_LINE_HEIGHT_RATIO / line_height_ratio).min(1.0),
+                bottom: 0.7 * (DEFAULT_UI_LINE_HEIGHT_RATIO / line_height_ratio).min(1.0),
             },
             prompt_to_editor_padding: 10.,
             editor_bottom_padding: 20.,

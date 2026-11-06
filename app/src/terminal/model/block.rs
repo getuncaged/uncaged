@@ -19,6 +19,7 @@ use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
 pub use serialized_block::*;
+use unicode_width::UnicodeWidthStr;
 use warp_core::command::ExitCode;
 use warp_core::features::FeatureFlag;
 use warp_terminal::model::grid::Dimensions as _;
@@ -354,6 +355,10 @@ pub struct Block {
     ignore_next_rprompt: bool,
 
     prompt_snapshot: Option<PromptSnapshot>,
+
+    /// Uncaged: the Warp prompt as it reads in front of the command (see `inline_prompt_label`),
+    /// kept beside the snapshot so block heights don't rebuild the string.
+    inline_prompt_label: Option<String>,
 
     /// The home directory the block was executed in.
     home_dir: Option<String>,
@@ -992,6 +997,7 @@ impl Block {
             block_banner: None,
             ignore_next_rprompt: false,
             prompt_snapshot: None,
+            inline_prompt_label: None,
             home_dir: None,
             filter_query: None,
             cloud_workflow_id: None,
@@ -1290,7 +1296,37 @@ impl Block {
     }
 
     pub fn set_prompt_snapshot(&mut self, prompt_snapshot: PromptSnapshot) {
+        self.inline_prompt_label = Some(prompt_snapshot.inline_label());
         self.prompt_snapshot = Some(prompt_snapshot);
+    }
+
+    /// Uncaged: the Warp prompt drawn in front of the command, on the command's own line, the way
+    /// a classic shell prompt reads. Only a one-line command that still fits beside the prompt
+    /// gets it; anything longer keeps the prompt on its own line above the command.
+    pub fn inline_prompt_label(&self) -> Option<&str> {
+        if self.honor_ps1()
+            || self.should_hide_command_grid
+            || self.is_background()
+            || self.header_grid.is_command_empty()
+        {
+            return None;
+        }
+        let label = self.inline_prompt_label.as_deref()?;
+        let grid = self.header_grid.prompt_and_command_grid();
+        if grid.len() != 1 {
+            return None;
+        }
+        let command_columns = grid
+            .rightmost_visible_nonempty_cell()
+            .map_or(0, |col| col + 1);
+        (inline_prompt_columns(label) + command_columns <= self.header_grid.prompt_grid_columns())
+            .then_some(label)
+    }
+
+    /// How many cells the prompt/command grid is drawn to the right of the block's left edge:
+    /// the width of the inline prompt, or zero when the prompt sits above the command.
+    pub fn prompt_and_command_column_offset(&self) -> usize {
+        self.inline_prompt_label().map_or(0, inline_prompt_columns)
     }
 
     pub fn prompt_snapshot(&self) -> Option<&PromptSnapshot> {
@@ -1528,7 +1564,7 @@ impl Block {
     /// Whether we render the prompt on the same line, in the context of a finished block. Post-same
     /// line prompt, we render on the same line for PS1, but not for Warp prompt!
     pub fn render_prompt_on_same_line(&self) -> bool {
-        self.honor_ps1()
+        self.honor_ps1() || self.inline_prompt_label().is_some()
     }
 
     /// Used for determining the height of the block with `DisplaySettings` used when sharing a block.
@@ -1993,7 +2029,8 @@ impl Block {
 
     /// Returns prompt height in lines.
     pub fn prompt_height(&self) -> Lines {
-        if !self.ready_to_render() {
+        // An inline prompt shares the command's row, so it adds no height of its own.
+        if !self.ready_to_render() || self.inline_prompt_label().is_some() {
             Lines::zero()
         } else {
             self.header_grid.prompt_height()
@@ -2051,7 +2088,10 @@ impl Block {
     }
 
     pub fn command_padding_top(&self) -> Lines {
-        if self.header_grid.is_command_empty() || !self.ready_to_render() {
+        if self.header_grid.is_command_empty()
+            || !self.ready_to_render()
+            || self.inline_prompt_label().is_some()
+        {
             Lines::zero()
         } else {
             self.padding.command_padding_top.into_lines()
@@ -3433,6 +3473,11 @@ impl ansi::Handler for Block {
     fn query_keyboard_enhancement_flags<W: std::io::Write>(&mut self, writer: &mut W) {
         delegate!(self.query_keyboard_enhancement_flags(writer));
     }
+}
+
+/// Cells an inline prompt takes in front of the command: its text plus one cell of space.
+fn inline_prompt_columns(label: &str) -> usize {
+    UnicodeWidthStr::width(label) + 1
 }
 
 #[cfg(test)]

@@ -470,8 +470,13 @@ impl BlockListPoint {
         let row = within_block_point.get().row.into_lines()
             + delta_to_top_of_block
             + block_heights_cursor.start().height;
+        // An inline prompt pushes the prompt/command grid right by its width.
+        let column_offset = match within_block_point.grid {
+            GridType::PromptAndCommand => block.prompt_and_command_column_offset(),
+            GridType::Output | GridType::Prompt | GridType::Rprompt => 0,
+        };
 
-        BlockListPoint::new(row, within_block_point.get().col)
+        BlockListPoint::new(row, within_block_point.get().col + column_offset)
     }
 }
 

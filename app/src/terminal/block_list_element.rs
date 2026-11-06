@@ -2601,11 +2601,14 @@ impl BlockListElement {
 
             *grid_origin += vec2f(0.0, prompt_vertical_offset_px);
 
-            // Determine command_origin based on snackbar_header.
+            // Determine command_origin based on snackbar_header. An inline prompt sits in front of
+            // the command on the same row, so the command starts after it.
+            let inline_prompt_offset_px = block.prompt_and_command_column_offset() as f32
+                * block_grid_params.grid_render_params.cell_size.x();
             let command_origin = if snackbar_header.is_some() {
-                prompt_origin + vec2f(0.0, prompt_vertical_offset_px)
+                prompt_origin + vec2f(inline_prompt_offset_px, prompt_vertical_offset_px)
             } else {
-                *grid_origin
+                *grid_origin + vec2f(inline_prompt_offset_px, 0.)
             };
 
             // Update grid_origin and draw command.
@@ -2707,7 +2710,14 @@ impl BlockListElement {
 
         if !block.should_hide_output_grid() {
             let viewport_origin = snackbar_header.map_or(element_origin, |_| {
-                command_origin + vec2f(0., cell_size_height * block_middle_lines.as_f64() as f32)
+                // The output starts at the block's left edge, not after an inline prompt.
+                let inline_prompt_offset_px = block.prompt_and_command_column_offset() as f32
+                    * block_grid_params.grid_render_params.cell_size.x();
+                command_origin
+                    + vec2f(
+                        -inline_prompt_offset_px,
+                        cell_size_height * block_middle_lines.as_f64() as f32,
+                    )
             });
 
             let output_grid_properties =

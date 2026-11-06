@@ -1841,7 +1841,9 @@ impl<'a> ViewportState<'a> {
             BlockSection::PromptAndCommandGrid(row) => (
                 IndexPoint {
                     row: row.as_f64() as usize,
-                    col: point.column,
+                    col: point
+                        .column
+                        .saturating_sub(block.prompt_and_command_column_offset()),
                 },
                 GridType::PromptAndCommand,
             ),

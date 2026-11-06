@@ -1648,3 +1648,86 @@ fn test_calculate_optimal_row_counts_very_narrow_terminal() {
     assert_eq!(top, 500);
     assert_eq!(bottom, 1000);
 }
+
+fn snapshot_in(directory: &str, diff: (u32, u32, u32)) -> PromptSnapshot {
+    use crate::context_chips::display_chip::GitLineChanges;
+    use crate::context_chips::{ChipResult, ChipValue, ContextChipKind};
+    use crate::settings::WarpPromptSeparator;
+
+    let (files_changed, lines_added, lines_removed) = diff;
+    PromptSnapshot::from_chips(
+        vec![
+            ChipResult::new_for_test(
+                ContextChipKind::WorkingDirectory,
+                Some(ChipValue::Text(directory.to_owned())),
+            ),
+            ChipResult::new_for_test(
+                ContextChipKind::GitDiffStats,
+                Some(ChipValue::GitDiffStats(GitLineChanges {
+                    files_changed,
+                    lines_added,
+                    lines_removed,
+                })),
+            ),
+        ],
+        false,
+        WarpPromptSeparator::None,
+    )
+}
+
+fn finished_block_running(command: &str, snapshot: PromptSnapshot) -> Block {
+    let mut block = TestBlockBuilder::new().build();
+    block.set_prompt_snapshot(snapshot);
+    block.start();
+    block.precmd(PrecmdValue::default());
+    for c in command.chars() {
+        block.input(c);
+    }
+    block.finish(0);
+    block
+}
+
+#[test]
+fn clean_git_diff_is_left_out_of_the_prompt() {
+    assert_eq!(snapshot_in("~", (0, 0, 0)).to_string(), "~");
+    assert_eq!(snapshot_in("~", (1, 2, 3)).to_string(), "~ 1 • +2 -3");
+    assert_eq!(snapshot_in("~", (0, 0, 0)).inline_label(), "~ ❯");
+}
+
+#[test]
+fn short_command_shares_its_row_with_the_prompt() {
+    // The test grid is 7 columns wide: "~ ❯" plus a space takes 4, leaving room for "pwd".
+    let block = finished_block_running("pwd", snapshot_in("~", (0, 0, 0)));
+
+    assert_eq!(block.inline_prompt_label(), Some("~ ❯"));
+    assert_eq!(block.prompt_and_command_column_offset(), 4);
+    assert!(block.render_prompt_on_same_line());
+    assert_eq!(block.prompt_height(), Lines::zero());
+    assert_eq!(block.command_padding_top(), Lines::zero());
+    assert_eq!(
+        block.prompt_and_command_grid_offset(),
+        block.prompt_grid_offset()
+    );
+}
+
+#[test]
+fn command_too_long_for_the_row_keeps_the_prompt_above_it() {
+    let block = finished_block_running("ls -la", snapshot_in("~", (0, 0, 0)));
+
+    assert_eq!(block.inline_prompt_label(), None);
+    assert_eq!(block.prompt_and_command_column_offset(), 0);
+    assert!(block.prompt_height() > Lines::zero());
+}
+
+#[test]
+fn ps1_prompt_is_never_drawn_inline() {
+    let mut block = TestBlockBuilder::new().with_honor_ps1(true).build();
+    block.set_prompt_snapshot(snapshot_in("~", (0, 0, 0)));
+    block.start();
+    block.precmd(PrecmdValue::default());
+    block.input('l');
+    block.finish(0);
+
+    assert_eq!(block.inline_prompt_label(), None);
+    assert_eq!(block.prompt_and_command_column_offset(), 0);
+}

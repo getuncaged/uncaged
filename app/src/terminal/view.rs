@@ -152,10 +152,10 @@ use warpui::elements::{
     get_rich_content_position_id, Align, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, DropTarget,
     DropTargetData, Empty, EventHandler, Fill, Flex, Hoverable, Icon, LiveElement,
-    MouseStateHandle, NewScrollable, OffsetPositioning, ParentAnchor, ParentElement,
-    ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Rect,
-    SavePosition, ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth, Shrinkable,
-    Stack, Text,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, NewScrollable, OffsetPositioning,
+    ParentAnchor, ParentElement, ParentOffsetBounds, PositionedElementAnchor,
+    PositionedElementOffsetBounds, Radius, Rect, SavePosition, ScrollStateHandle, Scrollable,
+    ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text,
 };
 use warpui::event::ModifiersState;
 use warpui::fonts::{Cache as FontCache, FamilyId, Properties};
@@ -22584,7 +22584,7 @@ impl TerminalView {
             Some(block) => block,
         };
 
-        let mut prompt = if block.honor_ps1() {
+        if block.honor_ps1() {
             block.prompt_contents_to_string(false)
         } else if block.prompt_snapshot().is_some() {
             // Note that we're checking not only for the flag being enabled but also ensuring the
@@ -22623,15 +22623,7 @@ impl TerminalView {
                     .git_branch()
                     .map_or_else(String::new, |b| format!(" git:({b})")),
             )
-        };
-
-        // On Local and Dev channels, append an indicator when NLD was overridden.
-        // Skip the honor_ps1 case since there's no good place to display the extra text.
-        if !block.honor_ps1() && block.nld_overridden() && ChannelState::enable_debug_features() {
-            prompt.push_str(" (nld overridden)");
         }
-
-        prompt
     }
 
     /// Returns the duration as an std::time::Duration struct
@@ -22642,10 +22634,15 @@ impl TerminalView {
     }
 
     fn block_duration_text(model: &TerminalModel, block_index: BlockIndex) -> Option<String> {
-        model
-            .block_list()
-            .block_at(block_index)?
-            .formatted_duration_string()
+        let block = model.block_list().block_at(block_index)?;
+        // Uncaged: an instant command's duration is noise; only a second or more is worth reading.
+        if block
+            .duration()
+            .is_some_and(|duration| duration < chrono::Duration::seconds(1))
+        {
+            return None;
+        }
+        block.formatted_duration_string()
     }
 
     fn is_block_duration_live(model: &TerminalModel, block_index: BlockIndex) -> bool {
@@ -23016,24 +23013,63 @@ impl TerminalView {
             .sub_text_color(appearance.theme().background())
             .into();
 
-        let prompt = Text::new_inline(
-            Self::block_prompt(model, sessions, index),
-            appearance.monospace_font_family(),
-            appearance.monospace_font_size() * WARP_PROMPT_HEIGHT_LINES,
-        )
+        // Uncaged: when the prompt fits in front of the command, it is drawn on the command's own
+        // row at the terminal's size, so its cells line up with the command after it.
+        let inline_label = model
+            .block_list()
+            .block_at(index)
+            .and_then(|block| block.inline_prompt_label())
+            .map(str::to_owned);
+        let label_font_size = if inline_label.is_some() {
+            appearance.monospace_font_size()
+        } else {
+            appearance.monospace_font_size() * WARP_PROMPT_HEIGHT_LINES
+        };
+        let is_inline = inline_label.is_some();
+
+        let prompt = match inline_label {
+            Some(label) => {
+                Text::new_inline(label, appearance.monospace_font_family(), label_font_size)
+                    .with_line_height_ratio(appearance.line_height_ratio())
+            }
+            None => Text::new_inline(
+                Self::block_prompt(model, sessions, index),
+                appearance.monospace_font_family(),
+                label_font_size,
+            ),
+        }
         .with_style(Properties::default().weight(appearance.monospace_font_weight()))
         .with_color(terminal_theme_prompt)
         .finish();
 
-        let mut label_row = Flex::row().with_child(prompt);
+        // An inline prompt pushes the duration to the far end of the row, out of the command's way.
+        let mut label_row = if is_inline {
+            Flex::row()
+                .with_main_axis_size(MainAxisSize::Max)
+                .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
+                .with_child(prompt)
+        } else {
+            Flex::row().with_child(prompt)
+        };
 
         let is_live = Self::is_block_duration_live(model, index);
         if let Some(duration_string) = Self::block_duration_text(model, index) {
+            // At the end of an inline row the duration stands alone, so it drops its brackets.
+            let duration_string = if is_inline {
+                duration_string
+                    .trim()
+                    .trim_start_matches('(')
+                    .trim_end_matches(')')
+                    .to_owned()
+            } else {
+                duration_string
+            };
             let duration = Text::new_inline(
                 duration_string,
                 appearance.monospace_font_family(),
-                appearance.monospace_font_size() * WARP_PROMPT_HEIGHT_LINES,
+                label_font_size,
             )
+            .with_line_height_ratio(appearance.line_height_ratio())
             .with_style(Properties::default().weight(appearance.monospace_font_weight()))
             .with_color(terminal_theme_prompt)
             .finish();

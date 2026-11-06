@@ -91,8 +91,32 @@ impl PromptSnapshot {
     }
 }
 
+impl PromptSnapshot {
+    /// Uncaged: the prompt as it reads in front of a finished command on the command's own line,
+    /// like a classic shell prompt: the chips, then the prompt's separator (or `❯`).
+    pub fn inline_label(&self) -> String {
+        let chips = self.to_string();
+        let separator = self.separator.renderable_string().unwrap_or("❯");
+        if chips.is_empty() {
+            separator.to_owned()
+        } else {
+            format!("{chips} {separator}")
+        }
+    }
+}
+
 impl std::fmt::Display for PromptSnapshot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&chips_to_string(self.chips.clone().into_iter()))
+        // Uncaged: a clean tree's `0 • +0 -0` says nothing, so a block header leaves it out.
+        let chips = self.chips.iter().filter(|chip| {
+            !matches!(
+                &chip.value,
+                Some(ChipValue::GitDiffStats(changes))
+                    if changes.files_changed == 0
+                        && changes.lines_added == 0
+                        && changes.lines_removed == 0
+            )
+        });
+        f.write_str(&chips_to_string(chips.cloned()))
     }
 }

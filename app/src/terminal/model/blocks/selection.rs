@@ -136,7 +136,12 @@ impl BlockListSelection {
                 | BlockSection::PaddingTop
                 | BlockSection::CommandPaddingTop => (Point::new(0, 0), GridType::PromptAndCommand),
                 BlockSection::PromptAndCommandGrid(row) => (
-                    Point::new(row, block_list_point.column),
+                    Point::new(
+                        row,
+                        block_list_point
+                            .column
+                            .saturating_sub(block.prompt_and_command_column_offset()),
+                    ),
                     GridType::PromptAndCommand,
                 ),
                 BlockSection::PaddingMiddle => (
