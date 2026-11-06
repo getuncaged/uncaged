@@ -14996,7 +14996,7 @@ dependencies = [
 
 [[package]]
 name = "warp"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "addr",
  "aha-reqwest-eventsource",
