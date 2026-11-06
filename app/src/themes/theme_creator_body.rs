@@ -1663,7 +1663,7 @@ impl ThemeCreatorBody {
         match self.mode {
             ThemeCreatorMode::Manual => {
                 buttons.push(action_button(
-                    "Share…",
+                    "Share to gallery",
                     ButtonVariant::Secondary,
                     self.share_mouse_state.clone(),
                     ThemeCreatorBodyAction::ShareTheme,
