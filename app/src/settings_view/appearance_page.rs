@@ -87,8 +87,6 @@ use crate::{report_error, report_if_error, send_telemetry_from_ctx, themes};
 /// One width for every dropdown on the page, so their edges line up down the column. The same
 /// width dropdowns default to elsewhere in Settings.
 const DROPDOWN_WIDTH: f32 = TOP_MENU_BAR_MAX_WIDTH;
-/// The tallest a dropdown's menu grows before it scrolls — the theme lists can be long.
-const DROPDOWN_MENU_MAX_HEIGHT: f32 = 320.;
 /// Every numeric field on the page (font sizes, line height, window size, padding).
 const NUMBER_INPUT_WIDTH: f32 = 64.;
 /// The current-theme preview on the Theme card, as a fraction of a full preview card.
@@ -563,8 +561,8 @@ pub struct AppearanceSettingsPageView {
     enforce_min_contrast_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     input_mode_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     /// The themes for light and dark system appearance, shown while "Sync with OS" is on.
-    light_theme_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
-    dark_theme_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
+    light_theme_dropdown: ViewHandle<FilterableDropdown<AppearancePageAction>>,
+    dark_theme_dropdown: ViewHandle<FilterableDropdown<AppearancePageAction>>,
     workspace_decorations_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     tab_close_button_position_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     zoom_level_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
@@ -1254,6 +1252,16 @@ impl AppearanceSettingsPageView {
 
         let light_theme_dropdown = Self::build_system_theme_dropdown(SystemTheme::Light, ctx);
         let dark_theme_dropdown = Self::build_system_theme_dropdown(SystemTheme::Dark, ctx);
+        // A searchable dropdown shows whichever item the search or arrow keys highlighted, even
+        // when it closes without a choice. Snap both back to the saved themes when they close, so
+        // what they show is what's set. A real choice has already been saved by then.
+        for dropdown in [&light_theme_dropdown, &dark_theme_dropdown] {
+            ctx.subscribe_to_view(dropdown, |me, _, event, ctx| {
+                if matches!(event, FilterableDropdownEvent::Close) {
+                    me.refresh_system_theme_dropdowns(ctx);
+                }
+            });
+        }
 
         let header_toolbar_inline_editor =
             ctx.add_typed_action_view(HeaderToolbarInlineEditor::new);
@@ -1480,12 +1488,14 @@ impl AppearanceSettingsPageView {
     fn build_system_theme_dropdown(
         appearance: SystemTheme,
         ctx: &mut ViewContext<Self>,
-    ) -> ViewHandle<Dropdown<AppearancePageAction>> {
+    ) -> ViewHandle<FilterableDropdown<AppearancePageAction>> {
+        // Searchable, like the font pickers: with every built-in theme plus downloads and the
+        // user's own, the list is long, and the plain dropdown couldn't scroll to its end — so the
+        // user's themes, which sort last, were out of reach.
         ctx.add_typed_action_view(|ctx| {
-            let mut dropdown = Dropdown::new(ctx);
+            let mut dropdown = FilterableDropdown::new(ctx);
             dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
             dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
-            dropdown.set_menu_max_height(DROPDOWN_MENU_MAX_HEIGHT, ctx);
             let selected = Self::system_theme_for(appearance, ctx);
             dropdown.set_items(Self::system_theme_items(appearance, &selected, ctx), ctx);
             dropdown.set_selected_by_action(
@@ -3070,16 +3080,16 @@ impl SettingsWidget for SyncThemeWithOsWidget {
                 appearance,
             ));
         if syncing {
-            column.add_child(dropdown_row(
+            column.add_child(dropdown_like_row(
                 "Light theme",
                 None,
-                &view.light_theme_dropdown,
+                ChildView::new(&view.light_theme_dropdown).finish(),
                 appearance,
             ));
-            column.add_child(dropdown_row(
+            column.add_child(dropdown_like_row(
                 "Dark theme",
                 None,
-                &view.dark_theme_dropdown,
+                ChildView::new(&view.dark_theme_dropdown).finish(),
                 appearance,
             ));
         }
