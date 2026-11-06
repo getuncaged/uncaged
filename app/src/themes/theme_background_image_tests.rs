@@ -157,3 +157,11 @@ fn importing_from_bytes_caps_and_thumbnails_too() {
     assert_eq!(full_img.width().max(full_img.height()), MAX_EDGE);
     assert!(thumbnail_path(&full).exists());
 }
+
+/// A picture that is already card-sized is drawn as it is, so no thumbnail is written for it.
+#[test]
+fn card_sized_pictures_preview_as_they_are() {
+    let (_dir, source) = rgba_png(THUMB_EDGE / 2, THUMB_EDGE / 3, Rgba([1, 2, 3, 255]));
+
+    assert_eq!(preview_thumbnail(&source).expect("preview"), source);
+}

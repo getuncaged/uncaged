@@ -683,8 +683,68 @@ impl From<WarpTheme> for PromptColors {
     }
 }
 
+/// A theme's preview card: a miniature terminal in its colours, over its background image.
+///
+/// Works out which image to draw on the spot, which costs a filesystem check for a theme with a
+/// local image. A grid of cards should resolve those once, off the main thread, with
+/// [`resolve_preview_image`] and draw with [`render_preview_with_image`] instead.
 pub fn render_preview(
     theme: &WarpTheme,
+    font_family: FamilyId,
+    form_factor: Option<f32>,
+) -> Box<dyn Element> {
+    let image = theme.background_image().and_then(|background_image| {
+        let source = crate::themes::default_themes::preview_source(background_image.source());
+        // A gallery theme that hasn't been installed yet carries an image path that isn't on
+        // disk. Painting nothing for it while still dimming the card would wash it out, so the
+        // image layer and its opacity are both skipped unless the file is actually there.
+        // Bundled sources are always present.
+        let loadable = match &source {
+            AssetSource::LocalFile { path, .. } => Path::new(path).exists(),
+            _ => true,
+        };
+        loadable.then_some(source)
+    });
+    render_preview_with_image(theme, image, font_family, form_factor)
+}
+
+/// The image a preview card should draw for `theme`, or `None` when it has none that can be
+/// drawn.
+///
+/// Always a small one: bundled themes map to their bundled thumbnails, and a local image is
+/// swapped for a thumbnail written beside it (or in the cache, for a picture that lives outside
+/// the themes dir), creating that thumbnail if it is missing. This touches the disk and may
+/// decode an image, so call it from a background task.
+pub fn resolve_preview_image(theme: &WarpTheme) -> Option<AssetSource> {
+    let source = theme.background_image()?.source();
+    match source {
+        AssetSource::LocalFile { path, .. } => {
+            let full = Path::new(&path);
+            if !full.exists() {
+                return None;
+            }
+            let shown = match crate::themes::theme_background_image::preview_thumbnail(full) {
+                Ok(thumbnail) => thumbnail.to_string_lossy().into_owned(),
+                // A card with the full image is slower but still right.
+                Err(error) => {
+                    log::warn!("couldn't make a preview thumbnail for {path}: {error:#}");
+                    path
+                }
+            };
+            Some(AssetSource::LocalFile {
+                path: shown,
+                content_version: None,
+            })
+        }
+        other => Some(crate::themes::default_themes::preview_source(other)),
+    }
+}
+
+/// [`render_preview`] with the background image already resolved — see [`resolve_preview_image`].
+/// `image` is drawn only when the theme has a background image at all.
+pub fn render_preview_with_image(
+    theme: &WarpTheme,
+    image: Option<AssetSource>,
     font_family: FamilyId,
     form_factor: Option<f32>,
 ) -> Box<dyn Element> {
@@ -762,32 +822,18 @@ pub fn render_preview(
 
     let mut thumbnail = Stack::new();
     let mut background_opacity: u8 = 100;
-    if let Some(background_image) = theme.background_image() {
-        let source = crate::themes::default_themes::preview_source(background_image.source());
-
-        // A gallery theme that hasn't been installed yet carries an image path that isn't on disk.
-        // Painting nothing for it while still dimming the card would wash it out, so the image
-        // layer and its opacity are both skipped unless the file is actually there. Bundled sources
-        // are always present. This stat is cheap because a preview grid repaints on interaction,
-        // not per frame.
-        let loadable = match &source {
-            AssetSource::LocalFile { path, .. } => std::path::Path::new(path).exists(),
-            _ => true,
-        };
-
-        if loadable {
-            thumbnail.add_child(
-                Shrinkable::new(
-                    1.,
-                    warpui::elements::Image::new(source, warpui::elements::CacheOption::BySize)
-                        .cover()
-                        .finish(),
-                )
-                .finish(),
-            );
-            // Clamped on deserialize; saturating here too so the arithmetic is locally safe.
-            background_opacity = background_opacity.saturating_sub(background_image.opacity);
-        }
+    if let (Some(background_image), Some(source)) = (theme.background_image(), image) {
+        thumbnail.add_child(
+            Shrinkable::new(
+                1.,
+                warpui::elements::Image::new(source, warpui::elements::CacheOption::BySize)
+                    .cover()
+                    .finish(),
+            )
+            .finish(),
+        );
+        // Clamped on deserialize; saturating here too so the arithmetic is locally safe.
+        background_opacity = background_opacity.saturating_sub(background_image.opacity);
     }
 
     thumbnail.add_child(

@@ -297,10 +297,10 @@ fn surface_theme_picker_open(
     ensure_surface_available(action, SurfaceDestination::ThemePicker, ctx)?;
     let workspace = target_workspace(action, target, ctx)?;
     activate_target(&workspace, action, target, ctx)?;
+    // Warp's theme picker panel is gone; the theme gallery in Settings is where themes are
+    // browsed and switched now.
     workspace.update(ctx, |workspace, ctx| {
-        if !workspace.is_theme_chooser_open() {
-            workspace.handle_action(&WorkspaceAction::ShowThemeChooserForActiveTheme, ctx);
-        }
+        workspace.handle_action(&WorkspaceAction::ShowThemeGallery, ctx);
     });
     Ok(ack(instance_id, action))
 }

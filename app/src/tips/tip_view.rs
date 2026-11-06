@@ -150,8 +150,9 @@ impl TipsView {
                 ctx,
             ),
             TipItem::new(
-                "Theme Picker".to_string(),
-                "Make Uncaged your own by choosing a built-in theme. Or create your own.".to_string(),
+                "Theme Gallery".to_string(),
+                "Make Uncaged your own by choosing a theme from the gallery. Or create your own."
+                    .to_string(),
                 TipAction::ThemePicker,
                 ctx,
             ),

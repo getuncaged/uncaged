@@ -171,7 +171,6 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
     register_test!(test_unnecessary_resizes);
     register_test!(test_open_and_close_settings);
     register_test!(test_suggestions_menu_positioning);
-    register_test!(test_open_and_close_theme_creator_modal);
     register_test!(test_removing_tabs_out_of_order);
     register_test!(test_ctrl_c);
     register_test!(test_click_on_prompt_to_focus_input);
@@ -231,7 +230,6 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
     register_test!(test_create_session_with_split_pane_while_bootstrapping);
     register_test!(test_create_session_with_new_tab_while_bootstrapping);
     register_test!(test_add_theme_to_warp_config);
-    register_test!(test_palette_opens_when_theme_chooser_is_open);
     #[cfg(target_os = "macos")]
     register_test!(test_preview_config_dir_migration);
     register_test!(test_launch_warp_with_theme_in_warp_config);

@@ -26,7 +26,7 @@ pub const MAX_EDGE: u32 = 2560;
 
 /// Longest edge kept for the small preview written beside the full image.
 ///
-/// The theme picker and explorer draw cards at roughly this size, and a card that decodes a 380px
+/// The theme gallery draws cards at roughly this size, and a card that decodes a 380px
 /// JPEG instead of a 2560px one is the difference between a cheap paint and the multi-millisecond
 /// decode-plus-resize that the bundled themes were given `jpg/thumbs/` to avoid. It also caps what
 /// the asset cache keeps resident: theme-image sources are never evicted, so a full-res card would
@@ -54,6 +54,69 @@ pub fn thumbnail_path(full_image: &Path) -> PathBuf {
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_default();
     full_image.with_file_name(format!("{stem}.thumb.{IMPORTED_EXTENSION}"))
+}
+
+/// The small image a preview card should draw for the background at `full_image`, creating it if
+/// it does not exist yet. Returns `full_image` itself when it is already thumbnail-sized.
+///
+/// An image inside the themes dir gets its thumbnail beside it, exactly where an import puts one,
+/// so themes installed before thumbnails existed catch up the first time they are shown. A picture
+/// elsewhere on the disk is the user's, not ours to write beside, so its thumbnail goes in the
+/// cache instead, keyed on the file's path, size and modification time so an edited picture gets
+/// a new one.
+///
+/// Reads the image header and, when a thumbnail is missing, decodes the whole image — keep it off
+/// the main thread.
+pub fn preview_thumbnail(full_image: &Path) -> Result<PathBuf> {
+    let thumbnail = if full_image.starts_with(crate::user_config::themes_dir()) {
+        thumbnail_path(full_image)
+    } else {
+        cached_thumbnail_path(full_image)?
+    };
+    if thumbnail.exists() {
+        return Ok(thumbnail);
+    }
+
+    let (width, height) = ImageReader::open(full_image)
+        .with_context(|| format!("couldn't open {}", full_image.display()))?
+        .with_guessed_format()
+        .with_context(|| format!("couldn't read {}", full_image.display()))?
+        .into_dimensions()
+        .with_context(|| format!("couldn't read the size of {}", full_image.display()))?;
+    if width.max(height) <= THUMB_EDGE {
+        return Ok(full_image.to_path_buf());
+    }
+    if width as u64 * height as u64 > MAX_INPUT_PIXELS {
+        bail!("that image is {width}x{height}, which is too large to preview");
+    }
+
+    let decoded = ImageReader::open(full_image)?
+        .with_guessed_format()?
+        .decode()
+        .with_context(|| format!("couldn't decode {}", full_image.display()))?;
+    if let Some(dir) = thumbnail.parent() {
+        std::fs::create_dir_all(dir)
+            .with_context(|| format!("couldn't create {}", dir.display()))?;
+    }
+    write_jpeg(&normalise(&decoded, THUMB_EDGE), &thumbnail)?;
+    Ok(thumbnail)
+}
+
+/// Where the thumbnail for a picture outside the themes dir is kept.
+fn cached_thumbnail_path(full_image: &Path) -> Result<PathBuf> {
+    use std::hash::{Hash, Hasher};
+
+    let metadata = std::fs::metadata(full_image)
+        .with_context(|| format!("couldn't read {}", full_image.display()))?;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    full_image.hash(&mut hasher);
+    metadata.len().hash(&mut hasher);
+    if let Ok(modified) = metadata.modified() {
+        modified.hash(&mut hasher);
+    }
+    Ok(warp_core::paths::cache_dir()
+        .join("theme-thumbnails")
+        .join(format!("{:016x}.{IMPORTED_EXTENSION}", hasher.finish())))
 }
 
 /// Decodes the file at `source`, normalises it, and writes it as `<dir>/<slug>.jpg` with a preview

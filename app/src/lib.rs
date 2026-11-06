@@ -1241,6 +1241,8 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(WarpManagedPathsWatcher::new);
 
     ctx.add_singleton_model(WarpConfig::new);
+    // Empty until the theme gallery is first shown; see `ThemeGalleryCatalogue`.
+    ctx.add_singleton_model(|_| themes::theme_gallery::ThemeGalleryCatalogue::new());
     ctx.add_singleton_model(|_ctx| SettingsManager::default());
 
     let user_defaults_on_startup = settings::init(startup_toml_parse_error, ctx);
@@ -1827,9 +1829,6 @@ pub(crate) fn initialize_app(
     tips::tip_view::init(ctx);
     launch_configs::init(ctx);
     workflows::init(ctx);
-    themes::theme_chooser::init(ctx);
-    themes::theme_creator_modal::init(ctx);
-    themes::theme_deletion_modal::init(ctx);
     root_view::init(ctx);
     voltron::init(ctx);
     auth::init(ctx);

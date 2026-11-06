@@ -493,10 +493,12 @@ pub fn init(app: &mut AppContext) {
     ]);
 
     app.register_editable_bindings([
+        // The binding keeps its old name so existing custom shortcuts, tips and the palette's
+        // suggestions still find it; it now opens the theme gallery.
         EditableBinding::new(
             "workspace:show_theme_chooser",
-            "Open theme picker",
-            WorkspaceAction::ShowThemeChooserForActiveTheme,
+            "Open theme gallery",
+            WorkspaceAction::ShowThemeGallery,
         )
         .with_context_predicate(id!("Workspace"))
         .with_group(bindings::BindingGroup::Settings.as_str()),

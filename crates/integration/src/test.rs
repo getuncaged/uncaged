@@ -104,7 +104,7 @@ use warp::integration_testing::navigation_palette::{
 };
 use warp::integration_testing::pane_group::assert_focused_pane_index;
 use warp::integration_testing::settings::{
-    assert_theme_chooser_contains, set_window_custom_size, toggle_setting,
+    assert_installed_themes_contain, set_window_custom_size, toggle_setting,
 };
 use warp::integration_testing::step::{
     assert_no_pending_model_events, new_step_with_default_assertions,
@@ -283,11 +283,11 @@ pub fn test_launch_warp_with_theme_in_warp_config() -> Builder {
                 &integration_testing::themes::themes_dir().join("test_theme.yaml"),
             );
         })
-        .with_step(assert_theme_chooser_contains("Test Theme", 1))
+        .with_step(assert_installed_themes_contain("Test Theme", 1))
 }
 
 /// Adds a theme to the mocked out warp config directory and verifies that
-/// the theme appears in the theme picker.
+/// the theme is loaded, so the theme gallery and Appearance offer it.
 pub fn test_add_theme_to_warp_config() -> Builder {
     new_builder()
         .with_setup(move |utils| {
@@ -297,7 +297,7 @@ pub fn test_add_theme_to_warp_config() -> Builder {
                 .expect("Should be able to create themes dir");
         })
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
-        .with_step(assert_theme_chooser_contains("Test Theme", 0))
+        .with_step(assert_installed_themes_contain("Test Theme", 0))
         .with_step(TestStep::new("Write a new theme").with_setup(|_utils| {
             integration_testing::create_file_from_assets(
                 TEST_ONLY_ASSETS,
@@ -305,7 +305,7 @@ pub fn test_add_theme_to_warp_config() -> Builder {
                 &integration_testing::themes::themes_dir().join("test_theme.yaml"),
             );
         }))
-        .with_step(assert_theme_chooser_contains("Test Theme", 1))
+        .with_step(assert_installed_themes_contain("Test Theme", 1))
         .with_step(
             TestStep::new("Write another new theme").with_setup(|_utils| {
                 integration_testing::create_file_from_assets(
@@ -315,7 +315,7 @@ pub fn test_add_theme_to_warp_config() -> Builder {
                 );
             }),
         )
-        .with_step(assert_theme_chooser_contains("Test Theme", 2))
+        .with_step(assert_installed_themes_contain("Test Theme", 2))
         .with_step(
             TestStep::new("Write another new theme with a name in the .yaml").with_setup(
                 |_utils| {
@@ -327,25 +327,8 @@ pub fn test_add_theme_to_warp_config() -> Builder {
                 },
             ),
         )
-        .with_step(assert_theme_chooser_contains("test_theme", 1))
-        .with_step(assert_theme_chooser_contains("Test Theme", 2))
-}
-
-pub fn test_palette_opens_when_theme_chooser_is_open() -> Builder {
-    new_builder()
-        .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
-        .with_steps(
-            open_command_palette_and_run_action("Open Theme Picker").add_assertion(
-                |app, window_id| {
-                    let views = app.views_of_type(window_id).unwrap();
-                    let workspace: &ViewHandle<Workspace> = views.first().unwrap();
-                    workspace.read(app, |view, _| {
-                        async_assert!(view.is_theme_chooser_open(), "Theme chooser should be open")
-                    })
-                },
-            ),
-        )
-        .with_step(open_command_palette())
+        .with_step(assert_installed_themes_contain("test_theme", 1))
+        .with_step(assert_installed_themes_contain("Test Theme", 2))
 }
 
 /// Manually executed test that runs a long-line.sh script. Useful for debugging the performance
@@ -485,50 +468,6 @@ pub fn test_open_and_close_settings() -> Builder {
                 .with_click_on_saved_position("close_tab_button:1")
                 .add_assertion(assert_tab_count(1))
                 .add_assertion(assert_tab_title(0, "~")),
-        )
-}
-
-pub fn test_open_and_close_theme_creator_modal() -> Builder {
-    new_builder()
-        .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
-        .with_steps(
-            open_command_palette_and_run_action("Open Theme Picker").add_assertion(
-                |app, window_id| {
-                    let views = app.views_of_type(window_id).unwrap();
-                    let workspace: &ViewHandle<Workspace> = views.first().unwrap();
-                    workspace.read(app, |view, _| {
-                        async_assert!(view.is_theme_chooser_open(), "Theme chooser should be open")
-                    })
-                },
-            ),
-        )
-        .with_step(
-            new_step_with_default_assertions("Click on button to open theme creator modal")
-                .with_click_on_saved_position("create_theme_button")
-                .add_assertion(move |app, window_id| {
-                    let views: Vec<ViewHandle<Workspace>> = app.views_of_type(window_id).unwrap();
-                    let workspace = views.first().unwrap();
-                    workspace.read(app, |view, _| {
-                        async_assert!(
-                            view.is_theme_creator_modal_open(),
-                            "Theme creator modal should be open"
-                        )
-                    })
-                }),
-        )
-        .with_step(
-            new_step_with_default_assertions("Click on cancel button to close theme creator modal")
-                .with_click_on_saved_position("theme_creator_cancel_button")
-                .add_assertion(move |app, window_id| {
-                    let views: Vec<ViewHandle<Workspace>> = app.views_of_type(window_id).unwrap();
-                    let workspace = views.first().unwrap();
-                    workspace.read(app, |view, _| {
-                        async_assert!(
-                            !view.is_theme_creator_modal_open(),
-                            "Theme creator modal should be closed"
-                        )
-                    })
-                }),
         )
 }
 

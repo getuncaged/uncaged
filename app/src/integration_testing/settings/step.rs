@@ -4,8 +4,8 @@ use warpui::windowing::WindowManager;
 use warpui::{async_assert, SingletonEntity};
 
 use crate::integration_testing::step::new_step_with_default_assertions;
-use crate::integration_testing::view_getters::theme_chooser_view;
 use crate::settings_view::SettingsAction;
+use crate::user_config::WarpConfig;
 use crate::window_settings::WindowSettings;
 use crate::workspace::{Workspace, WorkspaceAction};
 
@@ -32,16 +32,17 @@ pub fn toggle_setting(action: SettingsAction) -> TestStep {
     )
 }
 
-pub fn assert_theme_chooser_contains(theme_name: &'static str, count: usize) -> TestStep {
-    TestStep::new("Assert the theme chooser contents match our expectations").add_named_assertion(
-        format!("The theme chooser contains {count} theme(s) named \"{theme_name}\""),
-        move |app, window_id| {
-            let theme_chooser = theme_chooser_view(app, window_id);
-
-            let result: usize = theme_chooser.read(app, |theme_chooser, _| {
-                theme_chooser
-                    .themes()
-                    .filter(|theme| theme.matches(theme_name))
+/// Asserts how many loaded themes are named like `theme_name` — the themes the theme gallery and
+/// the Appearance page offer.
+pub fn assert_installed_themes_contain(theme_name: &'static str, count: usize) -> TestStep {
+    TestStep::new("Assert the installed themes match our expectations").add_named_assertion(
+        format!("The installed themes include {count} theme(s) named \"{theme_name}\""),
+        move |app, _window_id| {
+            let result: usize = app.read(|ctx| {
+                WarpConfig::as_ref(ctx)
+                    .theme_config()
+                    .theme_items()
+                    .filter(|(theme, _)| theme.matches(theme_name))
                     .count()
             });
             async_assert!(

@@ -42,7 +42,6 @@ use crate::tab_configs::TabConfig;
 use crate::terminal::available_shells::AvailableShell;
 use crate::terminal::view::inline_banner::ZeroStatePromptSuggestionType;
 use crate::themes::theme::AnsiColorIdentifier;
-use crate::themes::theme_chooser::ThemeChooserMode;
 use crate::workflows::{WorkflowSelectionSource, WorkflowSource, WorkflowType};
 use crate::workspace::tab_group::TabGroupId;
 use crate::workspace::PaneViewLocator;
@@ -310,8 +309,8 @@ pub enum WorkspaceAction {
         search_query: String,
         section: Option<SettingsSection>,
     },
-    ShowThemeChooser(ThemeChooserMode),
-    ShowThemeChooserForActiveTheme,
+    /// Opens Settings on the theme gallery — the one place to browse and switch themes.
+    ShowThemeGallery,
     IncreaseFontSize,
     DecreaseFontSize,
     ResetFontSize,
@@ -1040,8 +1039,7 @@ impl WorkspaceAction {
             | ShowSettings
             | ShowSettingsPage(_)
             | ShowSettingsPageWithSearch { .. }
-            | ShowThemeChooser(_)
-            | ShowThemeChooserForActiveTheme
+            | ShowThemeGallery
             | IncreaseFontSize
             | DecreaseFontSize
             | ResetFontSize

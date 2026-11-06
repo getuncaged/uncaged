@@ -1899,7 +1899,7 @@ pub enum Event {
         entrypoint: AnonymousUserSignupEntrypoint,
     },
 
-    OpenThemeChooser,
+    OpenThemeGallery,
     OpenConversationHistory,
     OpenMCPSettingsPage {
         page: Option<MCPServersSettingsPage>,
@@ -20037,8 +20037,8 @@ impl TerminalView {
                     profile_id: *active_profile.id(),
                 });
             }
-            AIBlockEvent::OpenThemeChooser => {
-                ctx.emit(Event::OpenThemeChooser);
+            AIBlockEvent::OpenThemeGallery => {
+                ctx.emit(Event::OpenThemeGallery);
             }
             AIBlockEvent::RunAwsLoginCommand => {
                 self.run_aws_login_command(ctx);

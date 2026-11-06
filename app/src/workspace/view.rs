@@ -106,9 +106,7 @@ use warpui::geometry::vector::{vec2f, Vector2F};
 use warpui::keymap::Context;
 use warpui::modals::{AlertDialogWithCallbacks, AppModalCallback, ModalButton};
 use warpui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
-use warpui::platform::{
-    Cursor, FilePickerConfiguration, FullscreenState, SystemTheme, TerminationMode,
-};
+use warpui::platform::{Cursor, FilePickerConfiguration, FullscreenState, TerminationMode};
 use warpui::text_layout::ClipConfig;
 use warpui::ui_components::button::{Button, ButtonVariant};
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
@@ -226,7 +224,7 @@ use crate::app_state::{
     PaneNodeSnapshot, PaneUuid, RightPanelSnapshot, SettingsPaneSnapshot, TabGroupSnapshot,
     TabSnapshot, TerminalPaneSnapshot, WindowSnapshot, WorkflowPaneSnapshot,
 };
-use crate::appearance::{Appearance, AppearanceManager};
+use crate::appearance::Appearance;
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
 use crate::auth::auth_override_warning_modal::{
     AuthOverrideWarningModal, AuthOverrideWarningModalEvent, AuthOverrideWarningModalVariant,
@@ -339,10 +337,10 @@ use crate::server::telemetry::{
 use crate::session_management::{SessionNavigationData, SessionSource, TabNavigationData};
 use crate::settings::cloud_preferences::CloudPreferencesSettings;
 use crate::settings::{
-    active_theme_kind, respect_system_theme, AISettings, AISettingsChangedEvent,
-    AccessibilitySettings, AliasExpansionSettings, AppEditorSettings, BlockVisibilitySettings,
-    ChangelogSettings, CodeSettings, CodeSettingsChangedEvent, CtrlTabBehavior, CursorBlink,
-    DebugSettings, DefaultSessionMode, FontSettings, GPUSettings, InputModeSettings, InputSettings,
+    respect_system_theme, AISettings, AISettingsChangedEvent, AccessibilitySettings,
+    AliasExpansionSettings, AppEditorSettings, BlockVisibilitySettings, ChangelogSettings,
+    CodeSettings, CodeSettingsChangedEvent, CtrlTabBehavior, CursorBlink, DebugSettings,
+    DefaultSessionMode, FontSettings, GPUSettings, InputModeSettings, InputSettings,
     MonospaceFontSize, PaneSettings, PrivacySettings, SelectionSettings, Settings, SshSettings,
     ThemeSettings, UpdateSettings,
 };
@@ -429,10 +427,7 @@ use crate::terminal::view::{
 };
 use crate::terminal::warpify::settings::WarpifySettings;
 use crate::terminal::{self, BlockListSettings, SizeInfo, TerminalModel, TerminalView};
-use crate::themes::theme::{AnsiColorIdentifier, RespectSystemTheme, ThemeKind};
-use crate::themes::theme_chooser::{ThemeChooser, ThemeChooserEvent, ThemeChooserMode};
-use crate::themes::theme_creator_modal::{ThemeCreatorModal, ThemeCreatorModalEvent};
-use crate::themes::theme_deletion_modal::{ThemeDeletionModal, ThemeDeletionModalEvent};
+use crate::themes::theme::{AnsiColorIdentifier, RespectSystemTheme};
 use crate::tips::{TipsEvent, TipsView};
 use crate::ui_components::avatar::{Avatar, AvatarContent, StatusElementTypes};
 use crate::ui_components::buttons::{combo_inner_button, icon_button_with_color};
@@ -1095,12 +1090,9 @@ pub struct Workspace {
     cli_agent_launcher_states: Vec<MouseStateHandle>,
     settings_pane: ViewHandle<SettingsView>,
     import_modal: ViewHandle<ImportModal>,
-    theme_chooser_view: ViewHandle<ThemeChooser>,
-    previous_theme: Option<ThemeKind>,
     reward_modal: ViewHandle<Modal<RewardView>>,
     reward_modal_pending: Option<RewardKind>,
     pub(crate) current_workspace_state: WorkspaceState,
-    previous_workspace_state: Option<WorkspaceState>,
     welcome_tips_view_state: WelcomeTipsViewState,
     welcome_tips_view: ViewHandle<TipsView>,
     model_event_sender: Option<mpsc::SyncSender<ModelEvent>>,
@@ -1137,8 +1129,6 @@ pub struct Workspace {
     header_toolbar_editor_modal: ViewHandle<HeaderToolbarEditorModal>,
     header_toolbar_context_menu: ViewHandle<Menu<WorkspaceAction>>,
     show_header_toolbar_context_menu: Option<Vector2F>,
-    theme_creator_modal: ViewHandle<ThemeCreatorModal>,
-    theme_deletion_modal: ViewHandle<ThemeDeletionModal>,
     suggested_agent_mode_workflow_modal: ViewHandle<SuggestedAgentModeWorkflowModal>,
     suggested_rule_modal: ViewHandle<SuggestedRuleModal>,
     oz_launch_modal: ModalWithTab<LaunchModal<OzLaunchSlide>>,
@@ -1780,23 +1770,7 @@ impl Workspace {
         resource_center_view
     }
 
-    fn build_settings_views(
-        global_resource_handles: GlobalResourceHandles,
-        tips_completed: ModelHandle<TipsCompleted>,
-        ctx: &mut ViewContext<Self>,
-    ) -> (ViewHandle<SettingsView>, ViewHandle<ThemeChooser>) {
-        let theme_chooser_view = ctx.add_typed_action_view(|ctx| {
-            ThemeChooser::new(
-                global_resource_handles.referral_theme_status,
-                ctx,
-                tips_completed,
-            )
-        });
-
-        ctx.subscribe_to_view(&theme_chooser_view, |me, _, event, ctx| {
-            me.handle_theme_chooser_event(event, ctx);
-        });
-
+    fn build_settings_view(ctx: &mut ViewContext<Self>) -> ViewHandle<SettingsView> {
         let settings_pane = ctx.add_typed_action_view(move |ctx| SettingsView::new(None, ctx));
         ctx.subscribe_to_view(&settings_pane, move |me, _, event, ctx| {
             me.handle_settings_pane_event(event, ctx);
@@ -1807,7 +1781,7 @@ impl Workspace {
             manager.register_view(window_id, settings_pane.clone());
         });
 
-        (settings_pane, theme_chooser_view)
+        settings_pane
     }
 
     fn build_require_login_modal(ctx: &mut ViewContext<Self>) -> ViewHandle<AuthView> {
@@ -1863,24 +1837,6 @@ impl Workspace {
         });
 
         workflow_modal
-    }
-
-    fn build_theme_creator_modal(ctx: &mut ViewContext<Self>) -> ViewHandle<ThemeCreatorModal> {
-        let theme_creator_modal = ctx.add_typed_action_view(ThemeCreatorModal::new);
-        ctx.subscribe_to_view(&theme_creator_modal, move |me, _, event, ctx| {
-            me.handle_theme_creator_modal_event(event, ctx);
-        });
-
-        theme_creator_modal
-    }
-
-    fn build_theme_deletion_modal(ctx: &mut ViewContext<Self>) -> ViewHandle<ThemeDeletionModal> {
-        let theme_deletion_modal = ctx.add_typed_action_view(ThemeDeletionModal::new);
-        ctx.subscribe_to_view(&theme_deletion_modal, move |me, _, event, ctx| {
-            me.handle_theme_deletion_modal_event(event, ctx);
-        });
-
-        theme_deletion_modal
     }
 
     fn build_suggested_agent_mode_workflow_modal(
@@ -2895,15 +2851,6 @@ impl Workspace {
         let auth_manager = AuthManager::handle(ctx);
         ctx.subscribe_to_model(&auth_manager, Self::handle_auth_manager_event);
 
-        // Handle theme updates when there is a cloud update to themes while the picker is open.
-        ctx.subscribe_to_model(&ThemeSettings::handle(ctx), |me, _, _, ctx| {
-            if me.is_theme_chooser_open() {
-                me.theme_chooser_view.update(ctx, |view, ctx| {
-                    view.handle_theme_change(ctx);
-                });
-            }
-        });
-
         ctx.subscribe_to_model(&referral_theme_status, |me, _, event, ctx| {
             me.handle_referral_theme_status_event(event, ctx);
         });
@@ -2936,8 +2883,7 @@ impl Workspace {
         let reward_modal = Self::build_reward_modal(ctx);
         let (welcome_tips_view, welcome_tips_view_state) =
             Self::build_welcome_tips(tips_completed.clone(), ctx);
-        let (settings_pane, theme_chooser_view) =
-            Self::build_settings_views(global_resource_handles, tips_completed.clone(), ctx);
+        let settings_pane = Self::build_settings_view(ctx);
 
         let resource_center_view =
             Self::build_resource_center_view(ctx, tips_completed.clone(), changelog_model.clone());
@@ -2990,10 +2936,6 @@ impl Workspace {
         let auth_override_warning_modal = Self::build_auth_override_warning_modal(ctx);
 
         let workflow_modal = Self::build_workflow_modal(ai_client.clone(), ctx);
-
-        let theme_creator_modal = Self::build_theme_creator_modal(ctx);
-
-        let theme_deletion_modal = Self::build_theme_deletion_modal(ctx);
 
         let suggested_agent_mode_workflow_modal =
             Self::build_suggested_agent_mode_workflow_modal(ctx);
@@ -3390,13 +3332,10 @@ impl Workspace {
             cli_agent_launcher_states: enum_iterator::all::<crate::terminal::cli_agent::CLIAgent>()
                 .map(|_| MouseStateHandle::default())
                 .collect(),
-            previous_theme: None,
             settings_pane,
-            theme_chooser_view,
             reward_modal,
             reward_modal_pending: None,
             current_workspace_state: Default::default(),
-            previous_workspace_state: None,
             model_event_sender,
             launch_config_save_modal,
             tab_config_params_modal,
@@ -3424,8 +3363,6 @@ impl Workspace {
             build_plan_migration_modal,
             require_login_modal,
             workflow_modal,
-            theme_creator_modal,
-            theme_deletion_modal,
             import_modal,
             window_id: ctx.window_id(),
             toast_stack,
@@ -4952,14 +4889,12 @@ impl Workspace {
     }
 
     /// This function shifts focus to the panel on the left.
-    /// The current focusable panels are: Warp Drive, theme chooser, AI, and resource center (keyboard shortcuts page only)
+    /// The current focusable panels are: Warp Drive, AI, and resource center (keyboard shortcuts page only)
     fn focus_left_panel(&mut self, ctx: &mut ViewContext<Self>) {
         // Starts from terminal
         if self.active_tab_pane_group().is_self_or_child_focused(ctx) {
             if self.current_workspace_state.is_warp_drive_open {
                 self.reset_focused_index_in_warp_drive(true, ctx);
-            } else if self.is_theme_chooser_open() {
-                ctx.focus(&self.theme_chooser_view);
             } else if self.current_workspace_state.is_resource_center_open {
                 ctx.focus(&self.resource_center_view);
             }
@@ -4972,16 +4907,6 @@ impl Workspace {
         else if self.is_warp_drive_view_focused(ctx) {
             if self.current_workspace_state.is_right_panel_open() {
                 self.set_selected_object(None, ctx);
-                if self.current_workspace_state.is_resource_center_open {
-                    ctx.focus(&self.resource_center_view);
-                }
-            } else {
-                self.focus_active_tab(ctx);
-            }
-        }
-        // Starts from a left panel: theme chooser
-        else if self.theme_chooser_view.is_self_or_child_focused(ctx) {
-            if self.current_workspace_state.is_right_panel_open() {
                 if self.current_workspace_state.is_resource_center_open {
                     ctx.focus(&self.resource_center_view);
                 }
@@ -5003,27 +4928,15 @@ impl Workspace {
                 ctx.focus(&self.resource_center_view);
             } else if self.current_workspace_state.is_warp_drive_open {
                 self.reset_focused_index_in_warp_drive(true, ctx);
-            } else if self.is_theme_chooser_open() {
-                ctx.focus(&self.theme_chooser_view);
             }
         }
-        // Starts from a left panel: Warp Drive, theme chooser
-        else if self.is_warp_drive_view_focused(ctx)
-            || self.theme_chooser_view.is_self_or_child_focused(ctx)
-        {
+        // Starts from a left panel: Warp Drive
+        else if self.is_warp_drive_view_focused(ctx) {
             self.focus_active_tab(ctx);
         }
         // Starts from a right panel: resource center (keyboard shortcuts page only)
         else if self.resource_center_view.is_self_or_child_focused(ctx) {
-            if self.current_workspace_state.is_left_panel_open() {
-                if self.current_workspace_state.is_warp_drive_open {
-                    self.reset_focused_index_in_warp_drive(true, ctx);
-                } else if self.is_theme_chooser_open() {
-                    ctx.focus(&self.theme_chooser_view);
-                }
-            } else {
-                self.focus_active_tab(ctx);
-            }
+            self.focus_active_tab(ctx);
         }
 
         self.update_pane_dimming_for_current_focus_region(ctx);
@@ -5896,7 +5809,7 @@ impl Workspace {
         match event {
             RewardEvent::OpenThemePicker => {
                 self.current_workspace_state.is_reward_modal_open = false;
-                self.show_theme_chooser_for_active_theme(ctx);
+                self.show_theme_gallery(ctx);
             }
         }
     }
@@ -11125,63 +11038,6 @@ impl Workspace {
         }
     }
 
-    fn handle_theme_creator_modal_event(
-        &mut self,
-        event: &ThemeCreatorModalEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            ThemeCreatorModalEvent::Close => {
-                self.current_workspace_state.is_theme_creator_modal_open = false;
-                // Clear any live-preview theme the editor set, so dismissing the modal reverts to
-                // the active theme. A saved theme has already been applied via `SetCustomTheme`
-                // (emitted before `Close`), so this doesn't discard the user's new theme.
-                AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-                    appearance_manager.clear_transient_theme(ctx);
-                });
-                ctx.notify();
-            }
-            ThemeCreatorModalEvent::SetCustomTheme { theme } => {
-                self.theme_chooser_view
-                    .update(ctx, |theme_chooser_view, ctx| {
-                        theme_chooser_view.reload_and_set_custom_theme(theme.clone(), ctx);
-                    });
-            }
-            ThemeCreatorModalEvent::ShowErrorToast { message } => {
-                self.toast_stack.update(ctx, |view, ctx| {
-                    let new_toast = DismissibleToast::error(message.clone());
-                    view.add_ephemeral_toast(new_toast, ctx);
-                });
-            }
-        }
-    }
-
-    fn handle_theme_deletion_modal_event(
-        &mut self,
-        event: &ThemeDeletionModalEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            ThemeDeletionModalEvent::Close => {
-                self.current_workspace_state.is_theme_deletion_modal_open = false;
-                ctx.notify();
-            }
-            ThemeDeletionModalEvent::ShowErrorToast { message } => {
-                self.toast_stack.update(ctx, |view, ctx| {
-                    let new_toast = DismissibleToast::error(message.clone());
-                    view.add_ephemeral_toast(new_toast, ctx);
-                });
-            }
-            ThemeDeletionModalEvent::DeleteCurrentTheme => {
-                self.theme_chooser_view
-                    .update(ctx, |theme_chooser_view, ctx| {
-                        // Reset theme to Dark if we are deleting the current theme
-                        theme_chooser_view.select_and_save_theme(&ThemeKind::Dark, ctx);
-                    });
-            }
-        }
-    }
-
     /// Returns the pane group with the matching EntityId, or None if it doesn't exist.
     fn get_pane_group_view_with_id(&self, id: EntityId) -> Option<&ViewHandle<PaneGroup>> {
         self.tab_views().find(|view| view.id() == id)
@@ -14983,14 +14839,6 @@ impl Workspace {
         });
     }
 
-    pub fn is_theme_creator_modal_open(&self) -> bool {
-        self.current_workspace_state.is_theme_creator_modal_open
-    }
-
-    pub fn is_theme_deletion_modal_open(&self) -> bool {
-        self.current_workspace_state.is_theme_deletion_modal_open
-    }
-
     pub fn is_palette_open(&self) -> bool {
         self.current_workspace_state.is_palette_open
             || self.current_workspace_state.is_ctrl_tab_palette_open
@@ -16957,8 +16805,8 @@ impl Workspace {
             pane_group::Event::SignupAnonymousUser { entrypoint } => {
                 self.initiate_user_signup(*entrypoint, ctx);
             }
-            pane_group::Event::OpenThemeChooser => {
-                self.show_theme_chooser_for_custom_theme(ctx);
+            pane_group::Event::OpenThemeGallery => {
+                self.show_theme_gallery(ctx);
             }
             pane_group::Event::OpenConversationHistory => {
                 self.open_palette_action(
@@ -17158,26 +17006,6 @@ impl Workspace {
                 self.free_tier_limit_check_triggered = true;
             }
         }
-    }
-
-    fn handle_theme_chooser_event(
-        &mut self,
-        event: &ThemeChooserEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            ThemeChooserEvent::Click => self.focus_theme_chooser(ctx),
-            ThemeChooserEvent::Close(mode) => {
-                self.save_theme_chooser(mode, ctx);
-                self.restore_previous_workspace_state(ctx);
-            }
-            ThemeChooserEvent::OpenThemeCreatorModal => {
-                self.open_theme_creator_modal(ctx);
-            }
-            ThemeChooserEvent::OpenThemeDeletionModal(theme_kind) => {
-                self.open_theme_deletion_modal(theme_kind.clone(), ctx);
-            }
-        };
     }
 
     fn handle_resource_center_event(
@@ -18344,76 +18172,6 @@ impl Workspace {
         }
     }
 
-    fn restore_previous_workspace_state(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(previous_state) = self.previous_workspace_state.take() {
-            self.current_workspace_state = previous_state;
-
-            // Assumption: at most one of the states will be active.
-            // If none are, then we focus the terminal view instead.
-            if self.current_workspace_state.is_palette_open {
-                self.open_command_palette(ctx);
-            } else if self.current_workspace_state.is_theme_chooser_open {
-                self.focus_theme_chooser(ctx);
-            } else if self.current_workspace_state.is_resource_center_open {
-                ctx.focus(&self.resource_center_view);
-            } else if self
-                .current_workspace_state
-                .is_close_session_confirmation_dialog_open
-            {
-                ctx.focus(&self.close_session_confirmation_dialog);
-            } else if self
-                .current_workspace_state
-                .is_rewind_confirmation_dialog_open
-            {
-                ctx.focus(&self.rewind_confirmation_dialog);
-            } else if self.current_workspace_state.is_native_quit_modal_open {
-                ctx.focus(&self.native_modal);
-            } else {
-                ctx.focus_self();
-            }
-
-            self.cancel_tab_rename(ctx);
-        }
-    }
-
-    fn should_keep_theme(system_theme: SystemTheme, ctx: &mut ViewContext<Self>) -> bool {
-        if system_theme == ctx.system_theme() {
-            let respect_system_theme = respect_system_theme(ThemeSettings::as_ref(ctx));
-            if let RespectSystemTheme::On { .. } = respect_system_theme {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn save_theme_chooser(&mut self, mode: &ThemeChooserMode, ctx: &mut ViewContext<Self>) {
-        let keep_theme = match mode {
-            ThemeChooserMode::SystemAgnostic => true,
-            ThemeChooserMode::SystemLight => Workspace::should_keep_theme(SystemTheme::Light, ctx),
-            ThemeChooserMode::SystemDark => Workspace::should_keep_theme(SystemTheme::Dark, ctx),
-        };
-        if keep_theme {
-            self.keep_theme(ctx);
-        } else {
-            self.revert_theme(ctx);
-        }
-    }
-
-    fn revert_theme(&mut self, ctx: &mut ViewContext<Self>) {
-        AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-            appearance_manager.clear_transient_theme(ctx);
-        });
-        self.current_workspace_state.is_theme_chooser_open = false;
-        self.previous_theme = None;
-        ctx.notify();
-    }
-
-    fn keep_theme(&mut self, ctx: &mut ViewContext<Self>) {
-        self.current_workspace_state.is_theme_chooser_open = false;
-        self.previous_theme = None;
-        ctx.notify();
-    }
-
     fn apply_update(&mut self, ctx: &mut ViewContext<Self>) {
         if let Ok(autoupdate::ReadyForRelaunch::Yes) = autoupdate::apply_update(self, ctx) {
             autoupdate::initiate_relaunch_for_update(ctx);
@@ -18588,47 +18346,18 @@ impl Workspace {
         });
     }
 
-    /// Shows the theme chooser so the user can change the active theme.
-    pub fn show_theme_chooser_for_active_theme(&mut self, ctx: &mut ViewContext<Self>) {
-        self.show_theme_chooser(Some(ThemeChooserMode::for_active_theme(ctx)), ctx)
-    }
-
-    pub fn show_theme_chooser_for_custom_theme(&mut self, ctx: &mut ViewContext<Self>) {
-        self.show_theme_chooser(None, ctx)
-    }
-
-    /// Shows the theme chooser so the user can change a specific theme.
-    pub fn show_theme_chooser(
-        &mut self,
-        theme_chooser_mode: Option<ThemeChooserMode>,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let current_theme = active_theme_kind(ThemeSettings::as_ref(ctx), ctx);
-
-        self.close_tab_bar_overflow_menu(ctx);
-
-        self.current_workspace_state.close_all_left_panels();
-
-        // When showing the theme chooser, let's close the command palette
-        // in case it was used to open the theme chooser.
-        self.current_workspace_state.is_palette_open = false;
-        self.current_workspace_state.is_ctrl_tab_palette_open = false;
-        self.previous_workspace_state = Some(self.current_workspace_state);
-        self.current_workspace_state.is_theme_chooser_open = true;
-
-        self.previous_theme = Some(current_theme);
-
-        self.theme_chooser_view.update(ctx, |view, ctx| {
-            view.record_open_theme(ctx);
-            if let Some(theme_chooser_mode) = theme_chooser_mode {
-                view.select_theme(theme_chooser_mode.into_theme_kind(ctx), ctx);
-                view.set_mode(theme_chooser_mode);
-            } else {
-                view.reload_and_set_latest_theme(ctx);
-            }
+    /// Opens Settings on the theme gallery, the one place to browse and switch themes. Every
+    /// entry point that used to open Warp's theme picker panel comes here.
+    pub fn show_theme_gallery(&mut self, ctx: &mut ViewContext<Self>) {
+        self.tips_completed.update(ctx, |tips_completed, ctx| {
+            mark_feature_used_and_write_to_user_defaults(
+                Tip::Action(TipAction::ThemePicker),
+                tips_completed,
+                ctx,
+            );
+            ctx.notify();
         });
-
-        self.focus_theme_chooser(ctx);
+        self.show_settings_with_section(Some(SettingsSection::ThemeGallery), ctx);
     }
 
     pub fn show_keyboard_settings(
@@ -18642,10 +18371,6 @@ impl Workspace {
                 settings_pane.search_for_keybinding(keybinding_name, ctx);
             });
         }
-    }
-
-    pub fn is_theme_chooser_open(&self) -> bool {
-        self.current_workspace_state.is_theme_chooser_open
     }
 
     /// Returns whether the workspace is currently showing a settings file
@@ -19351,11 +19076,6 @@ impl Workspace {
         })
     }
 
-    fn focus_theme_chooser(&self, ctx: &mut ViewContext<Self>) {
-        ctx.focus(&self.theme_chooser_view);
-        ctx.notify();
-    }
-
     fn open_prompt_editor(
         &mut self,
         open_source: PromptEditorOpenSource,
@@ -19420,24 +19140,6 @@ impl Workspace {
         self.close_all_overlays(ctx);
         self.current_workspace_state.is_agent_toolbar_editor_open = true;
         ctx.focus(&self.agent_toolbar_editor_modal);
-    }
-
-    fn open_theme_creator_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        self.current_workspace_state.is_theme_creator_modal_open = true;
-        self.theme_creator_modal
-            .update(ctx, |modal, ctx| modal.on_shown(ctx));
-        ctx.focus(&self.theme_creator_modal);
-        ctx.notify();
-    }
-
-    fn open_theme_deletion_modal(&mut self, theme_kind: ThemeKind, ctx: &mut ViewContext<Self>) {
-        self.current_workspace_state.is_theme_deletion_modal_open = true;
-        self.theme_deletion_modal
-            .update(ctx, |theme_deletion_modal, ctx| {
-                theme_deletion_modal.set_theme_kind(theme_kind, ctx);
-            });
-        ctx.focus(&self.theme_deletion_modal);
-        ctx.notify();
     }
 
     fn open_shared_objects_creation_denied_modal(
@@ -21876,13 +21578,6 @@ impl Workspace {
         .finish()
     }
 
-    fn render_theme_chooser(&self) -> Box<dyn Element> {
-        let theme_chooser = ChildView::new(&self.theme_chooser_view).finish();
-        ConstrainedBox::new(theme_chooser)
-            .with_max_width(240.0)
-            .finish()
-    }
-
     #[cfg(not(target_family = "wasm"))]
     fn render_resource_center(&self) -> Box<dyn Element> {
         ConstrainedBox::new(ChildView::new(&self.resource_center_view).finish())
@@ -22514,15 +22209,6 @@ impl Workspace {
             panels_view.add_child(panel);
         }
 
-        // Theme chooser (workspace-level, not configurable). Uses wrap_in_panel_surface, which
-        // adds its own margin and rounded surface.
-        if self.current_workspace_state.is_theme_chooser_open {
-            panels_view.add_child(self.render_panel(
-                app,
-                self.render_theme_chooser(),
-                &PanelPosition::Left,
-            ));
-        }
         // The outer workspace container in `render` already paints the terminal
         // background fill, so don't paint it again here (see APP-4328). Uncaged: beside a side
         // panel the terminal area is a rounded card, matching the panels.
@@ -24157,8 +23843,7 @@ impl TypedActionView for Workspace {
             OpenPromptSuggestionsUnavailableModal => {
                 self.open_prompt_suggestions_unavailable_modal(ctx)
             }
-            ShowThemeChooser(mode) => self.show_theme_chooser(Some(*mode), ctx),
-            ShowThemeChooserForActiveTheme => self.show_theme_chooser_for_active_theme(ctx),
+            ShowThemeGallery => self.show_theme_gallery(ctx),
             IncreaseFontSize => self.increase_font_size(ctx),
             DecreaseFontSize => self.decrease_font_size(ctx),
             ResetFontSize => self.reset_font_size(ctx),
@@ -26886,16 +26571,8 @@ impl View for Workspace {
             stack.add_child(ChildView::new(&self.auth_override_warning_modal).finish());
         }
 
-        if self.current_workspace_state.is_theme_creator_modal_open {
-            stack.add_child(ChildView::new(&self.theme_creator_modal).finish());
-        }
-
         if self.current_workspace_state.is_import_modal_open {
             stack.add_child(ChildView::new(&self.import_modal).finish());
-        }
-
-        if self.current_workspace_state.is_theme_deletion_modal_open {
-            stack.add_child(ChildView::new(&self.theme_deletion_modal).finish());
         }
 
         if self

@@ -1339,8 +1339,8 @@ fn handle_terminal_view_event(
                     entrypoint: *entrypoint,
                 });
             }
-            Event::OpenThemeChooser => {
-                ctx.emit(pane_group::Event::OpenThemeChooser);
+            Event::OpenThemeGallery => {
+                ctx.emit(pane_group::Event::OpenThemeGallery);
             }
             Event::OpenMCPSettingsPage { page } => {
                 ctx.emit(pane_group::Event::OpenMCPSettingsPage { page: *page });

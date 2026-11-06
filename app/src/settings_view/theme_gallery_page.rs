@@ -85,6 +85,12 @@ impl SettingsPageMeta for ThemeGalleryPageView {
         true
     }
 
+    fn on_page_selected(&mut self, _allow_steal_focus: bool, ctx: &mut ViewContext<Self>) {
+        // The catalogue and the card images are only looked at once the gallery is actually
+        // shown, so building Settings — at startup, in every window — costs no network or disk.
+        self.body.update(ctx, |body, ctx| body.activate(ctx));
+    }
+
     fn update_filter(&mut self, query: &str, ctx: &mut ViewContext<Self>) -> MatchData {
         self.page.update_filter(query, ctx)
     }
@@ -111,7 +117,8 @@ impl SettingsWidget for ThemeGalleryWidget {
     type View = ThemeGalleryPageView;
 
     fn search_terms(&self) -> &str {
-        "explore themes browse download install delete community system yours marketplace preview"
+        "explore themes theme gallery picker choose switch change browse download install delete \
+         community system yours marketplace preview"
     }
 
     fn render(

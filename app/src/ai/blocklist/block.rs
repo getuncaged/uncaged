@@ -2852,7 +2852,7 @@ impl AIBlock {
             );
         }
 
-        // This is used to trigger the theme chooser opening when the theme chooser onboarding block is active.
+        // This is used to open the theme gallery when the theme onboarding block is active.
         if let Some(text_message) = output.text_from_agent_output().last() {
             if text_message.sections.iter().any(|section| {
                 if let AIAgentTextSection::PlainText { text } = section {
@@ -2861,7 +2861,7 @@ impl AIBlock {
                     false
                 }
             }) {
-                ctx.emit(AIBlockEvent::OpenThemeChooser);
+                ctx.emit(AIBlockEvent::OpenThemeGallery);
             }
         }
         if self.requested_action_ids.is_empty() {
@@ -5974,7 +5974,7 @@ pub enum AIBlockEvent {
         rule_and_id: SuggestedRuleAndId,
     },
     FocusTerminal,
-    OpenThemeChooser,
+    OpenThemeGallery,
     #[cfg(windows)]
     WindowsCtrlC,
     AIOutputUpdated,

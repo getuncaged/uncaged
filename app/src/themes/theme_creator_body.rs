@@ -37,9 +37,10 @@ use crate::appearance::Appearance;
 use crate::editor::{EditOrigin, EditorView, Event as EditorEvent};
 use crate::server::telemetry::TelemetryEvent;
 use crate::settings_view::settings_page::{
-    build_toggle_element, render_settings_description, render_sub_header,
-    render_sub_header_with_description, settings_card, settings_description_color,
-    CONTENT_FONT_SIZE, HEADER_PADDING, SUBHEADER_FONT_SIZE,
+    build_toggle_element, render_segmented_control, render_settings_description, render_slider_row,
+    render_sub_header, render_sub_header_with_description, settings_card,
+    settings_description_color, Segment, SliderRow as SharedSliderRow, CONTENT_FONT_SIZE,
+    HEADER_PADDING, SUBHEADER_FONT_SIZE,
 };
 use crate::themes::theme::{CustomTheme, InMemoryThemeOptions, ThemeKind};
 use crate::themes::theme_background_image;
@@ -1022,7 +1023,7 @@ impl ThemeCreatorBody {
     /// The "Custom | From image" mode switcher shown at the top of the editor.
     fn mode_tabs(&self, appearance: &Appearance) -> Box<dyn Element> {
         Container::new(
-            Align::new(segmented_control(
+            Align::new(render_segmented_control(
                 vec![
                     Segment {
                         label: "Custom",
@@ -1457,7 +1458,7 @@ impl ThemeCreatorBody {
             appearance,
         ));
 
-        let appearance_control = segmented_control(
+        let appearance_control = render_segmented_control(
             vec![
                 Segment {
                     label: "Dark",
@@ -2367,12 +2368,7 @@ const COLUMN_GAP: f32 = 16.;
 const CARD_SPACING: f32 = 16.;
 const SWATCH_SIZE: f32 = 24.;
 const HEX_INPUT_WIDTH: f32 = 96.;
-const SLIDER_WIDTH: f32 = 160.;
-/// The fixed column each slider's value sits in, so values line up from row to row.
-const SLIDER_VALUE_WIDTH: f32 = 40.;
 const CONTROL_FONT_SIZE: f32 = 13.;
-/// The inset between a segmented control's track and its segments.
-const SEGMENT_TRACK_PADDING: f32 = 2.;
 const PREVIEW_FONT_SIZE: f32 = 12.;
 const STEP_BADGE_SIZE: f32 = 20.;
 const PREVIEW_LINE_GAP: f32 = 3.;
@@ -2385,14 +2381,6 @@ struct SliderRow {
     /// The value as shown beside the slider, e.g. "80%".
     value_label: String,
     make_action: fn(f32) -> ThemeCreatorBodyAction,
-}
-
-/// One option of a [`segmented_control`].
-struct Segment {
-    label: &'static str,
-    active: bool,
-    mouse_state: MouseStateHandle,
-    action: ThemeCreatorBodyAction,
 }
 
 /// The size and weight shared by every button on the page.
@@ -2425,8 +2413,8 @@ fn action_button(
         .finish()
 }
 
-/// A slider row: the label on the left; the slider and its current value, in a fixed-width
-/// column, on the right. Every slider on the page shows its value the same way.
+/// A slider row, drawn like every other slider in Settings (see [`render_slider_row`]). Dragging
+/// and releasing both apply the value live.
 fn slider_row(
     label: &str,
     description: Option<String>,
@@ -2440,111 +2428,19 @@ fn slider_row(
         value_label,
         make_action,
     } = slider;
-    let slider = appearance
-        .ui_builder()
-        .slider(state)
-        .with_range(range)
-        .with_default_value(value as f32)
-        .with_style(UiComponentStyles {
-            width: Some(SLIDER_WIDTH),
-            // Margin is 3. to add up with 7. padding on slider for a total of 10.
-            margin: Some(Coords::default().top(3.).bottom(3.)),
-            ..Default::default()
-        })
-        .on_drag(move |ctx, _, val| ctx.dispatch_typed_action(make_action(val)))
-        .on_change(move |ctx, _, val| ctx.dispatch_typed_action(make_action(val)))
-        .build()
-        .finish();
-
-    let value_text = ConstrainedBox::new(
-        Align::new(
-            Text::new_inline(value_label, appearance.ui_font_family(), CONTROL_FONT_SIZE)
-                .with_color(settings_description_color(appearance))
-                .finish(),
-        )
-        .right()
-        .finish(),
-    )
-    .with_width(SLIDER_VALUE_WIDTH)
-    .finish();
-
-    let control = Flex::row()
-        .with_cross_axis_alignment(CrossAxisAlignment::Center)
-        .with_child(slider)
-        .with_child(Container::new(value_text).with_margin_left(8.).finish())
-        .finish();
-    build_toggle_element(
-        row_label(label, appearance),
-        control,
-        appearance,
+    render_slider_row(
+        label,
         description,
+        SharedSliderRow {
+            state,
+            value,
+            range,
+            value_label,
+            on_drag: make_action,
+            on_change: make_action,
+        },
+        appearance,
     )
-}
-
-/// A compact segmented control: the options side by side in a quiet track, the selected one
-/// raised. Neutral rather than accent-coloured, so the accent stays reserved for saving.
-fn segmented_control(segments: Vec<Segment>, appearance: &Appearance) -> Box<dyn Element> {
-    let theme = appearance.theme();
-    let segment_radius =
-        CornerRadius::with_all(Radius::Pixels(radius::SMALL - SEGMENT_TRACK_PADDING));
-    let mut row = Flex::row()
-        .with_main_axis_size(MainAxisSize::Min)
-        .with_cross_axis_alignment(CrossAxisAlignment::Center);
-    for (index, segment) in segments.into_iter().enumerate() {
-        let Segment {
-            label,
-            active,
-            mouse_state,
-            action,
-        } = segment;
-        let item = Hoverable::new(mouse_state, |state| {
-            let text_color = if active || state.is_hovered() {
-                theme.active_ui_text_color()
-            } else {
-                theme.nonactive_ui_text_color()
-            };
-            let weight = if active {
-                Weight::Semibold
-            } else {
-                Weight::Normal
-            };
-            let container = Container::new(
-                Text::new_inline(label, appearance.ui_font_family(), CONTROL_FONT_SIZE)
-                    .with_color(text_color.into())
-                    .with_style(Properties::default().weight(weight))
-                    .finish(),
-            )
-            .with_vertical_padding(4.)
-            .with_horizontal_padding(14.)
-            .with_corner_radius(segment_radius);
-            // Every segment carries a border, transparent unless selected, so selecting one
-            // doesn't nudge its neighbours by a pixel.
-            if active {
-                container
-                    .with_background(theme.surface_3())
-                    .with_border(Border::all(1.).with_border_fill(theme.outline()))
-                    .finish()
-            } else {
-                container
-                    .with_border(Border::all(1.).with_border_color(ColorU::transparent_black()))
-                    .finish()
-            }
-        })
-        .with_cursor(Cursor::PointingHand)
-        .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
-        .finish();
-        row.add_child(if index == 0 {
-            item
-        } else {
-            Container::new(item).with_margin_left(2.).finish()
-        });
-    }
-
-    Container::new(row.finish())
-        .with_uniform_padding(SEGMENT_TRACK_PADDING)
-        .with_background(theme.surface_2())
-        .with_corner_radius(radius::small())
-        .finish()
 }
 
 /// One step of the "From image" flow: a settings card headed by its number, title and a line

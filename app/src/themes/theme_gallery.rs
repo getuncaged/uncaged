@@ -9,11 +9,13 @@
 //! fetching separately, and only at the moment someone installs the theme.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, Context as _, Result};
 use serde::Deserialize;
 use warp_core::ui::theme::WarpTheme;
+use warpui::{Entity, ModelContext, SingletonEntity};
 
 use crate::brand;
 use crate::themes::theme::{ThemeGroup, COMMUNITY_SUBFOLDER};
@@ -164,8 +166,48 @@ fn client() -> Result<reqwest::Client> {
         .context("couldn't start a network client")
 }
 
-/// Downloads the catalogue of installable themes.
+/// Downloads the catalogue of installable themes and keeps a copy on disk, so the next visit —
+/// and a visit without a network — can show it straight away.
 pub async fn fetch_index() -> Result<GalleryIndex> {
+    let bytes = fetch_index_bytes().await?;
+    let index = parse_index(&bytes)?;
+    // Best-effort: a catalogue that can't be cached still works for this run.
+    if let Err(error) = write_cached_index(&bytes) {
+        log::warn!("couldn't cache the theme catalogue: {error:#}");
+    }
+    Ok(index)
+}
+
+/// Where the last good catalogue is kept between runs.
+pub fn cached_index_path() -> PathBuf {
+    warp_core::paths::cache_dir()
+        .join("theme-gallery")
+        .join("index.json")
+}
+
+/// Reads the catalogue saved by the last successful fetch, if there is one and it still parses.
+pub fn read_cached_index() -> Result<GalleryIndex> {
+    let path = cached_index_path();
+    let bytes =
+        std::fs::read(&path).with_context(|| format!("couldn't read {}", path.display()))?;
+    parse_index(&bytes)
+}
+
+fn write_cached_index(bytes: &[u8]) -> Result<()> {
+    let path = cached_index_path();
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)
+            .with_context(|| format!("couldn't create {}", dir.display()))?;
+    }
+    // Written beside and renamed over, so a crash mid-write never leaves a half catalogue that
+    // the next run would refuse.
+    let partial = path.with_extension("json.partial");
+    std::fs::write(&partial, bytes)
+        .with_context(|| format!("couldn't write {}", partial.display()))?;
+    std::fs::rename(&partial, &path).with_context(|| format!("couldn't replace {}", path.display()))
+}
+
+async fn fetch_index_bytes() -> Result<Vec<u8>> {
     let response = client()?
         .get(index_url())
         .send()
@@ -197,7 +239,7 @@ pub async fn fetch_index() -> Result<GalleryIndex> {
         .await
         .context("Couldn't read the theme gallery.")?;
 
-    parse_index(&bytes)
+    Ok(bytes.to_vec())
 }
 
 /// Installs `theme` into `<themes_dir>/community/`, returning the path of the written YAML.
@@ -285,6 +327,110 @@ fn set_image_path(definition: &mut serde_yaml::Value, path: &Path) {
         );
     }
 }
+
+// ── The shared catalogue ─────────────────────────────────────────────────────
+
+/// The community catalogue, shared by every window.
+///
+/// Nothing is read or fetched until the gallery is first shown ([`Self::ensure_loaded`]); building
+/// Settings at startup costs no network. On that first showing the copy saved by the last
+/// successful fetch is shown at once, and the network is asked for a fresh one at most once per
+/// run — every window then gets the same answer through [`ThemeGalleryCatalogueEvent::Updated`].
+#[derive(Default)]
+pub struct ThemeGalleryCatalogue {
+    themes: Option<Arc<Vec<GalleryTheme>>>,
+    /// Whether `themes` came from the network during this run, rather than from the disk cache.
+    fresh: bool,
+    fetching: bool,
+    /// Why the last fetch failed, until the next one starts.
+    error: Option<String>,
+    started: bool,
+}
+
+pub enum ThemeGalleryCatalogueEvent {
+    Updated,
+}
+
+impl ThemeGalleryCatalogue {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The catalogue to show: fresh if this run has fetched one, otherwise the saved copy.
+    pub fn themes(&self) -> Option<&Arc<Vec<GalleryTheme>>> {
+        self.themes.as_ref()
+    }
+
+    /// True while there is nothing to show yet and a fetch is under way.
+    pub fn is_loading(&self) -> bool {
+        self.themes.is_none() && (self.fetching || !self.started)
+    }
+
+    /// Why the last fetch failed, if it did.
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+
+    /// True when what is shown is the saved copy because this run's fetch failed.
+    pub fn is_stale(&self) -> bool {
+        self.themes.is_some() && !self.fresh && self.error.is_some()
+    }
+
+    /// Shows the saved catalogue and starts this run's one refresh, the first time it is called.
+    pub fn ensure_loaded(&mut self, ctx: &mut ModelContext<Self>) {
+        if self.started {
+            return;
+        }
+        self.started = true;
+
+        ctx.spawn(
+            async move { read_cached_index().map(|index| index.themes) },
+            |me, cached, ctx| {
+                // A fetch that finished first has the newer list; the saved copy never replaces it.
+                if me.fresh {
+                    return;
+                }
+                if let Ok(themes) = cached {
+                    me.themes = Some(Arc::new(themes));
+                    ctx.emit(ThemeGalleryCatalogueEvent::Updated);
+                }
+            },
+        );
+        self.refresh(ctx);
+    }
+
+    /// Asks the network for the catalogue now — "Try again" after a failure.
+    pub fn refresh(&mut self, ctx: &mut ModelContext<Self>) {
+        if self.fetching {
+            return;
+        }
+        self.started = true;
+        self.fetching = true;
+        self.error = None;
+        ctx.emit(ThemeGalleryCatalogueEvent::Updated);
+
+        ctx.spawn(
+            async move { fetch_index().await.map_err(|e| e.to_string()) },
+            |me, result, ctx| {
+                me.fetching = false;
+                match result {
+                    Ok(index) => {
+                        me.themes = Some(Arc::new(index.themes));
+                        me.fresh = true;
+                    }
+                    Err(message) => me.error = Some(message),
+                }
+                ctx.emit(ThemeGalleryCatalogueEvent::Updated);
+            },
+        );
+    }
+}
+
+impl Entity for ThemeGalleryCatalogue {
+    type Event = ThemeGalleryCatalogueEvent;
+}
+
+impl SingletonEntity for ThemeGalleryCatalogue {}
 
 #[cfg(test)]
 #[path = "theme_gallery_tests.rs"]

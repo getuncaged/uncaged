@@ -89,9 +89,6 @@ impl WelcomeTipsViewState {
 pub struct WorkspaceState {
     pub is_palette_open: bool,
     pub is_ctrl_tab_palette_open: bool,
-    pub is_theme_chooser_open: bool,
-    pub is_theme_creator_modal_open: bool,
-    pub is_theme_deletion_modal_open: bool,
     pub is_changelog_modal_open: bool,
     pub is_tab_being_dragged: bool,
     pub is_reward_modal_open: bool,
@@ -135,16 +132,11 @@ pub struct WorkspaceState {
 
 impl WorkspaceState {
     pub fn is_any_non_terminal_view_open(&self, app: &AppContext) -> bool {
-        self.is_any_modal_open(app)
-            || self.is_theme_chooser_open
-            || self.is_workflow_modal_open
-            || self.is_warp_drive_open
+        self.is_any_modal_open(app) || self.is_workflow_modal_open || self.is_warp_drive_open
     }
 
     pub fn is_any_non_palette_modal_open(&self, app: &AppContext) -> bool {
-        self.is_theme_creator_modal_open
-            || self.is_theme_deletion_modal_open
-            || self.is_changelog_modal_open
+        self.is_changelog_modal_open
             || self.tab_being_renamed.is_some()
             || self.pane_being_renamed.is_some()
             || self.tab_group_being_renamed.is_some()
@@ -185,8 +177,6 @@ impl WorkspaceState {
     pub fn close_all_modals(&mut self) {
         self.is_palette_open = false;
         self.is_ctrl_tab_palette_open = false;
-        self.is_theme_creator_modal_open = false;
-        self.is_theme_deletion_modal_open = false;
         self.is_changelog_modal_open = false;
         self.tab_being_renamed = None;
         self.pane_being_renamed = None;
@@ -219,13 +209,8 @@ impl WorkspaceState {
         self.is_resource_center_open
     }
 
-    pub fn is_left_panel_open(&self) -> bool {
-        self.is_theme_chooser_open
-    }
-
     pub fn close_all_left_panels(&mut self) {
         self.is_warp_drive_open = false;
-        self.is_theme_chooser_open = false;
     }
 
     pub fn is_tab_being_renamed(&self) -> bool {

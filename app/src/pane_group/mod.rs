@@ -679,7 +679,7 @@ pub enum Event {
     SignupAnonymousUser {
         entrypoint: AnonymousUserSignupEntrypoint,
     },
-    OpenThemeChooser,
+    OpenThemeGallery,
     InvalidatedActiveConversation,
     OpenConversationHistory,
     OpenMCPSettingsPage {

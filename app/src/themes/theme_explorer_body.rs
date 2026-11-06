@@ -6,8 +6,9 @@
 //! adds is community themes, and those sit alongside your own rather than in a separate place, so
 //! "find me a theme" is one screen rather than two.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use settings::Setting as _;
 use warp_core::ui::theme::WarpTheme;
@@ -31,8 +32,10 @@ use crate::report_if_error;
 use crate::settings::{active_theme_kind, ThemeSettings};
 use crate::themes::theme::{self, SelectedSystemThemes, ThemeGroup, ThemeKind};
 use crate::themes::theme_background_image;
-use crate::themes::theme_gallery::{self, GalleryTheme};
-use crate::user_config::{load_theme_configs, themes_dir, WarpConfig};
+use crate::themes::theme_gallery::{
+    self, GalleryTheme, ThemeGalleryCatalogue, ThemeGalleryCatalogueEvent,
+};
+use crate::user_config::{load_theme_configs, themes_dir, WarpConfig, WarpConfigUpdateEvent};
 
 const CARD_WIDTH: f32 = 240.;
 const CARD_PREVIEW_SCALE: f32 = 1.2;
@@ -112,9 +115,15 @@ impl Filter {
 }
 
 /// A single card's worth of theme, whether it is here or merely offered.
+///
+/// Built once whenever the themes on disk or the catalogue change — never per frame — so a hover
+/// or a keystroke in the search box repaints the grid without walking, cloning and sorting every
+/// theme again.
 struct Entry {
     name: String,
-    definition: WarpTheme,
+    /// `name`, lowercased once for the search box.
+    name_lower: String,
+    definition: Arc<WarpTheme>,
     origin: Origin,
     /// How to select it. `None` for a theme that is not installed yet.
     kind: Option<ThemeKind>,
@@ -122,14 +131,30 @@ struct Entry {
     path: Option<PathBuf>,
     /// Catalogue slug, for installing.
     slug: Option<String>,
+    /// What the card draws behind its miniature terminal.
+    preview: PreviewImage,
 }
 
-/// How the community half of the explorer is doing. Local themes need none of this — they are
-/// always there.
-enum CatalogueState {
-    Loading,
-    Loaded(Vec<GalleryTheme>),
-    Failed(String),
+/// The background image of a card, resolved ahead of painting so a paint never touches the disk.
+#[derive(Clone)]
+enum PreviewImage {
+    /// Nothing to draw: no image, an image that isn't on disk, or a community theme not yet
+    /// installed.
+    None,
+    /// The small image to draw.
+    Ready(AssetSource),
+    /// A local image whose thumbnail is still being looked up, by its full path. The card shows
+    /// its colours alone until then.
+    Pending(String),
+}
+
+impl PreviewImage {
+    fn source(&self) -> Option<AssetSource> {
+        match self {
+            PreviewImage::Ready(source) => Some(source.clone()),
+            PreviewImage::None | PreviewImage::Pending(_) => None,
+        }
+    }
 }
 
 pub enum ThemeExplorerBodyEvent {
@@ -148,9 +173,30 @@ pub enum ThemeExplorerBodyAction {
 }
 
 pub struct ThemeExplorerBody {
-    catalogue: CatalogueState,
+    /// The community catalogue as last seen on the shared [`ThemeGalleryCatalogue`].
+    catalogue: Option<Arc<Vec<GalleryTheme>>>,
+    /// Nothing to offer yet, and a fetch is under way.
+    catalogue_loading: bool,
+    /// Why the last fetch failed, if it did.
+    catalogue_error: Option<String>,
+    /// The saved catalogue is on show because this run's fetch failed.
+    catalogue_stale: bool,
+    /// Whether the gallery has been shown yet. The catalogue and the card images are only looked
+    /// at from then on, so building Settings at startup reads nothing and fetches nothing.
+    activated: bool,
     filter: Filter,
     search_editor: ViewHandle<EditorView>,
+    /// The search box's text, trimmed and lowercased.
+    query: String,
+    /// Every card, in display order.
+    entries: Vec<Entry>,
+    /// Indices into `entries` that pass the filter and the search.
+    visible: Vec<usize>,
+    /// Card images already resolved off the main thread, keyed by the full image's path, so a
+    /// rebuild after an install or delete doesn't look them all up again.
+    resolved_images: HashMap<String, Option<AssetSource>>,
+    /// Full image paths being resolved right now.
+    resolving_images: HashSet<String>,
     installing: HashSet<String>,
     /// The theme whose delete button has been armed, identified by path. Removing a theme is not
     /// undoable, so it takes a second, deliberate click rather than a single stray one.
@@ -174,56 +220,98 @@ impl ThemeExplorerBody {
                 ctx,
             )
         });
-        ctx.subscribe_to_view(&search_editor, |_me, _, event, ctx| {
+        ctx.subscribe_to_view(&search_editor, |me, _, event, ctx| {
             if let EditorEvent::Edited(_) = event {
+                let query = me.search_editor.as_ref(ctx).buffer_text(ctx);
+                me.query = query.trim().to_lowercase();
+                me.recompute_visible();
                 ctx.notify();
             }
         });
 
+        ctx.subscribe_to_model(&WarpConfig::handle(ctx), |me, _, event, ctx| {
+            if let WarpConfigUpdateEvent::Themes = event {
+                me.rebuild_entries(ctx);
+            }
+        });
+        // The "In use" marker follows the active theme, which is read while painting; this only
+        // asks for the repaint.
+        ctx.subscribe_to_model(&ThemeSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
+
         let mut body = Self {
-            catalogue: CatalogueState::Loading,
+            catalogue: None,
+            catalogue_loading: true,
+            catalogue_error: None,
+            catalogue_stale: false,
+            activated: false,
             filter: Filter::default(),
             search_editor,
+            query: String::new(),
+            entries: Vec::new(),
+            visible: Vec::new(),
+            resolved_images: HashMap::new(),
+            resolving_images: HashSet::new(),
             installing: HashSet::new(),
             pending_delete: None,
             filter_states: Default::default(),
             retry_state: Default::default(),
         };
-        body.load(ctx);
+        // Local themes are already in memory, so the cards for them cost nothing to build. Their
+        // images and the community catalogue wait until the gallery is shown.
+        body.rebuild_entries(ctx);
         body
     }
 
-    fn load(&mut self, ctx: &mut ViewContext<Self>) {
-        self.catalogue = CatalogueState::Loading;
-        ctx.notify();
+    /// Called when the gallery is shown. The first time, it starts listening to the shared
+    /// catalogue — which shows the saved copy and refreshes it once per run — and starts resolving
+    /// card images.
+    pub fn activate(&mut self, ctx: &mut ViewContext<Self>) {
+        if self.activated {
+            return;
+        }
+        self.activated = true;
 
-        ctx.spawn(
-            async move {
-                theme_gallery::fetch_index()
-                    .await
-                    .map_err(|e| e.to_string())
-            },
-            |me, result, ctx| {
-                me.catalogue = match result {
-                    Ok(index) => CatalogueState::Loaded(index.themes),
-                    Err(message) => CatalogueState::Failed(message),
-                };
-                ctx.notify();
-            },
-        );
+        let catalogue = ThemeGalleryCatalogue::handle(ctx);
+        ctx.subscribe_to_model(&catalogue, |me, _, event, ctx| {
+            let ThemeGalleryCatalogueEvent::Updated = event;
+            me.sync_catalogue(ctx);
+        });
+        catalogue.update(ctx, |catalogue, ctx| catalogue.ensure_loaded(ctx));
+        self.sync_catalogue(ctx);
+    }
+
+    /// Copies what the shared catalogue knows into this view, rebuilding the cards only when the
+    /// list itself changed.
+    fn sync_catalogue(&mut self, ctx: &mut ViewContext<Self>) {
+        let catalogue = ThemeGalleryCatalogue::as_ref(ctx);
+        self.catalogue_loading = catalogue.is_loading();
+        self.catalogue_stale = catalogue.is_stale();
+        self.catalogue_error = catalogue.error().map(str::to_owned);
+        let themes = catalogue.themes().cloned();
+        let unchanged = match (&self.catalogue, &themes) {
+            (Some(old), Some(new)) => Arc::ptr_eq(old, new),
+            (None, None) => true,
+            _ => false,
+        };
+        if unchanged {
+            // Only the loading or error state moved.
+            ctx.notify();
+            return;
+        }
+        self.catalogue = themes;
+        self.rebuild_entries(ctx);
     }
 
     /// Everything the explorer can show, installed first and offers last.
-    fn entries(&self, app: &AppContext) -> Vec<Entry> {
+    fn rebuild_entries(&mut self, ctx: &mut ViewContext<Self>) {
         let mut entries = Vec::new();
         let mut present: HashSet<String> = HashSet::new();
 
-        for (kind, definition) in WarpConfig::as_ref(app).theme_config().theme_items() {
-            // The referral reward themes are promotional and tied to referral state. They are
-            // always present in the theme map, so without this every user would see two System
-            // cards for rewards they may not have earned — and the explorer can neither install nor
-            // delete them, so they'd be inert. They remain selectable from the Appearance chooser,
-            // which is the surface that gates them on referral status.
+        for (kind, definition) in WarpConfig::as_ref(ctx).theme_config().theme_items() {
+            // The referral reward themes are promotional leftovers: Uncaged has no referrals.
+            // They are always present in the theme map, so without this every user would see two
+            // System cards for rewards nobody can earn — and the explorer can neither install nor
+            // delete them, so they'd be inert.
             if matches!(
                 kind,
                 ThemeKind::SentReferralReward | ThemeKind::ReceivedReferralReward
@@ -234,23 +322,26 @@ impl ThemeExplorerBody {
             let name = kind.to_string();
             present.insert(name.clone());
 
+            let path = match kind {
+                ThemeKind::Custom(custom) | ThemeKind::CustomBase16(custom) => Some(custom.path()),
+                _ => None,
+            };
             let origin = match kind.group() {
                 ThemeGroup::System => Origin::System,
                 ThemeGroup::Community => Origin::Downloaded,
                 ThemeGroup::Mine => Origin::Mine,
             };
-            let path = match kind {
-                ThemeKind::Custom(custom) | ThemeKind::CustomBase16(custom) => Some(custom.path()),
-                _ => None,
-            };
+            let preview = self.preview_for(definition);
 
             entries.push(Entry {
+                name_lower: name.to_lowercase(),
                 name,
-                definition: definition.clone(),
+                definition: Arc::new(definition.clone()),
                 origin,
                 kind: Some(kind.clone()),
                 path,
                 slug: None,
+                preview,
             });
         }
 
@@ -261,8 +352,8 @@ impl ThemeExplorerBody {
                 .then(a.name.cmp(&b.name))
         });
 
-        if let CatalogueState::Loaded(catalogue) = &self.catalogue {
-            for gallery_theme in catalogue {
+        if let Some(catalogue) = &self.catalogue {
+            for gallery_theme in catalogue.iter() {
                 // A catalogue entry already on this machine is not an offer — it is the thing
                 // itself, and was listed above.
                 if present.contains(&gallery_theme.name) {
@@ -270,20 +361,101 @@ impl ThemeExplorerBody {
                 }
                 entries.push(Entry {
                     name: gallery_theme.name.clone(),
-                    definition: gallery_theme.definition.clone(),
+                    name_lower: gallery_theme.name.to_lowercase(),
+                    definition: Arc::new(gallery_theme.definition.clone()),
                     origin: Origin::Available,
                     kind: None,
                     path: None,
                     slug: Some(gallery_theme.slug.clone()),
+                    // Not on disk yet, so there is no image to draw — only its colours.
+                    preview: PreviewImage::None,
                 });
             }
         }
 
-        entries
+        self.entries = entries;
+        self.recompute_visible();
+        self.resolve_pending_images(ctx);
+        ctx.notify();
+    }
+
+    /// What a card can draw right now for `definition`'s background, without touching the disk.
+    fn preview_for(&self, definition: &WarpTheme) -> PreviewImage {
+        let Some(image) = definition.background_image() else {
+            return PreviewImage::None;
+        };
+        match image.source() {
+            AssetSource::LocalFile { path, .. } => match self.resolved_images.get(&path) {
+                Some(Some(source)) => PreviewImage::Ready(source.clone()),
+                Some(None) => PreviewImage::None,
+                None => PreviewImage::Pending(path),
+            },
+            source => PreviewImage::Ready(crate::themes::default_themes::preview_source(source)),
+        }
+    }
+
+    /// Looks up, off the main thread, the thumbnails for any cards still waiting on one —
+    /// creating the thumbnails that are missing.
+    fn resolve_pending_images(&mut self, ctx: &mut ViewContext<Self>) {
+        if !self.activated {
+            return;
+        }
+        let mut to_resolve: Vec<(String, Arc<WarpTheme>)> = Vec::new();
+        for entry in &self.entries {
+            if let PreviewImage::Pending(path) = &entry.preview {
+                if self.resolving_images.insert(path.clone()) {
+                    to_resolve.push((path.clone(), entry.definition.clone()));
+                }
+            }
+        }
+        if to_resolve.is_empty() {
+            return;
+        }
+
+        ctx.spawn(
+            async move {
+                to_resolve
+                    .into_iter()
+                    .map(|(path, definition)| (path, theme::resolve_preview_image(&definition)))
+                    .collect::<Vec<_>>()
+            },
+            |me, resolved, ctx| {
+                for (path, source) in resolved {
+                    me.resolving_images.remove(&path);
+                    let preview = match &source {
+                        Some(source) => PreviewImage::Ready(source.clone()),
+                        None => PreviewImage::None,
+                    };
+                    for entry in &mut me.entries {
+                        if matches!(&entry.preview, PreviewImage::Pending(pending) if *pending == path)
+                        {
+                            entry.preview = preview.clone();
+                        }
+                    }
+                    me.resolved_images.insert(path, source);
+                }
+                ctx.notify();
+            },
+        );
+    }
+
+    /// Applies the filter and the search to the entries.
+    fn recompute_visible(&mut self) {
+        let filter = self.filter;
+        let query = &self.query;
+        self.visible = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| {
+                filter.accepts(e.origin) && (query.is_empty() || e.name_lower.contains(query))
+            })
+            .map(|(index, _)| index)
+            .collect();
     }
 
     fn install(&mut self, slug: String, ctx: &mut ViewContext<Self>) {
-        let CatalogueState::Loaded(catalogue) = &self.catalogue else {
+        let Some(catalogue) = &self.catalogue else {
             return;
         };
         let Some(gallery_theme) = catalogue.iter().find(|t| t.slug == slug).cloned() else {
@@ -346,12 +518,14 @@ impl ThemeExplorerBody {
             }
         });
 
-        // Writing the setting persists the choice, but the window only repaints when the
-        // AppearanceManager is told to apply it. Without this the card flips to "In use" while the
-        // window keeps its old theme until something else — opening Appearance — reloads the
-        // setting. The chooser does the same two steps: persist, then apply now.
+        // Writing the setting persists the choice, and the AppearanceManager repaints from the
+        // settings — unless a transient (preview) theme is pinned over them, which would keep the
+        // window on its old theme while the card flips to "In use". Dropping any transient theme
+        // makes the window follow the settings from here on, including an OS appearance flip when
+        // Sync with OS is on. (Pinning the chosen theme as the transient one, as this used to,
+        // made the window ignore every later change to the theme settings.)
         AppearanceManager::handle(ctx).update(ctx, |appearance_manager, ctx| {
-            appearance_manager.set_transient_theme(kind.clone(), ctx);
+            appearance_manager.clear_transient_theme(ctx);
         });
         ctx.notify();
     }
@@ -400,8 +574,8 @@ impl ThemeExplorerBody {
         self.pending_delete = None;
 
         let Some(entry) = self
-            .entries(ctx)
-            .into_iter()
+            .entries
+            .iter()
             .find(|e| e.path.as_deref() == Some(path.as_path()))
         else {
             return;
@@ -409,11 +583,13 @@ impl ThemeExplorerBody {
         if !entry.origin.deletable() {
             return;
         }
+        let deleted_kind = entry.kind.clone();
+        let definition = entry.definition.clone();
         // Take the theme off wherever it is selected, so no slot is left pointing at a file that is
         // about to vanish. With Sync-with-OS on, the light and dark slots are independent and the
         // deleted theme may sit in either or both — not only the one currently showing — so every
         // reference is cleared, not just the active one.
-        if let Some(deleted) = entry.kind.clone() {
+        if let Some(deleted) = deleted_kind {
             self.clear_theme_everywhere(&deleted, ctx);
         }
 
@@ -421,11 +597,13 @@ impl ThemeExplorerBody {
         // legitimately point at a wallpaper elsewhere on the disk, and deleting the theme must not
         // take the user's own picture with it. Its preview thumbnail, which is ours and sits beside
         // it, goes too so it does not linger as an orphan.
-        if let Some(image) = entry.definition.background_image() {
+        if let Some(image) = definition.background_image() {
             if let AssetSource::LocalFile {
                 path: image_path, ..
             } = image.source()
             {
+                // A theme installed again at this path brings its own image; look it up afresh.
+                self.resolved_images.remove(&image_path);
                 let image_path = PathBuf::from(image_path);
                 if path_is_within(&image_path, &themes_dir()) {
                     let _ =
@@ -521,8 +699,9 @@ impl ThemeExplorerBody {
             .is_some_and(|slug| self.installing.contains(slug));
         let armed = self.pending_delete.is_some() && self.pending_delete == entry.path;
 
-        let preview = Container::new(theme::render_preview(
+        let preview = Container::new(theme::render_preview_with_image(
             &entry.definition,
+            entry.preview.source(),
             appearance.monospace_font_family(),
             Some(CARD_PREVIEW_SCALE),
         ))
@@ -729,10 +908,14 @@ impl TypedActionView for ThemeExplorerBody {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            ThemeExplorerBodyAction::Reload => self.load(ctx),
+            ThemeExplorerBodyAction::Reload => {
+                ThemeGalleryCatalogue::handle(ctx)
+                    .update(ctx, |catalogue, ctx| catalogue.refresh(ctx));
+            }
             ThemeExplorerBodyAction::SetFilter(filter) => {
                 self.filter = *filter;
                 self.pending_delete = None;
+                self.recompute_visible();
                 ctx.notify();
             }
             ThemeExplorerBodyAction::Install(slug) => {
@@ -765,10 +948,9 @@ impl View for ThemeExplorerBody {
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
-        let query = self.search_editor.as_ref(app).buffer_text(app);
-        let query = query.trim().to_lowercase();
+        let theme_settings = ThemeSettings::as_ref(app);
         // What is genuinely in effect, which is not `theme_kind` when syncing with the OS.
-        let active = active_theme_kind(ThemeSettings::as_ref(app), app);
+        let active = active_theme_kind(theme_settings, app);
 
         let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
 
@@ -812,29 +994,71 @@ impl View for ThemeExplorerBody {
         );
 
         column.add_child(
-            Container::new(self.render_filters(&appearance))
+            Container::new(self.render_filters(appearance))
                 .with_margin_bottom(16.)
                 .finish(),
         );
 
-        let entries = self.entries(app);
-        let visible: Vec<&Entry> = entries
-            .iter()
-            .filter(|e| {
-                self.filter.accepts(e.origin)
-                    && (query.is_empty() || e.name.to_lowercase().contains(&query))
-            })
-            .collect();
-
-        if visible.is_empty() {
-            let message = match &self.catalogue {
-                CatalogueState::Loading if self.filter == Filter::Available => "Loading themes…",
-                _ => "No themes match that search.",
+        // With Sync with OS on, "Use" fills the slot for the appearance the OS is in right now —
+        // say so, or picking a theme in light mode and then seeing another at night is a mystery.
+        if *theme_settings.use_system_theme.value() {
+            let slot = match app.system_theme() {
+                SystemTheme::Light => "light",
+                SystemTheme::Dark => "dark",
             };
             column.add_child(
                 Container::new(
-                    Text::new_inline(message.to_string(), appearance.ui_font_family(), 13.)
-                        .with_color(theme.disabled_text_color(theme.background()).into_solid())
+                    Text::new(
+                        format!(
+                            "Sync with OS is on, so Use sets your {slot} theme. Choose the other \
+                             one in Appearance."
+                        ),
+                        appearance.ui_font_family(),
+                        12.,
+                    )
+                    .with_color(theme.disabled_text_color(theme.background()).into_solid())
+                    .finish(),
+                )
+                .with_margin_bottom(14.)
+                .finish(),
+            );
+        }
+
+        if self.visible.is_empty() {
+            // An empty tab with no search isn't a failed search: say what the tab is waiting for.
+            let message = if !self.query.is_empty() {
+                "No themes match that search."
+            } else {
+                match self.filter {
+                    Filter::Available if self.catalogue_loading => "Loading themes…",
+                    Filter::Available => {
+                        "You already have every theme in the community gallery. Make one in \
+                         Theme creator and share it with the community."
+                    }
+                    Filter::Downloaded => {
+                        "Nothing downloaded yet. Themes you get from the community gallery show \
+                         up here."
+                    }
+                    Filter::Mine => {
+                        "You haven't made a theme yet. Theme creator is where to start."
+                    }
+                    Filter::All | Filter::System => "No themes to show.",
+                }
+            };
+            column.add_child(
+                Container::new(
+                    // A paragraph, so the longer hints wrap on a narrow window.
+                    appearance
+                        .ui_builder()
+                        .paragraph(message.to_string())
+                        .with_style(UiComponentStyles {
+                            font_color: Some(
+                                theme.disabled_text_color(theme.background()).into_solid(),
+                            ),
+                            font_size: Some(13.),
+                            ..Default::default()
+                        })
+                        .build()
                         .finish(),
                 )
                 .with_margin_top(20.)
@@ -845,25 +1069,33 @@ impl View for ThemeExplorerBody {
                 .with_spacing(GRID_GUTTER)
                 .with_run_spacing(GRID_GUTTER)
                 .with_cross_axis_alignment(CrossAxisAlignment::Start);
-            grid.extend(visible.iter().map(|entry| {
+            grid.extend(self.visible.iter().map(|&index| {
+                let entry = &self.entries[index];
                 let is_active = entry.kind.as_ref() == Some(&active);
-                self.render_card(entry, is_active, &appearance)
+                self.render_card(entry, is_active, appearance)
             }));
             column.add_child(grid.finish());
         }
 
         // A failed catalogue only costs the "Available" themes, so it is reported under the grid
-        // rather than replacing everything the user already has.
-        if let CatalogueState::Failed(message) = &self.catalogue {
+        // rather than replacing everything the user already has. When the saved copy is on show,
+        // the failure only means it may be out of date.
+        let notice = match (self.catalogue_error.as_deref(), self.catalogue_stale) {
+            (Some(_), true) => Some(
+                "Couldn't refresh the community themes, so these are from your last visit."
+                    .to_string(),
+            ),
+            (Some(message), false) if self.catalogue.is_none() => Some(format!(
+                "{message} Themes already on this machine are unaffected."
+            )),
+            (Some(_), false) | (None, _) => None,
+        };
+        if let Some(text) = notice {
             let mut notice = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Start);
             notice.add_child(
-                Text::new_inline(
-                    format!("{message} Themes already on this machine are unaffected."),
-                    appearance.ui_font_family(),
-                    12.,
-                )
-                .with_color(theme.disabled_text_color(theme.background()).into_solid())
-                .finish(),
+                Text::new_inline(text, appearance.ui_font_family(), 12.)
+                    .with_color(theme.disabled_text_color(theme.background()).into_solid())
+                    .finish(),
             );
             notice.add_child(
                 Container::new(

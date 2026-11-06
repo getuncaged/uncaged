@@ -1,6 +1,7 @@
 use core::fmt::{self, Display};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ops::Range;
 
 use itertools::Itertools as _;
 use pathfinder_color::ColorU;
@@ -23,6 +24,7 @@ use warpui::fonts::{Properties, Weight};
 use warpui::platform::Cursor;
 use warpui::ui_components::button::{Button, ButtonVariant};
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use warpui::ui_components::slider::SliderStateHandle;
 use warpui::units::Pixels;
 use warpui::{Action, AppContext, SingletonEntity, ViewContext, ViewHandle};
 
@@ -76,7 +78,7 @@ const SETTINGS_CARD_HORIZONTAL_PADDING: f32 = 16.;
 const SETTINGS_CARD_TOP_PADDING: f32 = 14.;
 const SETTINGS_CARD_SPACING: f32 = 16.;
 /// The gap between a setting's label and description column and its control.
-const ROW_CONTROL_GAP: f32 = 24.;
+pub(super) const ROW_CONTROL_GAP: f32 = 24.;
 const ALTERNATING_LIST_CLOSE_BUTTON_DIAMETER: f32 = 20.0;
 const ALTERNATING_LIST_ITEM_PADDING: f32 = 8.0;
 const GREY_TEXT_OPACITY: u8 = 60;
@@ -930,6 +932,168 @@ pub fn render_settings_description(text: String, appearance: &Appearance) -> Box
             ..Default::default()
         })
         .build()
+        .finish()
+}
+
+/// The width of the slider in a [`render_slider_row`].
+const SLIDER_WIDTH: f32 = 160.;
+/// The fixed column a slider's value sits in, so every slider on a page lines up.
+const SLIDER_VALUE_WIDTH: f32 = 40.;
+/// The inset between a segmented control's track and its segments.
+const SEGMENT_TRACK_PADDING: f32 = 2.;
+
+/// What a [`render_slider_row`] edits and how it shows its value.
+pub struct SliderRow<A> {
+    pub state: SliderStateHandle,
+    pub value: u8,
+    pub range: Range<f32>,
+    /// The value as shown beside the slider, e.g. "80%".
+    pub value_label: String,
+    /// Dispatched while the slider is dragged.
+    pub on_drag: fn(f32) -> A,
+    /// Dispatched when the slider is released.
+    pub on_change: fn(f32) -> A,
+}
+
+/// A slider row: the label (and description) on the left; the slider and its current value, in
+/// a fixed-width column, on the right. Every slider in Settings shows its value the same way —
+/// beside the slider, never inside the label.
+pub fn render_slider_row<A: Action + Clone>(
+    label: &str,
+    description: Option<String>,
+    slider: SliderRow<A>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let SliderRow {
+        state,
+        value,
+        range,
+        value_label,
+        on_drag,
+        on_change,
+    } = slider;
+    let slider = appearance
+        .ui_builder()
+        .slider(state)
+        .with_range(range)
+        .with_default_value(value as f32)
+        .with_style(UiComponentStyles {
+            width: Some(SLIDER_WIDTH),
+            // Margin is 3. to add up with 7. padding on slider for a total of 10.
+            margin: Some(Coords::default().top(3.).bottom(3.)),
+            ..Default::default()
+        })
+        .on_drag(move |ctx, _, val| ctx.dispatch_typed_action(on_drag(val)))
+        .on_change(move |ctx, _, val| ctx.dispatch_typed_action(on_change(val)))
+        .build()
+        .finish();
+
+    let value_text = ConstrainedBox::new(
+        Align::new(
+            Text::new_inline(value_label, appearance.ui_font_family(), LABEL_FONT_SIZE)
+                .with_color(settings_description_color(appearance))
+                .finish(),
+        )
+        .right()
+        .finish(),
+    )
+    .with_width(SLIDER_VALUE_WIDTH)
+    .finish();
+
+    let control = Flex::row()
+        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(slider)
+        .with_child(Container::new(value_text).with_margin_left(8.).finish())
+        .finish();
+    build_toggle_element(
+        Text::new_inline(
+            label.to_string(),
+            appearance.ui_font_family(),
+            LABEL_FONT_SIZE,
+        )
+        .with_color(appearance.theme().active_ui_text_color().into())
+        .finish(),
+        control,
+        appearance,
+        description,
+    )
+}
+
+/// One option of a [`render_segmented_control`].
+pub struct Segment<A> {
+    pub label: &'static str,
+    pub active: bool,
+    pub mouse_state: MouseStateHandle,
+    pub action: A,
+}
+
+/// A compact segmented control: the options side by side in a quiet track, the selected one
+/// raised. Neutral rather than accent-coloured, so the accent stays reserved for primary actions.
+pub fn render_segmented_control<A: Action + Clone>(
+    segments: Vec<Segment<A>>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let theme = appearance.theme();
+    let segment_radius = CornerRadius::with_all(Radius::Pixels(
+        warp_core::ui::radius::SMALL - SEGMENT_TRACK_PADDING,
+    ));
+    let mut row = Flex::row()
+        .with_main_axis_size(MainAxisSize::Min)
+        .with_cross_axis_alignment(CrossAxisAlignment::Center);
+    for (index, segment) in segments.into_iter().enumerate() {
+        let Segment {
+            label,
+            active,
+            mouse_state,
+            action,
+        } = segment;
+        let item = Hoverable::new(mouse_state, |state| {
+            let text_color = if active || state.is_hovered() {
+                theme.active_ui_text_color()
+            } else {
+                theme.nonactive_ui_text_color()
+            };
+            let weight = if active {
+                Weight::Semibold
+            } else {
+                Weight::Normal
+            };
+            let container = Container::new(
+                Text::new_inline(label, appearance.ui_font_family(), LABEL_FONT_SIZE)
+                    .with_color(text_color.into())
+                    .with_style(Properties::default().weight(weight))
+                    .finish(),
+            )
+            .with_vertical_padding(4.)
+            .with_horizontal_padding(14.)
+            .with_corner_radius(segment_radius);
+            // Every segment carries a border, transparent unless selected, so selecting one
+            // doesn't nudge its neighbours by a pixel.
+            if active {
+                container
+                    .with_background(theme.surface_3())
+                    .with_border(Border::all(1.).with_border_fill(theme.outline()))
+                    .finish()
+            } else {
+                container
+                    .with_border(Border::all(1.).with_border_color(ColorU::transparent_black()))
+                    .finish()
+            }
+        })
+        .with_cursor(Cursor::PointingHand)
+        .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
+        .finish();
+        row.add_child(if index == 0 {
+            item
+        } else {
+            Container::new(item).with_margin_left(2.).finish()
+        });
+    }
+
+    Container::new(row.finish())
+        .with_uniform_padding(SEGMENT_TRACK_PADDING)
+        .with_background(theme.surface_2())
+        .with_corner_radius(warp_core::ui::radius::small())
         .finish()
 }
 

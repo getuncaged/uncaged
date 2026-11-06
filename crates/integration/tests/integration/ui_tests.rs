@@ -22,7 +22,6 @@ integration_tests! {
     test_removing_tabs_out_of_order,
     #[ignore = "Affected by agent_view feature flag UI changes"]
     test_suggestions_menu_positioning,
-    test_open_and_close_theme_creator_modal,
     #[ignore = "Affected by agent_view feature flag UI changes"]
     test_click_on_prompt_to_focus_input,
     #[ignore = "Affected by agent_view feature flag UI changes"]
@@ -96,7 +95,6 @@ integration_tests! {
     test_block_based_snackbar_not_visible_pager_command_waterfall_mode,
     #[ignore = "Affected by agent_view feature flag UI changes"]
     test_accepting_completion_inserts_space,
-    test_palette_opens_when_theme_chooser_is_open,
     test_launch_warp_with_theme_in_warp_config,
     #[cfg(target_os="macos")]
     test_preview_config_dir_migration,

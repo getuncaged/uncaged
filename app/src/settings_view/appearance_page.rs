@@ -1,8 +1,6 @@
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 use ::settings::{Setting, SettingSection, ToggleableSetting};
 use enum_iterator::all;
@@ -10,19 +8,15 @@ use warp_core::ui::theme::color::internal_colors;
 use warp_util::path::user_friendly_path;
 use warpui::elements::{
     Align, Border, ChildView, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    Dismiss, Element, Empty, Fill, Flex, FormattedTextElement, Hoverable, MainAxisAlignment,
-    MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text, Wrap,
-    DEFAULT_UI_LINE_HEIGHT_RATIO,
+    Dismiss, Element, Empty, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
+    ParentElement, Radius, Shrinkable, Text, Wrap, DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::fonts::{FamilyId, FontInfo, Weight};
+use warpui::fonts::{FamilyId, FontInfo, Properties, Weight};
 use warpui::keymap::{ContextPredicate, FixedBinding};
 use warpui::platform::{Cursor, FilePickerConfiguration, GraphicsBackend, SystemTheme};
 use warpui::rendering::ThinStrokes;
 use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::radio_buttons::{
-    RadioButtonItem, RadioButtonLayout, RadioButtonStateHandle,
-};
 use warpui::ui_components::slider::SliderStateHandle;
 use warpui::ui_components::switch::SwitchStateHandle;
 use warpui::units::IntoPixels;
@@ -34,9 +28,10 @@ use warpui::{
 use super::directory_color_add_picker::{DirectoryColorAddPicker, DirectoryColorAddPickerEvent};
 use super::settings_page::{
     build_reset_button, render_body_item, render_body_item_label, render_dropdown_item,
-    AdditionalInfo, Category, LocalOnlyIconState, MatchData, PageType, SettingsPageEvent,
-    SettingsPageMeta, SettingsPageViewHandle, SettingsWidget, ToggleState, CONTENT_FONT_SIZE,
-    HEADER_PADDING,
+    render_segmented_control, render_settings_description, render_slider_row, Category,
+    LocalOnlyIconState, MatchData, PageType, Segment, SettingsPageEvent, SettingsPageMeta,
+    SettingsPageViewHandle, SettingsWidget, SliderRow, ToggleState, CONTENT_FONT_SIZE,
+    HEADER_PADDING, ROW_CONTROL_GAP,
 };
 use super::{
     flags, SettingActionPairContexts, SettingActionPairDescriptions, SettingsAction,
@@ -55,63 +50,53 @@ use crate::features::FeatureFlag;
 use crate::gpu_state::{GPUState, GPUStateEvent};
 use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
 use crate::server::telemetry::{InputUXChangeOrigin, TelemetryEvent};
-use crate::settings::app_icon::{AppIcon, AppIconSettings, ShowDockIconState};
+use crate::settings::app_icon::AppIconSettings;
 use crate::settings::{
     active_theme_kind, respect_system_theme, AIFontName, AppEditorSettings, CursorBlink,
-    CursorBlinkEnabled, CursorDisplayType, EnforceMinimumContrast, FocusPaneOnHover, FontSettings,
-    FontSettingsChangedEvent, GPUSettings, InputBoxType, InputModeSettings, InputModeState,
-    InputSettings, InputSettingsChangedEvent, MonospaceFontName, PaneSettings,
-    ShouldDimInactivePanes, ThemeSettings, UseSystemTheme, UseThinStrokes,
-    DEFAULT_MONOSPACE_FONT_NAME,
+    CursorDisplayType, EnforceMinimumContrast, FontSettings, FontSettingsChangedEvent, GPUSettings,
+    InputBoxType, InputModeSettings, InputSettings, InputSettingsChangedEvent, MonospaceFontName,
+    PaneSettings, ThemeSettings, DEFAULT_MONOSPACE_FONT_NAME,
 };
 use crate::terminal::block_list_viewport::InputMode;
 use crate::terminal::blockgrid_element::BlockGridElement;
-use crate::terminal::ligature_settings::{LigatureRenderingEnabled, LigatureSettings};
+use crate::terminal::ligature_settings::LigatureSettings;
 use crate::terminal::model::blockgrid::BlockGrid;
 use crate::terminal::model::ObfuscateSecrets;
 use crate::terminal::session_settings::SessionSettings;
-use crate::terminal::settings::{
-    AltScreenPadding, AltScreenPaddingMode, Spacing, SpacingMode, TerminalSettings,
-};
-use crate::terminal::{
-    BlockListSettings, ShowBlockDividers, ShowJumpToBottomOfBlockButton, SizeInfo,
-};
-use crate::themes::theme::{self, RespectSystemTheme, SelectedSystemThemes, ThemeKind, WarpTheme};
-use crate::themes::theme_chooser::ThemeChooserMode;
+use crate::terminal::settings::{AltScreenPaddingMode, SpacingMode, TerminalSettings};
+use crate::terminal::{BlockListSettings, SizeInfo};
+use crate::themes::theme::{self, RespectSystemTheme, SelectedSystemThemes, ThemeGroup, ThemeKind};
 use crate::ui_components::color_dot::{render_color_dot, TAB_COLOR_OPTIONS};
 use crate::ui_components::icons::Icon;
-use crate::user_config::WarpConfig;
+use crate::user_config::{WarpConfig, WarpConfigUpdateEvent};
 use crate::util::bindings;
 use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme};
+use crate::view_components::dropdown::{DROPDOWN_PADDING, TOP_MENU_BAR_MAX_WIDTH};
 use crate::view_components::{Dropdown, DropdownItem, FilterableDropdown, FilterableDropdownEvent};
 use crate::window_settings::{
-    BackgroundBlurRadius, BackgroundBlurTexture, BackgroundOpacity, LeftPanelVisibilityAcrossTabs,
-    OpenWindowsAtCustomSize, ShowLaunchAnimation, WindowSettings, WindowSettingsChangedEvent,
-    ZoomLevel,
+    BackgroundBlurRadius, BackgroundOpacity, WindowSettings, WindowSettingsChangedEvent, ZoomLevel,
 };
 use crate::workspace::header_toolbar_editor::HeaderToolbarInlineEditor;
 use crate::workspace::tab_settings::{
-    canonical_directory_key, DirectoryTabColor, HideTitleBarSearchBarInVerticalTabs,
-    PreserveActiveTabColor, ShowCodeReviewButton, ShowIndicatorsButton,
-    ShowVerticalTabPanelInRestoredWindows, TabCloseButtonPosition, TabSettings,
-    TabSettingsChangedEvent, UseLatestUserPromptAsConversationTitleInTabNames, UseVerticalTabs,
-    WorkspaceDecorationVisibility,
+    canonical_directory_key, DirectoryTabColor, TabCloseButtonPosition, TabSettings,
+    TabSettingsChangedEvent, WorkspaceDecorationVisibility,
 };
 use crate::workspace::WorkspaceAction;
 use crate::{report_error, report_if_error, send_telemetry_from_ctx, themes};
 
-const FONT_SIZE_INPUT_BOX_WIDTH: f32 = 80.;
-const NOTEBOOK_FONT_SIZE_INPUT_BOX_WIDTH: f32 = 50.;
-const FONT_FAMILY_DROPDOWN_WIDTH: f32 = 225.;
-const FONT_WEIGHT_DROPDOWN_WIDTH: f32 = 100.;
-const LINE_HEIGHT_INPUT_BOX_WIDTH: f32 = 80.;
-const OPACITY_SLIDER_WIDTH: f32 = 150.;
+/// One width for every dropdown on the page, so their edges line up down the column. The same
+/// width dropdowns default to elsewhere in Settings.
+const DROPDOWN_WIDTH: f32 = TOP_MENU_BAR_MAX_WIDTH;
+/// The tallest a dropdown's menu grows before it scrolls — the theme lists can be long.
+const DROPDOWN_MENU_MAX_HEIGHT: f32 = 320.;
+/// Every numeric field on the page (font sizes, line height, window size, padding).
+const NUMBER_INPUT_WIDTH: f32 = 64.;
+/// The current-theme preview on the Theme card, as a fraction of a full preview card.
+const CURRENT_THEME_PREVIEW_SCALE: f32 = 0.45;
 const MIN_FONT_SIZE: usize = 1;
 const MAX_FONT_SIZE: usize = 120;
 const MIN_LINE_SPACING: f32 = 0.1;
 const MAX_LINE_SPACING: f32 = 5.;
-
-const INPUT_MODE_DROPDOWN_WIDTH: f32 = 225.;
 
 // Max and min sizes for new window creation in terms of rows and cols
 const MIN_NEW_WINDOW_ROWS_OR_COLS: u16 = 5;
@@ -510,7 +495,6 @@ pub enum AppearancePageAction {
         from_binding: bool,
     },
     SetInputType(InputBoxType),
-    SetAppIcon(AppIcon),
     ToggleShowDockIcon,
     SetCursorType(CursorDisplayType),
     SetWorkspaceDecorationVisibility(WorkspaceDecorationVisibility),
@@ -537,7 +521,11 @@ pub enum AppearancePageAction {
     ToggleBlurTexture,
     ToggleLeftPanelVisibility,
     SetEnforceMinimumContrast(EnforceMinimumContrast),
-    OpenUrl(String),
+    /// The theme used while the system is in `appearance`, when "Sync with OS" is on.
+    SetSystemTheme {
+        appearance: SystemTheme,
+        theme: ThemeKind,
+    },
     ToggleFocusPaneOnHover,
     ToggleInputMode,
     ToggleAltScreenPadding,
@@ -557,7 +545,6 @@ pub enum AppearancePageAction {
 pub struct AppearanceSettingsPageView {
     page: PageType<Self>,
     window_id: WindowId,
-    local_only_icon_tooltip_states: RefCell<HashMap<String, MouseStateHandle>>,
     font_size_editor: ViewHandle<EditorView>,
     line_height_editor: ViewHandle<EditorView>,
     notebook_font_size_editor: ViewHandle<EditorView>,
@@ -566,16 +553,18 @@ pub struct AppearanceSettingsPageView {
     valid_new_window_columns: bool,
     new_window_rows_editor: ViewHandle<EditorView>,
     valid_new_window_rows: bool,
+    /// The window opacity and blur sliders' states. Owned here rather than by their rows so a
+    /// change made elsewhere (the theme creator, the settings file) can reset them.
     opacity_state: SliderStateHandle,
     blur_state: SliderStateHandle,
     font_family_dropdown: ViewHandle<FilterableDropdown<AppearancePageAction>>,
     font_weight_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
-    #[allow(dead_code)]
     thin_strokes_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     enforce_min_contrast_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     input_mode_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
-    input_type_radio_state: RadioButtonStateHandle,
-    app_icon_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
+    /// The themes for light and dark system appearance, shown while "Sync with OS" is on.
+    light_theme_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
+    dark_theme_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     workspace_decorations_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     tab_close_button_position_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
     zoom_level_dropdown: ViewHandle<Dropdown<AppearancePageAction>>,
@@ -663,13 +652,12 @@ impl TypedActionView for AppearanceSettingsPageView {
                 from_binding,
             } => self.set_input_mode(*new_mode, *from_binding, ctx),
             SetInputType(input_type) => self.set_input_type(*input_type, ctx),
-            SetAppIcon(new_icon) => self.set_app_icon(*new_icon, ctx),
             ToggleShowDockIcon => self.toggle_show_dock_icon(ctx),
             SetCursorType(cursor_display_type) => self.set_cursor_type(*cursor_display_type, ctx),
             OpacitySliderDragged(val) => self.set_opacity(*val, false, ctx),
             BlurSliderDragged(val) => self.set_blur(*val, false, ctx),
-            OpenUrl(url) => {
-                ctx.open_url(url);
+            SetSystemTheme { appearance, theme } => {
+                self.set_system_theme(*appearance, theme.clone(), ctx)
             }
             ToggleTabIndicators => self.toggle_tab_indicators(ctx),
             ToggleShowCodeReviewButton => self.toggle_show_code_review_button(ctx),
@@ -945,21 +933,23 @@ impl AppearanceSettingsPageView {
             ctx.notify()
         });
 
-        ctx.subscribe_to_model(&InputSettings::handle(ctx), |me, _, event, ctx| {
+        ctx.subscribe_to_model(&InputSettings::handle(ctx), |_, _, event, ctx| {
             if matches!(event, InputSettingsChangedEvent::InputBoxTypeSetting { .. }) {
-                let input_type = *InputSettings::as_ref(ctx).input_box_type;
-                me.input_type_radio_state
-                    .set_selected_idx(input_type as usize);
                 ctx.notify();
             }
         });
-        ctx.subscribe_to_model(&AppIconSettings::handle(ctx), |me, _, _, ctx| {
-            me.app_icon_dropdown.update(ctx, |dropdown, ctx| {
-                let app_icon = *AppIconSettings::as_ref(ctx).app_icon;
-                dropdown.set_selected_by_name(Self::app_icon_dropdown_item_label(app_icon), ctx);
+        ctx.subscribe_to_model(&AppIconSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
+        // The light and dark theme pickers follow the theme settings (changed from the gallery or
+        // the command palette too) and the set of installed themes.
+        ctx.subscribe_to_model(&ThemeSettings::handle(ctx), |me, _, _, ctx| {
+            me.refresh_system_theme_dropdowns(ctx);
+            ctx.notify();
+        });
+        ctx.subscribe_to_model(&WarpConfig::handle(ctx), |me, _, event, ctx| {
+            if let WarpConfigUpdateEvent::Themes = event {
+                me.refresh_system_theme_dropdowns(ctx);
                 ctx.notify();
-            });
-            ctx.notify()
+            }
         });
         ctx.subscribe_to_model(&SessionSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
         ctx.subscribe_to_model(&BlockListSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
@@ -1079,8 +1069,8 @@ impl AppearanceSettingsPageView {
         // See `request_system_fonts_if_needed` and the dropdown subscriptions below.
         let font_family_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = FilterableDropdown::new(ctx);
-            dropdown.set_top_bar_max_width(FONT_FAMILY_DROPDOWN_WIDTH);
-            dropdown.set_menu_width(FONT_FAMILY_DROPDOWN_WIDTH, ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
 
             // Initialize dropdown with the default font in case system fonts failed to load.
             dropdown.add_items(vec![Self::default_font_item(ctx, false)], ctx);
@@ -1096,8 +1086,8 @@ impl AppearanceSettingsPageView {
 
         let ai_font_family_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = FilterableDropdown::new(ctx);
-            dropdown.set_top_bar_max_width(FONT_FAMILY_DROPDOWN_WIDTH);
-            dropdown.set_menu_width(FONT_FAMILY_DROPDOWN_WIDTH, ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
 
             // Initialize dropdown with the default font in case system fonts failed to load.
             dropdown.add_items(vec![Self::default_font_item(ctx, true)], ctx);
@@ -1113,8 +1103,8 @@ impl AppearanceSettingsPageView {
 
         let font_weight_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = Dropdown::new(ctx);
-            dropdown.set_top_bar_max_width(FONT_WEIGHT_DROPDOWN_WIDTH);
-            dropdown.set_menu_width(FONT_WEIGHT_DROPDOWN_WIDTH, ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
 
             let selectable_weights = [Weight::Normal, Weight::Bold];
             let items = selectable_weights
@@ -1133,6 +1123,8 @@ impl AppearanceSettingsPageView {
 
         let thin_strokes_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = Dropdown::new(ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
 
             let values = vec![
                 ThinStrokes::Never,
@@ -1169,8 +1161,8 @@ impl AppearanceSettingsPageView {
 
         let input_mode_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = Dropdown::new(ctx);
-            dropdown.set_top_bar_max_width(INPUT_MODE_DROPDOWN_WIDTH);
-            dropdown.set_menu_width(INPUT_MODE_DROPDOWN_WIDTH, ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
 
             let values = vec![
                 InputMode::PinnedToBottom,
@@ -1206,43 +1198,10 @@ impl AppearanceSettingsPageView {
             dropdown
         });
 
-        let app_icon_dropdown = ctx.add_typed_action_view(|ctx| {
-            let mut dropdown = Dropdown::new(ctx);
-            dropdown.set_top_bar_max_width(INPUT_MODE_DROPDOWN_WIDTH);
-            dropdown.set_menu_width(INPUT_MODE_DROPDOWN_WIDTH, ctx);
-
-            // Uncaged ships only the neutral Default icon: every other AppIcon
-            // variant maps to a Warp-branded PNG in DockTilePlugin/Resources,
-            // so we do NOT expose them (was `all::<AppIcon>().collect()`).
-            let values: Vec<AppIcon> = vec![AppIcon::Default];
-            let current_value = *AppIconSettings::as_ref(ctx).app_icon;
-            let selected_index = values
-                .iter()
-                .position(|val| *val == current_value)
-                .unwrap_or_else(|| {
-                    log::error!("Could not find current AppIcon value in dropdown option list");
-                    0
-                });
-
-            dropdown.add_items(
-                values
-                    .into_iter()
-                    .map(|val| {
-                        DropdownItem::new(
-                            Self::app_icon_dropdown_item_label(val),
-                            AppearancePageAction::SetAppIcon(val),
-                        )
-                    })
-                    .collect(),
-                ctx,
-            );
-            dropdown.set_selected_by_index(selected_index, ctx);
-
-            dropdown
-        });
-
         let enforce_min_contrast_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = Dropdown::new(ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
 
             let values = vec![
                 EnforceMinimumContrast::Always,
@@ -1293,17 +1252,15 @@ impl AppearanceSettingsPageView {
             me.handle_alt_screen_padding_editor_event(event, ctx);
         });
 
-        // Initialize the input type radio state
-        let input_type = InputSettings::as_ref(ctx).input_type(ctx);
-        let input_type_radio_state = RadioButtonStateHandle::default();
-        input_type_radio_state.set_selected_idx(input_type as usize);
+        let light_theme_dropdown = Self::build_system_theme_dropdown(SystemTheme::Light, ctx);
+        let dark_theme_dropdown = Self::build_system_theme_dropdown(SystemTheme::Dark, ctx);
+
         let header_toolbar_inline_editor =
             ctx.add_typed_action_view(HeaderToolbarInlineEditor::new);
 
         AppearanceSettingsPageView {
             page: Self::build_page(ctx),
             window_id: ctx.window_id(),
-            local_only_icon_tooltip_states: Default::default(),
             ai_font_family_dropdown,
             notebook_font_size_editor,
             font_size_editor,
@@ -1318,8 +1275,8 @@ impl AppearanceSettingsPageView {
             font_weight_dropdown,
             thin_strokes_dropdown,
             input_mode_dropdown,
-            input_type_radio_state,
-            app_icon_dropdown,
+            light_theme_dropdown,
+            dark_theme_dropdown,
             enforce_min_contrast_dropdown,
             workspace_decorations_dropdown: Self::build_workspace_decoration_visibility_dropdown(
                 ctx,
@@ -1345,130 +1302,161 @@ impl AppearanceSettingsPageView {
         }
     }
 
+    /// The page, card by card: what you look at most (theme, text) first, then the window, the
+    /// tab bar, the input, the terminal content and the cursor, and the Dock last.
     fn build_page(ctx: &mut ViewContext<Self>) -> PageType<Self> {
         let mut categories = vec![Category::new(
-            "Themes",
+            "Theme",
             vec![
-                Box::new(CreateCustomThemeWidget::default()),
-                Box::new(ThemeSelectWidget::default()),
+                Box::new(CurrentThemeWidget::default()),
+                Box::new(SyncThemeWithOsWidget::default()),
             ],
         )];
 
-        if AppIconSettings::as_ref(ctx).is_supported_on_current_platform() {
-            categories.push(Category::new(
-                "Icon",
-                vec![Box::new(CustomAppIconWidget::default())],
-            ));
-        }
-
-        // Uncaged: the onboarding "Customize UI" choices live on their own
-        // dedicated top-level "Customize UI" settings page (see
-        // customize_ui_page.rs), not buried among the Appearance sections.
-
-        let window_settings = WindowSettings::as_ref(ctx);
-        let mut window_settings_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![];
-        if window_settings
-            .show_launch_animation
-            .is_supported_on_current_platform()
-        {
-            window_settings_widgets.push(Box::new(LaunchAnimationWidget::default()));
-        }
-        if window_settings
-            .open_windows_at_custom_size
-            .is_supported_on_current_platform()
-        {
-            window_settings_widgets.push(Box::new(CustomWindowSizeWidget::default()));
-        }
-        if window_settings
-            .background_opacity
-            .is_supported_on_current_platform()
-        {
-            window_settings_widgets.push(Box::new(WindowOpacityWidget::default()));
-        }
-        if window_settings
-            .background_blur_radius
-            .is_supported_on_current_platform()
-        {
-            window_settings_widgets.push(Box::new(WindowBlurWidget::default()));
-        }
-        if window_settings
-            .background_blur_texture
-            .is_supported_on_current_platform()
-        {
-            window_settings_widgets.push(Box::new(WindowBlurTextureWidget::default()));
-        }
-
-        if FeatureFlag::UIZoom.is_enabled() {
-            window_settings_widgets.push(Box::new(ZoomLevelWidget));
-        }
-
-        if window_settings
-            .left_panel_visibility_across_tabs
-            .is_supported_on_current_platform()
-        {
-            window_settings_widgets.push(Box::new(ToolsPanelStateScopeWidget::default()));
-        }
-
-        if !window_settings_widgets.is_empty() {
-            categories.push(Category::new("Window", window_settings_widgets));
-        }
-
-        // Create the Input category with all widgets
-        // The PromptWidget and InputModeWidget will handle their own visibility
-
-        let category_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
-            Box::new(InputTypeWidget::default()),
-            Box::new(PromptWidget::default()),
-            Box::new(InputModeWidget::default()),
-        ];
-
-        categories.push(Category::new("Input", category_widgets));
-
-        categories.push(Category::new(
-            "Panes",
-            vec![
-                Box::new(DimInactivePanesWidget::default()),
-                Box::new(FocusFollowsMouseWidget::default()),
-            ],
-        ));
-
-        let mut block_settings_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
-            Box::new(CompactModeWidget::default()),
-            Box::new(JumpToBottomOfBlockWidget::default()),
-        ];
-        if FeatureFlag::MinimalistUI.is_enabled() {
-            block_settings_widgets.push(Box::new(ShowBlockDividersWidget::default()));
-        }
-        categories.push(Category::new("Blocks", block_settings_widgets));
-
         let font_settings = FontSettings::as_ref(ctx);
-        let mut text_settings_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
+        let mut text_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
             Box::new(TerminalFontWidget::default()),
+            Box::new(FontWeightWidget),
+            Box::new(FontSizeWidget),
+            Box::new(LineHeightWidget::default()),
             Box::new(AIFontWidget::default()),
             Box::new(NotebookFontSizeWidget::default()),
         ];
-        if font_settings
-            .use_thin_strokes
-            .is_supported_on_current_platform()
-        {
-            text_settings_widgets.push(Box::new(ThinStrokesWidget::default()));
-        }
-        if font_settings
-            .enforce_minimum_contrast
-            .is_supported_on_current_platform()
-        {
-            text_settings_widgets.push(Box::new(MinimumContrastWidget::default()));
-        }
         let ligature_settings = LigatureSettings::as_ref(ctx);
         if FeatureFlag::Ligatures.is_enabled()
             && ligature_settings
                 .ligature_rendering_enabled
                 .is_supported_on_current_platform()
         {
-            text_settings_widgets.push(Box::new(LigaturesWidget::default()));
+            text_widgets.push(Box::new(LigaturesWidget::default()));
+        }
+        if font_settings
+            .use_thin_strokes
+            .is_supported_on_current_platform()
+        {
+            text_widgets.push(Box::new(ThinStrokesWidget::default()));
+        }
+        if font_settings
+            .enforce_minimum_contrast
+            .is_supported_on_current_platform()
+        {
+            text_widgets.push(Box::new(MinimumContrastWidget::default()));
+        }
+        categories.push(Category::new("Text", text_widgets));
+
+        let window_settings = WindowSettings::as_ref(ctx);
+        let mut window_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![];
+        if window_settings
+            .show_launch_animation
+            .is_supported_on_current_platform()
+        {
+            window_widgets.push(Box::new(LaunchAnimationWidget::default()));
+        }
+        if window_settings
+            .background_opacity
+            .is_supported_on_current_platform()
+        {
+            window_widgets.push(Box::new(WindowOpacityWidget));
+        }
+        if window_settings
+            .background_blur_radius
+            .is_supported_on_current_platform()
+        {
+            window_widgets.push(Box::new(WindowBlurWidget));
+        }
+        if window_settings
+            .background_blur_texture
+            .is_supported_on_current_platform()
+        {
+            window_widgets.push(Box::new(WindowBlurTextureWidget::default()));
+        }
+        if window_settings
+            .open_windows_at_custom_size
+            .is_supported_on_current_platform()
+        {
+            window_widgets.push(Box::new(CustomWindowSizeWidget::default()));
+        }
+        if FeatureFlag::UIZoom.is_enabled() {
+            window_widgets.push(Box::new(ZoomLevelWidget));
+        }
+        if window_settings
+            .left_panel_visibility_across_tabs
+            .is_supported_on_current_platform()
+        {
+            window_widgets.push(Box::new(ToolsPanelStateScopeWidget::default()));
+        }
+        if !window_widgets.is_empty() {
+            categories.push(Category::new("Window", window_widgets));
         }
 
-        categories.push(Category::new("Text", text_settings_widgets));
+        let tab_settings = TabSettings::as_ref(ctx);
+        let mut tab_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![];
+        if FeatureFlag::FullScreenZenMode.is_enabled()
+            && tab_settings
+                .workspace_decoration_visibility
+                .is_supported_on_current_platform()
+        {
+            tab_widgets.push(Box::new(ZenModeWidget::default()));
+        }
+        tab_widgets.push(Box::new(TabIndicatorWidget::default()));
+        if !FeatureFlag::OpenWarpNewSettingsModes.is_enabled() {
+            tab_widgets.push(Box::new(CodeReviewButtonWidget::default()));
+        }
+        if FeatureFlag::TabCloseButtonOnLeft.is_enabled() {
+            tab_widgets.push(Box::new(TabCloseButtonPositionWidget::default()));
+        }
+        tab_widgets.push(Box::new(PreserveActiveTabColorWidget::default()));
+
+        if FeatureFlag::VerticalTabs.is_enabled() {
+            tab_widgets.push(Box::new(VerticalTabsWidget::default()));
+            tab_widgets.push(Box::new(
+                ShowVerticalTabPanelInRestoredWindowsWidget::default(),
+            ));
+            tab_widgets.push(Box::new(
+                HideTitleBarSearchBarInVerticalTabsWidget::default(),
+            ));
+            tab_widgets.push(Box::new(
+                UseLatestUserPromptAsConversationTitleInTabNamesWidget::default(),
+            ));
+            if FeatureFlag::ConfigurableToolbar.is_enabled() {
+                tab_widgets.push(Box::new(EditToolbarWidget));
+            }
+        }
+
+        if FeatureFlag::DirectoryTabColors.is_enabled() {
+            let add_picker = ctx.add_typed_action_view(DirectoryColorAddPicker::new);
+            ctx.subscribe_to_view(&add_picker, |me, _, event, ctx| {
+                me.handle_directory_color_add_picker_event(event, ctx);
+            });
+            tab_widgets.push(Box::new(DirectoryTabColorsWidget { add_picker }));
+        }
+        categories.push(Category::new("Tabs", tab_widgets));
+
+        // Uncaged: the onboarding "Customize UI" choices live on their own
+        // dedicated top-level "Customize UI" settings page (see
+        // customize_ui_page.rs), not buried among the Appearance sections.
+
+        // The PromptWidget handles its own look for the PS1 and Uncaged input types.
+        categories.push(Category::new(
+            "Input",
+            vec![
+                Box::new(InputTypeWidget::default()),
+                Box::new(PromptWidget::default()),
+                Box::new(InputModeWidget::default()),
+            ],
+        ));
+
+        let mut block_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
+            Box::new(CompactModeWidget::default()),
+            Box::new(JumpToBottomOfBlockWidget::default()),
+        ];
+        if FeatureFlag::MinimalistUI.is_enabled() {
+            block_widgets.push(Box::new(ShowBlockDividersWidget::default()));
+        }
+        block_widgets.push(Box::new(DimInactivePanesWidget::default()));
+        block_widgets.push(Box::new(FocusFollowsMouseWidget::default()));
+        block_widgets.push(Box::new(AltScreenPaddingWidget::default()));
+        categories.push(Category::new("Blocks & panes", block_widgets));
 
         categories.push(Category::new(
             "Cursor",
@@ -1478,56 +1466,133 @@ impl AppearanceSettingsPageView {
             ],
         ));
 
-        let tab_settings = TabSettings::as_ref(ctx);
-        let mut tab_settings_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> =
-            vec![Box::new(TabIndicatorWidget::default())];
-        if !FeatureFlag::OpenWarpNewSettingsModes.is_enabled() {
-            tab_settings_widgets.push(Box::new(CodeReviewButtonWidget::default()));
-        }
-        if FeatureFlag::FullScreenZenMode.is_enabled()
-            && tab_settings
-                .workspace_decoration_visibility
-                .is_supported_on_current_platform()
-        {
-            tab_settings_widgets.push(Box::new(ZenModeWidget::default()));
-        }
-        if FeatureFlag::TabCloseButtonOnLeft.is_enabled() {
-            tab_settings_widgets.push(Box::new(TabCloseButtonPositionWidget::default()));
-        }
-        tab_settings_widgets.push(Box::new(PreserveActiveTabColorWidget::default()));
-
-        if FeatureFlag::VerticalTabs.is_enabled() {
-            tab_settings_widgets.push(Box::new(VerticalTabsWidget::default()));
-            tab_settings_widgets.push(Box::new(
-                ShowVerticalTabPanelInRestoredWindowsWidget::default(),
+        if AppIconSettings::as_ref(ctx).is_supported_on_current_platform() {
+            categories.push(Category::new(
+                "Dock",
+                vec![Box::new(CustomAppIconWidget::default())],
             ));
-            tab_settings_widgets.push(Box::new(
-                HideTitleBarSearchBarInVerticalTabsWidget::default(),
-            ));
-            tab_settings_widgets.push(Box::new(
-                UseLatestUserPromptAsConversationTitleInTabNamesWidget::default(),
-            ));
-            if FeatureFlag::ConfigurableToolbar.is_enabled() {
-                tab_settings_widgets.push(Box::new(EditToolbarWidget));
-            }
         }
-
-        if FeatureFlag::DirectoryTabColors.is_enabled() {
-            let add_picker = ctx.add_typed_action_view(DirectoryColorAddPicker::new);
-            ctx.subscribe_to_view(&add_picker, |me, _, event, ctx| {
-                me.handle_directory_color_add_picker_event(event, ctx);
-            });
-            tab_settings_widgets.push(Box::new(DirectoryTabColorsWidget { add_picker }));
-        }
-
-        categories.push(Category::new("Tabs", tab_settings_widgets));
-
-        categories.push(Category::new(
-            "Full-screen Apps",
-            vec![Box::new(AltScreenPaddingWidget::default())],
-        ));
 
         PageType::new_categorized(categories, None)
+    }
+
+    /// A light or dark theme picker for "Sync with OS".
+    fn build_system_theme_dropdown(
+        appearance: SystemTheme,
+        ctx: &mut ViewContext<Self>,
+    ) -> ViewHandle<Dropdown<AppearancePageAction>> {
+        ctx.add_typed_action_view(|ctx| {
+            let mut dropdown = Dropdown::new(ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
+            dropdown.set_menu_max_height(DROPDOWN_MENU_MAX_HEIGHT, ctx);
+            let selected = Self::system_theme_for(appearance, ctx);
+            dropdown.set_items(Self::system_theme_items(appearance, &selected, ctx), ctx);
+            dropdown.set_selected_by_action(
+                AppearancePageAction::SetSystemTheme {
+                    appearance,
+                    theme: selected,
+                },
+                ctx,
+            );
+            dropdown
+        })
+    }
+
+    /// The theme set for `appearance` under "Sync with OS".
+    fn system_theme_for(appearance: SystemTheme, app: &AppContext) -> ThemeKind {
+        let selected = ThemeSettings::as_ref(app).selected_system_themes.value();
+        match appearance {
+            SystemTheme::Light => selected.light.clone(),
+            SystemTheme::Dark => selected.dark.clone(),
+        }
+    }
+
+    /// Every installed theme, in the gallery's order: the ones that ship, then downloads, then
+    /// the user's own, each alphabetically. The referral reward themes are left out — Uncaged has
+    /// no referrals — unless one is somehow already the selection.
+    fn system_theme_items(
+        appearance: SystemTheme,
+        selected: &ThemeKind,
+        app: &AppContext,
+    ) -> Vec<DropdownItem<AppearancePageAction>> {
+        let group_order = |group: ThemeGroup| match group {
+            ThemeGroup::System => 0,
+            ThemeGroup::Community => 1,
+            ThemeGroup::Mine => 2,
+        };
+        let mut themes: Vec<(u8, String, ThemeKind)> = WarpConfig::as_ref(app)
+            .theme_config()
+            .theme_items()
+            .filter(|(kind, _)| {
+                !matches!(
+                    kind,
+                    ThemeKind::SentReferralReward | ThemeKind::ReceivedReferralReward
+                ) || *kind == selected
+            })
+            .map(|(kind, _)| (group_order(kind.group()), kind.to_string(), kind.clone()))
+            .collect();
+        themes.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        themes
+            .into_iter()
+            .map(|(_, name, theme)| {
+                DropdownItem::new(
+                    name,
+                    AppearancePageAction::SetSystemTheme { appearance, theme },
+                )
+            })
+            .collect()
+    }
+
+    /// Brings the light and dark theme pickers in line with the installed themes and the
+    /// current selection.
+    fn refresh_system_theme_dropdowns(&mut self, ctx: &mut ViewContext<Self>) {
+        for (appearance, dropdown) in [
+            (SystemTheme::Light, self.light_theme_dropdown.clone()),
+            (SystemTheme::Dark, self.dark_theme_dropdown.clone()),
+        ] {
+            dropdown.update(ctx, |dropdown, ctx| {
+                let selected = Self::system_theme_for(appearance, ctx);
+                dropdown.set_items(Self::system_theme_items(appearance, &selected, ctx), ctx);
+                dropdown.set_selected_by_action(
+                    AppearancePageAction::SetSystemTheme {
+                        appearance,
+                        theme: selected,
+                    },
+                    ctx,
+                );
+            });
+        }
+    }
+
+    /// Sets the theme for one system appearance. The AppearanceManager follows the theme
+    /// settings, so if the system is in that appearance now the window changes straight away.
+    fn set_system_theme(
+        &mut self,
+        appearance: SystemTheme,
+        theme: ThemeKind,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let current = ThemeSettings::as_ref(ctx)
+            .selected_system_themes
+            .value()
+            .clone();
+        let updated = match appearance {
+            SystemTheme::Light => SelectedSystemThemes {
+                light: theme,
+                dark: current.dark,
+            },
+            SystemTheme::Dark => SelectedSystemThemes {
+                light: current.light,
+                dark: theme,
+            },
+        };
+        ThemeSettings::handle(ctx).update(ctx, |theme_settings, ctx| {
+            report_if_error!(theme_settings
+                .selected_system_themes
+                .set_value(updated, ctx));
+        });
+        ctx.notify();
     }
 
     fn set_alt_screen_padding_editor_text(&mut self, ctx: &mut ViewContext<Self>) {
@@ -1640,28 +1705,6 @@ impl AppearanceSettingsPageView {
             InputMode::PinnedToBottom => "Pin to the bottom (Uncaged mode)",
             InputMode::PinnedToTop => "Pin to the top (Reverse mode)",
             InputMode::Waterfall => "Start at the top (Classic mode)",
-        }
-    }
-
-    fn app_icon_dropdown_item_label(val: AppIcon) -> &'static str {
-        match val {
-            AppIcon::Aurora => "Aurora",
-            AppIcon::Default => "Default",
-            AppIcon::Classic1 => "Classic 1",
-            AppIcon::Classic2 => "Classic 2",
-            AppIcon::Classic3 => "Classic 3",
-            AppIcon::Comets => "Comets",
-            AppIcon::GlassSky => "Glass Sky",
-            AppIcon::Glitch => "Glitch",
-            AppIcon::Cow => "Cow",
-            AppIcon::Glow => "Glow",
-            AppIcon::Holographic => "Holographic",
-            AppIcon::Mono => "Mono",
-            AppIcon::Neon => "Neon",
-            AppIcon::Original => "Original",
-            AppIcon::Starburst => "Starburst",
-            AppIcon::Sticker => "Sticker",
-            AppIcon::WarpOne => "Uncaged 1",
         }
     }
 
@@ -2359,8 +2402,6 @@ impl AppearanceSettingsPageView {
             InputSettings::handle(ctx).update(ctx, |input_type_settings, ctx| {
                 report_if_error!(input_type_settings.input_box_type.set_value(new_type, ctx));
             });
-            self.input_type_radio_state
-                .set_selected_idx(new_type as usize);
 
             let is_udi_enabled = new_type == InputBoxType::Universal;
             send_telemetry_from_ctx!(
@@ -2381,18 +2422,6 @@ impl AppearanceSettingsPageView {
 
             ctx.notify();
         }
-    }
-
-    fn set_app_icon(&mut self, new_icon: AppIcon, ctx: &mut ViewContext<Self>) {
-        AppIconSettings::handle(ctx).update(ctx, |app_icon_settings, ctx| {
-            report_if_error!(app_icon_settings.app_icon.set_value(new_icon, ctx));
-            send_telemetry_from_ctx!(
-                TelemetryEvent::AppIconSelection {
-                    icon: new_icon.to_string(),
-                },
-                ctx
-            );
-        });
     }
 
     fn toggle_show_dock_icon(&mut self, ctx: &mut ViewContext<Self>) {
@@ -2544,6 +2573,8 @@ impl AppearanceSettingsPageView {
     ) -> ViewHandle<Dropdown<AppearancePageAction>> {
         ctx.add_typed_action_view(|ctx| {
             let mut dropdown = Dropdown::new(ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
 
             let values = [
                 WorkspaceDecorationVisibility::AlwaysShow,
@@ -2571,6 +2602,8 @@ impl AppearanceSettingsPageView {
     ) -> ViewHandle<Dropdown<AppearancePageAction>> {
         ctx.add_typed_action_view(|ctx| {
             let mut dropdown = Dropdown::new(ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
 
             let values = [
                 TabCloseButtonPosition::Right,
@@ -2597,6 +2630,8 @@ impl AppearanceSettingsPageView {
     ) -> ViewHandle<Dropdown<AppearancePageAction>> {
         ctx.add_typed_action_view(|ctx| {
             let mut dropdown = Dropdown::new(ctx);
+            dropdown.set_top_bar_max_width(DROPDOWN_WIDTH);
+            dropdown.set_menu_width(DROPDOWN_WIDTH, ctx);
 
             dropdown.set_items(
                 crate::window_settings::ZoomLevel::VALUES
@@ -2709,170 +2744,309 @@ impl AppearanceSettingsPageView {
     }
 }
 
-fn render_group(
-    children: impl IntoIterator<Item = Box<dyn Element>>,
+// ── Row helpers ──────────────────────────────────────────────────────────────
+//
+// Every row on the page is drawn by one of these, so the label (and its short description) sits
+// on the left and the control on the right, in the same column, at the same size.
+
+/// A row with a switch on the right.
+fn switch_row(
+    label: &str,
+    description: Option<&str>,
+    state: &SwitchStateHandle,
+    checked: bool,
+    action: AppearancePageAction,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
-    let bar = Container::new(
-        ConstrainedBox::new(Empty::new().finish())
-            .with_width(4.)
+    render_body_item::<AppearancePageAction>(
+        label.to_string(),
+        None,
+        LocalOnlyIconState::Hidden,
+        ToggleState::Enabled,
+        appearance,
+        appearance
+            .ui_builder()
+            .switch(state.clone())
+            .check(checked)
+            .build()
+            .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
             .finish(),
+        description.map(str::to_owned),
     )
-    .with_background(appearance.theme().outline())
-    .with_corner_radius(CornerRadius::with_all(Radius::Percentage(50.)))
-    .with_margin_right(8.)
-    .with_margin_left(8.)
-    .finish();
+}
 
+/// A row with one of the page's dropdowns on the right.
+fn dropdown_row(
+    label: &str,
+    description: Option<&str>,
+    dropdown: &ViewHandle<Dropdown<AppearancePageAction>>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    render_dropdown_item(
+        appearance,
+        label,
+        description,
+        None,
+        LocalOnlyIconState::Hidden,
+        None,
+        dropdown,
+    )
+}
+
+/// A row whose control is a dropdown-sized element that isn't a [`Dropdown`] (the searchable font
+/// pickers). Spaced like [`dropdown_row`], whose dropdown carries its own vertical margin.
+fn dropdown_like_row(
+    label: &str,
+    description: Option<&str>,
+    control: Box<dyn Element>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let mut text = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+    text.add_child(
+        Align::new(render_body_item_label::<AppearancePageAction>(
+            label.to_string(),
+            None,
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+        ))
+        .left()
+        .finish(),
+    );
+    if let Some(description) = description {
+        text.add_child(render_settings_description(
+            description.to_string(),
+            appearance,
+        ));
+    }
     Container::new(
         Flex::row()
-            .with_main_axis_size(MainAxisSize::Max)
-            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-            .with_child(bar)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
-                Shrinkable::new(1., Flex::column().with_children(children).finish()).finish(),
+                Shrinkable::new(
+                    1.,
+                    Container::new(text.finish())
+                        .with_padding_right(ROW_CONTROL_GAP)
+                        .finish(),
+                )
+                .finish(),
+            )
+            .with_child(
+                ConstrainedBox::new(control)
+                    .with_width(DROPDOWN_WIDTH)
+                    .finish(),
             )
             .finish(),
     )
-    .with_margin_top(-4.)
-    .with_margin_bottom(HEADER_PADDING)
+    .with_padding_bottom(HEADER_PADDING - DROPDOWN_PADDING)
     .finish()
 }
 
-#[derive(Default)]
-struct CreateCustomThemeWidget;
+/// A short numeric text field, red-edged while its contents aren't valid. With `on_dismiss`,
+/// clicking away commits it.
+fn number_input(
+    editor: &ViewHandle<EditorView>,
+    valid: bool,
+    on_dismiss: Option<AppearancePageAction>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let input = appearance
+        .ui_builder()
+        .text_input(editor.clone())
+        .with_style(UiComponentStyles {
+            width: Some(NUMBER_INPUT_WIDTH),
+            padding: Some(Coords {
+                top: 5.,
+                bottom: 5.,
+                left: 8.,
+                right: 8.,
+            }),
+            background: Some(appearance.theme().surface_2().into()),
+            border_color: (!valid).then(|| themes::theme::Fill::error().into()),
+            ..Default::default()
+        })
+        .build()
+        .finish();
+    match on_dismiss {
+        Some(action) => Dismiss::new(input)
+            .on_dismiss(move |ctx, _app| ctx.dispatch_typed_action(action.clone()))
+            .finish(),
+        None => input,
+    }
+}
 
-impl SettingsWidget for CreateCustomThemeWidget {
+/// A row with a short text field on the right.
+fn input_row(
+    label: &str,
+    description: Option<&str>,
+    toggle_state: ToggleState,
+    control: Box<dyn Element>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    render_body_item::<AppearancePageAction>(
+        label.to_string(),
+        None,
+        LocalOnlyIconState::Hidden,
+        toggle_state,
+        appearance,
+        control,
+        description.map(str::to_owned),
+    )
+}
+
+/// A quiet "Reset" link, shown beside a control whose value differs from its default.
+fn reset_link(
+    mouse_state: &MouseStateHandle,
+    action: AppearancePageAction,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let theme = appearance.theme();
+    appearance
+        .ui_builder()
+        .button(ButtonVariant::Text, mouse_state.clone())
+        .with_style(UiComponentStyles {
+            font_size: Some(CONTENT_FONT_SIZE),
+            font_color: Some(theme.disabled_text_color(theme.surface_1()).into_solid()),
+            padding: Some(Coords::uniform(4.)),
+            ..Default::default()
+        })
+        .with_text_label("Reset".to_owned())
+        .build()
+        .with_cursor(Cursor::PointingHand)
+        .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
+        .finish()
+}
+
+/// A secondary button for the Theme card.
+fn theme_card_button(
+    label: &str,
+    mouse_state: &MouseStateHandle,
+    action: WorkspaceAction,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    appearance
+        .ui_builder()
+        .button(ButtonVariant::Secondary, mouse_state.clone())
+        .with_style(UiComponentStyles {
+            font_size: Some(CONTENT_FONT_SIZE + 1.),
+            font_weight: Some(Weight::Semibold),
+            padding: Some(Coords::uniform(7.).left(14.).right(14.)),
+            ..Default::default()
+        })
+        .with_centered_text_label(label.into())
+        .build()
+        .with_cursor(Cursor::PointingHand)
+        .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
+        .finish()
+}
+
+// ── Theme ────────────────────────────────────────────────────────────────────
+
+/// The theme in effect, with the ways to change it: the gallery, which is the one place themes
+/// are browsed and switched, and the theme creator.
+#[derive(Default)]
+struct CurrentThemeWidget {
+    browse_button_state: MouseStateHandle,
+    create_button_state: MouseStateHandle,
+}
+
+impl SettingsWidget for CurrentThemeWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "create theme create custom theme"
+        "theme themes current gallery browse download community create custom theme creator \
+         background backgrounds color colors customize"
     }
 
     fn render(
         &self,
         _view: &Self::View,
         appearance: &Appearance,
-        _app: &AppContext,
-    ) -> Box<dyn Element> {
-        // This used to be a link to the README, which read like "open the theme
-        // editor" but navigated out to a web page. The editor now has its own
-        // page, so point at that instead of leaving the trap in place.
-        Align::new(
-            appearance
-                .ui_builder()
-                .paragraph("Build your own theme in \"Theme creator\" in the sidebar.".to_string())
-                .build()
-                .with_margin_bottom(10.)
-                .finish(),
-        )
-        .left()
-        .finish()
-    }
-}
-
-#[derive(Default)]
-struct ThemeSelectWidget {
-    sync_os_switch_state: SwitchStateHandle,
-    open_theme_chooser_button_mouse_state: MouseStateHandle,
-    open_theme_chooser_button_mouse_state_light: MouseStateHandle,
-    open_theme_chooser_button_mouse_state_dark: MouseStateHandle,
-}
-
-impl ThemeSelectWidget {
-    fn render_theme_option(
-        &self,
-        appearance: &Appearance,
-        theme_kind: ThemeKind,
-        theme_chooser_mode: ThemeChooserMode,
-        state: MouseStateHandle,
-        is_selected: bool,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let theme: WarpTheme = WarpConfig::as_ref(app).theme_config().theme(&theme_kind);
-        let mode_ui_label = match theme_chooser_mode {
-            ThemeChooserMode::SystemLight => "Light",
-            ThemeChooserMode::SystemDark => "Dark",
-            ThemeChooserMode::SystemAgnostic => "Current theme",
+        let theme_settings = ThemeSettings::as_ref(app);
+        let kind = active_theme_kind(theme_settings, app);
+        let definition = WarpConfig::as_ref(app).theme_config().theme(&kind);
+        let detail = match respect_system_theme(theme_settings) {
+            RespectSystemTheme::Off => "Current theme",
+            RespectSystemTheme::On(_) => match app.system_theme() {
+                SystemTheme::Light => "Current theme, following your system's light mode",
+                SystemTheme::Dark => "Current theme, following your system's dark mode",
+            },
         };
 
-        ConstrainedBox::new(
-            Hoverable::new(state, |hover_state| {
-                let (border_color, border_width) = match hover_state.is_hovered() {
-                    true => (theme.accent(), 1.0),
-                    false => (theme.accent(), 0.0),
-                };
+        let preview = Container::new(theme::render_preview(
+            &definition,
+            appearance.monospace_font_family(),
+            Some(CURRENT_THEME_PREVIEW_SCALE),
+        ))
+        .with_corner_radius(warp_core::ui::radius::small())
+        .with_margin_right(12.)
+        .finish();
 
-                let mut container = Container::new(
-                    Flex::row()
-                        .with_child(
-                            appearance
-                                .ui_builder()
-                                .span(mode_ui_label.to_owned())
-                                .with_style(
-                                    UiComponentStyles::default()
-                                        .set_font_weight(Weight::Bold)
-                                        .set_margin(Coords {
-                                            top: 20.,
-                                            bottom: 20.,
-                                            left: 10.,
-                                            right: 20.,
-                                        }),
-                                )
-                                .build()
-                                .finish(),
-                        )
-                        .with_child(theme::render_preview(
-                            &theme,
-                            appearance.monospace_font_family(),
-                            Some(0.6),
-                        ))
-                        .with_child(
-                            appearance
-                                .ui_builder()
-                                .span(theme_kind.to_string())
-                                .with_style(UiComponentStyles::default().set_margin(Coords {
-                                    top: 20.,
-                                    bottom: 20.,
-                                    left: 20.,
-                                    right: 10.,
-                                }))
-                                .build()
-                                .finish(),
-                        )
-                        .finish(),
-                )
-                .with_border(Border::all(border_width).with_border_fill(border_color))
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
-                )))
-                .with_padding_left(10. - border_width)
-                .with_padding_top(5. - border_width)
-                .with_padding_bottom(5. - border_width);
+        let text = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(
+                Text::new_inline(kind.to_string(), appearance.ui_font_family(), 14.)
+                    .with_color(appearance.theme().active_ui_text_color().into())
+                    .with_style(Properties::default().weight(Weight::Semibold))
+                    .finish(),
+            )
+            .with_child(render_settings_description(detail.to_string(), appearance))
+            .finish();
 
-                if is_selected {
-                    container = container
-                        .with_background(internal_colors::fg_overlay_1(appearance.theme()));
-                }
-                container.finish()
-            })
-            .with_cursor(Cursor::PointingHand)
-            .on_click(move |ctx, _, _| {
-                ctx.dispatch_typed_action(WorkspaceAction::ShowThemeChooser(theme_chooser_mode));
-            })
-            .finish(),
+        let current = Container::new(
+            Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(preview)
+                .with_child(Shrinkable::new(1., text).finish())
+                .finish(),
         )
-        .with_min_height(70.)
-        .with_min_width(450.)
-        .finish()
+        .with_padding_bottom(HEADER_PADDING)
+        .finish();
+
+        // A wrap, so the buttons stack rather than overflow in a narrow pane.
+        let buttons = Container::new(
+            Wrap::row()
+                .with_spacing(8.)
+                .with_run_spacing(8.)
+                .with_child(theme_card_button(
+                    "Browse gallery",
+                    &self.browse_button_state,
+                    WorkspaceAction::ShowThemeGallery,
+                    appearance,
+                ))
+                .with_child(theme_card_button(
+                    "Create a theme",
+                    &self.create_button_state,
+                    WorkspaceAction::ShowSettingsPage(SettingsSection::ThemeCreator),
+                    appearance,
+                ))
+                .finish(),
+        )
+        .with_padding_bottom(HEADER_PADDING)
+        .finish();
+
+        Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(current)
+            .with_child(buttons)
+            .finish()
     }
 }
 
-impl SettingsWidget for ThemeSelectWidget {
+/// "Sync with OS", and — while it is on — the theme for each system appearance.
+#[derive(Default)]
+struct SyncThemeWithOsWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for SyncThemeWithOsWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "sync with os theme themes background backgrounds color colors customize"
+        "sync with os system theme themes light dark mode appearance automatic switch"
     }
 
     fn render(
@@ -2881,74 +3055,39 @@ impl SettingsWidget for ThemeSelectWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let theme_settings = ThemeSettings::handle(app);
-        let theme_picker = match respect_system_theme(theme_settings.as_ref(app)) {
-            RespectSystemTheme::Off => self.render_theme_option(
-                appearance,
-                active_theme_kind(theme_settings.as_ref(app), app),
-                ThemeChooserMode::SystemAgnostic,
-                self.open_theme_chooser_button_mouse_state.clone(),
-                true, // is selected
-                app,
-            ),
-            RespectSystemTheme::On(SelectedSystemThemes { light, dark }) => Flex::column()
-                .with_child(self.render_theme_option(
-                    appearance,
-                    light.clone(),
-                    ThemeChooserMode::SystemLight,
-                    self.open_theme_chooser_button_mouse_state_light.clone(),
-                    app.system_theme() == SystemTheme::Light,
-                    app,
-                ))
-                .with_child(self.render_theme_option(
-                    appearance,
-                    dark.clone(),
-                    ThemeChooserMode::SystemDark,
-                    self.open_theme_chooser_button_mouse_state_dark.clone(),
-                    app.system_theme() == SystemTheme::Dark,
-                    app,
-                ))
-                .finish(),
-        };
-
-        Flex::column()
+        let syncing = matches!(
+            respect_system_theme(ThemeSettings::as_ref(app)),
+            RespectSystemTheme::On(_)
+        );
+        let mut column = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-            .with_child(render_body_item::<AppearancePageAction>(
-                "Sync with OS".into(),
-                None,
-                LocalOnlyIconState::for_setting(
-                    UseSystemTheme::storage_key(),
-                    UseSystemTheme::sync_to_cloud(),
-                    &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                    app,
-                ),
-                ToggleState::Enabled,
+            .with_child(switch_row(
+                "Sync with OS",
+                Some("Switch between a light and a dark theme when your system does."),
+                &self.switch_state,
+                syncing,
+                AppearancePageAction::ToggleRespectSystemTheme,
                 appearance,
-                appearance
-                    .ui_builder()
-                    .switch(self.sync_os_switch_state.clone())
-                    .check(matches!(
-                        respect_system_theme(ThemeSettings::as_ref(app)),
-                        RespectSystemTheme::On { .. }
-                    ))
-                    .build()
-                    .on_click(move |ctx, _, _| {
-                        ctx.dispatch_typed_action(AppearancePageAction::ToggleRespectSystemTheme);
-                    })
-                    .finish(),
-                Some(
-                    "Automatically switch between light and dark themes when your system does."
-                        .to_string(),
-                ),
-            ))
-            .with_child(
-                Container::new(theme_picker)
-                    .with_margin_bottom(25.)
-                    .finish(),
-            )
-            .finish()
+            ));
+        if syncing {
+            column.add_child(dropdown_row(
+                "Light theme",
+                None,
+                &view.light_theme_dropdown,
+                appearance,
+            ));
+            column.add_child(dropdown_row(
+                "Dark theme",
+                None,
+                &view.dark_theme_dropdown,
+                appearance,
+            ));
+        }
+        column.finish()
     }
 }
+
+// ── Dock ─────────────────────────────────────────────────────────────────────
 
 #[derive(Default)]
 struct CustomAppIconWidget {
@@ -2962,109 +3101,31 @@ impl SettingsWidget for CustomAppIconWidget {
         "customize custom app icon icons dock cmd tab app switcher"
     }
 
+    fn should_render(&self, app: &AppContext) -> bool {
+        AppIconSettings::as_ref(app)
+            .show_dock_icon
+            .is_supported_on_current_platform()
+    }
+
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        #[allow(unused_mut)]
-        let show_bundle_warning = {
-            #[cfg(target_os = "macos")]
-            {
-                use objc2_app_kit::NSRunningApplication;
-                NSRunningApplication::currentApplication()
-                    .bundleIdentifier()
-                    .is_none()
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                false
-            }
-        };
-
-        let dropdown = render_dropdown_item(
+        // Uncaged ships a single app icon, so there is no icon to pick — only whether it shows.
+        switch_row(
+            "Show Uncaged in the Dock",
+            Some("When off, Uncaged is reached from its windows and the app switcher only."),
+            &self.show_dock_icon_switch_state,
+            *AppIconSettings::as_ref(app).show_dock_icon,
+            AppearancePageAction::ToggleShowDockIcon,
             appearance,
-            "Customize your app icon",
-            show_bundle_warning.then_some("Changing the app icon requires the app to be bundled."),
-            None,
-            LocalOnlyIconState::Hidden,
-            None,
-            &view.app_icon_dropdown,
-        );
-
-        let show_dock_icon_toggle = render_body_item::<AppearancePageAction>(
-            "Show Uncaged in Dock".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                ShowDockIconState::storage_key(),
-                ShowDockIconState::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
-            appearance,
-            appearance
-                .ui_builder()
-                .switch(self.show_dock_icon_switch_state.clone())
-                .check(*AppIconSettings::as_ref(app).show_dock_icon)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleShowDockIcon);
-                })
-                .finish(),
-            None,
-        );
-        let show_dock_icon_is_supported = AppIconSettings::as_ref(app)
-            .show_dock_icon
-            .is_supported_on_current_platform();
-
-        #[cfg(target_os = "macos")]
-        {
-            use crate::appearance::AppearanceManager;
-
-            let app_icon_at_startup = AppearanceManager::as_ref(app).app_icon_at_startup();
-            let current_icon = *AppIconSettings::as_ref(app).app_icon;
-            if current_icon == AppIcon::Default
-                && ChannelState::channel() != Channel::Local
-                && app_icon_at_startup != AppIcon::Default
-            {
-                let theme = appearance.theme();
-                let column = Flex::column().with_child(dropdown).with_child(
-                    appearance
-                        .ui_builder()
-                        .wrappable_text(
-                            "You may need to restart Uncaged for MacOS to apply the preferred icon style.",
-                            true,
-                        )
-                        .with_style(UiComponentStyles {
-                            font_color: Some(
-                                theme.sub_text_color(theme.background()).into_solid(),
-                            ),
-                            margin: Some(Coords::default().bottom(8.)),
-                            ..Default::default()
-                        })
-                        .build()
-                        .finish(),
-                );
-                let column = if show_dock_icon_is_supported {
-                    column.with_child(show_dock_icon_toggle)
-                } else {
-                    column
-                };
-                return column.finish();
-            }
-        }
-
-        let column = Flex::column().with_child(dropdown);
-        let column = if show_dock_icon_is_supported {
-            column.with_child(show_dock_icon_toggle)
-        } else {
-            column
-        };
-        column.finish()
+        )
     }
 }
+
+// ── Window ───────────────────────────────────────────────────────────────────
 
 #[derive(Default)]
 struct CustomWindowSizeWidget {
@@ -3075,7 +3136,7 @@ impl SettingsWidget for CustomWindowSizeWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "open windows with custom size"
+        "open windows with custom size columns rows new window"
     }
 
     fn render(
@@ -3084,121 +3145,56 @@ impl SettingsWidget for CustomWindowSizeWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let window_settings = WindowSettings::as_ref(app);
-        let column_border_color: Option<Fill> =
-            (!view.valid_new_window_columns).then(|| themes::theme::Fill::error().into());
-        let row_border_color: Option<Fill> =
-            (!view.valid_new_window_rows).then(|| themes::theme::Fill::error().into());
-        let mut column = Flex::column().with_child(render_body_item::<AppearancePageAction>(
-            "Open new windows with custom size".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                OpenWindowsAtCustomSize::storage_key(),
-                OpenWindowsAtCustomSize::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
-            appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*window_settings.open_windows_at_custom_size.value())
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleOpenWindowsAtCustomSize);
-                })
-                .finish(),
-            None,
-        ));
-        if *window_settings.open_windows_at_custom_size.value() {
-            column.add_child(
-                Container::new(render_body_item::<AppearancePageAction>(
-                    "Columns".into(),
-                    None,
-                    // We show the local-only icon for this with the toggle, not the individual inputs.
-                    LocalOnlyIconState::Hidden,
-                    ToggleState::Enabled,
+        let enabled = *WindowSettings::as_ref(app)
+            .open_windows_at_custom_size
+            .value();
+        let mut column = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(switch_row(
+                "Custom size for new windows",
+                Some("Open new windows at a set number of columns and rows."),
+                &self.switch_state,
+                enabled,
+                AppearancePageAction::ToggleOpenWindowsAtCustomSize,
+                appearance,
+            ));
+        if enabled {
+            column.add_child(input_row(
+                "Columns",
+                None,
+                ToggleState::Enabled,
+                number_input(
+                    &view.new_window_columns_editor,
+                    view.valid_new_window_columns,
+                    Some(AppearancePageAction::SetNewWindowsCustomColumns),
                     appearance,
-                    Dismiss::new(
-                        appearance
-                            .ui_builder()
-                            .text_input(view.new_window_columns_editor.clone())
-                            .with_style(UiComponentStyles {
-                                width: Some(60.),
-                                padding: Some(Coords {
-                                    top: 4.,
-                                    bottom: 4.,
-                                    left: 6.,
-                                    right: 6.,
-                                }),
-                                background: Some(appearance.theme().surface_2().into()),
-                                border_color: column_border_color,
-                                ..Default::default()
-                            })
-                            .build()
-                            .finish(),
-                    )
-                    .on_dismiss(|ctx, _app| {
-                        ctx.dispatch_typed_action(AppearancePageAction::SetNewWindowsCustomColumns)
-                    })
-                    .finish(),
-                    None,
-                ))
-                .with_margin_left(10.)
-                .finish(),
-            );
-            column.add_child(
-                Container::new(render_body_item::<AppearancePageAction>(
-                    "Rows".into(),
-                    None,
-                    // We show the local-only icon for this with the toggle, not the individual inputs.
-                    LocalOnlyIconState::Hidden,
-                    ToggleState::Enabled,
+                ),
+                appearance,
+            ));
+            column.add_child(input_row(
+                "Rows",
+                None,
+                ToggleState::Enabled,
+                number_input(
+                    &view.new_window_rows_editor,
+                    view.valid_new_window_rows,
+                    Some(AppearancePageAction::SetNewWindowsCustomRows),
                     appearance,
-                    Dismiss::new(
-                        appearance
-                            .ui_builder()
-                            .text_input(view.new_window_rows_editor.clone())
-                            .with_style(UiComponentStyles {
-                                width: Some(60.),
-                                padding: Some(Coords {
-                                    top: 4.,
-                                    bottom: 4.,
-                                    left: 6.,
-                                    right: 6.,
-                                }),
-                                background: Some(appearance.theme().surface_2().into()),
-                                border_color: row_border_color,
-                                ..Default::default()
-                            })
-                            .build()
-                            .finish(),
-                    )
-                    .on_dismiss(|ctx, _app| {
-                        ctx.dispatch_typed_action(AppearancePageAction::SetNewWindowsCustomRows)
-                    })
-                    .finish(),
-                    None,
-                ))
-                .with_margin_left(10.)
-                .finish(),
-            );
+                ),
+                appearance,
+            ));
         }
         column.finish()
     }
 }
 
-#[derive(Default)]
-struct WindowOpacityWidget {
-    slider_state: SliderStateHandle,
-}
+struct WindowOpacityWidget;
 
 impl SettingsWidget for WindowOpacityWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "window opacity transparency"
+        "window opacity transparency transparent"
     }
 
     fn render(
@@ -3212,74 +3208,26 @@ impl SettingsWidget for WindowOpacityWidget {
             .background_opacity
             .is_configurable(view.window_id, app)
         {
-            return Flex::column()
-                .with_child(
-                    Container::new(render_body_item_label::<AppearancePageAction>(
-                        "Window Opacity:".to_owned(),
-                        None,
-                        None,
-                        LocalOnlyIconState::Hidden,
-                        ToggleState::Disabled,
-                        appearance,
-                    ))
-                    .finish(),
-                )
-                .with_child(
-                    Container::new(
-                        FormattedTextElement::from_str(
-                            "Transparency is not supported with your graphics drivers.",
-                            appearance.ui_font_family(),
-                            appearance.ui_font_size(),
-                        )
-                        .with_color(appearance.theme().disabled_ui_text_color().into_solid())
-                        .finish(),
-                    )
-                    .with_margin_bottom(8.0)
-                    .finish(),
-                )
-                .finish();
+            return input_row(
+                "Window opacity",
+                Some("Transparency is not supported with your graphics drivers."),
+                ToggleState::Disabled,
+                Empty::new().finish(),
+                appearance,
+            );
         }
 
-        let opacity_value = *window_settings.background_opacity;
-        let mut col = Flex::column().with_child(render_body_item::<AppearancePageAction>(
-            format!("Window Opacity: {opacity_value}"),
-            // TODO(CORE-3384) add AdditionalInfo here.
-            None,
-            LocalOnlyIconState::for_setting(
-                BackgroundOpacity::storage_key(),
-                BackgroundOpacity::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
-            appearance,
-            appearance
-                .ui_builder()
-                .slider(self.slider_state.clone())
-                .with_range(BackgroundOpacity::MIN as f32..BackgroundOpacity::MAX as f32)
-                .with_default_value(opacity_value as f32)
-                .with_style(UiComponentStyles {
-                    width: Some(OPACITY_SLIDER_WIDTH),
-                    // Margin is 3. to add up with 7. padding on slider for a total of 10.
-                    margin: Some(Coords::default().top(3.).bottom(3.)),
-                    ..Default::default()
-                })
-                .on_drag(|ctx, _, val| {
-                    ctx.dispatch_typed_action(AppearancePageAction::OpacitySliderDragged(val))
-                })
-                .on_change(|ctx, _, val| {
-                    ctx.dispatch_typed_action(AppearancePageAction::SetOpacity(val))
-                })
-                .build()
-                .finish(),
-            None,
-        ));
-        if let Some(window) = app.windows().platform_window(view.window_id) {
-            // Skip showing the warning for OpenGL since WGPU often incorrectly reports it as not
-            // supporting alpha.
-            if !window.supports_transparency() && window.graphics_backend() != GraphicsBackend::Gl {
+        // Skip the warning for OpenGL, since WGPU often incorrectly reports it as not supporting
+        // alpha.
+        let warning = app
+            .windows()
+            .platform_window(view.window_id)
+            .filter(|window| {
+                !window.supports_transparency() && window.graphics_backend() != GraphicsBackend::Gl
+            })
+            .map(|_| {
                 let mut message = Cow::Borrowed(
-                    "The selected graphics settings may not support rendering transparent windows.",
+                    "The selected graphics settings may not support transparent windows.",
                 );
                 let gpu_settings = GPUSettings::as_ref(app);
                 if (gpu_settings
@@ -3290,36 +3238,31 @@ impl SettingsWidget for WindowOpacityWidget {
                         .preferred_backend
                         .is_supported_on_current_platform()
                 {
-                    message.to_mut().push_str(
-                        " Try changing the settings for the graphics backend or integrated GPU in \
-                        Features > System.",
-                    );
+                    message
+                        .to_mut()
+                        .push_str(" Try another graphics backend or GPU in Features > System.");
                 }
+                message.into_owned()
+            });
 
-                col.add_child(
-                    Container::new(
-                        FormattedTextElement::from_str(
-                            message,
-                            appearance.ui_font_family(),
-                            appearance.ui_font_size(),
-                        )
-                        .with_color(appearance.theme().disabled_ui_text_color().into_solid())
-                        .finish(),
-                    )
-                    .with_margin_bottom(8.0)
-                    .finish(),
-                );
-            }
-        }
-        col.finish()
+        let opacity = *window_settings.background_opacity;
+        render_slider_row(
+            "Window opacity",
+            warning,
+            SliderRow {
+                state: view.opacity_state.clone(),
+                value: opacity,
+                range: BackgroundOpacity::MIN as f32..BackgroundOpacity::MAX as f32,
+                value_label: format!("{opacity}%"),
+                on_drag: AppearancePageAction::OpacitySliderDragged,
+                on_change: AppearancePageAction::SetOpacity,
+            },
+            appearance,
+        )
     }
 }
 
-#[derive(Default)]
-struct WindowBlurWidget {
-    slider_state: SliderStateHandle,
-    info_button: MouseStateHandle,
-}
+struct WindowBlurWidget;
 
 impl SettingsWidget for WindowBlurWidget {
     type View = AppearanceSettingsPageView;
@@ -3334,52 +3277,20 @@ impl SettingsWidget for WindowBlurWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let window_settings = WindowSettings::as_ref(app);
-        let blur_value = *window_settings.background_blur_radius;
-        let label_info = AdditionalInfo {
-            mouse_state: self.info_button.clone(),
-            on_click_action: Some(AppearancePageAction::OpenUrl(
-                crate::brand::README_URL.into(),
-            )),
-            secondary_text: None,
-            tooltip_override_text: None,
-        };
-
-        Flex::column()
-            .with_child(render_body_item::<AppearancePageAction>(
-                format!("Window Blur Radius: {blur_value}"),
-                Some(label_info),
-                LocalOnlyIconState::for_setting(
-                    BackgroundBlurRadius::storage_key(),
-                    BackgroundBlurRadius::sync_to_cloud(),
-                    &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                    app,
-                ),
-                ToggleState::Enabled,
-                appearance,
-                appearance
-                    .ui_builder()
-                    .slider(self.slider_state.clone())
-                    .with_range(BackgroundBlurRadius::MIN as f32..BackgroundBlurRadius::MAX as f32)
-                    .with_default_value(blur_value as f32)
-                    .with_style(UiComponentStyles {
-                        width: Some(OPACITY_SLIDER_WIDTH),
-                        // Margin is 3. to add up with 7. padding on slider
-                        // for a total of 10.
-                        margin: Some(Coords::default().top(3.).bottom(3.)),
-                        ..Default::default()
-                    })
-                    .on_drag(|ctx, _, val| {
-                        ctx.dispatch_typed_action(AppearancePageAction::BlurSliderDragged(val))
-                    })
-                    .on_change(|ctx, _, val| {
-                        ctx.dispatch_typed_action(AppearancePageAction::SetBlur(val))
-                    })
-                    .build()
-                    .finish(),
-                None,
-            ))
-            .finish()
+        let blur = *WindowSettings::as_ref(app).background_blur_radius;
+        render_slider_row(
+            "Window blur",
+            Some("Blurs what shows through a transparent window.".to_string()),
+            SliderRow {
+                state: view.blur_state.clone(),
+                value: blur,
+                range: BackgroundBlurRadius::MIN as f32..BackgroundBlurRadius::MAX as f32,
+                value_label: format!("{blur}"),
+                on_drag: AppearancePageAction::BlurSliderDragged,
+                on_change: AppearancePageAction::SetBlur,
+            },
+            appearance,
+        )
     }
 }
 
@@ -3397,32 +3308,17 @@ impl SettingsWidget for LaunchAnimationWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let shown = *WindowSettings::as_ref(app).show_launch_animation.value();
-        render_body_item::<AppearancePageAction>(
-            "Launch animation".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                ShowLaunchAnimation::storage_key(),
-                ShowLaunchAnimation::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Launch animation",
+            Some("Show the Uncaged mark for a moment when the app starts."),
+            &self.switch_state,
+            *WindowSettings::as_ref(app).show_launch_animation.value(),
+            AppearancePageAction::ToggleLaunchAnimation,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(shown)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleLaunchAnimation);
-                })
-                .finish(),
-            Some("Show the Uncaged mark for a moment when the app starts.".to_string()),
         )
     }
 }
@@ -3445,48 +3341,24 @@ impl SettingsWidget for WindowBlurTextureWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let window_settings = WindowSettings::as_ref(app);
-        let use_blur_texture = *window_settings.background_blur_texture;
-        let mut col = Flex::column().with_child(render_body_item::<AppearancePageAction>(
-            "Use Window Blur (Acrylic texture)".to_string(),
-            None,
-            LocalOnlyIconState::for_setting(
-                BackgroundBlurTexture::storage_key(),
-                BackgroundBlurTexture::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        let unsupported = app
+            .windows()
+            .platform_window(view.window_id)
+            .is_some_and(|window| {
+                !window.supports_transparency() && window.graphics_backend() != GraphicsBackend::Gl
+            });
+        switch_row(
+            "Acrylic blur texture",
+            Some(if unsupported {
+                "Your hardware may not support transparent windows."
+            } else {
+                "Give the window blur a frosted, acrylic finish."
+            }),
+            &self.switch_state,
+            *WindowSettings::as_ref(app).background_blur_texture,
+            AppearancePageAction::ToggleBlurTexture,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(use_blur_texture)
-                .build()
-                .on_click(|evt_ctx, _app, _v2f| {
-                    evt_ctx.dispatch_typed_action(AppearancePageAction::ToggleBlurTexture);
-                })
-                .finish(),
-            None,
-        ));
-        if let Some(window) = app.windows().platform_window(view.window_id) {
-            if !window.supports_transparency() && window.graphics_backend() != GraphicsBackend::Gl {
-                col.add_child(
-                    Container::new(
-                        FormattedTextElement::from_str(
-                            "The selected hardware may not support rendering transparent windows.",
-                            appearance.ui_font_family(),
-                            appearance.ui_font_size(),
-                        )
-                        .with_color(appearance.theme().disabled_ui_text_color().into_solid())
-                        .finish(),
-                    )
-                    .with_margin_bottom(8.0)
-                    .finish(),
-                );
-            }
-        }
-        col.finish()
+        )
     }
 }
 
@@ -3504,48 +3376,66 @@ impl SettingsWidget for ToolsPanelStateScopeWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let window_settings = WindowSettings::as_ref(app);
-        let is_enabled = *window_settings.left_panel_visibility_across_tabs;
-
-        render_body_item::<AppearancePageAction>(
-            "Tools panel visibility is consistent across tabs".to_string(),
-            None,
-            LocalOnlyIconState::for_setting(
-                LeftPanelVisibilityAcrossTabs::storage_key(),
-                LeftPanelVisibilityAcrossTabs::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Same tools panel in every tab",
+            Some("Opening or closing the tools panel applies to all tabs, not just this one."),
+            &self.switch_state,
+            *WindowSettings::as_ref(app).left_panel_visibility_across_tabs,
+            AppearancePageAction::ToggleLeftPanelVisibility,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(is_enabled)
-                .build()
-                .on_click(|evt_ctx, _app, _v2f| {
-                    evt_ctx.dispatch_typed_action(AppearancePageAction::ToggleLeftPanelVisibility);
-                })
-                .finish(),
-            None,
         )
     }
 }
 
-struct InputTypeWidget {
-    radio_buttons_states: Vec<MouseStateHandle>,
+struct ZoomLevelWidget;
+
+impl SettingsWidget for ZoomLevelWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "zoom level zoom size scale"
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let changed_from_default =
+            *WindowSettings::as_ref(app).zoom_level.value() != ZoomLevel::default_value();
+        let reset_button = build_reset_button(
+            appearance,
+            view.zoom_reset_button_mouse_state.clone(),
+            changed_from_default,
+        )
+        .build()
+        .on_click(move |ctx, _, _| {
+            ctx.dispatch_typed_action(AppearancePageAction::ResetZoomLevel);
+        })
+        .finish();
+
+        render_dropdown_item(
+            appearance,
+            "Zoom",
+            Some("Scales the whole interface, in every window."),
+            Some(reset_button),
+            LocalOnlyIconState::Hidden,
+            None,
+            &view.zoom_level_dropdown,
+        )
+    }
 }
 
-impl Default for InputTypeWidget {
-    fn default() -> Self {
-        Self {
-            radio_buttons_states: vec![MouseStateHandle::default(), MouseStateHandle::default()],
-        }
-    }
+// ── Input ────────────────────────────────────────────────────────────────────
+
+#[derive(Default)]
+struct InputTypeWidget {
+    segment_states: [MouseStateHandle; 2],
 }
 
 impl SettingsWidget for InputTypeWidget {
@@ -3557,44 +3447,33 @@ impl SettingsWidget for InputTypeWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let input_type = InputSettings::as_ref(app).input_type(app);
-        let radio_buttons = appearance
-            .ui_builder()
-            .radio_buttons(
-                self.radio_buttons_states.clone(),
-                vec![
-                    RadioButtonItem::text("Uncaged"),
-                    RadioButtonItem::text("Shell (PS1)"),
-                ],
-                view.input_type_radio_state.clone(),
-                Some(input_type as usize),
-                appearance.ui_font_size(),
-                RadioButtonLayout::Row,
-            )
-            .on_change(Rc::new(move |ctx, _, index| {
-                if let Some(index) = index {
-                    let input_type = match index {
-                        0 => InputBoxType::Universal,
-                        _ => InputBoxType::Classic,
-                    };
-                    ctx.dispatch_typed_action(AppearancePageAction::SetInputType(input_type));
-                }
-            }))
-            .build()
-            .finish();
-
-        render_body_item::<AppearancePageAction>(
-            "Input type".into(),
-            None,
-            LocalOnlyIconState::Hidden,
+        input_row(
+            "Input type",
+            Some("Uncaged's own input editor, or your shell's prompt (PS1)."),
             ToggleState::Enabled,
+            render_segmented_control(
+                vec![
+                    Segment {
+                        label: "Uncaged",
+                        active: input_type == InputBoxType::Universal,
+                        mouse_state: self.segment_states[0].clone(),
+                        action: AppearancePageAction::SetInputType(InputBoxType::Universal),
+                    },
+                    Segment {
+                        label: "Shell (PS1)",
+                        active: input_type == InputBoxType::Classic,
+                        mouse_state: self.segment_states[1].clone(),
+                        action: AppearancePageAction::SetInputType(InputBoxType::Classic),
+                    },
+                ],
+                appearance,
+            ),
             appearance,
-            radio_buttons,
-            None,
         )
     }
 }
@@ -3613,21 +3492,13 @@ impl SettingsWidget for InputModeWidget {
         &self,
         view: &Self::View,
         appearance: &Appearance,
-        app: &AppContext,
+        _app: &AppContext,
     ) -> Box<dyn Element> {
-        render_dropdown_item(
-            appearance,
+        dropdown_row(
             "Input position",
             None,
-            None,
-            LocalOnlyIconState::for_setting(
-                InputModeState::storage_key(),
-                InputModeState::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            None,
             &view.input_mode_dropdown,
+            appearance,
         )
     }
 }
@@ -3694,7 +3565,7 @@ impl SettingsWidget for PromptWidget {
                 .finish()
         };
 
-        Hoverable::new(self.button_mouse_state.clone(), |hover_state| {
+        let preview = Hoverable::new(self.button_mouse_state.clone(), |hover_state| {
             let (border_color, border_width) = match hover_state.is_hovered() {
                 true => (appearance.theme().accent(), 1.0),
                 false => (appearance.theme().accent(), 0.0),
@@ -3706,8 +3577,7 @@ impl SettingsWidget for PromptWidget {
                 .with_border(Border::all(border_width).with_border_fill(border_color))
                 .with_horizontal_padding(24. - border_width)
                 .with_vertical_padding(12. - border_width)
-                .with_margin_right(4.)
-                .with_margin_bottom(16.)
+                .with_margin_bottom(HEADER_PADDING)
                 .finish()
         })
         .with_cursor(Cursor::PointingHand)
@@ -3716,9 +3586,38 @@ impl SettingsWidget for PromptWidget {
                 open_source: PromptEditorOpenSource::AppearancePage,
             })
         })
-        .finish()
+        .finish();
+
+        let description = "What shows above the input. Click the preview to edit it.";
+        Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(
+                Container::new(
+                    Flex::column()
+                        .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                        .with_child(render_body_item_label::<AppearancePageAction>(
+                            "Prompt".to_string(),
+                            None,
+                            None,
+                            LocalOnlyIconState::Hidden,
+                            ToggleState::Enabled,
+                            appearance,
+                        ))
+                        .with_child(render_settings_description(
+                            description.to_string(),
+                            appearance,
+                        ))
+                        .finish(),
+                )
+                .with_padding_bottom(8.)
+                .finish(),
+            )
+            .with_child(preview)
+            .finish()
     }
 }
+
+// ── Blocks & panes ───────────────────────────────────────────────────────────
 
 #[derive(Default)]
 struct DimInactivePanesWidget {
@@ -3734,31 +3633,17 @@ impl SettingsWidget for DimInactivePanesWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        render_body_item::<AppearancePageAction>(
-            "Dim inactive panes".into(),
+        switch_row(
+            "Dim inactive panes",
             None,
-            LocalOnlyIconState::for_setting(
-                ShouldDimInactivePanes::storage_key(),
-                ShouldDimInactivePanes::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+            &self.switch_state,
+            *PaneSettings::as_ref(app).should_dim_inactive_panes,
+            AppearancePageAction::ToggleDimInactivePanes,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*PaneSettings::as_ref(app).should_dim_inactive_panes)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleDimInactivePanes);
-                })
-                .finish(),
-            None,
         )
     }
 }
@@ -3772,36 +3657,22 @@ impl SettingsWidget for FocusFollowsMouseWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "focus follows mouse"
+        "focus follows mouse hover pane"
     }
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        render_body_item::<AppearancePageAction>(
-            "Focus follows mouse".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                FocusPaneOnHover::storage_key(),
-                FocusPaneOnHover::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Focus follows mouse",
+            Some("Focus a pane by moving the pointer over it."),
+            &self.switch_state,
+            *PaneSettings::as_ref(app).focus_panes_on_hover,
+            AppearancePageAction::ToggleFocusPaneOnHover,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*PaneSettings::as_ref(app).focus_panes_on_hover)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleFocusPaneOnHover);
-                })
-                .finish(),
-            None,
         )
     }
 }
@@ -3820,7 +3691,7 @@ impl SettingsWidget for CompactModeWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
@@ -3828,28 +3699,13 @@ impl SettingsWidget for CompactModeWidget {
             TerminalSettings::as_ref(app).spacing_mode.value(),
             SpacingMode::Compact
         );
-
-        render_body_item::<AppearancePageAction>(
-            "Compact mode".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                Spacing::storage_key(),
-                Spacing::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Compact mode",
+            Some("Less space around blocks, so more output fits."),
+            &self.switch_state,
+            is_compact_mode,
+            AppearancePageAction::ToggleCompactMode,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(is_compact_mode)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleCompactMode);
-                })
-                .finish(),
-            None,
         )
     }
 }
@@ -3868,37 +3724,19 @@ impl SettingsWidget for JumpToBottomOfBlockWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let block_list_settings = BlockListSettings::as_ref(app);
-        let enabled = block_list_settings
-            .show_jump_to_bottom_of_block_button
-            .value();
-        render_body_item::<AppearancePageAction>(
-            "Show Jump to Bottom of Block button".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                ShowJumpToBottomOfBlockButton::storage_key(),
-                ShowJumpToBottomOfBlockButton::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Jump to bottom of block button",
+            Some("Offer a button that jumps to the end of long output."),
+            &self.switch_state,
+            *BlockListSettings::as_ref(app)
+                .show_jump_to_bottom_of_block_button
+                .value(),
+            AppearancePageAction::ToggleJumpToBottomOfBlockButton,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*enabled)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(
-                        AppearancePageAction::ToggleJumpToBottomOfBlockButton,
-                    );
-                })
-                .finish(),
-            None,
         )
     }
 }
@@ -3917,47 +3755,31 @@ impl SettingsWidget for ShowBlockDividersWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let block_list_settings = BlockListSettings::as_ref(app);
-        let enabled = block_list_settings.show_block_dividers.value();
-        render_body_item::<AppearancePageAction>(
-            "Show block dividers".into(),
+        switch_row(
+            "Block dividers",
             None,
-            LocalOnlyIconState::for_setting(
-                ShowBlockDividers::storage_key(),
-                ShowBlockDividers::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+            &self.switch_state,
+            *BlockListSettings::as_ref(app).show_block_dividers.value(),
+            AppearancePageAction::ToggleShowBlockDividers,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*enabled)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleShowBlockDividers);
-                })
-                .finish(),
-            None,
         )
     }
 }
 
 #[derive(Default)]
-struct AIFontWidget {
-    checkbox_state: MouseStateHandle,
+struct AltScreenPaddingWidget {
+    switch_state: SwitchStateHandle,
 }
 
-impl SettingsWidget for AIFontWidget {
+impl SettingsWidget for AltScreenPaddingWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "text agent ai font family font size monospace"
+        "alt screen padding border space vim full-screen fullscreen apps"
     }
 
     fn render(
@@ -3966,159 +3788,181 @@ impl SettingsWidget for AIFontWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let font_settings = FontSettings::as_ref(app);
-        let mut ai_font_row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
-        let mut ai_font = Flex::column();
-        ai_font.add_child(render_body_item_label::<AppearancePageAction>(
-            "Agent font".to_string(),
-            None,
-            None,
-            LocalOnlyIconState::for_setting(
-                AIFontName::storage_key(),
-                AIFontName::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
-            appearance,
-        ));
-        ai_font.add_child(
-            Container::new(ChildView::new(&view.ai_font_family_dropdown).finish())
-                .with_margin_bottom(10.)
-                .finish(),
+        let custom = matches!(
+            TerminalSettings::as_ref(app).alt_screen_padding.value(),
+            AltScreenPaddingMode::Custom { .. }
         );
+        let mut column = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(switch_row(
+                "Custom padding in full-screen apps",
+                Some("Use your own padding in apps like vim or less, instead of the usual one."),
+                &self.switch_state,
+                custom,
+                AppearancePageAction::ToggleAltScreenPadding,
+                appearance,
+            ));
 
-        ai_font_row
-            .add_child(Shrinkable::new(1., Align::new(ai_font.finish()).left().finish()).finish());
-        ai_font_row.add_child(
-            appearance
-                .ui_builder()
-                .checkbox(self.checkbox_state.clone(), None)
-                .check(*font_settings.match_ai_font_to_terminal_font)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(
-                        AppearancePageAction::ToggleMatchAIToTerminalFontFamily,
-                    )
-                })
-                .finish(),
-        );
-        ai_font_row.add_child(
-            appearance
-                .ui_builder()
-                .span("Match terminal".to_string())
-                .build()
-                .with_margin_left(2.)
-                .with_margin_right(16.)
-                .finish(),
-        );
-
-        ai_font_row.finish()
+        if custom {
+            let buffer_text = view.alt_screen_padding_editor.as_ref(app).buffer_text(app);
+            let valid = matches!(buffer_text.parse::<f32>(), Ok(p) if p >= 0.);
+            column.add_child(input_row(
+                "Padding (px)",
+                None,
+                ToggleState::Enabled,
+                number_input(&view.alt_screen_padding_editor, valid, None, appearance),
+                appearance,
+            ));
+        }
+        column.finish()
     }
 }
+
+// ── Text ─────────────────────────────────────────────────────────────────────
 
 #[derive(Default)]
 struct TerminalFontWidget {
-    line_height_button_state: MouseStateHandle,
-    fonts_checkbox_state: MouseStateHandle,
-}
-
-impl TerminalFontWidget {
-    fn render_line_height_editor(
-        &self,
-        view: &AppearanceSettingsPageView,
-        appearance: &Appearance,
-        row: &mut Flex,
-    ) {
-        let mut line_height = Flex::column();
-        line_height.add_child(
-            appearance
-                .ui_builder()
-                .label("Line height".to_string())
-                .with_style(UiComponentStyles {
-                    margin: Some(Coords {
-                        left: 12.,
-                        ..Default::default()
-                    }),
-                    font_size: Some(CONTENT_FONT_SIZE),
-                    ..Default::default()
-                })
-                .build()
-                .finish(),
-        );
-        line_height.add_child(
-            Container::new(
-                Dismiss::new(
-                    appearance
-                        .ui_builder()
-                        .text_input(view.line_height_editor.clone())
-                        .with_style(UiComponentStyles {
-                            width: Some(LINE_HEIGHT_INPUT_BOX_WIDTH),
-                            padding: Some(Coords {
-                                top: 7.,
-                                bottom: 7.,
-                                left: 12.,
-                                right: 12.,
-                            }),
-                            margin: Some(Coords {
-                                top: 2.,
-                                left: 12.,
-                                ..Default::default()
-                            }),
-                            background: Some(appearance.theme().surface_2().into()),
-                            ..Default::default()
-                        })
-                        .build()
-                        .finish(),
-                )
-                .on_dismiss(|ctx, _app| {
-                    ctx.dispatch_typed_action(AppearancePageAction::SetLineHeight)
-                })
-                .finish(),
-            )
-            .with_padding_top(4.)
-            .finish(),
-        );
-        line_height.add_child({
-            let button = appearance
-                .ui_builder()
-                .reset_button(
-                    ButtonVariant::Text,
-                    self.line_height_button_state.clone(),
-                    appearance.line_height_ratio() != DEFAULT_UI_LINE_HEIGHT_RATIO,
-                    appearance
-                        .theme()
-                        .disabled_text_color(appearance.theme().surface_2())
-                        .into(),
-                )
-                .with_style(UiComponentStyles {
-                    padding: Some(Coords::default().bottom(HEADER_PADDING).top(4.)),
-                    margin: Some(Coords {
-                        top: 2.,
-                        left: 8.,
-                        ..Default::default()
-                    }),
-                    font_size: Some(appearance.ui_font_size() * 0.8),
-                    ..Default::default()
-                })
-                .with_text_label("Reset to default".to_string());
-
-            button
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::LineHeightEditorResetRatio);
-                })
-                .finish()
-        });
-        row.add_child(line_height.finish());
-    }
+    all_fonts_switch_state: SwitchStateHandle,
 }
 
 impl SettingsWidget for TerminalFontWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "text terminal font family font size line height monospace"
+        "text terminal font family monospace system fonts"
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        _app: &AppContext,
+    ) -> Box<dyn Element> {
+        Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(dropdown_like_row(
+                "Terminal font",
+                None,
+                ChildView::new(&view.font_family_dropdown).finish(),
+                appearance,
+            ))
+            .with_child(switch_row(
+                "List every system font",
+                Some("Include fonts that aren't monospaced in the list above."),
+                &self.all_fonts_switch_state,
+                view.view_font_type == FontType::Any,
+                AppearancePageAction::ToggleAllAvailableFonts,
+                appearance,
+            ))
+            .finish()
+    }
+}
+
+struct FontWeightWidget;
+
+impl SettingsWidget for FontWeightWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "text terminal font weight bold"
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        _app: &AppContext,
+    ) -> Box<dyn Element> {
+        dropdown_row("Font weight", None, &view.font_weight_dropdown, appearance)
+    }
+}
+
+struct FontSizeWidget;
+
+impl SettingsWidget for FontSizeWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "text terminal font size px"
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        _app: &AppContext,
+    ) -> Box<dyn Element> {
+        input_row(
+            "Font size (px)",
+            None,
+            ToggleState::Enabled,
+            number_input(
+                &view.font_size_editor,
+                true,
+                Some(AppearancePageAction::SetFontSize),
+                appearance,
+            ),
+            appearance,
+        )
+    }
+}
+
+#[derive(Default)]
+struct LineHeightWidget {
+    reset_state: MouseStateHandle,
+}
+
+impl SettingsWidget for LineHeightWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "text terminal line height spacing"
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        _app: &AppContext,
+    ) -> Box<dyn Element> {
+        let mut control = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        if appearance.line_height_ratio() != DEFAULT_UI_LINE_HEIGHT_RATIO {
+            control.add_child(
+                Container::new(reset_link(
+                    &self.reset_state,
+                    AppearancePageAction::LineHeightEditorResetRatio,
+                    appearance,
+                ))
+                .with_margin_right(8.)
+                .finish(),
+            );
+        }
+        control.add_child(number_input(
+            &view.line_height_editor,
+            true,
+            Some(AppearancePageAction::SetLineHeight),
+            appearance,
+        ));
+        input_row(
+            "Line height",
+            Some("A multiple of the font size."),
+            ToggleState::Enabled,
+            control.finish(),
+            appearance,
+        )
+    }
+}
+
+#[derive(Default)]
+struct AIFontWidget {
+    match_switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for AIFontWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "text agent ai font family match terminal monospace"
     }
 
     fn render(
@@ -4127,164 +3971,36 @@ impl SettingsWidget for TerminalFontWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let mut terminal_font_row = Flex::row();
-
-        // Terminal Font
-        let mut terminal_font = Flex::column();
-        terminal_font.add_child(render_body_item_label::<AppearancePageAction>(
-            "Terminal font".to_string(),
-            None,
-            None,
-            LocalOnlyIconState::for_setting(
-                MonospaceFontName::storage_key(),
-                MonospaceFontName::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
-            appearance,
-        ));
-
-        terminal_font.add_child(
-            Container::new(ChildView::new(&view.font_family_dropdown).finish())
-                .with_margin_bottom(10.)
-                .finish(),
-        );
-        terminal_font.add_child(
-            Container::new(
-                Flex::row()
-                    .with_child(
-                        Container::new(
-                            appearance
-                                .ui_builder()
-                                .checkbox(self.fonts_checkbox_state.clone(), None)
-                                .check(view.view_font_type == FontType::Any)
-                                .build()
-                                .on_click(move |ctx, _, _| {
-                                    ctx.dispatch_typed_action(
-                                        AppearancePageAction::ToggleAllAvailableFonts,
-                                    )
-                                })
-                                .finish(),
-                        )
-                        .with_margin_left(-7.)
-                        .finish(),
-                    )
-                    .with_child(
-                        Shrinkable::new(
-                            1.,
-                            appearance
-                                .ui_builder()
-                                .span("View all available system fonts".to_string())
-                                .build()
-                                .with_margin_left(2.)
-                                .finish(),
-                        )
-                        .finish(),
-                    )
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .finish(),
-            )
-            .with_margin_bottom(16.)
-            .finish(),
-        );
-
-        terminal_font_row.add_child(Shrinkable::new(1., terminal_font.finish()).finish());
-
-        // Font Weight
-        let mut font_weight = Flex::column();
-        font_weight.add_child(
-            appearance
-                .ui_builder()
-                .label("Font weight".to_string())
-                .with_style(UiComponentStyles {
-                    font_size: Some(CONTENT_FONT_SIZE),
-                    ..Default::default()
-                })
-                .build()
-                .with_margin_left(12.)
-                .finish(),
-        );
-
-        font_weight.add_child(
-            Container::new(ChildView::new(&view.font_weight_dropdown).finish())
-                .with_margin_left(12.)
-                .finish(),
-        );
-
-        terminal_font_row.add_child(Container::new(font_weight.finish()).finish());
-
-        // Font Size
-        let mut font_size = Flex::column();
-        font_size.add_child(
-            appearance
-                .ui_builder()
-                .label("Font size (px)".to_string())
-                .with_style(UiComponentStyles {
-                    margin: Some(Coords {
-                        left: 2.,
-                        ..Default::default()
-                    }),
-                    font_size: Some(CONTENT_FONT_SIZE),
-                    ..Default::default()
-                })
-                .build()
-                .finish(),
-        );
-        font_size.add_child(
-            Container::new(
-                Dismiss::new(
-                    appearance
-                        .ui_builder()
-                        .text_input(view.font_size_editor.clone())
-                        .with_style(UiComponentStyles {
-                            width: Some(FONT_SIZE_INPUT_BOX_WIDTH),
-                            padding: Some(Coords {
-                                top: 7.,
-                                bottom: 7.,
-                                left: 12.,
-                                right: 12.,
-                            }),
-                            margin: Some(Coords {
-                                top: 2.,
-                                left: 2.,
-                                ..Default::default()
-                            }),
-                            background: Some(appearance.theme().surface_2().into()),
-                            ..Default::default()
-                        })
-                        .build()
-                        .finish(),
-                )
-                .on_dismiss(|ctx, _app| {
-                    ctx.dispatch_typed_action(AppearancePageAction::SetFontSize)
-                })
-                .finish(),
-            )
-            .with_padding_top(4.)
-            .finish(),
-        );
-        terminal_font_row.add_child(
-            Container::new(font_size.finish())
-                .with_margin_left(12.)
-                .finish(),
-        );
-
-        self.render_line_height_editor(view, appearance, &mut terminal_font_row);
-        terminal_font_row.finish()
+        Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(dropdown_like_row(
+                "Agent font",
+                Some("The font of agent conversations."),
+                ChildView::new(&view.ai_font_family_dropdown).finish(),
+                appearance,
+            ))
+            .with_child(switch_row(
+                "Agent font matches terminal font",
+                None,
+                &self.match_switch_state,
+                *FontSettings::as_ref(app).match_ai_font_to_terminal_font,
+                AppearancePageAction::ToggleMatchAIToTerminalFontFamily,
+                appearance,
+            ))
+            .finish()
     }
 }
 
 #[derive(Default)]
 struct NotebookFontSizeWidget {
-    checkbox_state: MouseStateHandle,
+    match_switch_state: SwitchStateHandle,
 }
 
 impl SettingsWidget for NotebookFontSizeWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "text notebook font size"
+        "text notebook font size match terminal"
     }
 
     fn render(
@@ -4293,79 +4009,30 @@ impl SettingsWidget for NotebookFontSizeWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let font_settings = FontSettings::as_ref(app);
-        Container::new(
-            Flex::row()
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(
-                    Shrinkable::new(
-                        1.0,
-                        Align::new(
-                            appearance
-                                .ui_builder()
-                                .span("Notebook font size".to_string())
-                                .build()
-                                .with_margin_right(16.)
-                                .finish(),
-                        )
-                        .left()
-                        .finish(),
-                    )
-                    .finish(),
-                )
-                .with_child(
-                    appearance
-                        .ui_builder()
-                        .checkbox(self.checkbox_state.clone(), None)
-                        .check(*font_settings.match_notebook_to_monospace_font_size)
-                        .build()
-                        .on_click(move |ctx, _, _| {
-                            ctx.dispatch_typed_action(
-                                AppearancePageAction::ToggleMatchNotebookToMonospaceFontSize,
-                            )
-                        })
-                        .finish(),
-                )
-                .with_child(
-                    appearance
-                        .ui_builder()
-                        .span("Match terminal".to_string())
-                        .build()
-                        .with_margin_left(2.)
-                        .with_margin_right(16.)
-                        .finish(),
-                )
-                .with_child(
-                    Container::new(
-                        Dismiss::new(
-                            appearance
-                                .ui_builder()
-                                .text_input(view.notebook_font_size_editor.clone())
-                                .with_style(UiComponentStyles {
-                                    width: Some(NOTEBOOK_FONT_SIZE_INPUT_BOX_WIDTH),
-                                    padding: Some(Coords {
-                                        top: 7.,
-                                        bottom: 7.,
-                                        left: 16.,
-                                        right: 16.,
-                                    }),
-                                    background: Some(appearance.theme().surface_2().into()),
-                                    ..Default::default()
-                                })
-                                .build()
-                                .finish(),
-                        )
-                        .on_dismiss(|ctx, _app| {
-                            ctx.dispatch_typed_action(AppearancePageAction::SetNotebookFontSize)
-                        })
-                        .finish(),
-                    )
-                    .finish(),
-                )
-                .finish(),
-        )
-        .with_margin_bottom(10.)
-        .finish()
+        let matching = *FontSettings::as_ref(app).match_notebook_to_monospace_font_size;
+        Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(input_row(
+                "Notebook font size (px)",
+                None,
+                (!matching).into(),
+                number_input(
+                    &view.notebook_font_size_editor,
+                    true,
+                    Some(AppearancePageAction::SetNotebookFontSize),
+                    appearance,
+                ),
+                appearance,
+            ))
+            .with_child(switch_row(
+                "Notebook font size matches terminal",
+                None,
+                &self.match_switch_state,
+                matching,
+                AppearancePageAction::ToggleMatchNotebookToMonospaceFontSize,
+                appearance,
+            ))
+            .finish()
     }
 }
 
@@ -4383,21 +4050,13 @@ impl SettingsWidget for ThinStrokesWidget {
         &self,
         view: &Self::View,
         appearance: &Appearance,
-        app: &AppContext,
+        _app: &AppContext,
     ) -> Box<dyn Element> {
-        render_dropdown_item(
-            appearance,
-            "Use thin strokes",
-            None,
-            None,
-            LocalOnlyIconState::for_setting(
-                UseThinStrokes::storage_key(),
-                UseThinStrokes::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            None,
+        dropdown_row(
+            "Thin strokes",
+            Some("Draw text with lighter strokes."),
             &view.thin_strokes_dropdown,
+            appearance,
         )
     }
 }
@@ -4416,21 +4075,13 @@ impl SettingsWidget for MinimumContrastWidget {
         &self,
         view: &Self::View,
         appearance: &Appearance,
-        app: &AppContext,
+        _app: &AppContext,
     ) -> Box<dyn Element> {
-        render_dropdown_item(
-            appearance,
-            "Enforce minimum contrast",
-            None,
-            None,
-            LocalOnlyIconState::for_setting(
-                crate::settings::font::EnforceMinimumContrast::storage_key(),
-                crate::settings::font::EnforceMinimumContrast::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            None,
+        dropdown_row(
+            "Minimum contrast",
+            Some("Adjust text colors that are too close to the background."),
             &view.enforce_min_contrast_dropdown,
+            appearance,
         )
     }
 }
@@ -4438,7 +4089,6 @@ impl SettingsWidget for MinimumContrastWidget {
 #[derive(Default)]
 struct LigaturesWidget {
     switch_state: SwitchStateHandle,
-    info_mouse_state: MouseStateHandle,
 }
 
 impl SettingsWidget for LigaturesWidget {
@@ -4450,53 +4100,33 @@ impl SettingsWidget for LigaturesWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let ligature_rendering = &LigatureSettings::as_ref(app).ligature_rendering_enabled;
-        let ligature_rendering_enabled = ligature_rendering.value();
-
-        render_body_item::<AppearancePageAction>(
-            "Show ligatures in terminal".into(),
-            Some(AdditionalInfo {
-                mouse_state: self.info_mouse_state.clone(),
-                on_click_action: None,
-                secondary_text: None,
-                tooltip_override_text: Some("Ligatures may reduce performance".to_string()),
-            }),
-            LocalOnlyIconState::for_setting(
-                LigatureRenderingEnabled::storage_key(),
-                LigatureRenderingEnabled::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Ligatures",
+            Some("Join character pairs like -> in the terminal. May reduce performance."),
+            &self.switch_state,
+            *LigatureSettings::as_ref(app)
+                .ligature_rendering_enabled
+                .value(),
+            AppearancePageAction::ToggleLigatureRendering,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*ligature_rendering_enabled)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleLigatureRendering);
-                })
-                .finish(),
-            None,
         )
     }
 }
 
+// ── Cursor ───────────────────────────────────────────────────────────────────
+
 struct CursorTypeWidget {
-    radio_state: RadioButtonStateHandle,
-    radio_buttons_states: Vec<MouseStateHandle>,
+    segment_states: Vec<MouseStateHandle>,
 }
 
 impl Default for CursorTypeWidget {
     fn default() -> Self {
         Self {
-            radio_state: Default::default(),
-            radio_buttons_states: all::<CursorDisplayType>()
+            segment_states: all::<CursorDisplayType>()
                 .map(|_| Default::default())
                 .collect(),
         }
@@ -4512,62 +4142,47 @@ impl SettingsWidget for CursorTypeWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let settings = AppEditorSettings::as_ref(app);
-        let cursor_display_type = &settings.cursor_display_type;
-        let is_vim_mode_enabled = *settings.vim_mode.value();
+        if *settings.vim_mode.value() {
+            return input_row(
+                "Cursor shape",
+                Some("Vim mode sets the cursor shape."),
+                ToggleState::Disabled,
+                Empty::new().finish(),
+                appearance,
+            );
+        }
 
-        let cursor_display_types: Vec<CursorDisplayType> = all::<CursorDisplayType>().collect();
-
-        render_body_item::<AppearancePageAction>(
-            "Cursor type".into(),
+        let current = *settings.cursor_display_type.value();
+        let segments = all::<CursorDisplayType>()
+            .zip(self.segment_states.iter().cloned())
+            .map(|(cursor, mouse_state)| Segment {
+                label: cursor_display_type_label(cursor),
+                active: cursor == current,
+                mouse_state,
+                action: AppearancePageAction::SetCursorType(cursor),
+            })
+            .collect();
+        input_row(
+            "Cursor shape",
             None,
-            LocalOnlyIconState::for_setting(
-                CursorBlinkEnabled::storage_key(),
-                CursorBlinkEnabled::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
             ToggleState::Enabled,
+            render_segmented_control(segments, appearance),
             appearance,
-            match is_vim_mode_enabled {
-                true => Flex::column()
-                    .with_child(
-                        appearance
-                            .ui_builder()
-                            .span("Cursor type is disabled in Vim mode".to_string())
-                            .build()
-                            .finish(),
-                    )
-                    .finish(),
-                false => appearance
-                    .ui_builder()
-                    .radio_buttons(
-                        self.radio_buttons_states.clone(),
-                        cursor_display_types
-                            .iter()
-                            .map(|x| RadioButtonItem::text(x.to_string()))
-                            .collect(),
-                        self.radio_state.clone(),
-                        Some(cursor_display_type.value().to_index()),
-                        appearance.ui_font_size(),
-                        RadioButtonLayout::Row,
-                    )
-                    .on_change(Rc::new(move |ctx, _, index| {
-                        if let Some(index) = index {
-                            ctx.dispatch_typed_action(AppearancePageAction::SetCursorType(
-                                CursorDisplayType::nth(index).expect("Cursor does not exist"),
-                            ));
-                        }
-                    }))
-                    .build()
-                    .finish(),
-            },
-            None,
         )
+    }
+}
+
+/// The name of a cursor shape, for its segment.
+fn cursor_display_type_label(cursor: CursorDisplayType) -> &'static str {
+    match cursor {
+        CursorDisplayType::Bar => "Bar",
+        CursorDisplayType::Block => "Block",
+        CursorDisplayType::Underline => "Underline",
     }
 }
 
@@ -4580,41 +4195,27 @@ impl SettingsWidget for BlinkingCursorWidget {
     type View = AppearanceSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "blinking cursor"
+        "blinking cursor blink"
     }
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let settings = AppEditorSettings::as_ref(app);
-        let cursor_blink = &settings.cursor_blink;
-        render_body_item::<AppearancePageAction>(
-            "Blinking cursor".into(),
+        switch_row(
+            "Blinking cursor",
             None,
-            LocalOnlyIconState::for_setting(
-                CursorBlinkEnabled::storage_key(),
-                CursorBlinkEnabled::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+            &self.switch_state,
+            AppEditorSettings::as_ref(app).cursor_blink.value() == &CursorBlink::Enabled,
+            AppearancePageAction::ToggleCursorBlink,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(cursor_blink.value() == &CursorBlink::Enabled)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleCursorBlink);
-                })
-                .finish(),
-            None,
         )
     }
 }
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
 
 #[derive(Default)]
 struct TabCloseButtonPositionWidget {}
@@ -4630,21 +4231,13 @@ impl SettingsWidget for TabCloseButtonPositionWidget {
         &self,
         view: &Self::View,
         appearance: &Appearance,
-        app: &AppContext,
+        _app: &AppContext,
     ) -> Box<dyn Element> {
-        render_dropdown_item(
-            appearance,
-            "Tab close button position",
-            None,
-            None,
-            LocalOnlyIconState::for_setting(
-                TabCloseButtonPosition::storage_key(),
-                TabCloseButtonPosition::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
+        dropdown_row(
+            "Close button position",
             None,
             &view.tab_close_button_position_dropdown,
+            appearance,
         )
     }
 }
@@ -4663,33 +4256,17 @@ impl SettingsWidget for TabIndicatorWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let tab_settings = TabSettings::as_ref(app);
-
-        render_body_item::<AppearancePageAction>(
-            "Show tab indicators".into(),
+        switch_row(
+            "Tab indicators",
             None,
-            LocalOnlyIconState::for_setting(
-                ShowIndicatorsButton::storage_key(),
-                ShowIndicatorsButton::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+            &self.switch_state,
+            *TabSettings::as_ref(app).show_indicators,
+            AppearancePageAction::ToggleTabIndicators,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*tab_settings.show_indicators)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleTabIndicators);
-                })
-                .finish(),
-            None,
         )
     }
 }
@@ -4708,33 +4285,17 @@ impl SettingsWidget for CodeReviewButtonWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let tab_settings = TabSettings::as_ref(app);
-
-        render_body_item::<AppearancePageAction>(
-            "Show code review button".into(),
+        switch_row(
+            "Code review button",
             None,
-            LocalOnlyIconState::for_setting(
-                ShowCodeReviewButton::storage_key(),
-                ShowCodeReviewButton::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+            &self.switch_state,
+            *TabSettings::as_ref(app).show_code_review_button,
+            AppearancePageAction::ToggleShowCodeReviewButton,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*tab_settings.show_code_review_button)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleShowCodeReviewButton);
-                })
-                .finish(),
-            None,
         )
     }
 }
@@ -4753,33 +4314,17 @@ impl SettingsWidget for PreserveActiveTabColorWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let tab_settings = TabSettings::as_ref(app);
-
-        render_body_item::<AppearancePageAction>(
-            "Preserve active tab color for new tabs".into(),
+        switch_row(
+            "New tabs keep the active tab's color",
             None,
-            LocalOnlyIconState::for_setting(
-                PreserveActiveTabColor::storage_key(),
-                PreserveActiveTabColor::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+            &self.switch_state,
+            *TabSettings::as_ref(app).preserve_active_tab_color,
+            AppearancePageAction::TogglePreserveActiveTabColor,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*tab_settings.preserve_active_tab_color)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::TogglePreserveActiveTabColor);
-                })
-                .finish(),
-            None,
         )
     }
 }
@@ -4798,33 +4343,17 @@ impl SettingsWidget for VerticalTabsWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let tab_settings = TabSettings::as_ref(app);
-
-        render_body_item::<AppearancePageAction>(
-            "Use vertical tab layout".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                UseVerticalTabs::storage_key(),
-                UseVerticalTabs::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Vertical tabs",
+            Some("List tabs in a panel at the side instead of a bar along the top."),
+            &self.switch_state,
+            *TabSettings::as_ref(app).use_vertical_tabs,
+            AppearancePageAction::ToggleVerticalTabs,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*tab_settings.use_vertical_tabs)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AppearancePageAction::ToggleVerticalTabs);
-                })
-                .finish(),
-            None,
         )
     }
 }
@@ -4843,38 +4372,17 @@ impl SettingsWidget for ShowVerticalTabPanelInRestoredWindowsWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let tab_settings = TabSettings::as_ref(app);
-
-        render_body_item::<AppearancePageAction>(
-            "Show vertical tabs panel in restored windows".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                ShowVerticalTabPanelInRestoredWindows::storage_key(),
-                ShowVerticalTabPanelInRestoredWindows::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Show the vertical tabs panel in restored windows",
+            Some("Reopened windows show the panel even if it was closed when they were saved."),
+            &self.switch_state,
+            *TabSettings::as_ref(app).show_vertical_tab_panel_in_restored_windows,
+            AppearancePageAction::ToggleShowVerticalTabPanelInRestoredWindows,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*tab_settings.show_vertical_tab_panel_in_restored_windows)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(
-                        AppearancePageAction::ToggleShowVerticalTabPanelInRestoredWindows,
-                    );
-                })
-                .finish(),
-            Some(
-                "When enabled, reopening or restoring a window opens the vertical tabs panel even if it was closed when the window was last saved."
-                    .to_string(),
-            ),
         )
     }
 }
@@ -4893,38 +4401,17 @@ impl SettingsWidget for HideTitleBarSearchBarInVerticalTabsWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let tab_settings = TabSettings::as_ref(app);
-
-        render_body_item::<AppearancePageAction>(
-            "Hide search bar in vertical tab layout".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                HideTitleBarSearchBarInVerticalTabs::storage_key(),
-                HideTitleBarSearchBarInVerticalTabs::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Hide the title bar search with vertical tabs",
+            Some("Search stays available from the command palette and its shortcut."),
+            &self.switch_state,
+            *TabSettings::as_ref(app).hide_title_bar_search_bar_in_vertical_tabs,
+            AppearancePageAction::ToggleHideTitleBarSearchBarInVerticalTabs,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(*tab_settings.hide_title_bar_search_bar_in_vertical_tabs)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(
-                        AppearancePageAction::ToggleHideTitleBarSearchBarInVerticalTabs,
-                    );
-                })
-                .finish(),
-            Some(
-                "When using the vertical tab layout, hide the search bar in the title bar. Search stays available via the command palette and keyboard shortcuts."
-                    .to_string(),
-            ),
         )
     }
 }
@@ -4943,41 +4430,42 @@ impl SettingsWidget for UseLatestUserPromptAsConversationTitleInTabNamesWidget {
 
     fn render(
         &self,
-        view: &Self::View,
+        _view: &Self::View,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let tab_settings = TabSettings::as_ref(app);
-
-        render_body_item::<AppearancePageAction>(
-            "Use latest user prompt as conversation title in tab names".into(),
-            None,
-            LocalOnlyIconState::for_setting(
-                UseLatestUserPromptAsConversationTitleInTabNames::storage_key(),
-                UseLatestUserPromptAsConversationTitleInTabNames::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
+        switch_row(
+            "Name agent tabs after your latest prompt",
+            Some("Instead of the generated conversation title, in vertical tabs."),
+            &self.switch_state,
+            *TabSettings::as_ref(app).use_latest_user_prompt_as_conversation_title_in_tab_names,
+            AppearancePageAction::ToggleUseLatestUserPromptAsConversationTitleInTabNames,
             appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(
-                    *tab_settings
-                        .use_latest_user_prompt_as_conversation_title_in_tab_names,
-                )
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(
-                        AppearancePageAction::ToggleUseLatestUserPromptAsConversationTitleInTabNames,
-                    );
-                })
-                .finish(),
-            Some(
-                "Show the latest user prompt instead of the generated conversation title for Uncaged and third-party agent sessions in vertical tabs."
-                    .to_string(),
-            ),
+        )
+    }
+}
+
+#[derive(Default)]
+struct ZenModeWidget {}
+
+impl SettingsWidget for ZenModeWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "zen mode minimal tab bar window decoration"
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        _app: &AppContext,
+    ) -> Box<dyn Element> {
+        dropdown_row(
+            "Show the tab bar",
+            None,
+            &view.workspace_decorations_dropdown,
+            appearance,
         )
     }
 }
@@ -5233,195 +4721,6 @@ impl SettingsWidget for DirectoryTabColorsWidget {
         Container::new(content.finish())
             .with_padding_bottom(HEADER_PADDING)
             .finish()
-    }
-}
-
-#[derive(Default)]
-struct ZenModeWidget {}
-
-impl SettingsWidget for ZenModeWidget {
-    type View = AppearanceSettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "zen mode minimal tab bar window decoration"
-    }
-
-    fn render(
-        &self,
-        view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        render_dropdown_item(
-            appearance,
-            "Show the tab bar",
-            None,
-            None,
-            LocalOnlyIconState::for_setting(
-                WorkspaceDecorationVisibility::storage_key(),
-                WorkspaceDecorationVisibility::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            None,
-            &view.workspace_decorations_dropdown,
-        )
-    }
-}
-
-#[derive(Default)]
-struct AltScreenPaddingWidget {
-    switch_state: SwitchStateHandle,
-    additional_info_mouse_state: MouseStateHandle,
-}
-
-impl SettingsWidget for AltScreenPaddingWidget {
-    type View = AppearanceSettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "alt screen padding border space vim"
-    }
-
-    fn render(
-        &self,
-        view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let terminal_settings = &TerminalSettings::as_ref(app);
-        let theme = appearance.theme();
-        let mut column = Flex::column().with_child(render_body_item::<AppearancePageAction>(
-            "Use custom padding in alt-screen".into(),
-            Some(AdditionalInfo {
-                mouse_state: self.additional_info_mouse_state.clone(),
-                on_click_action: Some(AppearancePageAction::OpenUrl(
-                    crate::brand::README_URL.into(),
-                )),
-                secondary_text: None,
-                tooltip_override_text: None,
-            }),
-            LocalOnlyIconState::for_setting(
-                AltScreenPadding::storage_key(),
-                AltScreenPadding::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            ToggleState::Enabled,
-            appearance,
-            appearance
-                .ui_builder()
-                .switch(self.switch_state.clone())
-                .check(matches!(
-                    terminal_settings.alt_screen_padding.value(),
-                    AltScreenPaddingMode::Custom { .. }
-                ))
-                .build()
-                .on_click(move |ctx, app, _| {
-                    let new_mode = TerminalSettings::as_ref(app).alt_screen_padding.toggled();
-                    ctx.dispatch_typed_action(AppearancePageAction::UpdateAltScreenPaddingMode(
-                        new_mode,
-                    ));
-                })
-                .finish(),
-            None,
-        ));
-
-        if matches!(
-            terminal_settings.alt_screen_padding.value(),
-            AltScreenPaddingMode::Custom { .. }
-        ) {
-            let buffer_text = view.alt_screen_padding_editor.as_ref(app).buffer_text(app);
-            let border_color = match buffer_text.parse::<f32>() {
-                Ok(p) if p >= 0. => None,
-                _ => Some(themes::theme::Fill::error().into()),
-            };
-
-            let editor_style = UiComponentStyles {
-                width: Some(40.),
-                padding: Some(Coords::uniform(5.)),
-                background: Some(theme.surface_2().into()),
-                border_color,
-                ..Default::default()
-            };
-
-            let editor_row = Flex::row()
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_child(
-                    Container::new(
-                        Align::new(
-                            Text::new(
-                                "Uniform padding (px)",
-                                appearance.ui_font_family(),
-                                appearance.ui_font_size(),
-                            )
-                            .with_color(theme.active_ui_text_color().into())
-                            .finish(),
-                        )
-                        .finish(),
-                    )
-                    .finish(),
-                )
-                .with_child(
-                    appearance
-                        .ui_builder()
-                        .text_input(view.alt_screen_padding_editor.clone())
-                        .with_style(editor_style)
-                        .build()
-                        .finish(),
-                )
-                .finish();
-
-            column.add_child(render_group([editor_row], appearance));
-        }
-        column.finish()
-    }
-}
-
-struct ZoomLevelWidget;
-
-impl SettingsWidget for ZoomLevelWidget {
-    type View = AppearanceSettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "zoom level zoom size scale"
-    }
-
-    fn render(
-        &self,
-        view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let current_zoom_level = *WindowSettings::as_ref(app).zoom_level.value();
-        let changed_from_default = current_zoom_level != ZoomLevel::default_value();
-
-        let reset_button = build_reset_button(
-            appearance,
-            view.zoom_reset_button_mouse_state.clone(),
-            changed_from_default,
-        )
-        .build()
-        .on_click(move |ctx, _, _| {
-            ctx.dispatch_typed_action(AppearancePageAction::ResetZoomLevel);
-        })
-        .finish();
-
-        render_dropdown_item(
-            appearance,
-            "Zoom",
-            Some("Adjusts the default zoom level across all windows"),
-            Some(reset_button),
-            LocalOnlyIconState::for_setting(
-                crate::window_settings::ZoomLevel::storage_key(),
-                crate::window_settings::ZoomLevel::sync_to_cloud(),
-                &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                app,
-            ),
-            None,
-            &view.zoom_level_dropdown,
-        )
     }
 }
 
