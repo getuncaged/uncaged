@@ -141,10 +141,9 @@ pub mod themes;
 use ::ai::index::full_source_code_embedding::manager::{
     CodebaseIndexManager, CodebaseIndexManagerConfig,
 };
-use ::ai::index::full_source_code_embedding::LocalStoreClient;
 #[cfg(feature = "local_fs")]
 use ::ai::index::full_source_code_embedding::SnapshotStorage;
-use ::ai::index::full_source_code_embedding::SyncTask;
+use ::ai::index::full_source_code_embedding::{LocalStoreClient, SyncTask};
 use ::ai::index::DEFAULT_SYNC_REQUESTS_PER_MIN;
 use ::ai::project_context::model::ProjectContextModel;
 pub use ai::agent::todos::AIAgentTodoList;
@@ -2238,6 +2237,14 @@ pub(crate) fn initialize_app(
 
         CodebaseIndexManager::new_with_config(codebase_index_config, ctx)
     });
+
+    // Uncaged: serve the index to CLI agents (Claude Code, Gemini CLI, Codex) as an MCP tool.
+    #[cfg(not(target_family = "wasm"))]
+    if launch_mode.supports_indexing()
+        && !matches!(launch_mode, LaunchMode::RemoteServerDaemon { .. })
+    {
+        ctx.add_singleton_model(ai::uncaged_code_search::UncagedCodeSearch::new);
+    }
 
     ctx.add_singleton_model(|ctx| {
         ProjectContextModel::new_from_persisted(

@@ -41,7 +41,12 @@ pub trait Provider: Send + Sync {
 /// Construct the provider selected by config. `conversation_id` keys the CLI/ACP
 /// session pool so a tab reuses one agent session across turns (ignored by the
 /// stateless HTTP providers, which rebuild full history from each request).
-pub fn build(config: &UncagedConfig, conversation_id: &str) -> Box<dyn Provider> {
+/// `working_directory` is where a CLI agent's session works (also ignored by HTTP providers).
+pub fn build(
+    config: &UncagedConfig,
+    conversation_id: &str,
+    working_directory: Option<&str>,
+) -> Box<dyn Provider> {
     match &config.provider {
         ProviderConfig::Anthropic {
             api_key,
@@ -79,6 +84,7 @@ pub fn build(config: &UncagedConfig, conversation_id: &str) -> Box<dyn Provider>
             model: model.clone(),
             effort: *effort,
             conversation_id: conversation_id.to_string(),
+            working_directory: working_directory.map(str::to_string),
         }),
     }
 }

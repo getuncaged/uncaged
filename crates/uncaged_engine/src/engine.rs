@@ -55,7 +55,11 @@ pub fn run_turn(config: &UncagedConfig, request: &api::Request) -> EngineStream 
         tools: registry.specs.clone(),
     };
 
-    let provider = providers::build(config, &parsed.conversation_id);
+    let provider = providers::build(
+        config,
+        &parsed.conversation_id,
+        parsed.working_directory.as_deref(),
+    );
     let (tx, rx) = mpsc::unbounded();
 
     let target_task_id = parsed.target_task_id.clone();

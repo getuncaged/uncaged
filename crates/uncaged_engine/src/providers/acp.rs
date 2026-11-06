@@ -12,7 +12,9 @@
 //!
 //! IMPORTANT, documented honestly: an ACP agent runs *its own* tool loop in its
 //! *own* process, so this path does NOT drive Warp's native client-side tools /
-//! permission UI — it surfaces the agent's text output. For the full native
+//! permission UI — it surfaces the agent's text output. The one native feature it does
+//! get is codebase search: every session is handed Uncaged's code search MCP server
+//! (see [`crate::code_search`]) when the agent can reach HTTP MCP servers. For the full native
 //! Agent Mode experience powered by your own model, use the Anthropic or
 //! OpenAI-compatible providers. ACP method/shape details vary by agent and
 //! protocol version; treat this as a starting point to adapt per agent.
@@ -29,6 +31,7 @@ use tokio::process::Command;
 use tokio::sync::Mutex as AsyncMutex;
 
 use super::{Provider, ProviderEvent};
+use crate::code_search;
 use crate::config::Effort;
 use crate::model::{Conversation, NeutralMsg};
 
@@ -38,6 +41,9 @@ struct AcpSession {
     stdin: tokio::process::ChildStdin,
     lines: tokio::io::Lines<BufReader<tokio::process::ChildStdout>>,
     session_id: String,
+    /// The folder the session works in. Kept so a reopened session resumes in the same
+    /// place (Claude Code files its sessions by folder).
+    working_directory: Option<String>,
     /// The model and effort the session is running with, so a change in the menu can be
     /// applied to the live session instead of waiting for the next spawn.
     model: Option<String>,
@@ -113,6 +119,9 @@ pub struct AcpProvider {
     pub effort: Option<Effort>,
     /// The tab's agent-thread id; the key under which we keep the CLI session.
     pub conversation_id: String,
+    /// The terminal's folder when the turn was sent. A new session starts there; a live
+    /// session keeps the folder it started in.
+    pub working_directory: Option<String>,
 }
 
 impl Provider for AcpProvider {
@@ -142,7 +151,8 @@ impl AcpProvider {
         // stored session whose child has exited is treated as absent so we
         // transparently respawn (e.g. the CLI crashed or was killed).
         if guard.as_mut().is_none_or(session_is_dead) {
-            *guard = Some(self.open_session(None, tx).await?);
+            let working_directory = usable_directory(self.working_directory.as_deref());
+            *guard = Some(self.open_session(None, working_directory, tx).await?);
         }
 
         // Effort is fixed when a session is created, so a changed effort reopens the session,
@@ -151,8 +161,12 @@ impl AcpProvider {
             && session.effort != self.effort
         {
             let resume = session.session_id.clone();
+            let working_directory = session.working_directory.clone();
             *guard = None;
-            *guard = Some(self.open_session(Some(resume), tx).await?);
+            *guard = Some(
+                self.open_session(Some(resume), working_directory, tx)
+                    .await?,
+            );
         }
 
         // A changed model is switched on the live session.
@@ -182,6 +196,7 @@ impl AcpProvider {
     async fn open_session(
         &self,
         resume: Option<String>,
+        working_directory: Option<String>,
         tx: &mpsc::UnboundedSender<ProviderEvent>,
     ) -> anyhow::Result<AcpSession> {
         let Some((program, args)) = self.command.split_first() else {
@@ -205,6 +220,11 @@ impl AcpProvider {
             .env_remove("CLAUDE_CODE_SSE_PORT");
         if let Some(path) = USER_PATH.as_deref() {
             cmd.env("PATH", path);
+        }
+        // Run the agent where the user is working, so its own tools (and its project
+        // settings) see the same files the terminal does.
+        if let Some(directory) = working_directory.as_deref() {
+            cmd.current_dir(directory);
         }
         let mut child = cmd.spawn().map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
@@ -235,7 +255,7 @@ impl AcpProvider {
             json!({ "protocolVersion": 1, "clientCapabilities": {} }),
         )
         .await?;
-        let _ = read_result(&mut lines, 1, tx).await?; // capabilities ignored by the text bridge
+        let initialized = read_result(&mut lines, &mut stdin, 1, tx).await?;
 
         // Claude Code's ACP adapter spreads `_meta.claudeCode.options` into its Agent SDK
         // options, which is where effort and resume live. Other agents ignore `_meta`.
@@ -246,12 +266,21 @@ impl AcpProvider {
         if let Some(resume) = resume {
             claude_code_options.insert("resume".into(), json!(resume));
         }
-        let mut new_session = json!({ "cwd": ".", "mcpServers": [] });
+        // ACP wants an absolute folder; "." keeps the old behaviour when the terminal's
+        // folder is unknown.
+        let cwd = working_directory.clone().unwrap_or_else(|| ".".to_string());
+        let mcp_servers: Vec<Value> = working_directory
+            .as_deref()
+            .filter(|_| supports_http_mcp(&initialized))
+            .and_then(code_search::acp_server_entry)
+            .into_iter()
+            .collect();
+        let mut new_session = json!({ "cwd": cwd, "mcpServers": mcp_servers });
         if !claude_code_options.is_empty() {
             new_session["_meta"] = json!({ "claudeCode": { "options": claude_code_options } });
         }
         send(&mut stdin, 2, "session/new", new_session).await?;
-        let session = read_result(&mut lines, 2, tx).await?;
+        let session = read_result(&mut lines, &mut stdin, 2, tx).await?;
         let session_id = session
             .get("sessionId")
             .and_then(Value::as_str)
@@ -267,6 +296,7 @@ impl AcpProvider {
             stdin,
             lines,
             session_id,
+            working_directory,
             model: self.model.clone(),
             effort: self.effort,
             next_id: 3,
@@ -294,7 +324,7 @@ async fn set_model(
         .await
         .is_ok()
     {
-        let _ = read_result(&mut session.lines, id, tx).await;
+        let _ = read_result(&mut session.lines, &mut session.stdin, id, tx).await;
     }
 }
 
@@ -323,7 +353,7 @@ async fn prompt_turn(
         }),
     )
     .await?;
-    read_result(&mut session.lines, id, tx).await?;
+    read_result(&mut session.lines, &mut session.stdin, id, tx).await?;
     Ok(())
 }
 
@@ -347,9 +377,11 @@ async fn send(
 }
 
 /// Read lines until the JSON-RPC response with `id` arrives, forwarding any
-/// `session/update` text chunks to the event stream along the way.
+/// `session/update` text chunks to the event stream along the way, and answering the
+/// agent's permission requests for Uncaged's own code search tool.
 async fn read_result(
     lines: &mut tokio::io::Lines<BufReader<tokio::process::ChildStdout>>,
+    stdin: &mut tokio::process::ChildStdin,
     id: u64,
     tx: &mpsc::UnboundedSender<ProviderEvent>,
 ) -> anyhow::Result<Value> {
@@ -369,6 +401,24 @@ async fn read_result(
             continue;
         }
 
+        // The agent asking to run Uncaged's code search: it only reads the on-device
+        // index, so allow it rather than leave the turn waiting on a prompt the text
+        // bridge can't show.
+        if message.get("method").and_then(Value::as_str) == Some("session/request_permission")
+            && let Some(request_id) = message.get("id")
+            && let Some(params) = message.get("params")
+            && code_search::is_own_tool_permission(params)
+            && let Some(option_id) = allow_option(params)
+        {
+            respond(
+                stdin,
+                request_id,
+                json!({ "outcome": { "outcome": "selected", "optionId": option_id } }),
+            )
+            .await?;
+            continue;
+        }
+
         // Response to one of our requests.
         if message.get("id").and_then(Value::as_u64) == Some(id) {
             if let Some(error) = message.get("error") {
@@ -382,6 +432,49 @@ async fn read_result(
         }
     }
     anyhow::bail!("ACP agent closed the stream before responding");
+}
+
+/// Write one JSON-RPC response line to the agent's stdin.
+async fn respond(
+    stdin: &mut tokio::process::ChildStdin,
+    id: &Value,
+    result: Value,
+) -> anyhow::Result<()> {
+    let line = serde_json::to_string(&json!({ "jsonrpc": "2.0", "id": id, "result": result }))?;
+    stdin.write_all(line.as_bytes()).await?;
+    stdin.write_all(b"\n").await?;
+    stdin.flush().await?;
+    Ok(())
+}
+
+/// The option of a permission request that allows the call, preferring "allow always"
+/// so the agent stops asking for the rest of the session.
+fn allow_option(params: &Value) -> Option<String> {
+    let options = params.get("options")?.as_array()?;
+    ["allow_always", "allow_once"].iter().find_map(|kind| {
+        options
+            .iter()
+            .find(|option| option.get("kind").and_then(Value::as_str) == Some(kind))
+            .and_then(|option| option.get("optionId"))
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    })
+}
+
+/// Whether the agent's `initialize` result says it can connect to HTTP MCP servers.
+fn supports_http_mcp(initialized: &Value) -> bool {
+    initialized
+        .pointer("/agentCapabilities/mcpCapabilities/http")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+/// `directory` if it is an absolute path to a folder that exists; ACP needs one, and
+/// spawning into a missing folder would fail.
+fn usable_directory(directory: Option<&str>) -> Option<String> {
+    let directory = directory?;
+    let path = std::path::Path::new(directory);
+    (path.is_absolute() && path.is_dir()).then(|| directory.to_string())
 }
 
 fn extract_chunk_text(message: &Value) -> Option<String> {
@@ -405,3 +498,7 @@ fn latest_user_text(conversation: &Conversation) -> String {
         })
         .unwrap_or_default()
 }
+
+#[cfg(test)]
+#[path = "acp_tests.rs"]
+mod tests;

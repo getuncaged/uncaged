@@ -26,6 +26,7 @@
 //! actions the UI renders.
 
 mod catalog;
+mod code_search;
 mod config;
 mod connections;
 mod engine;
@@ -46,6 +47,9 @@ mod live_tests;
 mod tests;
 
 pub use catalog::{Group, PRESETS, Preset, Wire, preset_by_id, presets_in};
+pub use code_search::{
+    SearchFn as CodeSearchFn, SearchRequest as CodeSearchRequest, start as start_code_search_server,
+};
 pub use config::{
     ANTHROPIC_DEFAULT_BASE_URL, Effort, LMSTUDIO_DEFAULT_BASE_URL, OLLAMA_DEFAULT_BASE_URL,
     OPENAI_DEFAULT_BASE_URL, OPENROUTER_DEFAULT_BASE_URL, ProviderConfig, UncagedConfig, active,

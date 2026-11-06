@@ -17,6 +17,8 @@ pub struct ParsedHistory {
     pub target_task_id: Option<String>,
     /// Round-tripped to the client in `StreamInit`.
     pub conversation_id: String,
+    /// The terminal's working directory when the user sent this turn, if known.
+    pub working_directory: Option<String>,
 }
 
 pub fn parse(request: &api::Request) -> ParsedHistory {
@@ -54,10 +56,19 @@ pub fn parse(request: &api::Request) -> ParsedHistory {
         .filter(|id| !id.is_empty())
         .unwrap_or_else(new_id);
 
+    let working_directory = request
+        .input
+        .as_ref()
+        .and_then(|input| input.context.as_ref())
+        .and_then(|context| context.directory.as_ref())
+        .map(|directory| directory.pwd.clone())
+        .filter(|pwd| !pwd.is_empty());
+
     ParsedHistory {
         messages: builder.messages,
         target_task_id,
         conversation_id,
+        working_directory,
     }
 }
 
