@@ -23,6 +23,7 @@ use warpui::elements::{
 use warpui::{AppContext, Element, SingletonEntity as _};
 
 use crate::appearance::Appearance;
+use crate::channel::{Channel, ChannelState};
 use crate::window_settings::WindowSettings;
 
 /// The mark and title fade in over this long.
@@ -48,6 +49,11 @@ impl LaunchSplash {
     /// A splash for the first window of this run, if the user hasn't turned it off.
     pub fn for_first_window(app: &AppContext) -> Option<Self> {
         if !*WindowSettings::as_ref(app).show_launch_animation.value() {
+            return None;
+        }
+        // Integration tests click and type from their first frame; a splash on top would swallow
+        // those clicks.
+        if ChannelState::channel() == Channel::Integration {
             return None;
         }
         if SHOWN.swap(true, Ordering::Relaxed) {
