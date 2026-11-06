@@ -45,6 +45,8 @@ mod global_resource_handles;
 mod gpu_state;
 mod input_classifier;
 mod interval_timer;
+/// Bridge to the local Uncaged engine (see `uncaged.rs`).
+mod launch_splash;
 mod linear;
 #[cfg(feature = "local_fs")]
 mod local_control;
@@ -90,7 +92,6 @@ mod tracing;
 #[cfg(feature = "tui")]
 mod tui;
 mod ui_components;
-/// Bridge to the local Uncaged engine (see `uncaged.rs`).
 mod uncaged;
 mod undo_close;
 mod uri;
@@ -1661,6 +1662,7 @@ pub(crate) fn initialize_app(
         ctx.on_first_frame_drawn(move |ctx| {
             let timing_data = IntervalTimer::handle(ctx).update(ctx, |timer, _| {
                 timer.mark_interval_end("FIRST_FRAME_DRAWN");
+                log::info!("Startup timing: {}", timer.summary());
                 timer.compute_stats()
             });
             let event = TelemetryEvent::AppStartup(AppStartupInfo {
@@ -1694,6 +1696,14 @@ pub(crate) fn initialize_app(
             });
         })
     } else {
+        // Uncaged: there are no accounts, so most launches land here. Log where startup
+        // time went, so a slow launch can be traced from the log.
+        ctx.on_first_frame_drawn(|ctx| {
+            IntervalTimer::handle(ctx).update(ctx, |timer, _| {
+                timer.mark_interval_end("FIRST_FRAME_DRAWN");
+                log::info!("Startup timing: {}", timer.summary());
+            });
+        });
         // If the app was opened while logged out, record an event for measuring new users.
         // This is sent immediately in case they quit the app on the signup screen.
         send_telemetry_sync_from_app_ctx!(TelemetryEvent::LoggedOutStartup, ctx);

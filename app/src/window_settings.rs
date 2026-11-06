@@ -69,6 +69,15 @@ define_settings_group!(WindowSettings, settings: [
         toml_path: "appearance.window.left_panel_visibility_across_tabs",
         description: "Whether the left panel visibility is shared across all tabs.",
     },
+    show_launch_animation: ShowLaunchAnimation {
+        type: bool,
+        default: true,
+        supported_platforms: SupportedPlatforms::DESKTOP,
+        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
+        private: false,
+        toml_path: "appearance.window.launch_animation",
+        description: "Whether the first window shows the Uncaged mark for a moment when the app starts.",
+    },
     zoom_level: ZoomLevel {
         type: u16,
         default: 100,

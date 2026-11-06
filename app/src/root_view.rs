@@ -65,6 +65,7 @@ use crate::experiments::{BlockOnboarding, Experiment};
 use crate::features::FeatureFlag;
 use crate::interval_timer::IntervalTimer;
 use crate::launch_configs::launch_config;
+use crate::launch_splash::{self, LaunchSplash};
 use crate::linear::LinearIssueWork;
 use crate::notebooks::manager::NotebookSource;
 use crate::pane_group::{NewTerminalOptions, PanesLayout};
@@ -1622,6 +1623,32 @@ pub struct RootView {
     /// settings to apply after a new user login / initial cloud load completes
     pending_post_auth_onboarding_settings: Option<SelectedSettings>,
     paste_auth_token_modal: Option<ViewHandle<PasteAuthTokenModalView>>,
+    /// Uncaged: the mark shown over the first window while the app starts.
+    launch_splash: Option<LaunchSplash>,
+}
+
+impl RootView {
+    /// Redraw the launch splash on the next frame, and drop it once it has faded out.
+    fn schedule_launch_splash_frame(ctx: &mut ViewContext<Self>) {
+        ctx.spawn(
+            async {
+                warpui::r#async::Timer::after(launch_splash::FRAME).await;
+            },
+            |me, _, ctx| {
+                if me
+                    .launch_splash
+                    .as_ref()
+                    .is_some_and(LaunchSplash::is_finished)
+                {
+                    me.launch_splash = None;
+                }
+                ctx.notify();
+                if me.launch_splash.is_some() {
+                    Self::schedule_launch_splash_frame(ctx);
+                }
+            },
+        );
+    }
 }
 
 impl RootView {
@@ -1703,6 +1730,8 @@ impl RootView {
             view
         };
 
+        let auth_onboarding_state_is_terminal =
+            matches!(auth_onboarding_state, AuthOnboardingState::Terminal(_));
         let root_view = Self {
             auth_onboarding_state,
             server_time: None,
@@ -1718,7 +1747,14 @@ impl RootView {
             pending_tutorial: None,
             pending_post_auth_onboarding_settings: None,
             paste_auth_token_modal: None,
+            // First-run onboarding has its own welcome, so the splash is for the terminal.
+            launch_splash: auth_onboarding_state_is_terminal
+                .then(|| LaunchSplash::for_first_window(ctx))
+                .flatten(),
         };
+        if root_view.launch_splash.is_some() {
+            Self::schedule_launch_splash_frame(ctx);
+        }
 
         match &root_view.auth_onboarding_state {
             AuthOnboardingState::Terminal(workspace) if FeatureFlag::Changelog.is_enabled() => {
@@ -3384,6 +3420,10 @@ impl View for RootView {
 
         let mut stack = Stack::new();
         stack.add_child(child);
+
+        if let Some(splash) = &self.launch_splash {
+            stack.add_child(splash.render(Appearance::as_ref(app)));
+        }
 
         if let Some(modal) = &self.paste_auth_token_modal {
             stack.add_child(ChildView::new(modal).finish());

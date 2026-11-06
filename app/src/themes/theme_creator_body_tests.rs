@@ -111,3 +111,84 @@ fn showing_theme_editor_explicitly_starts_default_preview() {
         });
     });
 }
+
+#[test]
+fn appearance_segments_set_light_and_dark_without_toggling() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let (_, body) = app.add_window(WindowStyle::NotStealFocus, ThemeCreatorBody::new);
+
+        body.update(&mut app, |body, ctx| {
+            body.handle_action(&ThemeCreatorBodyAction::SetLightAppearance(true), ctx);
+        });
+        body.read(&app, |body, ctx| {
+            assert!(body.is_light);
+            assert_eq!(
+                Appearance::as_ref(ctx).theme(),
+                &body.build_manual_theme(ctx, None)
+            );
+        });
+
+        // Clicking the segment that is already selected keeps it selected rather than flipping it.
+        body.update(&mut app, |body, ctx| {
+            body.handle_action(&ThemeCreatorBodyAction::SetLightAppearance(true), ctx);
+        });
+        body.read(&app, |body, _| assert!(body.is_light));
+
+        body.update(&mut app, |body, ctx| {
+            body.handle_action(&ThemeCreatorBodyAction::SetLightAppearance(false), ctx);
+        });
+        body.read(&app, |body, _| assert!(!body.is_light));
+    });
+}
+
+#[test]
+fn preview_follows_manual_edits_and_gradient_switch() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let (_, body) = app.add_window(WindowStyle::NotStealFocus, ThemeCreatorBody::new);
+
+        body.read(&app, |body, ctx| {
+            assert!(matches!(
+                body.preview_theme(ctx).background(),
+                ThemeFill::VerticalGradient(_)
+            ));
+        });
+
+        body.update(&mut app, |body, ctx| {
+            body.handle_action(&ThemeCreatorBodyAction::ToggleGradient, ctx);
+            body.color_editors[SLOT_BG].update(ctx, |editor, ctx| {
+                editor.set_buffer_text("#203040", ctx);
+            });
+        });
+
+        body.read(&app, |body, ctx| {
+            let expected_background = coloru_from_hex_string("#203040").unwrap();
+            assert_eq!(
+                body.preview_theme(ctx).background(),
+                ThemeFill::Solid(expected_background)
+            );
+            assert_eq!(body.preview_theme(ctx), body.build_manual_theme(ctx, None));
+        });
+    });
+}
+
+#[test]
+fn from_image_preview_shows_current_theme_until_an_image_is_picked() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let (_, body) = app.add_window(WindowStyle::NotStealFocus, ThemeCreatorBody::new);
+
+        body.update(&mut app, |body, ctx| {
+            body.handle_action(
+                &ThemeCreatorBodyAction::SetMode(ThemeCreatorMode::FromImage),
+                ctx,
+            );
+        });
+
+        body.read(&app, |body, ctx| {
+            assert_eq!(body.mode, ThemeCreatorMode::FromImage);
+            assert_eq!(&body.preview_theme(ctx), Appearance::as_ref(ctx).theme());
+        });
+    });
+}

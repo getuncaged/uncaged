@@ -22736,6 +22736,9 @@ impl Workspace {
         if is_compact_mode {
             context.set.insert(flags::COMPACT_MODE_CONTEXT_FLAG);
         }
+        if *window_settings.show_launch_animation.value() {
+            context.set.insert(flags::LAUNCH_ANIMATION_CONTEXT_FLAG);
+        }
 
         let respect_system_theme = respect_system_theme(theme_settings);
         if matches!(respect_system_theme, RespectSystemTheme::On(_)) {

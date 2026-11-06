@@ -1,6 +1,7 @@
 use std::default::Default;
 use std::fmt;
 use std::io::Write;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use palette::{FromColor, Hsv, Srgb};
@@ -8,21 +9,24 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use settings::Setting as _;
 use warp_core::ui::color::hex_color::{coloru_from_hex_string, coloru_to_hex_string};
+use warp_core::ui::radius;
 use warp_core::ui::theme::{
     AnsiColors, Details, Fill as ThemeFill, Image as ThemeImage, TerminalColors, VerticalGradient,
     WarpTheme,
 };
 use warpui::assets::asset_cache::AssetSource;
 use warpui::elements::{
-    Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
-    EventHandler, Fill, Flex, Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle,
-    ParentElement, Radius, Rect, SavePosition, Shrinkable, Stack, Text,
+    Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
+    DispatchEventResult, EventHandler, Expanded, Fill, Flex, Hoverable, Icon, MainAxisAlignment,
+    MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect, SavePosition, Shrinkable,
+    SizeConstraintCondition, SizeConstraintSwitch, Stack, Text, Wrap,
 };
-use warpui::fonts::Weight;
+use warpui::fonts::{Properties, Weight};
 use warpui::platform::Cursor;
 use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::slider::SliderStateHandle;
+use warpui::ui_components::switch::SwitchStateHandle;
 use warpui::ui_components::text_input::TextInput;
 use warpui::{
     AppContext, Element, Entity, EventContext, SingletonEntity, TypedActionView, View, ViewContext,
@@ -32,9 +36,14 @@ use warpui::{
 use crate::appearance::{Appearance, AppearanceManager};
 use crate::editor::{EditOrigin, EditorView, Event as EditorEvent};
 use crate::server::telemetry::TelemetryEvent;
+use crate::settings_view::settings_page::{
+    build_toggle_element, render_settings_description, render_sub_header,
+    render_sub_header_with_description, settings_card, settings_description_color,
+    CONTENT_FONT_SIZE, HEADER_PADDING,
+};
 use crate::themes::theme::{CustomTheme, InMemoryThemeOptions, ThemeKind};
 use crate::themes::theme_background_image;
-use crate::window_settings::WindowSettings;
+use crate::window_settings::{BackgroundBlurRadius, BackgroundOpacity, WindowSettings};
 use crate::{report_if_error, send_telemetry_from_ctx, user_config};
 
 /// The number of editable color slots in the manual editor (background + optional gradient bottom,
@@ -52,7 +61,7 @@ const SLOT_BRIGHT_START: usize = 13;
 /// palette.
 const COLOR_SLOTS: [(&str, &str); NUM_COLOR_SLOTS] = [
     ("Background", "#15110c"),
-    ("Background (bottom)", "#0c0a08"),
+    ("Bottom color", "#0c0a08"),
     ("Text", "#e9e1d4"),
     ("Accent", "#ff7a18"),
     ("Cursor", "#ffb23a"),
@@ -95,11 +104,6 @@ pub enum ThemeCreatorMode {
     FromImage,
 }
 
-const BUTTON_PADDING: f32 = 12.;
-const BUTTON_FONT_SIZE: f32 = 14.;
-const BUTTON_BORDER_RADIUS: f32 = 4.;
-const BORDER_WIDTH: f32 = 1.;
-
 const MODAL_SUBHEADER: &str =
     "Automatically generate a theme based on extracted colors from an image (.png, .jpg).";
 const IMAGE_PICKER_BUTTON_PRE_SELECT_TEXT: &str = "Select an image";
@@ -136,8 +140,14 @@ pub struct ThemeCreatorBody {
     bg_image_opacity: u8,
     advanced_expanded: bool,
     mode_tab_states: [MouseStateHandle; 2],
-    /// Hover/click states for the gradient, light/dark, and advanced toggles.
-    toggle_states: [MouseStateHandle; 3],
+    /// The background gradient's on/off switch.
+    gradient_switch_state: SwitchStateHandle,
+    /// The "Dark | Light" segments of the appearance control.
+    appearance_segment_states: [MouseStateHandle; 2],
+    /// The clickable header row that expands and collapses the Advanced card.
+    advanced_header_state: MouseStateHandle,
+    /// One per colour slot, for the swatch that opens that slot's picker.
+    swatch_mouse_states: Vec<MouseStateHandle>,
     bg_opacity_slider: SliderStateHandle,
     bg_image_opacity_slider: SliderStateHandle,
     window_opacity_slider: SliderStateHandle,
@@ -170,7 +180,8 @@ pub enum ThemeCreatorBodyAction {
     // Manual editor actions.
     SetMode(ThemeCreatorMode),
     ToggleGradient,
-    ToggleLightDark,
+    /// Picks the light (`true`) or dark (`false`) UI details for the theme.
+    SetLightAppearance(bool),
     ToggleAdvanced,
     SetBackgroundOpacity(f32),
     SetBackgroundImageOpacity(f32),
@@ -263,7 +274,12 @@ impl ThemeCreatorBody {
             bg_image_opacity: DEFAULT_BG_IMAGE_OPACITY,
             advanced_expanded: false,
             mode_tab_states: Default::default(),
-            toggle_states: Default::default(),
+            gradient_switch_state: Default::default(),
+            appearance_segment_states: Default::default(),
+            advanced_header_state: Default::default(),
+            swatch_mouse_states: (0..NUM_COLOR_SLOTS)
+                .map(|_| MouseStateHandle::default())
+                .collect(),
             bg_opacity_slider: Default::default(),
             bg_image_opacity_slider: Default::default(),
             window_opacity_slider: Default::default(),
@@ -278,6 +294,10 @@ impl ThemeCreatorBody {
 
     fn editor(ctx: &mut ViewContext<Self>) -> ViewHandle<EditorView> {
         let editor = { ctx.add_typed_action_view(|ctx| EditorView::new(Default::default(), ctx)) };
+        // An empty name saves as "Custom Theme" (see `manual_name`), so say so up front.
+        editor.update(ctx, |editor, ctx| {
+            editor.set_placeholder_text("Custom Theme", ctx)
+        });
         ctx.subscribe_to_view(&editor, move |me, _, event, ctx| {
             me.handle_editor_event(event, ctx);
         });
@@ -752,8 +772,13 @@ impl ThemeCreatorBody {
         self.refresh_manual_preview(ctx);
     }
 
-    fn toggle_light_dark(&mut self, ctx: &mut ViewContext<Self>) {
-        self.is_light = !self.is_light;
+    /// Sets the theme's UI details to light or dark. Clicking the segment that is already
+    /// selected changes nothing, so it doesn't re-apply the preview either.
+    fn set_light_appearance(&mut self, is_light: bool, ctx: &mut ViewContext<Self>) {
+        if self.is_light == is_light {
+            return;
+        }
+        self.is_light = is_light;
         self.refresh_manual_preview(ctx);
     }
 
@@ -868,100 +893,98 @@ impl ThemeCreatorBody {
 }
 
 impl ThemeCreatorBody {
-    /// The "Custom | From image" mode switcher shown at the top of the modal.
+    /// The theme the preview card shows: the one being edited in the manual editor, the theme
+    /// generated from the picked image, or — before any image is picked — the current theme.
+    fn preview_theme(&self, app: &AppContext) -> WarpTheme {
+        match self.mode {
+            ThemeCreatorMode::Manual => self.build_manual_theme(app, self.bg_image.as_deref()),
+            ThemeCreatorMode::FromImage => match &self.theme_options {
+                Some(theme_options) => theme_options.theme(),
+                None => Appearance::as_ref(app).theme().clone(),
+            },
+        }
+    }
+
+    /// The "Custom | From image" mode switcher shown at the top of the editor.
     fn mode_tabs(&self, appearance: &Appearance) -> Box<dyn Element> {
         Container::new(
-            Flex::row()
-                .with_child(
-                    Container::new(self.pill_button(
-                        "Custom",
-                        self.mode == ThemeCreatorMode::Manual,
-                        self.mode_tab_states[0].clone(),
-                        ThemeCreatorBodyAction::SetMode(ThemeCreatorMode::Manual),
-                        appearance,
-                    ))
-                    .with_margin_right(8.)
-                    .finish(),
-                )
-                .with_child(self.pill_button(
-                    "From image",
-                    self.mode == ThemeCreatorMode::FromImage,
-                    self.mode_tab_states[1].clone(),
-                    ThemeCreatorBodyAction::SetMode(ThemeCreatorMode::FromImage),
-                    appearance,
-                ))
-                .finish(),
+            Align::new(segmented_control(
+                vec![
+                    Segment {
+                        label: "Custom",
+                        active: self.mode == ThemeCreatorMode::Manual,
+                        mouse_state: self.mode_tab_states[0].clone(),
+                        action: ThemeCreatorBodyAction::SetMode(ThemeCreatorMode::Manual),
+                    },
+                    Segment {
+                        label: "From image",
+                        active: self.mode == ThemeCreatorMode::FromImage,
+                        mouse_state: self.mode_tab_states[1].clone(),
+                        action: ThemeCreatorBodyAction::SetMode(ThemeCreatorMode::FromImage),
+                    },
+                ],
+                appearance,
+            ))
+            .left()
+            .finish(),
         )
-        .with_margin_bottom(12.)
+        .with_margin_bottom(CARD_SPACING)
         .finish()
     }
 
-    /// A single "label + swatch + hex input" editing row for color slot `index`.
+    /// A single colour row for slot `index`: its label on the left, and on the right the swatch
+    /// (which opens the picker) beside the hex field. Every colour row puts these two in the same
+    /// right-aligned column, so they line up with each other and with the sliders.
     fn color_field_row(&self, index: usize, appearance: &Appearance) -> Box<dyn Element> {
         let (label, _) = COLOR_SLOTS[index];
         let color = self.manual_colors[index];
         let theme = appearance.theme();
 
-        // The swatch is the picker's affordance: click it to open sliders for this colour. The hex
-        // field beside it stays editable for anyone who'd rather type a value.
+        // The swatch is the picker's affordance: click it to open the colour wheel for this
+        // colour. The hex field beside it stays editable for anyone who'd rather type a value.
         let is_open = self.open_picker == Some(index);
-        let swatch = EventHandler::new(
+        let swatch = Hoverable::new(self.swatch_mouse_states[index].clone(), |_| {
             ConstrainedBox::new(
                 Rect::new()
                     .with_background_color(color)
-                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+                    .with_corner_radius(radius::small())
                     .with_border(Border::all(if is_open { 2. } else { 1. }).with_border_fill(
                         if is_open {
                             theme.accent()
                         } else {
-                            theme.main_text_color(theme.background())
+                            theme.outline()
                         },
                     ))
                     .finish(),
             )
-            .with_width(26.)
-            .with_height(26.)
-            .finish(),
-        )
-        .on_left_mouse_down(move |ctx, _, _| {
+            .with_width(SWATCH_SIZE)
+            .with_height(SWATCH_SIZE)
+            .finish()
+        })
+        .with_cursor(Cursor::PointingHand)
+        .on_click(move |ctx, _, _| {
             ctx.dispatch_typed_action(ThemeCreatorBodyAction::TogglePicker(index));
-            DispatchEventResult::StopPropagation
         })
         .finish();
 
         let input = ConstrainedBox::new(
             TextInput::new(
                 self.color_editors[index].clone(),
-                UiComponentStyles::default()
-                    .set_border_color(theme.outline().into())
-                    .set_font_family_id(appearance.ui_font_family())
-                    .set_font_size(13.)
-                    .set_background(Fill::None)
-                    .set_border_radius(CornerRadius::with_all(Radius::Pixels(4.)))
-                    .set_padding(Coords::uniform(8.))
-                    .set_border_width(1.),
+                hex_input_styles(appearance),
             )
             .build()
             .finish(),
         )
-        .with_width(120.)
+        .with_width(HEX_INPUT_WIDTH)
         .finish();
 
-        let label_el = ConstrainedBox::new(label_text(label, appearance))
-            .with_width(130.)
+        let control = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(Container::new(swatch).with_margin_right(8.).finish())
+            .with_child(input)
             .finish();
 
-        let row = Container::new(
-            Flex::row()
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(label_el)
-                .with_child(Container::new(swatch).with_margin_right(10.).finish())
-                .with_child(input)
-                .finish(),
-        )
-        .with_vertical_padding(4.)
-        .finish();
-
+        let row = build_toggle_element(row_label(label, appearance), control, appearance, None);
         if !is_open {
             return row;
         }
@@ -986,7 +1009,7 @@ impl ThemeCreatorBody {
             .with_child(self.render_saturation_value_square(hue, saturation, value, outline))
             .with_child(
                 Container::new(self.render_hue_strip(hue, outline))
-                    .with_margin_left(10.)
+                    .with_margin_left(PICKER_GAP)
                     .finish(),
             )
             .finish();
@@ -1000,9 +1023,7 @@ impl ThemeCreatorBody {
         );
 
         Container::new(picker.finish())
-            .with_margin_left(130.)
-            .with_margin_top(6.)
-            .with_margin_bottom(10.)
+            .with_margin_bottom(HEADER_PADDING)
             .finish()
     }
 
@@ -1144,378 +1165,559 @@ impl ThemeCreatorBody {
         .finish()
     }
 
-    /// Quick-pick swatches, so the common choices stay one click away.
+    /// Quick-pick swatches, so the common choices stay one click away. They wrap rather than
+    /// run off the card when the page is narrow.
     fn render_preset_swatches(&self, outline: ThemeFill) -> Box<dyn Element> {
-        let mut presets = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        let mut presets = Wrap::row()
+            .with_spacing(5.)
+            .with_run_spacing(5.)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center);
         for rgb in PRESET_COLORS {
             let preset = ColorU::from_u32((rgb << 8) | 0xFF);
             presets.add_child(
-                Container::new(
-                    EventHandler::new(
-                        ConstrainedBox::new(
-                            Rect::new()
-                                .with_background_color(preset)
-                                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
-                                .with_border(Border::all(1.).with_border_fill(outline))
-                                .finish(),
-                        )
-                        .with_width(18.)
-                        .with_height(18.)
-                        .finish(),
+                EventHandler::new(
+                    ConstrainedBox::new(
+                        Rect::new()
+                            .with_background_color(preset)
+                            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+                            .with_border(Border::all(1.).with_border_fill(outline))
+                            .finish(),
                     )
-                    .on_left_mouse_down(move |ctx, _, _| {
-                        ctx.dispatch_typed_action(ThemeCreatorBodyAction::SetPresetColor(rgb));
-                        DispatchEventResult::StopPropagation
-                    })
+                    .with_width(18.)
+                    .with_height(18.)
                     .finish(),
                 )
-                .with_margin_right(5.)
+                .on_left_mouse_down(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(ThemeCreatorBodyAction::SetPresetColor(rgb));
+                    DispatchEventResult::StopPropagation
+                })
                 .finish(),
             );
         }
-        presets.finish()
-    }
-
-    /// A small pill button that dispatches `action` when clicked.
-    fn pill_button(
-        &self,
-        label: &str,
-        active: bool,
-        mouse_state: MouseStateHandle,
-        action: ThemeCreatorBodyAction,
-        appearance: &Appearance,
-    ) -> Box<dyn Element> {
-        let variant = if active {
-            ButtonVariant::Accent
-        } else {
-            ButtonVariant::Secondary
-        };
-        appearance
-            .ui_builder()
-            .button(variant, mouse_state)
-            .with_style(UiComponentStyles {
-                font_size: Some(13.),
-                font_weight: Some(Weight::Bold),
-                padding: Some(Coords::uniform(10.)),
-                ..Default::default()
-            })
-            .with_centered_text_label(label.into())
-            .build()
-            .with_cursor(Cursor::PointingHand)
-            .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
+        ConstrainedBox::new(presets.finish())
+            .with_max_width(SV_SQUARE_WIDTH + PICKER_GAP + HUE_STRIP_WIDTH)
             .finish()
     }
 
-    fn opacity_slider(
-        &self,
-        state: SliderStateHandle,
-        value: u8,
-        make_action: fn(f32) -> ThemeCreatorBodyAction,
-        appearance: &Appearance,
-    ) -> Box<dyn Element> {
-        appearance
-            .ui_builder()
-            .slider(state)
-            .with_range(0.0..100.0)
-            .with_default_value(value as f32)
-            .with_style(UiComponentStyles {
-                width: Some(180.),
-                margin: Some(Coords::default().top(3.).bottom(3.)),
-                ..Default::default()
-            })
-            .on_drag(move |ctx, _, val| ctx.dispatch_typed_action(make_action(val)))
-            .on_change(move |ctx, _, val| ctx.dispatch_typed_action(make_action(val)))
-            .build()
-            .finish()
+    /// The theme name field, shared by both modes.
+    fn render_name_card(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let input = Container::new(
+            TextInput::new(self.editor.clone(), name_input_styles(appearance))
+                .build()
+                .finish(),
+        )
+        .with_padding_bottom(HEADER_PADDING)
+        .finish();
+        section_card("Name", None, vec![input], appearance)
     }
 
-    fn render_manual(&self, app: &AppContext) -> Box<dyn Element> {
+    /// The left-hand column of the manual editor: one card per group of settings.
+    fn render_manual_controls(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
-        let theme = appearance.theme();
+        let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
 
-        let tabs = self.mode_tabs(appearance);
+        column.add_child(self.render_name_card(appearance));
 
-        // Name.
-        let name_field = Flex::column()
-            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-            .with_child(Container::new(label_text("Theme name", appearance)).finish())
-            .with_child(
-                Container::new(
-                    TextInput::new(
-                        self.editor.clone(),
-                        UiComponentStyles::default()
-                            .set_border_color(theme.outline().into())
-                            .set_font_family_id(appearance.ui_font_family())
-                            .set_font_size(14.)
-                            .set_background(Fill::None)
-                            .set_border_radius(CornerRadius::with_all(Radius::Pixels(4.)))
-                            .set_padding(Coords::uniform(10.))
-                            .set_border_width(1.),
-                    )
-                    .build()
-                    .finish(),
-                )
-                .with_margin_top(6.)
-                .finish(),
-            )
+        column.add_child(section_card(
+            "Colors",
+            None,
+            vec![
+                self.color_field_row(SLOT_BG, appearance),
+                self.color_field_row(SLOT_FG, appearance),
+                self.color_field_row(SLOT_ACCENT, appearance),
+                self.color_field_row(SLOT_CURSOR, appearance),
+            ],
+            appearance,
+        ));
+
+        // Background: the gradient switch, its bottom colour, and transparency.
+        let gradient_switch = appearance
+            .ui_builder()
+            .switch(self.gradient_switch_state.clone())
+            .check(self.use_gradient)
+            .build()
+            .on_click(|ctx, _, _| ctx.dispatch_typed_action(ThemeCreatorBodyAction::ToggleGradient))
             .finish();
-
-        // Simple section.
-        let mut content = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
-        content.add_child(name_field);
-        content.add_child(
-            Container::new(section_label("Colors", appearance))
-                .with_margin_top(18.)
-                .finish(),
-        );
-        content.add_child(self.color_field_row(SLOT_BG, appearance));
-        content.add_child(
-            Container::new(self.pill_button(
-                if self.use_gradient {
-                    "Background gradient: On"
-                } else {
-                    "Background gradient: Off"
-                },
-                self.use_gradient,
-                self.toggle_states[0].clone(),
-                ThemeCreatorBodyAction::ToggleGradient,
-                appearance,
-            ))
-            .with_vertical_padding(4.)
-            .finish(),
-        );
+        let mut background_rows = vec![build_toggle_element(
+            row_label("Gradient", appearance),
+            gradient_switch,
+            appearance,
+            Some("Fade the background from its color at the top to another at the bottom.".into()),
+        )];
         if self.use_gradient {
-            content.add_child(self.color_field_row(SLOT_BG_BOTTOM, appearance));
+            background_rows.push(self.color_field_row(SLOT_BG_BOTTOM, appearance));
         }
-        content.add_child(self.color_field_row(SLOT_FG, appearance));
-        content.add_child(self.color_field_row(SLOT_ACCENT, appearance));
-        content.add_child(self.color_field_row(SLOT_CURSOR, appearance));
-
-        content.add_child(
-            Container::new(self.pill_button(
-                if self.is_light {
-                    "Appearance: Light"
-                } else {
-                    "Appearance: Dark"
-                },
-                false,
-                self.toggle_states[1].clone(),
-                ThemeCreatorBodyAction::ToggleLightDark,
-                appearance,
-            ))
-            .with_vertical_padding(4.)
-            .finish(),
-        );
-
         // Background transparency. Hidden once there's a background image: the fill is forced
         // opaque in that case (see `build_manual_theme`), so leaving the slider on screen would
         // offer a control that silently does nothing. Image opacity and window opacity are the
         // two that still bite, and both are shown elsewhere on this page.
         if self.bg_image.is_none() {
-            content.add_child(
-                Container::new(
-                    Flex::row()
-                        .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                        .with_child(
-                            ConstrainedBox::new(label_text("Background opacity", appearance))
-                                .with_width(150.)
-                                .finish(),
-                        )
-                        .with_child(self.opacity_slider(
-                            self.bg_opacity_slider.clone(),
-                            self.bg_opacity,
-                            ThemeCreatorBodyAction::SetBackgroundOpacity,
-                            appearance,
-                        ))
-                        .finish(),
-                )
-                .with_vertical_padding(6.)
+            background_rows.push(slider_row(
+                "Opacity",
+                None,
+                SliderRow {
+                    state: self.bg_opacity_slider.clone(),
+                    value: self.bg_opacity,
+                    range: 0.0..100.0,
+                    value_label: format!("{}%", self.bg_opacity),
+                    make_action: ThemeCreatorBodyAction::SetBackgroundOpacity,
+                },
+                appearance,
+            ));
+        } else {
+            background_rows.push(
+                Container::new(render_settings_description(
+                    "Opacity follows the background image's opacity, under Advanced.".into(),
+                    appearance,
+                ))
+                .with_padding_bottom(HEADER_PADDING)
                 .finish(),
             );
         }
+        column.add_child(section_card(
+            "Background",
+            None,
+            background_rows,
+            appearance,
+        ));
 
         // Window-level appearance. Not part of the theme file, but it's what people actually mean
         // by "how my terminal looks", so it's editable right here and applies live.
         let window_settings = WindowSettings::as_ref(app);
         let window_opacity = *window_settings.background_opacity.value();
         let window_blur = *window_settings.background_blur_radius.value();
-        content.add_child(
-            Container::new(section_label("Window", appearance))
-                .with_margin_top(18.)
-                .finish(),
-        );
-        content.add_child(
-            Container::new(
-                Flex::row()
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        ConstrainedBox::new(label_text(
-                            &format!("Window opacity: {window_opacity}"),
-                            appearance,
-                        ))
-                        .with_width(150.)
-                        .finish(),
-                    )
-                    .with_child(self.opacity_slider(
-                        self.window_opacity_slider.clone(),
-                        window_opacity,
-                        ThemeCreatorBodyAction::SetWindowOpacity,
-                        appearance,
-                    ))
-                    .finish(),
-            )
-            .with_vertical_padding(6.)
-            .finish(),
-        );
-        content.add_child(
-            Container::new(
-                Flex::row()
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        ConstrainedBox::new(label_text(
-                            &format!("Window blur radius: {window_blur}"),
-                            appearance,
-                        ))
-                        .with_width(150.)
-                        .finish(),
-                    )
-                    .with_child(self.opacity_slider(
-                        self.window_blur_slider.clone(),
-                        window_blur,
-                        ThemeCreatorBodyAction::SetWindowBlurRadius,
-                        appearance,
-                    ))
-                    .finish(),
-            )
-            .with_vertical_padding(6.)
-            .finish(),
-        );
+        column.add_child(section_card(
+            "Window",
+            Some("Applies to every window right away. Not saved with the theme."),
+            vec![
+                slider_row(
+                    "Opacity",
+                    None,
+                    SliderRow {
+                        state: self.window_opacity_slider.clone(),
+                        value: window_opacity,
+                        range: BackgroundOpacity::MIN as f32..BackgroundOpacity::MAX as f32,
+                        value_label: format!("{window_opacity}%"),
+                        make_action: ThemeCreatorBodyAction::SetWindowOpacity,
+                    },
+                    appearance,
+                ),
+                slider_row(
+                    "Blur radius",
+                    None,
+                    SliderRow {
+                        state: self.window_blur_slider.clone(),
+                        value: window_blur,
+                        range: BackgroundBlurRadius::MIN as f32..BackgroundBlurRadius::MAX as f32,
+                        value_label: format!("{window_blur}"),
+                        make_action: ThemeCreatorBodyAction::SetWindowBlurRadius,
+                    },
+                    appearance,
+                ),
+            ],
+            appearance,
+        ));
 
-        // Advanced section.
-        content.add_child(
-            Container::new(self.pill_button(
-                if self.advanced_expanded {
-                    "▾ Advanced"
-                } else {
-                    "▸ Advanced"
+        let appearance_control = segmented_control(
+            vec![
+                Segment {
+                    label: "Dark",
+                    active: !self.is_light,
+                    mouse_state: self.appearance_segment_states[0].clone(),
+                    action: ThemeCreatorBodyAction::SetLightAppearance(false),
                 },
-                false,
-                self.toggle_states[2].clone(),
-                ThemeCreatorBodyAction::ToggleAdvanced,
-                appearance,
-            ))
-            .with_margin_top(14.)
-            .finish(),
+                Segment {
+                    label: "Light",
+                    active: self.is_light,
+                    mouse_state: self.appearance_segment_states[1].clone(),
+                    action: ThemeCreatorBodyAction::SetLightAppearance(true),
+                },
+            ],
+            appearance,
         );
+        column.add_child(section_card(
+            "Appearance",
+            None,
+            vec![build_toggle_element(
+                row_label("Style", appearance),
+                appearance_control,
+                appearance,
+                Some(
+                    "Tunes the contrast of menus and panels for a dark or light background.".into(),
+                ),
+            )],
+            appearance,
+        ));
 
-        if self.advanced_expanded {
-            content.add_child(
-                Container::new(section_label("Terminal colors", appearance))
-                    .with_margin_top(10.)
+        column.add_child(self.render_advanced_card(appearance));
+        column.finish()
+    }
+
+    /// The Advanced card: a clickable header row with a chevron, and — when expanded — the 16
+    /// terminal colours and the background image.
+    fn render_advanced_card(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let expanded = self.advanced_expanded;
+        let header = Hoverable::new(self.advanced_header_state.clone(), |state| {
+            let theme = appearance.theme();
+            let chevron_color = if state.is_hovered() {
+                theme.active_ui_text_color()
+            } else {
+                theme.nonactive_ui_text_color()
+            };
+            let chevron = ConstrainedBox::new(
+                Icon::new(
+                    if expanded {
+                        "bundled/svg/chevron-down.svg"
+                    } else {
+                        "bundled/svg/chevron-right.svg"
+                    },
+                    chevron_color.into_solid(),
+                )
+                .finish(),
+            )
+            .with_width(14.)
+            .with_height(14.)
+            .finish();
+            Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(
+                    Shrinkable::new(
+                        1.,
+                        render_sub_header_with_description(
+                            appearance,
+                            "Advanced",
+                            "Terminal colors and a background image.",
+                        ),
+                    )
                     .finish(),
-            );
-            for i in SLOT_NORMAL_START..SLOT_BRIGHT_START + 8 {
-                content.add_child(self.color_field_row(i, appearance));
+                )
+                .with_child(
+                    Container::new(chevron)
+                        .with_margin_left(12.)
+                        .with_padding_bottom(HEADER_PADDING)
+                        .finish(),
+                )
+                .finish()
+        })
+        .with_cursor(Cursor::PointingHand)
+        .on_click(|ctx, _, _| ctx.dispatch_typed_action(ThemeCreatorBodyAction::ToggleAdvanced))
+        .finish();
+
+        let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+        column.add_child(header);
+
+        if expanded {
+            column.add_child(group_label("Normal colors", appearance));
+            for i in SLOT_NORMAL_START..SLOT_BRIGHT_START {
+                column.add_child(self.color_field_row(i, appearance));
+            }
+            column.add_child(group_label("Bright colors", appearance));
+            for i in SLOT_BRIGHT_START..SLOT_BRIGHT_START + 8 {
+                column.add_child(self.color_field_row(i, appearance));
             }
 
-            content.add_child(
-                Container::new(section_label("Background image", appearance))
-                    .with_margin_top(14.)
-                    .finish(),
-            );
-            content.add_child(
-                Container::new(self.pill_button(
+            column.add_child(group_label("Background image", appearance));
+            let image_description = match &self.bg_image {
+                Some(path) => path
+                    .file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                None => "Shown behind the terminal, under the background color.".to_string(),
+            };
+            column.add_child(build_toggle_element(
+                row_label("Image", appearance),
+                action_button(
                     if self.bg_image.is_some() {
-                        "Change background image"
+                        "Change…"
                     } else {
-                        "Add background image"
+                        "Add image…"
                     },
-                    false,
+                    ButtonVariant::Secondary,
                     self.pick_image_mouse_state.clone(),
                     ThemeCreatorBodyAction::PickBackgroundImage,
                     appearance,
-                ))
-                .with_vertical_padding(4.)
-                .finish(),
-            );
+                ),
+                appearance,
+                Some(image_description),
+            ));
             if self.bg_image.is_some() {
-                content.add_child(
-                    Container::new(
-                        Flex::row()
-                            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                            .with_child(
-                                ConstrainedBox::new(label_text("Image opacity", appearance))
-                                    .with_width(150.)
-                                    .finish(),
-                            )
-                            .with_child(self.opacity_slider(
-                                self.bg_image_opacity_slider.clone(),
-                                self.bg_image_opacity,
-                                ThemeCreatorBodyAction::SetBackgroundImageOpacity,
-                                appearance,
-                            ))
+                column.add_child(slider_row(
+                    "Image opacity",
+                    None,
+                    SliderRow {
+                        state: self.bg_image_opacity_slider.clone(),
+                        value: self.bg_image_opacity,
+                        range: 0.0..100.0,
+                        value_label: format!("{}%", self.bg_image_opacity),
+                        make_action: ThemeCreatorBodyAction::SetBackgroundImageOpacity,
+                    },
+                    appearance,
+                ));
+            }
+        }
+
+        settings_card(column.finish(), appearance)
+            .with_margin_bottom(CARD_SPACING)
+            .finish()
+    }
+
+    /// The left-hand column of the "From image" flow: pick an image, then name the theme and
+    /// choose which extracted colour becomes its background.
+    fn render_from_image_controls(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+
+        let picker_button = {
+            let button = appearance
+                .ui_builder()
+                .button(
+                    ButtonVariant::Secondary,
+                    self.button_mouse_states.image_picker_mouse_state.clone(),
+                )
+                .with_style(button_styles());
+            if let ThemeCreatorImageState::Uploading = self.image_state {
+                button
+                    .with_centered_text_label(self.image_state.to_string())
+                    .disabled()
+                    .build()
+                    .finish()
+            } else {
+                button
+                    .with_text_and_icon_label(
+                        TextAndIcon::new(
+                            TextAndIconAlignment::IconFirst,
+                            self.image_state.to_string(),
+                            Icon::new(
+                                "bundled/svg/upload-01.svg",
+                                theme.active_ui_text_color().into_solid(),
+                            ),
+                            MainAxisSize::Min,
+                            MainAxisAlignment::Center,
+                            vec2f(14., 14.),
+                        )
+                        .with_inner_padding(6.),
+                    )
+                    .build()
+                    .with_cursor(Cursor::PointingHand)
+                    .on_click(move |ctx, _, _| {
+                        ctx.dispatch_typed_action(ThemeCreatorBodyAction::OpenFilePicker)
+                    })
+                    .finish()
+            }
+        };
+        let image_description = self.theme_options.as_ref().and_then(|theme_options| {
+            theme_options
+                .path()
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+        });
+        column.add_child(section_card(
+            "Image",
+            Some(MODAL_SUBHEADER),
+            vec![build_toggle_element(
+                row_label("Image", appearance),
+                picker_button,
+                appearance,
+                image_description,
+            )],
+            appearance,
+        ));
+
+        if let Some(theme_options) = &self.theme_options {
+            column.add_child(self.render_name_card(appearance));
+
+            let chosen = theme_options.chosen_bg_color_index();
+            let mut swatches = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+            for (bg_color_index, bg_color) in
+                theme_options.possible_bg_colors().into_iter().enumerate()
+            {
+                // The chosen colour gets a ring in the text colour, which reads on any swatch.
+                let border = if bg_color_index == chosen {
+                    Border::all(2.).with_border_fill(theme.main_text_color(theme.surface_1()))
+                } else {
+                    Border::all(1.).with_border_fill(theme.outline())
+                };
+                let swatch = EventHandler::new(
+                    ConstrainedBox::new(
+                        Rect::new()
+                            .with_background_color(bg_color)
+                            .with_corner_radius(radius::small())
+                            .with_border(border)
                             .finish(),
                     )
-                    .with_vertical_padding(6.)
+                    .with_height(36.)
                     .finish(),
+                )
+                .on_left_mouse_down(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(ThemeCreatorBodyAction::SetBackgroundColor(
+                        bg_color_index,
+                    ));
+                    DispatchEventResult::StopPropagation
+                })
+                .finish();
+                let swatch = if bg_color_index == 0 {
+                    swatch
+                } else {
+                    Container::new(swatch).with_margin_left(6.).finish()
+                };
+                swatches.add_child(Expanded::new(1., swatch).finish());
+            }
+            column.add_child(section_card(
+                "Background color",
+                Some("Pick which of the image's colors fills the background."),
+                vec![Container::new(swatches.finish())
+                    .with_padding_bottom(HEADER_PADDING)
+                    .finish()],
+                appearance,
+            ));
+        }
+
+        column.finish()
+    }
+
+    /// The preview card: a small terminal drawn in the theme being edited.
+    fn render_preview_card(&self, app: &AppContext) -> Box<dyn Element> {
+        let appearance = Appearance::as_ref(app);
+        let preview_theme = self.preview_theme(app);
+        let description = match self.mode {
+            ThemeCreatorMode::Manual => "Updates as you edit.",
+            ThemeCreatorMode::FromImage if self.theme_options.is_some() => {
+                "The theme made from your image."
+            }
+            ThemeCreatorMode::FromImage => "Select an image to see the theme it makes.",
+        };
+
+        let mut rows = vec![
+            Container::new(render_terminal_preview(&preview_theme, appearance))
+                .with_padding_bottom(HEADER_PADDING)
+                .finish(),
+        ];
+        if self.mode == ThemeCreatorMode::Manual && self.bg_image.is_some() {
+            rows.push(
+                Container::new(render_settings_description(
+                    "Your background image shows in the app, not in this preview.".into(),
+                    appearance,
+                ))
+                .with_padding_bottom(HEADER_PADDING)
+                .finish(),
+            );
+        }
+        section_card("Preview", Some(description), rows, appearance)
+    }
+
+    /// The controls column for whichever mode is showing.
+    fn render_controls(&self, app: &AppContext) -> Box<dyn Element> {
+        match self.mode {
+            ThemeCreatorMode::Manual => self.render_manual_controls(app),
+            ThemeCreatorMode::FromImage => self.render_from_image_controls(Appearance::as_ref(app)),
+        }
+    }
+
+    /// Controls and preview side by side when there's room, and the preview stacked above the
+    /// controls when there isn't (a narrow window, or the modal).
+    fn render_columns(&self, app: &AppContext) -> Box<dyn Element> {
+        let wide = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(Expanded::new(1., self.render_controls(app)).finish())
+            .with_child(
+                Container::new(
+                    ConstrainedBox::new(self.render_preview_card(app))
+                        .with_width(PREVIEW_COLUMN_WIDTH)
+                        .finish(),
+                )
+                .with_margin_left(COLUMN_GAP)
+                .finish(),
+            )
+            .finish();
+        let narrow = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(self.render_preview_card(app))
+            .with_child(self.render_controls(app))
+            .finish();
+        SizeConstraintSwitch::new(
+            wide,
+            vec![(
+                SizeConstraintCondition::WidthLessThan(TWO_COLUMN_MIN_WIDTH),
+                narrow,
+            )],
+        )
+        .finish()
+    }
+
+    /// The right-aligned action row under everything: secondary actions, then the one primary
+    /// action — saving — last.
+    fn render_footer(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let cancel = SavePosition::new(
+            action_button(
+                CANCEL_BUTTON_TEXT,
+                ButtonVariant::Secondary,
+                self.button_mouse_states.cancel_mouse_state.clone(),
+                ThemeCreatorBodyAction::Cancel,
+                appearance,
+            ),
+            "theme_creator_cancel_button",
+        )
+        .finish();
+
+        let mut buttons: Vec<Box<dyn Element>> = Vec::new();
+        match self.mode {
+            ThemeCreatorMode::Manual => {
+                buttons.push(action_button(
+                    "Share…",
+                    ButtonVariant::Secondary,
+                    self.share_mouse_state.clone(),
+                    ThemeCreatorBodyAction::ShareTheme,
+                    appearance,
+                ));
+                buttons.push(cancel);
+                buttons.push(action_button(
+                    "Save theme",
+                    ButtonVariant::Accent,
+                    self.button_mouse_states.create_mouse_state.clone(),
+                    ThemeCreatorBodyAction::Create,
+                    appearance,
+                ));
+            }
+            ThemeCreatorMode::FromImage => {
+                buttons.push(cancel);
+                let create = appearance
+                    .ui_builder()
+                    .button(
+                        ButtonVariant::Accent,
+                        self.button_mouse_states.create_mouse_state.clone(),
+                    )
+                    .with_style(button_styles())
+                    .with_centered_text_label(CREATE_BUTTON_TEXT.into());
+                // Nothing to create until an image has been turned into a palette.
+                let create = if self.theme_options.is_some() {
+                    create
+                } else {
+                    create.disabled()
+                };
+                buttons.push(
+                    create
+                        .build()
+                        .with_cursor(Cursor::PointingHand)
+                        .on_click(|ctx, _, _| {
+                            ctx.dispatch_typed_action(ThemeCreatorBodyAction::Create)
+                        })
+                        .finish(),
                 );
             }
         }
 
-        // The editor lives on a full settings page, which supplies its own scrolling. Letting the
-        // content flow at its natural height (rather than boxing it into a fixed-height scroller
-        // sized for the old modal) is what keeps the lower sections — appearance, background
-        // opacity, Window, and Advanced — from being clipped off the bottom.
-        let scrollable = Container::new(content.finish()).finish();
-
-        // Action buttons.
-        let cancel_button = self.pill_button(
-            "Cancel",
-            false,
-            self.button_mouse_states.cancel_mouse_state.clone(),
-            ThemeCreatorBodyAction::Cancel,
-            appearance,
-        );
-        let share_button = self.pill_button(
-            "Share…",
-            false,
-            self.share_mouse_state.clone(),
-            ThemeCreatorBodyAction::ShareTheme,
-            appearance,
-        );
-        let create_button = self.pill_button(
-            "Save theme",
-            true,
-            self.button_mouse_states.create_mouse_state.clone(),
-            ThemeCreatorBodyAction::Create,
-            appearance,
-        );
-
-        let buttons = Container::new(
-            Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_child(Shrinkable::new(0.34, cancel_button).finish())
-                .with_child(
-                    Container::new(Shrinkable::new(0.33, share_button).finish())
-                        .with_margin_left(8.)
-                        .finish(),
-                )
-                .with_child(
-                    Container::new(Shrinkable::new(0.33, create_button).finish())
-                        .with_margin_left(8.)
-                        .finish(),
-                )
-                .finish(),
-        )
-        .with_margin_top(16.)
-        .finish();
-
-        Flex::column()
-            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-            .with_child(tabs)
-            .with_child(scrollable)
-            .with_child(buttons)
-            .finish()
+        let mut row = Flex::row()
+            .with_main_axis_size(MainAxisSize::Max)
+            .with_main_axis_alignment(MainAxisAlignment::End)
+            .with_cross_axis_alignment(CrossAxisAlignment::Center);
+        for (index, button) in buttons.into_iter().enumerate() {
+            row.add_child(if index == 0 {
+                button
+            } else {
+                Container::new(button).with_margin_left(8.).finish()
+            });
+        }
+        row.finish()
     }
 }
 
@@ -1630,6 +1832,8 @@ async fn find_open_pull_request_for(client: &reqwest::Client, path: &str) -> Opt
 const SV_SQUARE_WIDTH: f32 = 232.;
 const SV_SQUARE_HEIGHT: f32 = 148.;
 const HUE_STRIP_WIDTH: f32 = 20.;
+/// The space between the saturation/value square and the hue strip.
+const PICKER_GAP: f32 = 10.;
 const CROSSHAIR_SIZE: f32 = 14.;
 const HUE_MARKER_HEIGHT: f32 = 6.;
 
@@ -1810,17 +2014,403 @@ fn hsv_to_coloru(hue: f32, saturation: f32, value: f32) -> ColorU {
     )
 }
 
-/// A section heading label.
-fn section_label(text: &str, appearance: &Appearance) -> Box<dyn Element> {
-    Text::new_inline(text.to_string(), appearance.ui_font_family(), 14.)
-        .with_color(appearance.theme().active_ui_text_color().into())
+// ── Page layout ──────────────────────────────────────────────────────────────
+
+/// Below this width the preview stacks above the controls instead of sitting beside them.
+const TWO_COLUMN_MIN_WIDTH: f32 = 720.;
+/// The preview's column when it sits beside the controls.
+const PREVIEW_COLUMN_WIDTH: f32 = 340.;
+const COLUMN_GAP: f32 = 16.;
+/// The gap under each card, matching the rest of Settings.
+const CARD_SPACING: f32 = 16.;
+const SWATCH_SIZE: f32 = 24.;
+const HEX_INPUT_WIDTH: f32 = 96.;
+const SLIDER_WIDTH: f32 = 160.;
+/// The fixed column each slider's value sits in, so values line up from row to row.
+const SLIDER_VALUE_WIDTH: f32 = 40.;
+const CONTROL_FONT_SIZE: f32 = 13.;
+/// The inset between a segmented control's track and its segments.
+const SEGMENT_TRACK_PADDING: f32 = 2.;
+const PREVIEW_FONT_SIZE: f32 = 12.;
+const PREVIEW_LINE_GAP: f32 = 3.;
+
+/// What a [`slider_row`] edits and how it shows its value.
+struct SliderRow {
+    state: SliderStateHandle,
+    value: u8,
+    range: Range<f32>,
+    /// The value as shown beside the slider, e.g. "80%".
+    value_label: String,
+    make_action: fn(f32) -> ThemeCreatorBodyAction,
+}
+
+/// One option of a [`segmented_control`].
+struct Segment {
+    label: &'static str,
+    active: bool,
+    mouse_state: MouseStateHandle,
+    action: ThemeCreatorBodyAction,
+}
+
+/// The size and weight shared by every button on the page.
+fn button_styles() -> UiComponentStyles {
+    UiComponentStyles {
+        font_size: Some(CONTROL_FONT_SIZE),
+        font_weight: Some(Weight::Semibold),
+        padding: Some(Coords::uniform(7.).left(14.).right(14.)),
+        ..Default::default()
+    }
+}
+
+/// A footer or row button. `Accent` is reserved for the one primary action (saving); every
+/// other button is `Secondary`, so the accent colour never turns up as a big block.
+fn action_button(
+    label: &str,
+    variant: ButtonVariant,
+    mouse_state: MouseStateHandle,
+    action: ThemeCreatorBodyAction,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    appearance
+        .ui_builder()
+        .button(variant, mouse_state)
+        .with_style(button_styles())
+        .with_centered_text_label(label.into())
+        .build()
+        .with_cursor(Cursor::PointingHand)
+        .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
         .finish()
 }
 
-/// A field label.
-fn label_text(text: &str, appearance: &Appearance) -> Box<dyn Element> {
-    Text::new_inline(text.to_string(), appearance.ui_font_family(), 13.)
-        .with_color(appearance.theme().nonactive_ui_text_color().into())
+/// A slider row: the label on the left; the slider and its current value, in a fixed-width
+/// column, on the right. Every slider on the page shows its value the same way.
+fn slider_row(
+    label: &str,
+    description: Option<String>,
+    slider: SliderRow,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let SliderRow {
+        state,
+        value,
+        range,
+        value_label,
+        make_action,
+    } = slider;
+    let slider = appearance
+        .ui_builder()
+        .slider(state)
+        .with_range(range)
+        .with_default_value(value as f32)
+        .with_style(UiComponentStyles {
+            width: Some(SLIDER_WIDTH),
+            // Margin is 3. to add up with 7. padding on slider for a total of 10.
+            margin: Some(Coords::default().top(3.).bottom(3.)),
+            ..Default::default()
+        })
+        .on_drag(move |ctx, _, val| ctx.dispatch_typed_action(make_action(val)))
+        .on_change(move |ctx, _, val| ctx.dispatch_typed_action(make_action(val)))
+        .build()
+        .finish();
+
+    let value_text = ConstrainedBox::new(
+        Align::new(
+            Text::new_inline(value_label, appearance.ui_font_family(), CONTROL_FONT_SIZE)
+                .with_color(settings_description_color(appearance))
+                .finish(),
+        )
+        .right()
+        .finish(),
+    )
+    .with_width(SLIDER_VALUE_WIDTH)
+    .finish();
+
+    let control = Flex::row()
+        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(slider)
+        .with_child(Container::new(value_text).with_margin_left(8.).finish())
+        .finish();
+    build_toggle_element(
+        row_label(label, appearance),
+        control,
+        appearance,
+        description,
+    )
+}
+
+/// A compact segmented control: the options side by side in a quiet track, the selected one
+/// raised. Neutral rather than accent-coloured, so the accent stays reserved for saving.
+fn segmented_control(segments: Vec<Segment>, appearance: &Appearance) -> Box<dyn Element> {
+    let theme = appearance.theme();
+    let segment_radius =
+        CornerRadius::with_all(Radius::Pixels(radius::SMALL - SEGMENT_TRACK_PADDING));
+    let mut row = Flex::row()
+        .with_main_axis_size(MainAxisSize::Min)
+        .with_cross_axis_alignment(CrossAxisAlignment::Center);
+    for (index, segment) in segments.into_iter().enumerate() {
+        let Segment {
+            label,
+            active,
+            mouse_state,
+            action,
+        } = segment;
+        let item = Hoverable::new(mouse_state, |state| {
+            let text_color = if active || state.is_hovered() {
+                theme.active_ui_text_color()
+            } else {
+                theme.nonactive_ui_text_color()
+            };
+            let weight = if active {
+                Weight::Semibold
+            } else {
+                Weight::Normal
+            };
+            let container = Container::new(
+                Text::new_inline(label, appearance.ui_font_family(), CONTROL_FONT_SIZE)
+                    .with_color(text_color.into())
+                    .with_style(Properties::default().weight(weight))
+                    .finish(),
+            )
+            .with_vertical_padding(4.)
+            .with_horizontal_padding(14.)
+            .with_corner_radius(segment_radius);
+            // Every segment carries a border, transparent unless selected, so selecting one
+            // doesn't nudge its neighbours by a pixel.
+            if active {
+                container
+                    .with_background(theme.surface_3())
+                    .with_border(Border::all(1.).with_border_fill(theme.outline()))
+                    .finish()
+            } else {
+                container
+                    .with_border(Border::all(1.).with_border_color(ColorU::transparent_black()))
+                    .finish()
+            }
+        })
+        .with_cursor(Cursor::PointingHand)
+        .on_click(move |ctx, _, _| ctx.dispatch_typed_action(action.clone()))
+        .finish();
+        row.add_child(if index == 0 {
+            item
+        } else {
+            Container::new(item).with_margin_left(2.).finish()
+        });
+    }
+
+    Container::new(row.finish())
+        .with_uniform_padding(SEGMENT_TRACK_PADDING)
+        .with_background(theme.surface_2())
+        .with_corner_radius(radius::small())
+        .finish()
+}
+
+/// One section of the editor: a settings card with a small title (and optional description),
+/// then its rows — the same card every other settings page uses.
+fn section_card(
+    title: &'static str,
+    description: Option<&'static str>,
+    rows: Vec<Box<dyn Element>>,
+    appearance: &Appearance,
+) -> Box<dyn Element> {
+    let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+    column.add_child(match description {
+        Some(description) => render_sub_header_with_description(appearance, title, description),
+        None => render_sub_header(appearance, title, None),
+    });
+    column.add_children(rows);
+    settings_card(column.finish(), appearance)
+        .with_margin_bottom(CARD_SPACING)
+        .finish()
+}
+
+/// A row's label, styled like every other settings row's.
+fn row_label(text: &str, appearance: &Appearance) -> Box<dyn Element> {
+    Text::new_inline(
+        text.to_string(),
+        appearance.ui_font_family(),
+        CONTROL_FONT_SIZE,
+    )
+    .with_color(appearance.theme().active_ui_text_color().into())
+    .finish()
+}
+
+/// A small heading for a group of rows inside a card (the Advanced card's groups).
+fn group_label(text: &str, appearance: &Appearance) -> Box<dyn Element> {
+    Container::new(
+        Text::new_inline(
+            text.to_string(),
+            appearance.ui_font_family(),
+            CONTENT_FONT_SIZE,
+        )
+        .with_color(settings_description_color(appearance))
+        .with_style(Properties::default().weight(Weight::Semibold))
+        .finish(),
+    )
+    .with_margin_top(4.)
+    .with_padding_bottom(10.)
+    .finish()
+}
+
+fn hex_input_styles(appearance: &Appearance) -> UiComponentStyles {
+    UiComponentStyles::default()
+        .set_border_color(appearance.theme().outline().into())
+        .set_font_family_id(appearance.monospace_font_family())
+        .set_font_size(12.)
+        .set_background(Fill::None)
+        .set_border_radius(radius::small())
+        .set_padding(Coords::uniform(6.).left(8.).right(8.))
+        .set_border_width(1.)
+}
+
+fn name_input_styles(appearance: &Appearance) -> UiComponentStyles {
+    UiComponentStyles::default()
+        .set_border_color(appearance.theme().outline().into())
+        .set_font_family_id(appearance.ui_font_family())
+        .set_font_size(CONTROL_FONT_SIZE)
+        .set_background(Fill::None)
+        .set_border_radius(radius::small())
+        .set_padding(Coords::uniform(8.).left(10.).right(10.))
+        .set_border_width(1.)
+}
+
+/// A small terminal drawn entirely in `theme`: a tab strip with the active tab underlined in the
+/// accent, a couple of commands and their output in the text and ANSI colours, the 16 ANSI
+/// colours as chips, and the cursor block. The background is the theme's own fill, so its
+/// gradient and opacity show as they will in the app.
+///
+/// This is the one place on the page with colours that don't come from the app's theme tokens:
+/// it shows the theme being made, not the one the page is drawn in.
+fn render_terminal_preview(theme: &WarpTheme, appearance: &Appearance) -> Box<dyn Element> {
+    let font = appearance.monospace_font_family();
+    let foreground = theme.foreground().into_solid();
+    let dimmed = ColorU::new(foreground.r, foreground.g, foreground.b, 140);
+    let rule = ColorU::new(foreground.r, foreground.g, foreground.b, 40);
+    let accent = theme.accent().into_solid();
+    let cursor = theme.cursor().into_solid();
+    let terminal_colors = theme.terminal_colors();
+    let normal = &terminal_colors.normal;
+    let blue = ColorU::from(normal.blue);
+    let green = ColorU::from(normal.green);
+    let red = ColorU::from(normal.red);
+    let yellow = ColorU::from(normal.yellow);
+    let magenta = ColorU::from(normal.magenta);
+
+    let span = |text: &str, color: ColorU| -> Box<dyn Element> {
+        Text::new_inline(text.to_string(), font, PREVIEW_FONT_SIZE)
+            .with_color(color)
+            .finish()
+    };
+    let line = |spans: Vec<Box<dyn Element>>| -> Box<dyn Element> {
+        let mut row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        row.add_children(spans);
+        Container::new(Clipped::new(row.finish()).finish())
+            .with_padding_bottom(PREVIEW_LINE_GAP)
+            .finish()
+    };
+    let prompt = |command: &str| -> Vec<Box<dyn Element>> {
+        vec![
+            span("~/uncaged", blue),
+            span(" main", magenta),
+            span(" ❯ ", green),
+            span(command, foreground),
+        ]
+    };
+    let tab = |label: &str, active: bool| -> Box<dyn Element> {
+        let (text_color, underline) = if active {
+            (foreground, accent)
+        } else {
+            (dimmed, ColorU::transparent_black())
+        };
+        Container::new(span(label, text_color))
+            .with_horizontal_padding(10.)
+            .with_padding_bottom(6.)
+            .with_border(Border::bottom(2.).with_border_color(underline))
+            .finish()
+    };
+    let chips = |colors: &AnsiColors| -> Box<dyn Element> {
+        let mut row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
+        let all = [
+            colors.black,
+            colors.red,
+            colors.green,
+            colors.yellow,
+            colors.blue,
+            colors.magenta,
+            colors.cyan,
+            colors.white,
+        ];
+        for (index, color) in all.into_iter().enumerate() {
+            let chip = ConstrainedBox::new(
+                Rect::new()
+                    .with_background_color(ColorU::from(color))
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(2.)))
+                    .finish(),
+            )
+            .with_height(10.)
+            .finish();
+            let chip = if index == 0 {
+                chip
+            } else {
+                Container::new(chip).with_margin_left(4.).finish()
+            };
+            row.add_child(Expanded::new(1., chip).finish());
+        }
+        Container::new(row.finish())
+            .with_padding_bottom(4.)
+            .finish()
+    };
+
+    let tabs = Container::new(
+        Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::End)
+            .with_child(tab("~/uncaged", true))
+            .with_child(tab("zsh", false))
+            .finish(),
+    )
+    .with_border(Border::bottom(1.).with_border_color(rule))
+    .with_margin_bottom(10.)
+    .finish();
+
+    let mut cursor_line = prompt("");
+    cursor_line.push(
+        ConstrainedBox::new(Rect::new().with_background_color(cursor).finish())
+            .with_width(7.)
+            .with_height(14.)
+            .finish(),
+    );
+
+    let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
+    column.add_child(tabs);
+    column.add_child(line(prompt("git status")));
+    column.add_child(line(vec![span("On branch main", foreground)]));
+    column.add_child(line(vec![span("  modified:  src/theme.rs", red)]));
+    column.add_child(line(vec![span("  new file:  themes/ember.yaml", green)]));
+    column.add_child(line(prompt("ls")));
+    column.add_child(line(vec![
+        span("app  ", blue),
+        span("crates  ", blue),
+        span("run.sh  ", green),
+        span("README.md", foreground),
+    ]));
+    column.add_child(line(vec![
+        span("warning: ", yellow),
+        span("1 commit to push", foreground),
+    ]));
+    column.add_child(Container::new(chips(normal)).with_margin_top(6.).finish());
+    column.add_child(chips(&terminal_colors.bright));
+    column.add_child(
+        Container::new(line(cursor_line))
+            .with_margin_top(6.)
+            .finish(),
+    );
+
+    Container::new(column.finish())
+        .with_background(theme.background())
+        .with_corner_radius(radius::small())
+        .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
+        .with_horizontal_padding(12.)
+        .with_padding_top(8.)
+        .with_padding_bottom(10.)
         .finish()
 }
 
@@ -1855,333 +2445,17 @@ impl View for ThemeCreatorBody {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
-        if self.mode == ThemeCreatorMode::Manual {
-            return self.render_manual(app);
-        }
-
         let appearance = Appearance::as_ref(app);
 
-        let default_button_styles = UiComponentStyles {
-            font_size: Some(BUTTON_FONT_SIZE),
-            font_family_id: Some(appearance.ui_font_family()),
-            font_color: Some(
-                appearance
-                    .theme()
-                    .main_text_color(appearance.theme().background())
-                    .into(),
-            ),
-            font_weight: Some(Weight::Bold),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(BUTTON_BORDER_RADIUS))),
-            border_color: Some(appearance.theme().outline().into()),
-            border_width: Some(BORDER_WIDTH),
-            padding: Some(Coords::uniform(BUTTON_PADDING)),
-            background: Some(appearance.theme().surface_1().into()),
-            ..Default::default()
-        };
-
-        let cancel_hovered_styles = UiComponentStyles {
-            background: Some(appearance.theme().outline().into()),
-            border_color: Some(appearance.theme().accent().into()),
-            ..default_button_styles
-        };
-
-        let disabled_styles = UiComponentStyles {
-            background: Some(appearance.theme().surface_3().into()),
-            font_color: Some(appearance.theme().disabled_ui_text_color().into()),
-            ..default_button_styles
-        };
-
-        let create_default_styles = UiComponentStyles {
-            background: Some(appearance.theme().accent().into()),
-            border_color: Some(appearance.theme().accent().into()),
-            font_color: Some(
-                appearance
-                    .theme()
-                    .main_text_color(appearance.theme().accent())
-                    .into(),
-            ),
-            ..default_button_styles
-        };
-
-        let create_hovered_styles = UiComponentStyles {
-            border_color: Some(
-                appearance
-                    .theme()
-                    .main_text_color(appearance.theme().background())
-                    .into(),
-            ),
-            ..create_default_styles
-        };
-
-        let image_picker_button_background = if self.theme_options.is_some() {
-            appearance.theme().surface_1()
-        } else {
-            appearance.theme().accent()
-        };
-
-        let image_picker_button_hovered_styles = if self.theme_options.is_some() {
-            cancel_hovered_styles
-        } else {
-            UiComponentStyles {
-                border_color: Some(appearance.theme().foreground().into()),
-                background: Some(image_picker_button_background.into()),
-                font_color: Some(
-                    appearance
-                        .theme()
-                        .main_text_color(image_picker_button_background)
-                        .into(),
-                ),
-                ..default_button_styles
-            }
-        };
-
-        let image_picker_button = appearance.ui_builder().button_with_custom_styles(
-            ButtonVariant::Accent,
-            self.button_mouse_states.image_picker_mouse_state.clone(),
-            UiComponentStyles {
-                background: Some(image_picker_button_background.into()),
-                font_color: Some(
-                    appearance
-                        .theme()
-                        .main_text_color(image_picker_button_background)
-                        .into(),
-                ),
-                ..default_button_styles
-            },
-            Some(image_picker_button_hovered_styles),
-            Some(image_picker_button_hovered_styles),
-            Some(disabled_styles),
-        );
-
-        let cancel_button = appearance
-            .ui_builder()
-            .button(
-                ButtonVariant::Secondary,
-                self.button_mouse_states.cancel_mouse_state.clone(),
-            )
-            .with_style(UiComponentStyles {
-                font_size: Some(BUTTON_FONT_SIZE),
-                font_weight: Some(Weight::Bold),
-                padding: Some(Coords::uniform(BUTTON_PADDING)),
-                ..Default::default()
-            })
-            .with_centered_text_label(CANCEL_BUTTON_TEXT.into());
-
-        let mut create_button = appearance
-            .ui_builder()
-            .button_with_custom_styles(
-                ButtonVariant::Basic,
-                self.button_mouse_states.create_mouse_state.clone(),
-                create_default_styles,
-                Some(create_hovered_styles),
-                Some(create_hovered_styles),
-                Some(disabled_styles),
-            )
-            .with_centered_text_label(CREATE_BUTTON_TEXT.into());
-
-        let mut flex: Flex = Flex::column()
-            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-            .with_child(
-                Container::new(
-                    Text::new_inline(MODAL_SUBHEADER, appearance.ui_font_family(), 14.)
-                        .with_color(appearance.theme().active_ui_text_color().into())
-                        .finish(),
-                )
-                .finish(),
-            );
-
-        if let Some(theme_options) = &self.theme_options {
-            flex.add_child(
-                Container::new(
-                    Text::new_inline("Theme name", appearance.ui_font_family(), 14.)
-                        .with_color(appearance.theme().active_ui_text_color().into())
-                        .finish(),
-                )
-                .with_margin_top(12.)
-                .finish(),
-            );
-            flex.add_child(
-                Container::new(
-                    TextInput::new(
-                        self.editor.clone(),
-                        UiComponentStyles::default()
-                            .set_border_color(appearance.theme().outline().into())
-                            .set_font_family_id(appearance.header_font_family())
-                            .set_font_size(14.)
-                            .set_background(Fill::None)
-                            .set_border_radius(CornerRadius::with_all(Radius::Pixels(4.)))
-                            .set_padding(Coords::uniform(20.).top(10.).bottom(10.))
-                            .set_border_width(2.),
-                    )
-                    .build()
-                    .finish(),
-                )
-                .with_margin_top(8.)
-                .finish(),
-            );
-
-            flex.add_child(
-                Container::new(
-                    Text::new_inline("Background color", appearance.ui_font_family(), 14.)
-                        .with_color(appearance.theme().active_ui_text_color().into())
-                        .finish(),
-                )
-                .with_margin_top(24.)
-                .finish(),
-            );
-
-            let mut color_row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
-
-            for (bg_color_index, bg_color) in
-                theme_options.possible_bg_colors().into_iter().enumerate()
-            {
-                // Add corner radius if the rect is the first or last one
-                let corner_radius = if bg_color_index == 0 {
-                    CornerRadius::with_left(Radius::Pixels(8.))
-                } else if bg_color_index == 4 {
-                    CornerRadius::with_right(Radius::Pixels(8.))
-                } else {
-                    CornerRadius::with_all(Radius::Pixels(0.))
-                };
-
-                // Add a border around the chosen background color
-                let border_width = if bg_color_index == theme_options.chosen_bg_color_index() {
-                    3.
-                } else {
-                    0.
-                };
-
-                color_row.add_child(
-                    Flex::row()
-                        .with_child(
-                            EventHandler::new(
-                                ConstrainedBox::new(
-                                    Rect::new()
-                                        .with_background_color(bg_color)
-                                        .with_corner_radius(corner_radius)
-                                        .with_border(
-                                            Border::all(border_width).with_border_fill(
-                                                appearance.theme().main_text_color(
-                                                    appearance.theme().background(),
-                                                ),
-                                            ),
-                                        )
-                                        .finish(),
-                                )
-                                .with_width(110.)
-                                .with_height(40.)
-                                .finish(),
-                            )
-                            .on_left_mouse_down(move |ctx, _, _| {
-                                ctx.dispatch_typed_action(
-                                    ThemeCreatorBodyAction::SetBackgroundColor(bg_color_index),
-                                );
-                                DispatchEventResult::StopPropagation
-                            })
-                            .finish(),
-                        )
-                        .finish(),
-                );
-            }
-
-            flex.add_child(
-                Container::new(color_row.finish())
-                    .with_margin_top(8.)
-                    .finish(),
-            );
-        } else {
-            create_button = create_button.disabled();
-        }
-
-        flex.add_child(
-            Container::new(
-                if let ThemeCreatorImageState::Uploading = self.image_state {
-                    image_picker_button
-                        .with_centered_text_label(self.image_state.to_string())
-                        .disabled()
-                        .build()
-                        .finish()
-                } else {
-                    image_picker_button
-                        .with_text_and_icon_label(
-                            TextAndIcon::new(
-                                TextAndIconAlignment::TextFirst,
-                                self.image_state.to_string(),
-                                Icon::new("bundled/svg/upload-01.svg", ColorU::white()),
-                                MainAxisSize::Max,
-                                MainAxisAlignment::Center,
-                                vec2f(16., 16.),
-                            )
-                            .with_inner_padding(4.),
-                        )
-                        .build()
-                        .with_cursor(Cursor::PointingHand)
-                        .on_click(move |ctx, _, _| {
-                            ctx.dispatch_typed_action(ThemeCreatorBodyAction::OpenFilePicker)
-                        })
-                        .finish()
-                },
-            )
-            .with_margin_top(24.)
-            .finish(),
-        );
-
+        // The editor lives on a full settings page, which supplies its own scrolling. Letting the
+        // content flow at its natural height (rather than boxing it into a fixed-height scroller
+        // sized for the old modal) is what keeps the lower sections — appearance, background
+        // opacity, Window, and Advanced — from being clipped off the bottom.
         Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
             .with_child(self.mode_tabs(appearance))
-            .with_child(
-                Container::new(
-                    flex.with_child(
-                        Container::new(
-                            Flex::row()
-                                .with_child(
-                                    Shrinkable::new(
-                                        0.5,
-                                        Container::new(
-                                            SavePosition::new(
-                                                cancel_button
-                                                    .build()
-                                                    .with_cursor(Cursor::PointingHand)
-                                                    .on_click(move |ctx, _, _| {
-                                                        ctx.dispatch_typed_action(
-                                                            ThemeCreatorBodyAction::Cancel,
-                                                        )
-                                                    })
-                                                    .finish(),
-                                                "theme_creator_cancel_button",
-                                            )
-                                            .finish(),
-                                        )
-                                        .with_margin_right(8.)
-                                        .finish(),
-                                    )
-                                    .finish(),
-                                )
-                                .with_child(
-                                    Shrinkable::new(
-                                        0.5,
-                                        create_button
-                                            .build()
-                                            .with_cursor(Cursor::PointingHand)
-                                            .on_click(move |ctx, _, _| {
-                                                ctx.dispatch_typed_action(
-                                                    ThemeCreatorBodyAction::Create,
-                                                )
-                                            })
-                                            .finish(),
-                                    )
-                                    .finish(),
-                                )
-                                .with_main_axis_size(MainAxisSize::Max)
-                                .finish(),
-                        )
-                        .with_margin_top(24.)
-                        .finish(),
-                    )
-                    .finish(),
-                )
-                .finish(),
-            )
+            .with_child(self.render_columns(app))
+            .with_child(self.render_footer(appearance))
             .finish()
     }
 }
@@ -2215,7 +2489,9 @@ impl TypedActionView for ThemeCreatorBody {
             ThemeCreatorBodyAction::FilePickerCancelled => self.handle_file_picker_cancelled(ctx),
             ThemeCreatorBodyAction::SetMode(mode) => self.set_mode(*mode, ctx),
             ThemeCreatorBodyAction::ToggleGradient => self.toggle_gradient(ctx),
-            ThemeCreatorBodyAction::ToggleLightDark => self.toggle_light_dark(ctx),
+            ThemeCreatorBodyAction::SetLightAppearance(is_light) => {
+                self.set_light_appearance(*is_light, ctx)
+            }
             ThemeCreatorBodyAction::ToggleAdvanced => self.toggle_advanced(ctx),
             ThemeCreatorBodyAction::SetBackgroundOpacity(value) => {
                 self.set_background_opacity(*value, ctx)

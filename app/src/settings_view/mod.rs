@@ -475,6 +475,7 @@ pub mod flags {
     pub const AGENT_IN_APP_NOTIFICATIONS_FLAG: &str = "Agent_In_App_Notifications";
     pub const LINK_TOOLTIP_CONTEXT_FLAG: &str = "Link_Tooltip";
     pub const COMPACT_MODE_CONTEXT_FLAG: &str = "Compact_Mode_Enabled";
+    pub const LAUNCH_ANIMATION_CONTEXT_FLAG: &str = "Launch_Animation_Enabled";
     pub const CURSOR_BLINK_CONTEXT_FLAG: &str = "Cursor_Blink_Enabled";
     pub const VIM_MODE_CONTEXT_FLAG: &str = "Vim_Mode_Enabled";
     pub const VIM_UNNAMED_SYSTEM_CLIPBOARD: &str = "Vim_Unnamed_System_Clipboard";

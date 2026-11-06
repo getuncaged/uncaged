@@ -21,7 +21,7 @@ use warpui::{
 };
 
 use super::settings_page::{
-    settings_card, MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget,
+    MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget,
 };
 use super::SettingsSection;
 use crate::appearance::Appearance;
@@ -186,9 +186,6 @@ impl From<ViewHandle<ThemeCreatorPageView>> for SettingsPageViewHandle {
     }
 }
 
-/// The space under the editor inside its card; the editor's own rows bring no bottom padding.
-const SETTINGS_CARD_BOTTOM_PADDING: f32 = 16.;
-
 /// The whole page is one widget: the hosted editor.
 struct ThemeCreatorWidget;
 
@@ -203,12 +200,11 @@ impl SettingsWidget for ThemeCreatorWidget {
     fn render(
         &self,
         view: &Self::View,
-        appearance: &Appearance,
+        _appearance: &Appearance,
         _app: &AppContext,
     ) -> Box<dyn Element> {
-        // Uncaged: the editor sits in a settings card, like the other pages' sections.
-        settings_card(ChildView::new(&view.body).finish(), appearance)
-            .with_padding_bottom(SETTINGS_CARD_BOTTOM_PADDING)
-            .finish()
+        // Uncaged: the editor lays out its own settings cards — one per section, beside a live
+        // preview — so the page hosts it bare rather than inside one more card.
+        ChildView::new(&view.body).finish()
     }
 }

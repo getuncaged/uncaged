@@ -86,7 +86,8 @@ use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme
 use crate::view_components::{Dropdown, DropdownItem, FilterableDropdown, FilterableDropdownEvent};
 use crate::window_settings::{
     BackgroundBlurRadius, BackgroundBlurTexture, BackgroundOpacity, LeftPanelVisibilityAcrossTabs,
-    OpenWindowsAtCustomSize, WindowSettings, WindowSettingsChangedEvent, ZoomLevel,
+    OpenWindowsAtCustomSize, ShowLaunchAnimation, WindowSettings, WindowSettingsChangedEvent,
+    ZoomLevel,
 };
 use crate::workspace::header_toolbar_editor::HeaderToolbarInlineEditor;
 use crate::workspace::tab_settings::{
@@ -196,6 +197,15 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 .is_supported_on_current_platform(),
         ),
     );
+
+    toggle_binding_pairs.push(ToggleSettingActionPair::new(
+        "launch animation",
+        builder(SettingsAction::AppearancePageToggle(
+            AppearancePageAction::ToggleLaunchAnimation,
+        )),
+        context,
+        flags::LAUNCH_ANIMATION_CONTEXT_FLAG,
+    ));
 
     toggle_binding_pairs.push(ToggleSettingActionPair::new(
         "dim inactive panes",
@@ -511,6 +521,7 @@ pub enum AppearancePageAction {
     ToggleCursorBlink,
     ToggleRespectSystemTheme,
     ToggleOpenWindowsAtCustomSize,
+    ToggleLaunchAnimation,
     ToggleDimInactivePanes,
     ToggleAllAvailableFonts,
     ToggleMatchNotebookToMonospaceFontSize,
@@ -641,6 +652,7 @@ impl TypedActionView for AppearanceSettingsPageView {
             ToggleCompactMode => self.toggle_compact_mode(ctx),
             ToggleCursorBlink => self.toggle_cursor_blink(ctx),
             ToggleOpenWindowsAtCustomSize => self.toggle_open_windows_at_custom_size(ctx),
+            ToggleLaunchAnimation => self.toggle_launch_animation(ctx),
             ToggleRespectSystemTheme => self.toggle_respect_system_theme(ctx),
             ToggleAllAvailableFonts => self.toggle_all_available_fonts(ctx),
             ToggleDimInactivePanes => self.toggle_dim_inactive_panes(ctx),
@@ -1355,6 +1367,12 @@ impl AppearanceSettingsPageView {
 
         let window_settings = WindowSettings::as_ref(ctx);
         let mut window_settings_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![];
+        if window_settings
+            .show_launch_animation
+            .is_supported_on_current_platform()
+        {
+            window_settings_widgets.push(Box::new(LaunchAnimationWidget::default()));
+        }
         if window_settings
             .open_windows_at_custom_size
             .is_supported_on_current_platform()
@@ -2235,6 +2253,13 @@ impl AppearanceSettingsPageView {
             report_if_error!(block_list_settings
                 .show_block_dividers
                 .set_value(new_value, ctx));
+        });
+    }
+
+    pub fn toggle_launch_animation(&mut self, ctx: &mut ViewContext<Self>) {
+        WindowSettings::handle(ctx).update(ctx, |window_settings, ctx| {
+            let shown = *window_settings.show_launch_animation.value();
+            report_if_error!(window_settings.show_launch_animation.set_value(!shown, ctx));
         });
     }
 
@@ -3355,6 +3380,50 @@ impl SettingsWidget for WindowBlurWidget {
                 None,
             ))
             .finish()
+    }
+}
+
+#[derive(Default)]
+struct LaunchAnimationWidget {
+    switch_state: SwitchStateHandle,
+}
+
+impl SettingsWidget for LaunchAnimationWidget {
+    type View = AppearanceSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "launch animation splash startup start logo"
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let shown = *WindowSettings::as_ref(app).show_launch_animation.value();
+        render_body_item::<AppearancePageAction>(
+            "Launch animation".into(),
+            None,
+            LocalOnlyIconState::for_setting(
+                ShowLaunchAnimation::storage_key(),
+                ShowLaunchAnimation::sync_to_cloud(),
+                &mut view.local_only_icon_tooltip_states.borrow_mut(),
+                app,
+            ),
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(shown)
+                .build()
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(AppearancePageAction::ToggleLaunchAnimation);
+                })
+                .finish(),
+            Some("Show the Uncaged mark for a moment when the app starts.".to_string()),
+        )
     }
 }
 

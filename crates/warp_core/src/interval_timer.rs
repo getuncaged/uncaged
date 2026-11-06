@@ -89,6 +89,20 @@ impl IntervalTimer {
             })
             .collect()
     }
+
+    /// One line with every interval so far, e.g. `SQLITE_INITIALIZED +12ms (=40ms), ...`.
+    pub fn summary(&self) -> String {
+        self.compute_stats()
+            .iter()
+            .map(|point| {
+                format!(
+                    "{} +{}ms (={}ms)",
+                    point.name, point.marginal_duration_ms, point.cumulative_duration_ms
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
 }
 
 impl Default for IntervalTimer {
