@@ -56,9 +56,6 @@ use crate::view_components::action_button::{ActionButton, SecondaryTheme};
 use crate::view_components::DismissibleToast;
 use crate::workspace::tab_settings::TabSettings;
 use crate::workspace::ToastStack;
-use crate::workspaces::update_manager::TeamUpdateManager;
-use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::workspaces::workspace::AdminEnablementSetting;
 
 const MAIN_SECTION_MARGIN: f32 = 12.;
 const SUB_SECTION_MARGIN: f32 = 8.;
@@ -72,8 +69,6 @@ const CODEBASE_INDEX_DESCRIPTION: &str = "Uncaged indexes your repositories on t
 const WARP_INDEXING_IGNORE_DESCRIPTION: &str = "Files ignored by git are never indexed. To leave out more, list them in a .uncagedignore file at the root of the repository (.warpindexingignore and .cursorignore also work). Agents can still open ignored files; they just won't come up in search.";
 const AUTO_INDEX_FEATURE_NAME: &str = "Index new folders by default";
 const AUTO_INDEX_DESCRIPTION: &str = "Index a repository the first time you open a terminal in it. Indexing runs in the background and keeps up with your edits.";
-const INDEXING_DISABLED_ADMIN_TEXT: &str = "Team admins have disabled codebase indexing.";
-const INDEXING_WORKSPACE_ENABLED_ADMIN_TEXT: &str = "Team admins have enabled codebase indexing.";
 const INDEXING_DISABLED_GLOBAL_AI_TEXT: &str =
     "AI Features must be enabled to use codebase indexing.";
 const CODEBASE_INDEX_LIMIT_REACHED: &str = "You have reached the maximum number of codebase indices. Delete existing indices to auto-index new codebases.";
@@ -560,17 +555,6 @@ impl TypedActionView for CodeSettingsPageView {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
             CodeSettingsPageAction::ToggleCodebaseContext => {
-                // If the organization has an explicit setting (on or off), ignore user toggles.
-                let setting = UserWorkspaces::as_ref(ctx).team_allows_codebase_context();
-                match setting {
-                    AdminEnablementSetting::Enable | AdminEnablementSetting::Disable => {
-                        return;
-                    }
-                    AdminEnablementSetting::RespectUserSetting => {
-                        // Allow user to toggle
-                    }
-                }
-
                 CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
                     if let Err(e) = settings.codebase_context_enabled.toggle_and_save_value(ctx) {
                         log::warn!("Failed to set value for Codebase Context: {e:?}");
@@ -872,7 +856,7 @@ impl SettingsWidget for CodePageWidget {
             appearance,
         ));
 
-        let codebase_context_enabled = UserWorkspaces::as_ref(app).is_codebase_context_enabled(app);
+        let codebase_context_enabled = CodeSettings::is_codebase_context_enabled(app);
         if global_ai_enabled && codebase_context_enabled {
             content.add_children(self.render_autoindexing_rows(appearance, app));
         }
@@ -906,8 +890,7 @@ impl CodePageWidget {
         app: &AppContext,
     ) -> Vec<Box<dyn Element>> {
         let auto_indexing_enabled = *CodeSettings::as_ref(app).auto_indexing_enabled;
-        let codebase_indexing_enabled =
-            UserWorkspaces::as_ref(app).is_codebase_context_enabled(app);
+        let codebase_indexing_enabled = CodeSettings::is_codebase_context_enabled(app);
 
         let mut rows = vec![
             self.render_autoindex_row(
@@ -1063,7 +1046,6 @@ impl CodePageWidget {
     ) -> Box<dyn Element> {
         let ui_builder = appearance.ui_builder();
         let theme = appearance.theme();
-        let admin_setting = UserWorkspaces::as_ref(app).team_allows_codebase_context();
 
         let label = ui_builder
             .span(CODEBASE_INDEXING_LABEL)
@@ -1078,16 +1060,10 @@ impl CodePageWidget {
 
         let switch = ui_builder
             .switch(self.switch_state.clone())
-            .check(UserWorkspaces::as_ref(app).is_codebase_context_enabled(app));
+            .check(CodeSettings::is_codebase_context_enabled(app));
 
-        let disabled_tooltip_text = match admin_setting {
-            AdminEnablementSetting::Enable => Some(INDEXING_WORKSPACE_ENABLED_ADMIN_TEXT),
-            AdminEnablementSetting::Disable => Some(INDEXING_DISABLED_ADMIN_TEXT),
-            AdminEnablementSetting::RespectUserSetting if !global_ai_enabled => {
-                Some(INDEXING_DISABLED_GLOBAL_AI_TEXT)
-            }
-            AdminEnablementSetting::RespectUserSetting => None,
-        };
+        let disabled_tooltip_text =
+            (!global_ai_enabled).then_some(INDEXING_DISABLED_GLOBAL_AI_TEXT);
 
         let toggle_element = if let Some(tooltip_text) = disabled_tooltip_text {
             switch
@@ -2108,24 +2084,17 @@ impl SettingsWidget for CodebaseIndexingCategorizedWidget {
     ) -> Box<dyn Element> {
         let ui_builder = appearance.ui_builder();
         let global_ai_enabled = AISettings::as_ref(app).is_any_ai_enabled(app);
-        let codebase_context_enabled = UserWorkspaces::as_ref(app).is_codebase_context_enabled(app);
+        let codebase_context_enabled = CodeSettings::is_codebase_context_enabled(app);
 
         let mut content = Flex::column();
 
         // Codebase indexing toggle using render_body_item for consistent styling
-        let admin_setting = UserWorkspaces::as_ref(app).team_allows_codebase_context();
         let switch = ui_builder
             .switch(self.inner.switch_state.clone())
             .check(codebase_context_enabled);
 
-        let disabled_tooltip_text = match admin_setting {
-            AdminEnablementSetting::Enable => Some(INDEXING_WORKSPACE_ENABLED_ADMIN_TEXT),
-            AdminEnablementSetting::Disable => Some(INDEXING_DISABLED_ADMIN_TEXT),
-            AdminEnablementSetting::RespectUserSetting if !global_ai_enabled => {
-                Some(INDEXING_DISABLED_GLOBAL_AI_TEXT)
-            }
-            AdminEnablementSetting::RespectUserSetting => None,
-        };
+        let disabled_tooltip_text =
+            (!global_ai_enabled).then_some(INDEXING_DISABLED_GLOBAL_AI_TEXT);
 
         let toggle_element = if let Some(tooltip_text) = disabled_tooltip_text {
             switch
@@ -2285,14 +2254,6 @@ impl SettingsPageMeta for CodeSettingsPageView {
     fn should_render(&self, _ctx: &AppContext) -> bool {
         FeatureFlag::FullSourceCodeEmbedding.is_enabled()
             || FeatureFlag::OpenWarpNewSettingsModes.is_enabled()
-    }
-
-    fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {
-        // We want to immediately see if the user is part of a workspace rather than wait for the next poll.
-        std::mem::drop(
-            TeamUpdateManager::handle(ctx)
-                .update(ctx, |manager, ctx| manager.refresh_workspace_metadata(ctx)),
-        );
     }
 
     fn scroll_to_widget(&mut self, widget_id: &'static str) {

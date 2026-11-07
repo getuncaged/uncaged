@@ -46,7 +46,6 @@ use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model::session::Session;
 use crate::terminal::TerminalView;
 use crate::throttle::throttle;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// The frequency at which we check for modifications and save the AI document to the server.
 /// Uses the same 2-second period as notebooks for consistency.
@@ -1265,12 +1264,11 @@ impl AIDocumentModel {
         let is_service_account = AuthStateProvider::as_ref(ctx).get().is_service_account();
 
         if is_service_account {
-            // If the SA doesn't have a team, we'll skip the plan sync in the caller
-            UserWorkspaces::as_ref(ctx)
-                .current_team_uid()
-                .map(|team_uid| Owner::Team { team_uid })
+            // Uncaged has no teams, so a service account has no team drive and the caller
+            // skips the plan sync.
+            None
         } else {
-            UserWorkspaces::as_ref(ctx).personal_drive(ctx)
+            Some(Owner::local_user())
         }
     }
 

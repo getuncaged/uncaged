@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Context;
 use url::Url;
 use warpui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 
@@ -11,7 +10,7 @@ use super::{
     ShareableLinkError,
 };
 use crate::app_state::{LeafContents, NotebookPaneSnapshot};
-use crate::cloud_object::Space;
+use crate::cloud_object::{Owner, Space};
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::{CloudObjectTypeAndId, OpenWarpDriveObjectSettings};
 use crate::notebooks::link::{LinkEvent, NotebookLinks};
@@ -19,7 +18,6 @@ use crate::notebooks::manager::{NotebookManager, NotebookSource};
 use crate::notebooks::notebook::{NotebookEvent, NotebookView};
 use crate::server::ids::SyncId;
 use crate::workflows::{WorkflowSelectionSource, WorkflowSource, WorkflowType};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub struct NotebookPane {
     view: ViewHandle<PaneView<NotebookView>>,
@@ -51,9 +49,7 @@ impl NotebookPane {
             Some(id) => NotebookSource::Existing(id),
             None => NotebookSource::New {
                 title: None,
-                owner: UserWorkspaces::as_ref(ctx)
-                    .personal_drive(ctx)
-                    .context("personal drive unavailable")?,
+                owner: Owner::local_user(),
                 initial_folder_id: None,
             },
         };

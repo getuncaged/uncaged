@@ -301,8 +301,6 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
 
     register_test!(test_can_auto_bootstrap);
 
-    register_test!(test_create_folder_from_command_palette);
-
     register_test!(test_tab_behavior_setting);
 
     register_test!(test_private_public_settings_routing_with_flag_enabled);
@@ -315,7 +313,6 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
 
     register_test!(test_websocket_does_not_begin_on_startup);
     register_test!(test_websocket_begins_on_startup);
-    register_test!(test_websocket_begins_after_joining_a_team);
     register_test!(test_websocket_begins_after_creating_an_object);
 
     register_test!(test_secret_is_obfuscated_on_copy);

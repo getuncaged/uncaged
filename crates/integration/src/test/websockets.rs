@@ -1,6 +1,5 @@
 use warp::integration_testing::assertions::{
     assert_websocket_has_not_started, assert_websocket_has_started, create_a_personal_workflow,
-    join_a_workspace,
 };
 use warp::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
 use warp::integration_testing::{self};
@@ -28,15 +27,6 @@ pub fn test_websocket_begins_on_startup() -> Builder {
             );
         })
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
-        .with_step(assert_websocket_has_started())
-}
-
-/// The websocket should start only after joining a team
-pub fn test_websocket_begins_after_joining_a_team() -> Builder {
-    new_builder()
-        .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
-        .with_step(assert_websocket_has_not_started())
-        .with_step(join_a_workspace())
         .with_step(assert_websocket_has_started())
 }
 

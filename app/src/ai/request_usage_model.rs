@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use ai::api_keys::ApiKeyManager;
 use chrono::{DateTime, Local, Utc};
 use instant::Instant;
 use serde::{Deserialize, Serialize};
@@ -14,7 +13,6 @@ use crate::ai::agent::AIAgentExchangeId;
 use crate::auth::AuthStateProvider;
 use crate::server::server_api::ai::AIClient;
 use crate::settings::AISettings;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::workspaces::workspace::WorkspaceUid;
 use crate::BlocklistAIHistoryModel;
 
@@ -387,41 +385,16 @@ impl AIRequestUsageModel {
 
     /// Returns `true` if the user meets one of the following conditions:
     /// 1. user has ai credits from the plan base limit
-    /// 2. user has overage enabled
-    /// 3. user has bonus grants (either team grants or user grants)
-    /// 4. user's team plan has pay-as-you-go enabled (enterprise only)
-    /// 5. user's team has enterprise bonus grants auto-reload enabled (enterprise only)
-    /// 6. user has BYOK enabled and has either provided at least one API key or
-    ///    connected a Grok subscription
+    /// 2. user has user bonus grants
+    /// 3. a local engine powers AI
     /// Use this method as the starting point for AI availability checking.
-    pub fn has_any_ai_remaining(&self, ctx: &AppContext) -> bool {
-        let current_workspace = UserWorkspaces::as_ref(ctx).current_workspace();
-
+    pub fn has_any_ai_remaining(&self) -> bool {
         let has_base_plan_ai_requests = self.has_requests_remaining();
 
         let user_bonus_credits = self.total_user_interactive_bonus_credits_remaining() > 0;
-        let workspace_bonus_credits = current_workspace
-            .map(|workspace| self.total_workspace_bonus_credits_remaining(workspace.uid) > 0)
-            .unwrap_or_default();
-
-        let workspace_has_overages =
-            current_workspace.is_some_and(|workspace| workspace.are_overages_remaining());
-
-        let is_payg_enabled = current_workspace
-            .is_some_and(|w| w.billing_metadata.is_enterprise_pay_as_you_go_enabled());
-        let is_enterprise_auto_reload_enabled = current_workspace
-            .is_some_and(|w| w.billing_metadata.is_enterprise_auto_reload_enabled());
-        // If you have provided your own API key or connected a Grok
-        // subscription, it doesn't matter if you are out of warp-provided requests.
-        let has_byo_credentials = UserWorkspaces::as_ref(ctx).is_byo_api_key_enabled(ctx)
-            && ApiKeyManager::as_ref(ctx).has_any_key();
 
         has_base_plan_ai_requests
-            || (user_bonus_credits || workspace_bonus_credits)
-            || workspace_has_overages
-            || is_payg_enabled
-            || is_enterprise_auto_reload_enabled
-            || has_byo_credentials
+            || user_bonus_credits
             // Uncaged: a local engine means unlimited local AI, no Warp credits.
             || crate::uncaged::engine_active()
     }
@@ -509,23 +482,6 @@ impl AIRequestUsageModel {
         self.ambient_credits_banner_dismissed = true;
         cache_ambient_credits_banner_dismissed(true, ctx);
         ctx.emit(AIRequestUsageModelEvent::AmbientCreditsBannerDismissed);
-    }
-
-    pub fn total_workspace_bonus_credits_remaining(&self, uid: WorkspaceUid) -> i32 {
-        let now = Utc::now();
-        self.bonus_grants
-            .iter()
-            .filter(|grant| grant.scope == BonusGrantScope::Workspace(uid))
-            .filter(|grant| grant.expiration.is_none_or(|exp| now < exp))
-            .map(|grant| grant.request_credits_remaining)
-            .sum()
-    }
-
-    pub fn total_current_workspace_bonus_credits_remaining(&self, ctx: &AppContext) -> i32 {
-        UserWorkspaces::as_ref(ctx)
-            .current_workspace()
-            .map(|workspace| self.total_workspace_bonus_credits_remaining(workspace.uid))
-            .unwrap_or(0)
     }
 
     pub fn total_user_interactive_bonus_credits_remaining(&self) -> i32 {

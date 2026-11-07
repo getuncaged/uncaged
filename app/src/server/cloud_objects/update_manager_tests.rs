@@ -447,9 +447,9 @@ fn assert_folder_for_object(app: &App, uid: &ObjectUid, folder_id: Option<SyncId
 }
 
 fn assert_space_for_object(app: &App, uid: &ObjectUid, space: Space) {
-    CloudModel::handle(app).read(app, |cloud_model, ctx| {
+    CloudModel::handle(app).read(app, |cloud_model, _| {
         if let Some(object) = cloud_model.get_by_uid(uid) {
-            assert_eq!(object.space(ctx), space);
+            assert_eq!(object.space(), space);
         } else {
             panic!("object should have been in cloud model, but wasn't");
         }

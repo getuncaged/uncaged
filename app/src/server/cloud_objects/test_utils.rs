@@ -18,9 +18,7 @@ use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
 use crate::settings::{PrivacySettings, WarpDrivePrivacySettings};
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_profiles::UserProfiles;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// The size of the bounded channel that we use to queue persistence/sqlite-related events.
 const CHANNEL_SIZE: usize = 128;
@@ -46,8 +44,6 @@ pub fn initialize_app(app: &mut App) {
     WarpDrivePrivacySettings::register(app);
     app.update(PrivacySettings::register_singleton);
     app.add_singleton_model(CloudModel::mock);
-    app.add_singleton_model(UserWorkspaces::default_mock);
-    app.add_singleton_model(TeamUpdateManager::mock);
     app.add_singleton_model(|_| ObjectActions::new(Vec::new()));
 }
 

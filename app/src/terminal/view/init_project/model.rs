@@ -16,7 +16,6 @@ use crate::terminal::view::init_project::{
     CodebaseIndexingResult, CreateEnvironmentResult, InitActionResult, LanguageServersResult,
     ProjectScopedRulesResult, FILES_TO_CHECK, LINKABLE_FILES,
 };
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const INIT_STEP_COUNT: usize = enum_iterator::cardinality::<InitStepKind>();
 
@@ -178,8 +177,7 @@ impl InitProjectModel {
     pub fn should_have_available_steps(path: &Path, ctx: &warpui::AppContext) -> bool {
         // Note that we consider auto-indexing setting to true to satisfy the codebase context step.
         // This avoids the potential race condition with the banner showing just when we start auto-indexing.
-        let has_pending_codebase_context = UserWorkspaces::as_ref(ctx)
-            .is_codebase_context_enabled(ctx)
+        let has_pending_codebase_context = CodeSettings::is_codebase_context_enabled(ctx)
             && CodebaseIndexManager::as_ref(ctx)
                 .get_codebase_index_status_for_path(path, ctx)
                 .is_none()
@@ -363,7 +361,7 @@ impl InitProjectModel {
     }
 
     fn compute_codebase_context_step(&mut self, pwd_path: &Path, ctx: &mut ModelContext<Self>) {
-        if !UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx) {
+        if !CodeSettings::is_codebase_context_enabled(ctx) {
             // Feature disabled, leave as None
             return;
         }

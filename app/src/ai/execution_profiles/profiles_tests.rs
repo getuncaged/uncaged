@@ -22,7 +22,6 @@ use crate::server::sync_queue::SyncQueue;
 use crate::settings::PrivacySettings;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
     ServerMetadata {
@@ -85,7 +84,6 @@ fn install_singletons(app: &mut App, auth_state: AuthStateProvider) {
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| TemplatableMCPServerManager::default());
     app.add_singleton_model(PrivacySettings::mock);
-    app.add_singleton_model(UserWorkspaces::default_mock);
 }
 
 /// Regression test for the onboarding autonomy bug where

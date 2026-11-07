@@ -47,7 +47,6 @@ use crate::view_components::dropdown::{
     Dropdown, DropdownAction, DropdownItemAction, DropdownStyle,
 };
 use crate::view_components::FilterableDropdown;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{report_if_error, LLMPreferences};
 
 /// Env var override for the workspace default host (developer testing).
@@ -454,13 +453,12 @@ pub fn new_standard_filterable_picker_dropdown<A: OrchestrationControlAction, V:
 }
 
 /// Returns Warp base-model choices for orchestration.
-fn get_base_model_choices<'a>(
-    llm_prefs: &'a LLMPreferences,
-    app: &'a AppContext,
+fn get_base_model_choices(
+    llm_prefs: &LLMPreferences,
     is_local: bool,
-) -> impl Iterator<Item = &'a LLMInfo> {
+) -> impl Iterator<Item = &LLMInfo> {
     llm_prefs
-        .get_base_llm_choices_for_agent_mode(app)
+        .get_base_llm_choices_for_agent_mode()
         .filter(move |llm| is_local || llm_prefs.custom_llm_info_for_id(&llm.id).is_none())
 }
 /// Populates the model picker based on the active harness.
@@ -489,7 +487,7 @@ pub fn populate_model_picker_for_harness<A: OrchestrationControlAction, V: View>
                 // Order: auto models first, then custom models, then other models.
                 let llm_prefs = LLMPreferences::as_ref(ctx_dropdown);
                 let (auto_models, rest): (Vec<_>, Vec<_>) =
-                    get_base_model_choices(llm_prefs, ctx_dropdown, is_local)
+                    get_base_model_choices(llm_prefs, is_local)
                         .partition(|llm| llm.id.as_str().starts_with("auto"));
                 let (custom_models, other_models): (Vec<_>, Vec<_>) = rest
                     .into_iter()
@@ -587,8 +585,7 @@ pub fn is_model_in_filtered_choices<V: View>(
     match harness {
         Some(Harness::Oz) | None => {
             let llm_prefs = LLMPreferences::as_ref(ctx);
-            get_base_model_choices(llm_prefs, ctx, is_local)
-                .any(|llm| llm.id.to_string() == model_id)
+            get_base_model_choices(llm_prefs, is_local).any(|llm| llm.id.to_string() == model_id)
         }
         Some(Harness::Codex) if is_local => model_id.is_empty(),
         Some(harness) => {
@@ -617,7 +614,7 @@ pub fn first_filtered_model_id<V: View>(
         Some(Harness::Oz) | None => {
             let llm_prefs = LLMPreferences::as_ref(ctx);
             llm_prefs
-                .get_base_llm_choices_for_agent_mode(ctx)
+                .get_base_llm_choices_for_agent_mode()
                 .next()
                 .map(|llm| llm.id.to_string())
         }
@@ -781,7 +778,7 @@ pub fn populate_host_picker<V: View>(
     initial_host: &str,
     ctx: &mut ViewContext<V>,
 ) {
-    let default_host = resolve_default_host_slug(ctx);
+    let default_host = resolve_default_host_slug();
     let recent_host = resolve_recent_host_slug(ctx);
     let initial = if initial_host.trim().is_empty() {
         ORCHESTRATION_WARP_WORKER_HOST.to_string()
@@ -794,20 +791,17 @@ pub fn populate_host_picker<V: View>(
     });
 }
 
-/// Resolves the workspace-configured default host slug, honoring the
-/// `WARP_CLOUD_MODE_DEFAULT_HOST` env var override for developer
-/// testing. Mirrors the single-agent ambient flow.
-pub fn resolve_default_host_slug(ctx: &AppContext) -> Option<String> {
+/// Resolves the default host slug from the `WARP_CLOUD_MODE_DEFAULT_HOST` env var
+/// override for developer testing; Uncaged has no workspace-configured default.
+/// Mirrors the single-agent ambient flow.
+pub fn resolve_default_host_slug() -> Option<String> {
     if let Ok(slug) = std::env::var(DEFAULT_HOST_ENV_VAR) {
         let trimmed = slug.trim();
         if !trimmed.is_empty() {
             return Some(trimmed.to_string());
         }
     }
-    UserWorkspaces::as_ref(ctx)
-        .default_host_slug()
-        .map(str::to_string)
-        .filter(|s| !s.trim().is_empty())
+    None
 }
 
 /// Returns the user's last-selected custom host slug from
@@ -822,7 +816,7 @@ pub fn resolve_recent_host_slug(ctx: &AppContext) -> Option<String> {
     if last.eq_ignore_ascii_case(ORCHESTRATION_WARP_WORKER_HOST) {
         return None;
     }
-    if resolve_default_host_slug(ctx).as_deref() == Some(last.as_str()) {
+    if resolve_default_host_slug().as_deref() == Some(last.as_str()) {
         return None;
     }
     Some(last)
@@ -1322,7 +1316,7 @@ pub fn sync_picker_selections<A: OrchestrationControlAction, V: View>(
                 Some(Harness::Oz) | None => {
                     let llm_prefs = LLMPreferences::as_ref(ctx_dropdown);
                     llm_prefs
-                        .get_base_llm_choices_for_agent_mode(ctx_dropdown)
+                        .get_base_llm_choices_for_agent_mode()
                         .find(|llm| llm.id.to_string() == target_model_id)
                         .map(|llm| llm.menu_display_name())
                 }

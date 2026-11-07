@@ -19,8 +19,6 @@ use crate::search::data_source::Query;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::ServerId;
 use crate::server::ids::SyncId::{self};
-use crate::server::server_api::team::MockTeamClient;
-use crate::server::server_api::workspace::MockWorkspaceClient;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
 use crate::settings::AISettings;
@@ -29,7 +27,6 @@ use crate::workflows::workflow::Workflow;
 use crate::workflows::{CloudWorkflowModel, WorkflowId};
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::UserProfiles;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 fn mock_server_metadata() -> ServerMetadata {
     ServerMetadata {
@@ -81,16 +78,6 @@ fn initialize_app(app: &mut App) {
     // Add the necessary singleton models to the App
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
-    let mock_team_client = Arc::new(MockTeamClient::new());
-    let mock_workspace_client = Arc::new(MockWorkspaceClient::new());
-    app.add_singleton_model(|ctx| {
-        UserWorkspaces::mock(
-            mock_team_client.clone(),
-            mock_workspace_client.clone(),
-            vec![],
-            ctx,
-        )
-    });
     app.add_singleton_model(TeamTesterStatus::new);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);

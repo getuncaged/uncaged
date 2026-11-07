@@ -92,7 +92,6 @@ use crate::workspace::view::TOGGLE_PROJECT_EXPLORER_BINDING_NAME;
 use crate::workspace::ToastStack;
 #[cfg(not(target_family = "wasm"))]
 use crate::workspace::WorkspaceAction;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const ENABLE_NLD_TOOLTIP: &str = "Enable terminal command autodetection";
 const DISABLE_NLD_TOOLTIP: &str = "Disable terminal command autodetection";
@@ -499,9 +498,6 @@ impl AgentInputFooter {
         });
 
         ctx.subscribe_to_model(&NetworkStatus::handle(ctx), |_, _, _, ctx| {
-            ctx.notify();
-        });
-        ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |_, _, _, ctx| {
             ctx.notify();
         });
         ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |_, _, _, ctx| {

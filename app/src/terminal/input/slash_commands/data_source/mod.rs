@@ -29,15 +29,14 @@ use crate::search::slash_command_menu::static_commands::Availability;
 use crate::search::slash_command_menu::{SlashCommandId, StaticCommand};
 use crate::search::SyncDataSource;
 use crate::settings::{
-    AISettings, AISettingsChangedEvent, InputSettings, InputSettingsChangedEvent, PrivacySettings,
-    PrivacySettingsChangedEvent,
+    AISettings, AISettingsChangedEvent, CodeSettings, CodeSettingsChangedEvent, InputSettings,
+    InputSettingsChangedEvent, PrivacySettings, PrivacySettingsChangedEvent,
 };
 use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
 use crate::terminal::model::session::active_session::{ActiveSession, ActiveSessionEvent};
 use crate::terminal::model::session::SessionType;
-use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 
 pub struct DataSourceArgs {
     pub active_session: ModelHandle<ActiveSession>,
@@ -114,11 +113,11 @@ impl SlashCommandDataSource {
                 me.recompute_active_commands(ctx);
             }
         });
-        ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |me, _, event, ctx| {
+        ctx.subscribe_to_model(&CodeSettings::handle(ctx), |me, _, event, ctx| {
             if matches!(
                 event,
-                UserWorkspacesEvent::CodebaseContextEnablementChanged
-                    | UserWorkspacesEvent::TeamsChanged
+                CodeSettingsChangedEvent::CodebaseContextEnabled { .. }
+                    | CodeSettingsChangedEvent::AutoIndexingEnabled { .. }
             ) {
                 me.recompute_active_commands(ctx);
             }
@@ -255,7 +254,7 @@ impl SlashCommandDataSource {
             session_context |= Availability::ACTIVE_CONVERSATION;
         }
 
-        if UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx) {
+        if CodeSettings::is_codebase_context_enabled(ctx) {
             session_context |= Availability::CODEBASE_CONTEXT;
         }
 

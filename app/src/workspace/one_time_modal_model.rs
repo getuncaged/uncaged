@@ -17,8 +17,6 @@ use crate::settings::cloud_preferences_syncer::{
 };
 use crate::settings::{AISettings, CodeSettings};
 use crate::terminal::general_settings::GeneralSettings;
-use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::workspaces::workspace::CustomerType;
 
 /// A generic model for managing one-time modals that should be shown to users only once.
 ///
@@ -47,10 +45,6 @@ pub struct OneTimeModalModel {
     /// cloud-synced settings, so event-driven re-checks must wait for the initial
     /// cloud preferences load to avoid acting on stale values.
     has_completed_initial_modal_checks: bool,
-    /// Whether `UserWorkspaces` has emitted `TeamsChanged`, meaning workspace billing
-    /// data reflects more than the local cache and "no workspace" can be trusted to
-    /// mean a solo (Free) user rather than not-yet-loaded data.
-    has_fetched_workspaces: bool,
     /// The window ID where the currently open one-time modal should be displayed.
     /// This is captured when a modal is first opened and ensures the modal stays on that window.
     target_window_id: Option<WindowId>,
@@ -58,22 +52,6 @@ pub struct OneTimeModalModel {
 
 impl OneTimeModalModel {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        // Subscribe to UserWorkspaces to detect when sunsetted_to_build_ts changes
-        ctx.subscribe_to_model(
-            &crate::workspaces::user_workspaces::UserWorkspaces::handle(ctx),
-            |me, _, event, ctx| {
-                use crate::workspaces::user_workspaces::UserWorkspacesEvent;
-                match event {
-                    UserWorkspacesEvent::SunsettedToBuildDataUpdated => {}
-                    UserWorkspacesEvent::TeamsChanged => {
-                        me.has_fetched_workspaces = true;
-                        me.maybe_recheck_free_ai_removal_modal(ctx);
-                    }
-                    _ => {}
-                }
-            },
-        );
-
         // The base-credit allowance that gates the free-AI-removal notice loads
         // asynchronously, so re-evaluate the notice whenever request usage updates.
         ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |me, _, event, ctx| {
@@ -146,7 +124,6 @@ impl OneTimeModalModel {
             is_free_ai_removal_modal_open: false,
             is_hoa_onboarding_open: false,
             has_completed_initial_modal_checks: false,
-            has_fetched_workspaces: false,
             target_window_id: None,
         }
     }
@@ -427,23 +404,12 @@ impl OneTimeModalModel {
             return false;
         }
 
-        let customer_type = UserWorkspaces::as_ref(ctx)
-            .current_workspace()
-            .map(|workspace| workspace.billing_metadata.customer_type);
+        // Uncaged has no workspace billing data, so the notice can't be shown to a
+        // confirmed Free user: it is only marked seen once it can't apply.
         let is_warp_ai_enabled = *AISettings::as_ref(ctx).is_any_ai_enabled;
         let has_byok_or_byoe = ApiKeyManager::as_ref(ctx).has_any_key();
         let completed_new_onboarding = has_completed_local_onboarding(ctx);
-        let has_zero_base_credits = AIRequestUsageModel::as_ref(ctx).request_limit() == 0;
-
-        let decision = free_ai_removal_modal_decision(
-            customer_type,
-            is_warp_ai_enabled,
-            has_byok_or_byoe,
-            completed_new_onboarding,
-            has_zero_base_credits,
-            self.has_fetched_workspaces,
-        );
-        if decision == FreeAiRemovalModalDecision::Defer {
+        if is_warp_ai_enabled && !has_byok_or_byoe && !completed_new_onboarding {
             return false;
         }
 
@@ -455,14 +421,7 @@ impl OneTimeModalModel {
                 log::warn!("Failed to mark free AI removal modal as seen: {e}");
             }
         });
-
-        if decision == FreeAiRemovalModalDecision::MarkSeenSilently {
-            return false;
-        }
-
-        let should_show = !matches!(ChannelState::channel(), Channel::Integration);
-        self.set_free_ai_removal_modal_open(should_show, ctx);
-        should_show
+        false
     }
 
     fn set_hoa_onboarding_open(&mut self, is_open: bool, ctx: &mut ModelContext<Self>) -> bool {
@@ -592,48 +551,6 @@ pub fn mark_free_ai_removal_notice_seen(app: &mut AppContext) {
 }
 
 /// The outcome of evaluating the free-AI-removal notice conditions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum FreeAiRemovalModalDecision {
-    /// Show the modal and write the seen marker.
-    Show,
-    /// Write the seen marker without showing the modal.
-    MarkSeenSilently,
-    /// Not enough data to decide; re-evaluate on the next billing/experiments update.
-    Defer,
-}
-
-fn free_ai_removal_modal_decision(
-    customer_type: Option<CustomerType>,
-    is_warp_ai_enabled: bool,
-    has_byok_or_byoe: bool,
-    completed_new_onboarding: bool,
-    has_zero_base_credits: bool,
-    workspaces_fetched: bool,
-) -> FreeAiRemovalModalDecision {
-    if !is_warp_ai_enabled || has_byok_or_byoe || completed_new_onboarding {
-        return FreeAiRemovalModalDecision::MarkSeenSilently;
-    }
-    // Restrict to a Free (or confirmed solo) user; anyone else is paid (silently
-    // marked) or not-yet-known (deferred).
-    match customer_type {
-        Some(CustomerType::Free) => {}
-        // A missing workspace usually means billing data hasn't loaded yet; only treat
-        // it as a solo Free user once a server fetch has confirmed there is none, so a
-        // paid user's modal decision never runs against absent data.
-        None if workspaces_fetched => {}
-        None | Some(CustomerType::Unknown) => return FreeAiRemovalModalDecision::Defer,
-        Some(_) => return FreeAiRemovalModalDecision::MarkSeenSilently,
-    }
-    // Some ICPs still receive base AI credits on the Free plan; don't spook them with
-    // the notice. Only show once the base allowance is gone, and defer (rather than
-    // mark seen) otherwise so it re-evaluates if the allowance later drops to zero.
-    if has_zero_base_credits {
-        FreeAiRemovalModalDecision::Show
-    } else {
-        FreeAiRemovalModalDecision::Defer
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OneTimeModalEvent {
     VisibilityChanged { is_open: bool },

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use async_channel::Sender;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -119,7 +119,7 @@ use warp_graphql::queries::get_updated_cloud_objects::{
     GetUpdatedCloudObjects, GetUpdatedCloudObjectsVariables, UpdatedCloudObjectsInput,
     UpdatedCloudObjectsResult,
 };
-use warp_graphql::subscriptions::get_warp_drive_updates::GetWarpDriveUpdates;
+use warp_graphql::subscriptions::get_warp_drive_updates::{GetWarpDriveUpdates, WarpDriveUpdate};
 use warp_graphql::subscriptions::start_graphql_streaming_operation;
 
 use crate::ai::document::ai_document_model::AIDocumentId;
@@ -153,7 +153,6 @@ use crate::server::sync_queue::SerializedModel;
 use crate::settings::Preference;
 use crate::workflows::workflow_enum::WorkflowEnum;
 use crate::workflows::WorkflowId;
-use crate::workspaces::gql_convert::object_update_message_from_gql;
 use crate::workspaces::user_profiles::UserProfileWithUID;
 
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
@@ -1399,5 +1398,53 @@ fn parse_server_gso<T, S>(
             map.entry(format).or_default().push(Box::new(object));
         }
         Err(err) => report_error!(err.context(format!("Failed to convert {format:?} {uid}"))),
+    }
+}
+
+fn object_update_message_from_gql(value: WarpDriveUpdate) -> Result<ObjectUpdateMessage> {
+    match value {
+        WarpDriveUpdate::ObjectActionOccurred(message) => {
+            Ok(ObjectUpdateMessage::ObjectActionOccurred {
+                history: object_action_history_from_gql(message.history)?,
+            })
+        }
+        WarpDriveUpdate::ObjectContentUpdated(message) => {
+            let server_object = message.object.try_into()?;
+            let last_editor = message.last_editor.map(|e| e.into());
+            Ok(ObjectUpdateMessage::ObjectContentChanged {
+                server_object: Box::new(server_object),
+                last_editor,
+            })
+        }
+        WarpDriveUpdate::ObjectDeleted(message) => Ok(ObjectUpdateMessage::ObjectDeleted {
+            object_uid: ServerId::from_string_lossy(message.object_uid.inner()),
+        }),
+        WarpDriveUpdate::ObjectMetadataUpdated(message) => {
+            Ok(ObjectUpdateMessage::ObjectMetadataChanged {
+                metadata: message.metadata.try_into()?,
+            })
+        }
+        WarpDriveUpdate::ObjectPermissionsUpdated(message) => {
+            Ok(ObjectUpdateMessage::ObjectPermissionsChangedV2 {
+                object_uid: ServerId::from_string_lossy(message.object_uid.inner()),
+                user_profiles: message
+                    .user_profiles
+                    .into_iter()
+                    .flatten()
+                    .map(Into::into)
+                    .collect(),
+                permissions: message.permissions.try_into()?,
+            })
+        }
+        WarpDriveUpdate::TeamMembershipsChanged(_) => {
+            Ok(ObjectUpdateMessage::TeamMembershipsChanged)
+        }
+        WarpDriveUpdate::AmbientTaskUpdated(message) => {
+            Ok(ObjectUpdateMessage::AmbientTaskUpdated {
+                task_id: message.task_id.inner().to_string(),
+                timestamp: message.task_updated_ts.utc(),
+            })
+        }
+        WarpDriveUpdate::Unknown => bail!("Unexpected WarpDriveUpdate variant"),
     }
 }

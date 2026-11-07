@@ -1,15 +1,13 @@
 use asset_macro::bundled_or_fetched_asset;
 use markdown_parser::{FormattedTextFragment, FormattedTextLine};
 use warpui::assets::asset_cache::AssetSource;
-use warpui::{AppContext, SingletonEntity};
+use warpui::AppContext;
 
 use super::{CTAButton, CheckboxConfig, LaunchModalEvent, Slide};
 use crate::terminal::view::OnboardingIntention;
 use crate::ui_components::icons::Icon;
 use crate::workspace::action::WorkspaceAction;
 use crate::workspace::view::OnboardingTutorial;
-use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::workspaces::workspace::{AdminEnablementSetting, UgcCollectionEnablementSetting};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OzLaunchSlide {
@@ -168,16 +166,9 @@ impl Slide for OzLaunchSlide {
         })
     }
 
-    fn should_show_checkbox(&self, app: &AppContext) -> bool {
-        let cloud_storage_setting =
-            UserWorkspaces::as_ref(app).get_cloud_conversation_storage_enablement_setting();
-        let ugc_setting = UserWorkspaces::as_ref(app).get_ugc_collection_enablement_setting();
-
-        // Show checkbox only when user has control over cloud storage AND UGC is not force-enabled.
-        matches!(
-            cloud_storage_setting,
-            AdminEnablementSetting::RespectUserSetting
-        ) && !matches!(ugc_setting, UgcCollectionEnablementSetting::Enable)
+    fn should_show_checkbox(&self, _app: &AppContext) -> bool {
+        // Uncaged has no workspace, so the user always controls cloud storage and UGC.
+        true
     }
 
     fn on_close(&self, ctx: &mut warpui::ViewContext<super::LaunchModal<Self>>) {

@@ -57,7 +57,6 @@ use crate::terminal::model::block::{SerializedAgentViewVisibility, SerializedBlo
 use crate::terminal::model::session::SessionId;
 use crate::workflows::CloudWorkflow;
 use crate::workspaces::user_profiles::UserProfileWithUID;
-use crate::workspaces::workspace::{Workspace as WorkspaceMetadata, WorkspaceUid};
 
 pub enum PersistenceScope {
     App,
@@ -185,8 +184,6 @@ pub struct PersistedData {
 
     /// Shareable objects.
     pub cloud_objects: Vec<Box<dyn CloudObject>>,
-    pub workspaces: Vec<WorkspaceMetadata>,
-    pub current_workspace_uid: Option<WorkspaceUid>,
     pub command_history: Vec<PersistedCommand>,
     pub user_profiles: Vec<UserProfileWithUID>,
     pub time_of_next_force_object_refresh: Option<DateTime<Utc>>,
@@ -270,15 +267,6 @@ pub enum ModelEvent {
     },
     DeleteObjects {
         ids: Vec<(SyncId, ObjectIdType)>,
-    },
-    UpsertWorkspace {
-        workspace: Box<WorkspaceMetadata>,
-    },
-    UpsertWorkspaces {
-        workspaces: Vec<WorkspaceMetadata>,
-    },
-    SetCurrentWorkspace {
-        workspace_uid: WorkspaceUid,
     },
     UpdateObjectMetadata {
         id: String,

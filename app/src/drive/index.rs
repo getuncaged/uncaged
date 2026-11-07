@@ -15,11 +15,10 @@ use warpui::clipboard::ClipboardContent;
 use warpui::elements::{
     Align, AnchorPair, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dash, DropTarget, DropTargetData,
-    Empty, Flex, Highlight, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
-    OffsetPositioning, OffsetType, ParentAnchor, ParentElement, ParentOffsetBounds,
-    PositionedElementAnchor, PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition,
-    ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, Text, XAxisAnchor,
-    YAxisAnchor,
+    Empty, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
+    OffsetType, ParentAnchor, ParentElement, ParentOffsetBounds, PositionedElementAnchor,
+    PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition, ScrollTarget,
+    ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, Text, XAxisAnchor, YAxisAnchor,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::keymap::FixedBinding;
@@ -54,7 +53,6 @@ use crate::ai::facts::{AIFact, AIMemory};
 use crate::appearance::Appearance;
 use crate::auth::auth_manager::AuthManager;
 use crate::auth::auth_state::AuthState;
-use crate::auth::auth_view_modal::AuthViewVariant;
 use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::model::view::{CloudViewModel, CloudViewModelEvent, UpdateTimestamp};
@@ -85,12 +83,8 @@ use crate::ui_components::menu_button::{icon_button_with_context_menu, MenuDirec
 #[cfg(target_family = "wasm")]
 use crate::uri::web_intent_parser::open_url_on_desktop;
 use crate::util::color::coloru_with_opacity;
-use crate::view_components::{Dropdown, DropdownItem};
 use crate::workflows::{CloudWorkflow, WorkflowViewMode};
 use crate::workspace::active_terminal_in_window;
-use crate::workspaces::update_manager::TeamUpdateManager;
-use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::workspaces::workspace::WorkspaceUid;
 use crate::{report_if_error, ObjectActions};
 
 const WARP_DRIVE_TITLE: &str = "Drive";
@@ -175,20 +169,6 @@ const ZERO_STATE_NOTEBOOK_LABEL: &str = "Notebook";
 const SORTING_BUTTON_TOOLTIP_LABEL: &str = "Sort by";
 
 const RETRY_BUTTON_TOOLTIP_LABEL: &str = "Retry sync";
-
-const SHARED_OBJECT_LIMIT_HIT_BANNER_LINE: &str =
-    "Upgrade for access to more notebooks, workflows, shared sessions, and AI credits.";
-
-const PAYMENT_ISSUE_BANNER_LINE_1: &str =
-    "Shared objects have been restricted due to a subscription payment issue.";
-
-const PAYMENT_ISSUE_BANNER_LINE_2_ADMIN: &str =
-    "Please update your payment information to restore access.";
-
-const PAYMENT_ISSUE_BANNER_LINE_2_ADMIN_ENTERPRISE: &str =
-    "Please contact support@warp.dev to restore access.";
-
-const PAYMENT_ISSUE_BANNER_LINE_2_NONADMIN: &str = "Please contact a team admin to restore access.";
 
 /// Struct to hold different state-related information on per-space basis.
 /// Currently, we only have 1 space (1 Team), but as we're working on personal space, and add
@@ -334,15 +314,8 @@ pub enum DriveIndexAction {
     EscapeKey,
     /// Hitting cmd+enter on a WD item toggles the context menu.
     ToggleDriveItemContextMenu,
-    ViewPlans {
-        team_uid: ServerId,
-    },
-    ManageBilling {
-        team_uid: ServerId,
-    },
     SignupAnonymousUser,
     DismissPersonalObjectLimits,
-    SetCurrentWorkspace(WorkspaceUid),
     AttachPlanAsContext(AIDocumentId),
 }
 
@@ -376,11 +349,6 @@ impl DriveIndexAction {
                 initial_folder_id,
             },
         }
-    }
-
-    pub fn blocked_for_anonymous_user(&self) -> bool {
-        use DriveIndexAction::*;
-        matches!(self, ViewPlans { .. } | ManageBilling { .. })
     }
 }
 
@@ -434,7 +402,6 @@ pub enum DriveIndexEvent {
     },
     OpenWorkflowModalWithCloudWorkflow(SyncId),
     FocusWarpDrive,
-    OpenSharedObjectsCreationDeniedModal(DriveObjectType, ServerId),
     AttachPlanAsContext(AIDocumentId),
 }
 
@@ -445,8 +412,6 @@ struct MouseStateHandles {
     retry_button_mouse_state: MouseStateHandle,
     trash_row_mouse_state: MouseStateHandle,
     exit_trash_button_mouse_state: MouseStateHandle,
-    shared_object_limit_hit_banner_button_mouse_state: MouseStateHandle,
-    payment_issue_banner_button_mouse_state: MouseStateHandle,
     anonymous_sign_up_button_mouse_state: MouseStateHandle,
     anonymous_object_limit_close_button_mouse_state: MouseStateHandle,
     search_button_mouse_state: MouseStateHandle,
@@ -517,8 +482,6 @@ pub struct DriveIndex {
     /// objects button in the case of syncing failures.
     num_errored_objects: usize,
 
-    workspace_dropdown: ViewHandle<Dropdown<DriveIndexAction>>,
-
     /// Drive item to represent collection of AI facts.
     /// Special-cased to always render at the top of the Personal space section.
     ai_fact_collection: WarpDriveAIFactCollection,
@@ -559,51 +522,18 @@ pub fn init(app: &mut AppContext) {
 }
 
 impl DriveIndex {
-    // Called whenever cloud model or user workspaces change.
+    // Called whenever the cloud model changes.
     pub fn initialize_section_states(&mut self, ctx: &mut ViewContext<Self>) {
-        let user_workspaces = UserWorkspaces::handle(ctx);
-
-        self.workspace_dropdown.update(ctx, |dropdown, ctx| {
-            let workspaces = user_workspaces.as_ref(ctx).workspaces();
-            let selected_index =
-                if let Some(current_workspace) = user_workspaces.as_ref(ctx).current_workspace() {
-                    workspaces
-                        .iter()
-                        .position(|workspace| workspace.uid == current_workspace.uid)
-                        .unwrap_or_else(|| {
-                            log::error!("Could not find current workspace in dropdown option list");
-                            0
-                        })
-                } else {
-                    0
-                };
-            dropdown.set_items(
-                workspaces
-                    .iter()
-                    .map(|workspace| {
-                        DropdownItem::new(
-                            workspace.name.clone(),
-                            DriveIndexAction::SetCurrentWorkspace(workspace.uid),
-                        )
-                    })
-                    .collect(),
-                ctx,
-            );
-            dropdown.set_selected_by_index(selected_index, ctx);
-        });
-
         let cloud_model = CloudModel::handle(ctx);
 
-        let spaces = user_workspaces.update(ctx, |user_workspaces, ctx| {
-            user_workspaces.all_user_spaces(ctx)
-        });
+        let spaces = Space::all_user_spaces(ctx);
         let num_cloud_objects_per_space = match self.index_variant {
             DriveIndexVariant::MainIndex => cloud_model
                 .as_ref(ctx)
-                .num_active_cloud_objects_per_space(spaces.iter(), ctx),
+                .num_active_cloud_objects_per_space(spaces.iter()),
             DriveIndexVariant::Trash => cloud_model
                 .as_ref(ctx)
-                .num_trashed_cloud_objects_per_space(spaces.iter(), ctx),
+                .num_trashed_cloud_objects_per_space(spaces.iter()),
         };
         // Uncaged is account-free and has no teams, so the Drive never shows the Create/Join
         // team sections.
@@ -689,7 +619,7 @@ impl DriveIndex {
             (DriveIndexVariant::MainIndex, CloudObjectLocation::Space(Space::Shared)) => {
                 let user_uid = AuthStateProvider::as_ref(app).get().user_id();
                 cloud_model
-                    .active_cloud_objects_in_location_without_descendents(location, app)
+                    .active_cloud_objects_in_location_without_descendents(location)
                     .filter(move |cloud_object| {
                         cloud_object.renders_in_warp_drive()
                             && (!hide_welcome || !cloud_object.is_welcome_object())
@@ -704,7 +634,7 @@ impl DriveIndex {
                     ))
             }
             (DriveIndexVariant::MainIndex, _) => cloud_model
-                .active_cloud_objects_in_location_without_descendents(location, app)
+                .active_cloud_objects_in_location_without_descendents(location)
                 .filter(move |cloud_object| {
                     cloud_object.renders_in_warp_drive()
                         && (!hide_welcome || !cloud_object.is_welcome_object())
@@ -715,14 +645,14 @@ impl DriveIndex {
                     app,
                 )),
             (DriveIndexVariant::Trash, CloudObjectLocation::Space(space)) => cloud_model
-                .directly_trashed_cloud_objects_in_space(space, app)
+                .directly_trashed_cloud_objects_in_space(space)
                 .sorted_by(self.sorting_choice.sort_by(
                     cloud_view_model,
                     UpdateTimestamp::Trashed,
                     app,
                 )),
             (DriveIndexVariant::Trash, _) => cloud_model
-                .indirectly_trashed_cloud_objects_in_location_without_descendents(location, app)
+                .indirectly_trashed_cloud_objects_in_location_without_descendents(location)
                 .sorted_by(self.sorting_choice.sort_by(
                     cloud_view_model,
                     UpdateTimestamp::Trashed,
@@ -859,9 +789,6 @@ impl DriveIndex {
             Self::handle_cloud_view_model_event,
         );
 
-        let user_workspaces = UserWorkspaces::handle(ctx);
-        ctx.observe(&user_workspaces, Self::on_user_workspaces_changed);
-
         let network_status = NetworkStatus::handle(ctx);
         ctx.subscribe_to_model(&network_status, |_me, _, _event, ctx| {
             ctx.notify();
@@ -913,43 +840,6 @@ impl DriveIndex {
             ctx.notify();
         });
 
-        let workspace_dropdown = ctx.add_typed_action_view(|ctx| {
-            let mut dropdown = Dropdown::new(ctx);
-            dropdown.set_top_bar_max_width(400.);
-            dropdown.set_menu_width(225., ctx);
-
-            let workspaces = user_workspaces.as_ref(ctx).workspaces();
-
-            let selected_index =
-                if let Some(current_workspace) = user_workspaces.as_ref(ctx).current_workspace() {
-                    workspaces
-                        .iter()
-                        .position(|workspace| workspace.uid == current_workspace.uid)
-                        .unwrap_or_else(|| {
-                            log::error!("Could not find current workspace in dropdown option list");
-                            0
-                        })
-                } else {
-                    0
-                };
-
-            dropdown.add_items(
-                workspaces
-                    .iter()
-                    .map(|workspace| {
-                        DropdownItem::new(
-                            workspace.name.clone(),
-                            DriveIndexAction::SetCurrentWorkspace(workspace.uid),
-                        )
-                    })
-                    .collect(),
-                ctx,
-            );
-            dropdown.set_selected_by_index(selected_index, ctx);
-
-            dropdown
-        });
-
         let ai_fact_collection = WarpDriveAIFactCollection::new(ClientId::default());
         let mcp_server_collection = WarpDriveMCPServerCollection::new(ClientId::default());
 
@@ -979,7 +869,6 @@ impl DriveIndex {
             has_initialized_sections: Default::default(),
             num_errored_objects: Default::default(),
             should_show_personal_object_limit_status: true,
-            workspace_dropdown,
             ai_fact_collection,
             ai_fact_collection_item_mouse_states: Default::default(),
             mcp_server_collection,
@@ -1100,15 +989,6 @@ impl DriveIndex {
                 self.scroll_item_into_view(*item_id, ctx);
             }
         }
-        ctx.notify();
-    }
-
-    fn on_user_workspaces_changed(
-        &mut self,
-        _: ModelHandle<UserWorkspaces>,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.initialize_section_states(ctx);
         ctx.notify();
     }
 
@@ -1486,7 +1366,7 @@ impl DriveIndex {
             // Disable Empty Trash button if trash is empty
             let cloud_model = CloudModel::as_ref(app);
             if cloud_model
-                .directly_trashed_cloud_objects_in_space(*space, app)
+                .directly_trashed_cloud_objects_in_space(*space)
                 .count()
                 == 0
             {
@@ -1590,7 +1470,7 @@ impl DriveIndex {
                     appearance.theme().active_ui_text_color().into()
                 };
                 Some(self.render_space_section_header(
-                    self.render_section_title(space, title_font_color, appearance, app),
+                    self.render_section_title(space, title_font_color, appearance),
                     &space,
                     section_state,
                     section,
@@ -1602,7 +1482,7 @@ impl DriveIndex {
                 let title_font_color = self
                     .font_color_based_on_focused_state(appearance, WarpDriveItemId::Space(space));
                 Some(self.render_trash_section_header(
-                    self.render_section_title(space, title_font_color, appearance, app),
+                    self.render_section_title(space, title_font_color, appearance),
                     &space,
                     section_state,
                     section,
@@ -1631,12 +1511,11 @@ impl DriveIndex {
         space: Space,
         title_font_color: ColorU,
         appearance: &Appearance,
-        app: &AppContext,
     ) -> Box<dyn Element> {
         Container::new(
             appearance
                 .ui_builder()
-                .wrappable_text(space.name(app).to_uppercase(), false)
+                .wrappable_text(space.name().to_uppercase(), false)
                 .with_style(UiComponentStyles {
                     font_family_id: Some(appearance.ui_font_family()),
                     font_size: Some(SECTION_HEADER_FONT_SIZE),
@@ -1844,7 +1723,6 @@ impl DriveIndex {
                         cloud_model
                             .active_cloud_objects_in_location_without_descendents(
                                 CloudObjectLocation::Space(space),
-                                app,
                             )
                             .filter(move |cloud_object| {
                                 !is_shared_space
@@ -1859,7 +1737,7 @@ impl DriveIndex {
                             ))
                     }
                     DriveIndexVariant::Trash => cloud_model
-                        .directly_trashed_cloud_objects_in_space(space, app)
+                        .directly_trashed_cloud_objects_in_space(space)
                         .sorted_by(self.sorting_choice.sort_by(
                             cloud_view_model,
                             UpdateTimestamp::Trashed,
@@ -2170,15 +2048,6 @@ impl DriveIndex {
         sections.into_iter()
     }
 
-    fn render_workspace_picker(&self) -> Box<dyn Element> {
-        Container::new(ChildView::new(&self.workspace_dropdown).finish())
-            .with_padding_bottom(6.)
-            .with_padding_top(6.)
-            .with_padding_left(12.)
-            .with_padding_right(12.)
-            .finish()
-    }
-
     fn render_title(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
         let text = Container::new(
             appearance
@@ -2469,18 +2338,16 @@ impl DriveIndex {
             let mut item_and_children = vec![rendered_item];
 
             if folder.model().is_open {
-                let results = self
-                    .sorted_orders_by_location
-                    .get(&CloudObjectLocation::Folder(folder.id))
-                    .cloned()
-                    .unwrap_or_else(|| {
-                        let cloud_view_model = CloudViewModel::as_ref(app);
-                        match self.index_variant {
+                let results =
+                    self.sorted_orders_by_location
+                        .get(&CloudObjectLocation::Folder(folder.id))
+                        .cloned()
+                        .unwrap_or_else(|| {
+                            let cloud_view_model = CloudViewModel::as_ref(app);
+                            match self.index_variant {
                             DriveIndexVariant::MainIndex => cloud_model
                                 .active_cloud_objects_in_location_without_descendents(
-                                    CloudObjectLocation::Folder(folder.id),
-                                    app,
-                                )
+                                    CloudObjectLocation::Folder(folder.id))
                                 .sorted_by(self.sorting_choice.sort_by(
                                     cloud_view_model,
                                     UpdateTimestamp::Revision,
@@ -2488,9 +2355,7 @@ impl DriveIndex {
                                 )),
                             DriveIndexVariant::Trash => cloud_model
                                 .indirectly_trashed_cloud_objects_in_location_without_descendents(
-                                    CloudObjectLocation::Folder(folder.id),
-                                    app,
-                                )
+                                    CloudObjectLocation::Folder(folder.id))
                                 .sorted_by(self.sorting_choice.sort_by(
                                     cloud_view_model,
                                     UpdateTimestamp::Revision,
@@ -2499,7 +2364,7 @@ impl DriveIndex {
                         }
                         .map(|item| item.uid())
                         .collect()
-                    });
+                        });
 
                 let item_iter = results
                     .into_iter()
@@ -2937,48 +2802,15 @@ impl DriveIndex {
         // Only proceed if we can move the object to this location AND the operation results in a change.
         // Even though an object technically can be moved to its current location (can_move_object_to_location returns true)
         // we do not need to do any of the update logic that follows.
-        if !cloud_model.as_ref(ctx).can_move_object_to_location(
-            &cloud_object_type_and_id.uid(),
-            new_location,
-            ctx,
-        ) || cloud_model
+        if !cloud_model
             .as_ref(ctx)
-            .object_location(&cloud_object_type_and_id.uid(), ctx)
-            .is_none_or(|location| location == new_location)
+            .can_move_object_to_location(&cloud_object_type_and_id.uid(), new_location)
+            || cloud_model
+                .as_ref(ctx)
+                .object_location(&cloud_object_type_and_id.uid())
+                .is_none_or(|location| location == new_location)
         {
             return;
-        }
-
-        // Check if object is being moved into team space, if it is, then check
-        // corresponding object limits for that team.
-        if let CloudObjectLocation::Space(Space::Team { team_uid }) = new_location {
-            match *cloud_object_type_and_id {
-                CloudObjectTypeAndId::Notebook(_) => {
-                    if !UserWorkspaces::has_capacity_for_shared_notebooks(team_uid, ctx, 1) {
-                        // If team has reached the limit for notebooks, show the modal
-                        // and return early.
-                        ctx.emit(DriveIndexEvent::OpenSharedObjectsCreationDeniedModal(
-                            DriveObjectType::Notebook {
-                                is_ai_document: false,
-                            },
-                            team_uid,
-                        ));
-                        return;
-                    }
-                }
-                CloudObjectTypeAndId::Workflow(_) => {
-                    if !UserWorkspaces::has_capacity_for_shared_workflows(team_uid, ctx, 1) {
-                        // If team has reached the limit for workflows, show the modal
-                        // and return early.
-                        ctx.emit(DriveIndexEvent::OpenSharedObjectsCreationDeniedModal(
-                            DriveObjectType::Workflow,
-                            team_uid,
-                        ));
-                        return;
-                    }
-                }
-                _ => (),
-            }
         }
 
         // Otherwise allow object move to go through.
@@ -3073,19 +2905,6 @@ impl DriveIndex {
                     return;
                 }
 
-                // If the new notebook is being created in the team space, check if the team has
-                // reached the limit for notebooks.
-                if let Space::Team { team_uid } = space {
-                    if !UserWorkspaces::has_capacity_for_shared_notebooks(team_uid, ctx, 1) {
-                        // If team has reached the limit for notebooks, show the modal
-                        // and return early.
-                        ctx.emit(DriveIndexEvent::OpenSharedObjectsCreationDeniedModal(
-                            object_type,
-                            team_uid,
-                        ));
-                        return;
-                    }
-                }
                 ctx.emit(DriveIndexEvent::CreateNotebook {
                     space,
                     title,
@@ -3200,90 +3019,8 @@ impl DriveIndex {
             CloudViewModel::as_ref(ctx).object_space(&cloud_object_type_and_id.uid(), ctx)
         {
             match space {
-                Space::Team { team_uid } => {
-                    match cloud_object_type_and_id {
-                        CloudObjectTypeAndId::Notebook(_) => {
-                            if !UserWorkspaces::has_capacity_for_shared_notebooks(team_uid, ctx, 1)
-                            {
-                                // If team has reached the limit for notebooks, show the modal
-                                // and return early.
-                                ctx.emit(DriveIndexEvent::OpenSharedObjectsCreationDeniedModal(
-                                    DriveObjectType::Notebook {
-                                        is_ai_document: false,
-                                    },
-                                    team_uid,
-                                ));
-                                return;
-                            }
-                        }
-                        CloudObjectTypeAndId::Workflow(_) => {
-                            if !UserWorkspaces::has_capacity_for_shared_workflows(team_uid, ctx, 1)
-                            {
-                                // If team has reached the limit for workflows, show the modal
-                                // and return early.
-                                ctx.emit(DriveIndexEvent::OpenSharedObjectsCreationDeniedModal(
-                                    DriveObjectType::Workflow,
-                                    team_uid,
-                                ));
-                                return;
-                            }
-                        }
-                        CloudObjectTypeAndId::Folder(folder_id) => {
-                            let cloud_model = CloudModel::handle(ctx);
-
-                            // When untrashing a folder, check to see if there are any notebooks or workflows
-                            // in the trashed folder and make sure they are within limits.
-                            let trashed_object_types = cloud_model
-                                .as_ref(ctx)
-                                .trashed_cloud_object_types_in_location_with_descendants(
-                                    CloudObjectLocation::Folder(*folder_id),
-                                    ctx,
-                                );
-                            let notebooks_in_trashed_folder = trashed_object_types
-                                .clone()
-                                .into_iter()
-                                .filter(|object_type| *object_type == ObjectType::Notebook)
-                                .count();
-
-                            // Check # of notebooks in the trashed folder and make sure they are within limits
-                            if !UserWorkspaces::has_capacity_for_shared_notebooks(
-                                team_uid,
-                                ctx,
-                                notebooks_in_trashed_folder,
-                            ) {
-                                // If team has reached the limit for notebooks, show the modal
-                                // and return early.
-                                ctx.emit(DriveIndexEvent::OpenSharedObjectsCreationDeniedModal(
-                                    DriveObjectType::Notebook {
-                                        is_ai_document: false,
-                                    },
-                                    team_uid,
-                                ));
-                                return;
-                            }
-
-                            // Check # of workflows in the trashed folder and make sure they are within limits
-                            let workflows_in_trashed_folder = trashed_object_types
-                                .into_iter()
-                                .filter(|object_type| *object_type == ObjectType::Workflow)
-                                .count();
-                            if !UserWorkspaces::has_capacity_for_shared_workflows(
-                                team_uid,
-                                ctx,
-                                workflows_in_trashed_folder,
-                            ) {
-                                // If team has reached the limit for workflows, show the modal
-                                // and return early.
-                                ctx.emit(DriveIndexEvent::OpenSharedObjectsCreationDeniedModal(
-                                    DriveObjectType::Workflow,
-                                    team_uid,
-                                ));
-                                return;
-                            }
-                        }
-                        _ => (),
-                    }
-                }
+                // Uncaged has no teams, so there are no team object limits to check.
+                Space::Team { .. } => (),
                 Space::Personal => match cloud_object_type_and_id {
                     CloudObjectTypeAndId::Notebook(_) => {
                         if has_feature_gated_anonymous_user_reached_notebook_limit(ctx) {
@@ -3578,13 +3315,13 @@ impl DriveIndex {
         let personal_object_limits = self.auth_state.personal_object_limits()?;
 
         let num_workflows = CloudModel::as_ref(ctx)
-            .active_non_welcome_workflows_in_space(Space::Personal, ctx)
+            .active_non_welcome_workflows_in_space(Space::Personal)
             .count();
         let num_notebooks = CloudModel::as_ref(ctx)
-            .active_non_welcome_notebooks_in_space(Space::Personal, ctx)
+            .active_non_welcome_notebooks_in_space(Space::Personal)
             .count();
         let num_env_var_collections = CloudModel::as_ref(ctx)
-            .active_non_welcome_env_var_collections_in_space(Space::Personal, ctx)
+            .active_non_welcome_env_var_collections_in_space(Space::Personal)
             .count();
 
         let theme = appearance.theme();
@@ -3823,181 +3560,6 @@ impl DriveIndex {
                     .finish(),
             )
             .finish()
-    }
-
-    fn render_shared_object_limit_hit_banner(
-        &self,
-        appearance: &Appearance,
-        team_uid: ServerId,
-        object_type: ObjectType,
-    ) -> Box<dyn Element> {
-        let theme = appearance.theme();
-        let background_color = theme.surface_2();
-
-        let highlight =
-            Highlight::new().with_properties(Properties::default().weight(Weight::Bold));
-
-        let banner_line_1 = format!("You've run out of {object_type}s on your plan.");
-        let body = Container::new(
-            appearance
-                .ui_builder()
-                .wrappable_text(
-                    format!("{banner_line_1} {SHARED_OBJECT_LIMIT_HIT_BANNER_LINE}"),
-                    true,
-                )
-                .with_highlights((0..banner_line_1.len()).collect::<Vec<_>>(), highlight)
-                .with_style(UiComponentStyles {
-                    font_size: Some(12.),
-                    font_color: Some(appearance.theme().main_text_color(background_color).into()),
-                    ..Default::default()
-                })
-                .build()
-                .finish(),
-        )
-        .with_margin_bottom(16.)
-        .finish();
-
-        let button = appearance
-            .ui_builder()
-            .button(
-                ButtonVariant::Accent,
-                self.mouse_state_handles
-                    .shared_object_limit_hit_banner_button_mouse_state
-                    .clone(),
-            )
-            .with_centered_text_label("Compare plans".into())
-            .with_style(UiComponentStyles {
-                font_size: Some(14.),
-                font_weight: Some(Weight::Light),
-                padding: Some(Coords {
-                    top: 8.,
-                    bottom: 8.,
-                    left: 12.,
-                    right: 12.,
-                }),
-                ..Default::default()
-            })
-            .build()
-            .with_cursor(Cursor::PointingHand)
-            .on_click(move |ctx, _, _| {
-                ctx.dispatch_typed_action(DriveIndexAction::ViewPlans { team_uid })
-            })
-            .finish();
-
-        Container::new(
-            Container::new(
-                Flex::column()
-                    .with_main_axis_alignment(MainAxisAlignment::Center)
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(body)
-                    .with_child(button)
-                    .finish(),
-            )
-            .with_background(background_color)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
-            )))
-            .with_uniform_padding(16.)
-            .finish(),
-        )
-        .with_uniform_padding(8.)
-        .with_border(Border::top(1.).with_border_color(background_color.into()))
-        .finish()
-    }
-
-    fn render_payment_issue_banner(
-        &self,
-        appearance: &Appearance,
-        team_uid: ServerId,
-        has_admin_permissions: bool,
-        is_on_stripe_paid_plan: bool,
-    ) -> Box<dyn Element> {
-        let theme = appearance.theme();
-        let background_color = theme.surface_2();
-
-        let mut body = Flex::column()
-            .with_main_axis_alignment(MainAxisAlignment::Center)
-            .with_cross_axis_alignment(CrossAxisAlignment::Center);
-
-        let highlight =
-            Highlight::new().with_properties(Properties::default().weight(Weight::Bold));
-
-        let banner_line_2 = if has_admin_permissions && is_on_stripe_paid_plan {
-            PAYMENT_ISSUE_BANNER_LINE_2_ADMIN
-        } else if has_admin_permissions && !is_on_stripe_paid_plan {
-            PAYMENT_ISSUE_BANNER_LINE_2_ADMIN_ENTERPRISE
-        } else {
-            PAYMENT_ISSUE_BANNER_LINE_2_NONADMIN
-        };
-
-        body.add_child(
-            Container::new(
-                appearance
-                    .ui_builder()
-                    .wrappable_text(
-                        format!("{PAYMENT_ISSUE_BANNER_LINE_1} {banner_line_2}").to_string(),
-                        true,
-                    )
-                    .with_highlights(
-                        (0..PAYMENT_ISSUE_BANNER_LINE_1.len()).collect::<Vec<_>>(),
-                        highlight,
-                    )
-                    .with_style(UiComponentStyles {
-                        font_size: Some(12.),
-                        font_color: Some(
-                            appearance.theme().main_text_color(background_color).into(),
-                        ),
-                        ..Default::default()
-                    })
-                    .build()
-                    .finish(),
-            )
-            .finish(),
-        );
-
-        // Only show a manage billing button if they are an admin and on a paid stripe plan
-        if has_admin_permissions && is_on_stripe_paid_plan {
-            let button = appearance
-                .ui_builder()
-                .button(
-                    ButtonVariant::Accent,
-                    self.mouse_state_handles
-                        .payment_issue_banner_button_mouse_state
-                        .clone(),
-                )
-                .with_centered_text_label("Manage billing".into())
-                .with_style(UiComponentStyles {
-                    font_size: Some(14.),
-                    font_weight: Some(Weight::Light),
-                    padding: Some(Coords {
-                        top: 8.,
-                        bottom: 8.,
-                        left: 12.,
-                        right: 12.,
-                    }),
-                    ..Default::default()
-                })
-                .build()
-                .with_cursor(Cursor::PointingHand)
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(DriveIndexAction::ManageBilling { team_uid })
-                })
-                .finish();
-            body.add_child(Container::new(button).with_margin_top(16.).finish());
-        }
-
-        Container::new(
-            Container::new(body.finish())
-                .with_background(background_color)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
-                )))
-                .with_uniform_padding(16.)
-                .finish(),
-        )
-        .with_uniform_padding(8.)
-        .with_border(Border::top(1.).with_border_color(background_color.into()))
-        .finish()
     }
 
     fn menu_items(
@@ -4311,7 +3873,7 @@ impl DriveIndex {
                             match space {
                                 Space::Personal | Space::Shared => None,
                                 Space::Team { .. } => Some(
-                                    MenuItemFields::new(format!("Move to {}", space.name(app)))
+                                    MenuItemFields::new(format!("Move to {}", space.name()))
                                         .with_on_select_action(DriveIndexAction::MoveObject {
                                             cloud_object_type_and_id: *cloud_object_type_and_id,
                                             new_space: *space,
@@ -4721,7 +4283,6 @@ impl View for DriveIndex {
 
     fn render(&self, app: &AppContext) -> Box<dyn warpui::Element> {
         let appearance = Appearance::as_ref(app);
-        let workspaces = UserWorkspaces::as_ref(app);
 
         // The content of the index is all spaces rendered into a flex column.
         let content = Flex::column().with_children(self.render_all_sections(app));
@@ -4776,11 +4337,6 @@ impl View for DriveIndex {
 
         let mut drive = Flex::column();
 
-        // Only show the workspace picker if they are in multiple workspaces.
-        if FeatureFlag::MultiWorkspace.is_enabled() && workspaces.workspaces().len() > 1 {
-            drive.add_child(self.render_workspace_picker());
-        }
-
         match self.index_variant {
             DriveIndexVariant::MainIndex => {
                 drive.add_child(self.render_title(appearance, app));
@@ -4792,40 +4348,6 @@ impl View for DriveIndex {
                 drive.add_child(Shrinkable::new(1., index_content).finish());
             }
         };
-
-        if let Some(team) = workspaces.current_team() {
-            if team.billing_metadata.is_delinquent_due_to_payment_issue() {
-                let current_user_email = self.auth_state.user_email().unwrap_or_default();
-                let has_admin_permissions = team.has_admin_permissions(&current_user_email);
-                let is_on_stripe_paid_plan = team.billing_metadata.is_on_stripe_paid_plan();
-                drive.add_child(self.render_payment_issue_banner(
-                    appearance,
-                    team.uid,
-                    has_admin_permissions,
-                    is_on_stripe_paid_plan,
-                ));
-            } else if UserWorkspaces::is_at_tier_limit_for_object_type(
-                team.uid,
-                ObjectType::Workflow,
-                app,
-            ) {
-                drive.add_child(self.render_shared_object_limit_hit_banner(
-                    appearance,
-                    team.uid,
-                    ObjectType::Workflow,
-                ));
-            } else if UserWorkspaces::is_at_tier_limit_for_object_type(
-                team.uid,
-                ObjectType::Notebook,
-                app,
-            ) {
-                drive.add_child(self.render_shared_object_limit_hit_banner(
-                    appearance,
-                    team.uid,
-                    ObjectType::Notebook,
-                ));
-            }
-        }
 
         drive.finish()
     }
@@ -4839,15 +4361,6 @@ impl TypedActionView for DriveIndex {
     type Action = DriveIndexAction;
 
     fn handle_action(&mut self, action: &DriveIndexAction, ctx: &mut ViewContext<Self>) {
-        // Block anonymous users from performing team actions
-        if self.auth_state.is_anonymous_or_logged_out() && action.blocked_for_anonymous_user() {
-            AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                auth_manager
-                    .attempt_login_gated_feature(AuthViewVariant::RequireLoginCloseable, ctx)
-            });
-            return;
-        }
-
         match action {
             DriveIndexAction::CreateObject {
                 object_type,
@@ -5211,14 +4724,6 @@ impl TypedActionView for DriveIndex {
             DriveIndexAction::InvokeEnvVarCollectionInSubshell(id) => {
                 ctx.emit(DriveIndexEvent::InvokeEnvVarCollectionInSubshell(*id))
             }
-            DriveIndexAction::ViewPlans { team_uid } => {
-                ctx.open_url(UserWorkspaces::upgrade_link_for_team(*team_uid).as_str());
-            }
-            DriveIndexAction::ManageBilling { team_uid } => {
-                UserWorkspaces::handle(ctx).update(ctx, move |user_workspaces, ctx| {
-                    user_workspaces.generate_stripe_billing_portal_link(*team_uid, ctx);
-                });
-            }
             DriveIndexAction::SignupAnonymousUser => {
                 AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
                     auth_manager.initiate_anonymous_user_linking(ctx);
@@ -5226,11 +4731,6 @@ impl TypedActionView for DriveIndex {
             }
             DriveIndexAction::DismissPersonalObjectLimits => {
                 self.dismiss_personal_object_limit_status(ctx);
-            }
-            DriveIndexAction::SetCurrentWorkspace(workspace_uid) => {
-                TeamUpdateManager::handle(ctx).update(ctx, |manager, ctx| {
-                    manager.set_current_workspace_uid(*workspace_uid, ctx)
-                });
             }
             DriveIndexAction::AttachPlanAsContext(id) => {
                 ctx.emit(DriveIndexEvent::AttachPlanAsContext(*id))

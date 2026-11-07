@@ -2,8 +2,6 @@ pub mod ai;
 pub mod auth;
 pub mod managed_secrets;
 pub mod object;
-pub mod team;
-pub mod workspace;
 
 use std::ops::Deref;
 use std::sync::Arc;
@@ -20,7 +18,6 @@ use object::ObjectClient;
 use parking_lot::Mutex;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use team::TeamClient;
 use url::Url;
 use warp_core::context_flag::ContextFlag;
 use warp_core::errors::{register_error, AnyhowErrorExt, ErrorExt};
@@ -34,7 +31,6 @@ use warp_server_client::network_logging::NetworkLogModel;
 pub use warp_server_client::HttpStatusError;
 use warpui::r#async::BoxFuture;
 use warpui::{Entity, ModelContext, SingletonEntity};
-use workspace::WorkspaceClient;
 
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::get_relevant_files::api::{GetRelevantFiles, GetRelevantFilesResponse};
@@ -976,14 +972,6 @@ impl ServerApiProvider {
 
     pub fn get_auth_client(&self) -> Arc<dyn AuthClient> {
         self.auth_client.clone()
-    }
-
-    pub fn get_workspace_client(&self) -> Arc<dyn WorkspaceClient> {
-        self.server_api.clone()
-    }
-
-    pub fn get_team_client(&self) -> Arc<dyn TeamClient> {
-        self.server_api.clone()
     }
 
     pub fn get_ai_client(&self) -> Arc<dyn AIClient> {

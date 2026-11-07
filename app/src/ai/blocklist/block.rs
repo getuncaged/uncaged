@@ -78,7 +78,6 @@ use super::inline_action::code_diff_view::{
 };
 use super::inline_action::requested_action::{CTRL_C_KEYSTROKE, ENTER_KEYSTROKE};
 use super::inline_action::requested_command_attribution::is_command_copied_from_document;
-use super::permissions::is_agent_mode_autonomy_allowed;
 use super::suggested_agent_mode_workflow_modal::SuggestedAgentModeWorkflowAndId;
 use super::suggested_rule_modal::SuggestedRuleAndId;
 use super::{
@@ -183,7 +182,6 @@ use crate::view_components::find::FindEvent;
 use crate::view_components::DismissibleToast;
 use crate::workspace::{ForkAIConversationParams, ForkedConversationDestination, WorkspaceAction};
 use crate::workspaces::user_profiles::{UserProfileWithUID, UserProfiles};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{
     report_error, report_if_error, AIAgentTodoList, Appearance, FileEdit, LLMPreferences,
     ToastStack,
@@ -2545,74 +2543,72 @@ impl AIBlock {
                 }
             })
         {
-            if is_agent_mode_autonomy_allowed(ctx) {
-                let autoexecute_decision = escape_char.map(|escape_char| {
-                    BlocklistAIPermissions::as_ref(ctx).can_autoexecute_command(
-                        &self.client_ids.conversation_id,
-                        command,
-                        escape_char,
-                        is_read_only,
-                        is_risky,
-                        Some(self.terminal_view_id),
-                        ctx,
-                    )
-                });
+            let autoexecute_decision = escape_char.map(|escape_char| {
+                BlocklistAIPermissions::as_ref(ctx).can_autoexecute_command(
+                    &self.client_ids.conversation_id,
+                    command,
+                    escape_char,
+                    is_read_only,
+                    is_risky,
+                    Some(self.terminal_view_id),
+                    ctx,
+                )
+            });
 
-                match autoexecute_decision {
-                    Some(CommandExecutionPermission::Denied(
-                        CommandExecutionPermissionDeniedReason::AlwaysAskEnabled,
-                    )) if !*AISettings::as_ref(ctx)
-                        .has_shown_agent_mode_profile_command_autoexecution_speedbump =>
-                    {
-                        // Show the default command autonomy setting if set to Always Ask.
-                        self.autonomy_setting_speedbump =
-                            AutonomySettingSpeedbump::ShouldShowForProfileCommandAutoexecution {
-                                action_id: requested_command_action_id.clone(),
-                                shown: Default::default(),
-                            };
-                        self.update_requested_command_autonomy_speedbump(
-                            requested_command_action_id.clone(),
-                            ctx,
-                        );
-                        // Mark the speedbump as shown in settings so that we do not render it again.
-                        AISettings::handle(ctx)
-                            .update(ctx, |ai_settings, ctx| {
-                                if let Err(err) = ai_settings.has_shown_agent_mode_profile_command_autoexecution_speedbump.set_value(true, ctx) {
-                                    log::warn!("Could not mark profile command autoexecution speedbump as shown {err}");
-                                }
+            match autoexecute_decision {
+                Some(CommandExecutionPermission::Denied(
+                    CommandExecutionPermissionDeniedReason::AlwaysAskEnabled,
+                )) if !*AISettings::as_ref(ctx)
+                    .has_shown_agent_mode_profile_command_autoexecution_speedbump =>
+                {
+                    // Show the default command autonomy setting if set to Always Ask.
+                    self.autonomy_setting_speedbump =
+                        AutonomySettingSpeedbump::ShouldShowForProfileCommandAutoexecution {
+                            action_id: requested_command_action_id.clone(),
+                            shown: Default::default(),
+                        };
+                    self.update_requested_command_autonomy_speedbump(
+                        requested_command_action_id.clone(),
+                        ctx,
+                    );
+                    // Mark the speedbump as shown in settings so that we do not render it again.
+                    AISettings::handle(ctx)
+                        .update(ctx, |ai_settings, ctx| {
+                            if let Err(err) = ai_settings.has_shown_agent_mode_profile_command_autoexecution_speedbump.set_value(true, ctx) {
+                                log::warn!("Could not mark profile command autoexecution speedbump as shown {err}");
                             }
-                        )
-                    }
-                    Some(CommandExecutionPermission::Denied(
-                        CommandExecutionPermissionDeniedReason::Inconclusive,
-                    )) if *AISettings::as_ref(ctx)
-                        .should_show_agent_mode_autoexecute_readonly_commands_speedbump
-                        && is_read_only =>
-                    {
-                        // Try to show the speedbump for the readonly command setting
-                        // if we haven't shown it enough before and this command is
-                        // considered readonly.
-                        self.autonomy_setting_speedbump =
-                            AutonomySettingSpeedbump::ShouldShowForAutoexecutingReadonlyCommands {
-                                action_id: requested_command_action_id.clone(),
-                                checked: true,
-                                shown: Arc::new(Mutex::new(false)),
-                            };
-                        self.update_requested_command_autonomy_speedbump(
-                            requested_command_action_id.clone(),
-                            ctx,
-                        );
-                        // Mark the speedbump as shown in settings so that we do not render it again.
-                        AISettings::handle(ctx)
-                            .update(ctx, |ai_settings, ctx| {
-                                if let Err(err) = ai_settings.should_show_agent_mode_autoexecute_readonly_commands_speedbump.set_value(false, ctx) {
-                                    log::warn!("Could not mark autoexecute read-only commands speedbump as shown {err}");
-                                }
-                            }
-                        )
-                    }
-                    _ => (),
+                        }
+                    )
                 }
+                Some(CommandExecutionPermission::Denied(
+                    CommandExecutionPermissionDeniedReason::Inconclusive,
+                )) if *AISettings::as_ref(ctx)
+                    .should_show_agent_mode_autoexecute_readonly_commands_speedbump
+                    && is_read_only =>
+                {
+                    // Try to show the speedbump for the readonly command setting
+                    // if we haven't shown it enough before and this command is
+                    // considered readonly.
+                    self.autonomy_setting_speedbump =
+                        AutonomySettingSpeedbump::ShouldShowForAutoexecutingReadonlyCommands {
+                            action_id: requested_command_action_id.clone(),
+                            checked: true,
+                            shown: Arc::new(Mutex::new(false)),
+                        };
+                    self.update_requested_command_autonomy_speedbump(
+                        requested_command_action_id.clone(),
+                        ctx,
+                    );
+                    // Mark the speedbump as shown in settings so that we do not render it again.
+                    AISettings::handle(ctx)
+                        .update(ctx, |ai_settings, ctx| {
+                            if let Err(err) = ai_settings.should_show_agent_mode_autoexecute_readonly_commands_speedbump.set_value(false, ctx) {
+                                log::warn!("Could not mark autoexecute read-only commands speedbump as shown {err}");
+                            }
+                        }
+                    )
+                }
+                _ => (),
             }
 
             for citation in &output.citations {
@@ -2633,9 +2629,7 @@ impl AIBlock {
             .actions()
             .filter_map(|action| (action.is_get_relevant_files()).then_some(&action.id))
         {
-            if is_agent_mode_autonomy_allowed(ctx)
-                && *AISettings::as_ref(ctx).should_show_agent_mode_autoread_files_speedbump
-            {
+            if *AISettings::as_ref(ctx).should_show_agent_mode_autoread_files_speedbump {
                 // Try to show the speedbump for codebase search.
                 self.state_handles.codebase_search_speedbump_option_handles =
                     vec![Default::default(), Default::default()];
@@ -2666,9 +2660,7 @@ impl AIBlock {
             let is_file_access =
                 action.is_get_specific_files() || action.is_grep() || action.is_file_glob();
             if is_file_access {
-                if is_agent_mode_autonomy_allowed(ctx)
-                    && *AISettings::as_ref(ctx).should_show_agent_mode_autoread_files_speedbump
-                {
+                if *AISettings::as_ref(ctx).should_show_agent_mode_autoread_files_speedbump {
                     // Try to show the speedbump for autoread files setting
                     // if we haven't shown it enough before.
                     self.autonomy_setting_speedbump =
@@ -2692,7 +2684,6 @@ impl AIBlock {
             } else if matches!(action.action, AIAgentActionType::AskUserQuestion { .. })
                 && !self.model.is_restored()
                 && FeatureFlag::AskUserQuestion.is_enabled()
-                && is_agent_mode_autonomy_allowed(ctx)
                 && *AISettings::as_ref(ctx).should_show_agent_mode_ask_user_question_speedbump
             {
                 self.autonomy_setting_speedbump =
@@ -2944,7 +2935,6 @@ impl AIBlock {
         // Only show the speedbump once, update the setting afterwards.
         let should_show_code_suggestion_speedbump =
             self.model.request_type(ctx).is_passive_code_diff()
-                && UserWorkspaces::as_ref(ctx).is_code_suggestions_toggleable()
                 && AISettings::as_ref(ctx).show_code_suggestion_speedbump(ctx);
         if should_show_code_suggestion_speedbump {
             AISettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -3921,7 +3911,6 @@ impl AIBlock {
             .model
             .request_type(ctx)
             .is_passive_unit_test_suggestion()
-            && UserWorkspaces::as_ref(ctx).is_code_suggestions_toggleable()
             && AISettings::as_ref(ctx).show_code_suggestion_speedbump(ctx);
         if should_show_speedbump {
             AISettings::handle(ctx).update(ctx, |settings, ctx| {

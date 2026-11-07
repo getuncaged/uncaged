@@ -29,13 +29,13 @@ use crate::ai::document::ai_document_model::AIDocumentId;
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
 use crate::ai::outline::RepoOutlines;
 use crate::code_review::github_repo_model::GitHubRepoModel;
+use crate::settings::CodeSettings;
 use crate::terminal::event::{BlockCompletedEvent, BlockType};
 use crate::terminal::model::block::{BlockId, BlockMetadata};
 use crate::terminal::model::session::Sessions;
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
 use crate::terminal::TerminalModel;
 use crate::util::git::{PrInfo, RepositoryInfo};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// A non-image file picked via the "attach file" button, stored until query submission.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -412,7 +412,7 @@ impl BlocklistAIContextModel {
             // source code embedding based context is still available.
             false
         } else {
-            UserWorkspaces::as_ref(app).is_codebase_context_enabled(app)
+            CodeSettings::is_codebase_context_enabled(app)
                 && pwd.as_ref().is_some_and(|pwd| {
                     RepoOutlines::as_ref(app).is_directory_indexed(Path::new(&pwd))
                 })

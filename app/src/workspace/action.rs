@@ -351,16 +351,10 @@ pub enum WorkspaceAction {
     ShowCommandSearch(CommandSearchOptions),
     CreatePersonalNotebook,
     ImportToPersonalDrive,
-    ImportToTeamDrive,
-    CreateTeamNotebook,
     CreatePersonalWorkflow,
-    CreateTeamWorkflow,
     CreatePersonalFolder,
-    CreateTeamFolder,
-    CreateTeamEnvVarCollection,
     CreatePersonalEnvVarCollection,
     CreatePersonalAIPrompt,
-    CreateTeamAIPrompt,
     ToggleMouseReporting,
     ToggleScrollReporting,
     ToggleFocusReporting,
@@ -785,19 +779,6 @@ pub enum WorkspaceAction {
 }
 
 impl WorkspaceAction {
-    pub fn blocked_for_anonymous_user(&self) -> bool {
-        use WorkspaceAction::*;
-        matches!(
-            self,
-            ImportToTeamDrive
-                | CreateTeamNotebook
-                | CreateTeamWorkflow
-                | CreateTeamFolder
-                | CreateTeamEnvVarCollection
-                | CreateTeamAIPrompt
-        )
-    }
-
     /// Matches what actions require the app state to be saved, and which don't. We match all
     /// actions directly, rather than using _, so we're forced to make a conscious decision for each
     /// of them, rather than following some default.
@@ -945,17 +926,11 @@ impl WorkspaceAction {
             | ToggleScrollReporting
             | ToggleFocusReporting
             | ImportToPersonalDrive
-            | ImportToTeamDrive
             | CreatePersonalNotebook
-            | CreateTeamNotebook
             | CreatePersonalWorkflow
-            | CreateTeamWorkflow
             | CreatePersonalFolder
-            | CreateTeamFolder
-            | CreateTeamEnvVarCollection
             | CreatePersonalEnvVarCollection
             | CreatePersonalAIPrompt
-            | CreateTeamAIPrompt
             | OpenInExplorer { .. }
             | DragTab { .. }
             | StartTabDrag

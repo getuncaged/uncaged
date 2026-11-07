@@ -25,11 +25,9 @@ use super::model_spec_scores::{
 };
 use crate::ai::custom_model_routers::is_custom_router_id;
 use crate::ai::execution_profiles::model_menu_items::is_auto;
-use crate::ai::llms::{
-    is_using_api_key_for_provider, DisableReason, LLMId, LLMInfo, LLMPreferences, LLMProvider,
-    LLMSpec,
-};
+use crate::ai::llms::{DisableReason, LLMId, LLMInfo, LLMPreferences, LLMSpec};
 use crate::auth::AuthStateProvider;
+use crate::billing;
 use crate::features::FeatureFlag;
 use crate::search::data_source::{Query, QueryFilter, QueryResult};
 use crate::search::mixer::DataSourceRunErrorWrapper;
@@ -42,7 +40,6 @@ use crate::terminal::input::inline_menu::{
 };
 use crate::terminal::input::message_bar::{Message, MessageItem};
 use crate::workspace::WorkspaceAction;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 #[derive(Clone, Debug)]
 pub struct AcceptModel {
@@ -194,10 +191,10 @@ impl SyncDataSource for ModelSelectorDataSource {
         };
 
         let choices = if is_full_terminal {
-            llm_preferences.get_cli_agent_llm_choices(app).collect_vec()
+            llm_preferences.get_cli_agent_llm_choices().collect_vec()
         } else {
             llm_preferences
-                .get_base_llm_choices_for_agent_mode(app)
+                .get_base_llm_choices_for_agent_mode()
                 .collect_vec()
         };
         let choices = Self::order_model_choices(llm_preferences, choices);
@@ -241,7 +238,6 @@ impl Entity for ModelSelectorDataSource {
 #[derive(Clone)]
 struct ModelSearchItem {
     id: LLMId,
-    provider: LLMProvider,
     spec: Option<LLMSpec>,
     leading_icon: Icon,
     credential_icon: Option<Icon>,
@@ -261,21 +257,12 @@ struct ModelSearchItem {
 
 impl ModelSearchItem {
     fn new(llm: &LLMInfo, active_llm_id: &LLMId, app: &AppContext) -> Self {
-        // If the model requires an upgrade but the user already has a BYOK key
-        // for this provider, treat it as enabled by clearing the disable reason.
-        let disable_reason = if llm.disable_reason == Some(DisableReason::RequiresUpgrade)
-            && is_using_api_key_for_provider(&llm.provider, app)
-        {
-            None
-        } else {
-            llm.disable_reason.clone()
-        };
+        let disable_reason = llm.disable_reason.clone();
         let is_custom_endpoint = LLMPreferences::as_ref(app)
             .custom_llm_info_for_id(&llm.id)
             .is_some();
         let is_custom_router = is_custom_router_id(llm.id.as_str());
-        let is_using_api_key =
-            is_custom_endpoint || is_using_api_key_for_provider(&llm.provider, app);
+        let is_using_api_key = is_custom_endpoint;
         let leading_icon = if is_custom_router {
             Icon::Dataflow
         } else {
@@ -288,7 +275,6 @@ impl ModelSearchItem {
         };
         Self {
             id: llm.id.clone(),
-            provider: llm.provider.clone(),
             spec: llm.spec.clone(),
             leading_icon,
             credential_icon,
@@ -434,10 +420,7 @@ impl SearchItem for ModelSearchItem {
             row = row.with_child(Container::new(disabled_text).with_margin_left(6.).finish());
         }
 
-        if should_show_discount_chip(
-            self.discount_percentage,
-            is_using_api_key_for_provider(&self.provider, app),
-        ) {
+        if should_show_discount_chip(self.discount_percentage, false) {
             let discount_percentage = self.discount_percentage.unwrap_or(0.);
             let chip = Container::new(
                 Text::new_inline(
@@ -508,8 +491,7 @@ impl SearchItem for ModelSearchItem {
         };
         let header = render_model_spec_header(title, description, app);
 
-        let is_using_api_key =
-            self.is_custom_endpoint || is_using_api_key_for_provider(&self.provider, app);
+        let is_using_api_key = self.is_custom_endpoint;
         let cost_row = if is_using_api_key {
             let search_query = "api".to_string();
             let manage_button = appearance
@@ -563,46 +545,23 @@ impl SearchItem for ModelSearchItem {
             .with_child(scores);
 
         if self.disable_reason.as_ref() == Some(&DisableReason::RequiresUpgrade) {
-            let upgrade_url = if let Some(team) = UserWorkspaces::as_ref(app).current_team() {
-                UserWorkspaces::upgrade_link_for_team(team.uid)
-            } else {
-                let user_id = AuthStateProvider::as_ref(app)
-                    .get()
-                    .user_id()
-                    .unwrap_or_default();
-                UserWorkspaces::upgrade_link(user_id)
-            };
+            let user_id = AuthStateProvider::as_ref(app)
+                .get()
+                .user_id()
+                .unwrap_or_default();
+            let upgrade_url = billing::upgrade_link(user_id);
 
             let mut display_name = self.display_text.clone();
             if let Some(first) = display_name.get_mut(..1) {
                 first.make_ascii_uppercase();
             }
 
-            // Show a BYOK option when the user's tier supports it and the provider
-            // is one that accepts user-supplied API keys.
-            let byok_available = UserWorkspaces::as_ref(app).is_byo_api_key_enabled(app)
-                && matches!(
-                    self.provider,
-                    LLMProvider::OpenAI | LLMProvider::Anthropic | LLMProvider::Google
-                );
-
-            let mut text_fragments = vec![
+            let text_fragments = vec![
                 FormattedTextFragment::plain_text(format!(
                     "{display_name} is not available for free users. "
                 )),
                 FormattedTextFragment::hyperlink("Upgrade", upgrade_url),
             ];
-
-            if byok_available {
-                text_fragments.push(FormattedTextFragment::plain_text(" or ".to_string()));
-                text_fragments.push(FormattedTextFragment::hyperlink_action(
-                    "bring your own key",
-                    WorkspaceAction::ShowSettingsPageWithSearch {
-                        search_query: "api".to_string(),
-                        section: Some(SettingsSection::WarpAgent),
-                    },
-                ));
-            }
 
             let upgrade_text = FormattedTextElement::new(
                 FormattedText::new([FormattedTextLine::Line(text_fragments)]),

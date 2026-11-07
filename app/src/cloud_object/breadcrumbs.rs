@@ -1,5 +1,3 @@
-use warpui::AppContext;
-
 use super::{CloudObject, Space};
 use crate::drive::folders::CloudFolder;
 use crate::drive::items::WarpDriveItemId;
@@ -34,9 +32,9 @@ impl From<&CloudFolder> for ContainingObject {
 }
 
 impl Space {
-    pub fn into_containing_object(self, app: &AppContext) -> ContainingObject {
+    pub fn into_containing_object(self) -> ContainingObject {
         ContainingObject {
-            name: self.name(app).clone(),
+            name: self.name().clone(),
             kind: ContainingObjectKind::Space(self),
         }
     }

@@ -165,8 +165,8 @@ use watcher::HomeDirectoryWatcher;
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 #[cfg(not(target_family = "wasm"))]
-use crate::ai::geap_credentials::GeapCredentialRefresher as _;
 use crate::ai::mcp::{FileBasedMCPManager, FileMCPWatcher};
+use crate::settings::CodeSettings;
 use crate::uri::web_intent_parser::maybe_rewrite_web_url_to_intent;
 use crate::view_components::DismissibleToast;
 pub mod workflows;
@@ -281,9 +281,7 @@ use crate::workspace::{
     ActiveSession, OneTimeModalModel, PaneViewLocator, ToastStack, Workspace, WorkspaceAction,
 };
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_profiles::UserProfiles;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// Our embedded application assets.
 pub static ASSETS: warp_assets::Assets = warp_assets::Assets;
@@ -936,8 +934,6 @@ pub(crate) fn initialize_app(
 
     let (
         cloud_objects,
-        cached_workspaces,
-        current_workspace_uid,
         app_state,
         command_history,
         restored_user_profiles,
@@ -956,8 +952,6 @@ pub(crate) fn initialize_app(
         .map(|sqlite_data| {
             (
                 sqlite_data.cloud_objects,
-                sqlite_data.workspaces,
-                sqlite_data.current_workspace_uid,
                 Some(sqlite_data.app_state),
                 sqlite_data.command_history,
                 sqlite_data.user_profiles,
@@ -991,49 +985,20 @@ pub(crate) fn initialize_app(
                 Default::default(),
                 Default::default(),
                 Default::default(),
-                Default::default(),
-                Default::default(),
             )
         });
 
     ctx.add_singleton_model(|ctx| AIRequestUsageModel::new(ai_client, ctx));
 
     ctx.add_singleton_model(|ctx| {
-        UserWorkspaces::new(
-            server_api_provider.as_ref(ctx).get_team_client(),
-            server_api_provider.as_ref(ctx).get_workspace_client(),
-            cached_workspaces,
-            current_workspace_uid,
-            ctx,
-        )
-    });
-
-    // Initialize ApiKeyManager after UserWorkspaces so it can subscribe to workspace/settings changes
-    ctx.add_singleton_model(|ctx| {
         #[cfg_attr(target_family = "wasm", allow(unused_mut))]
         let mut manager = ::ai::api_keys::ApiKeyManager::new(ctx);
-        // Gemini Enterprise (GEAP) credential refresh triggers: workspace
-        // settings saves / team changes and the member's enablement toggle.
-        #[cfg(not(target_family = "wasm"))]
-        if FeatureFlag::GeminiEnterprise.is_enabled() {
-            manager.subscribe_to_geap_settings_changes(ctx);
-        }
         // The Grok subscription refresher (`ai::grok_subscription`) has no
-        // visibility into workspace policy, so wire the BYO API key policy in
-        // here. The initial value resumes proactive refresh of any tokens
-        // restored from secure storage; TeamsChanged keeps the policy aligned
-        // as team data loads or the workspace changes.
+        // visibility into the BYO API key policy, so wire it in here. Uncaged has
+        // no BYO entitlement on Warp's server, so proactive refresh stays off.
         #[cfg(not(target_family = "wasm"))]
         if FeatureFlag::SuperGrok.is_enabled() {
-            use crate::workspaces::user_workspaces::UserWorkspacesEvent;
-            ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |manager, _, event, ctx| {
-                if matches!(event, UserWorkspacesEvent::TeamsChanged) {
-                    let allowed = UserWorkspaces::as_ref(ctx).is_byo_api_key_enabled(ctx);
-                    manager.set_grok_refresh_allowed(allowed, ctx);
-                }
-            });
-            let allowed = UserWorkspaces::as_ref(ctx).is_byo_api_key_enabled(ctx);
-            manager.set_grok_refresh_allowed(allowed, ctx);
+            manager.set_grok_refresh_allowed(false, ctx);
         }
         manager
     });
@@ -1251,7 +1216,6 @@ pub(crate) fn initialize_app(
     prompt::editor_modal::init(ctx);
     ai::blocklist::agent_view::editor::init(ctx);
     undo_close::init(ctx);
-    billing::shared_objects_creation_denied_modal::init(ctx);
     tab_configs::new_worktree_modal::init(ctx);
     tab_configs::params_modal::init(ctx);
     ai::blocklist::init(ctx);
@@ -1402,17 +1366,8 @@ pub(crate) fn initialize_app(
 
     ctx.add_singleton_model(|_| AudibleBell::new());
 
-    // This model has to be registered after the user workspaces model because it relies on it,
-    // and before the UpdateManager models because they rely on the TeamTester model.
+    // This model has to be registered before the UpdateManager models because they rely on it.
     ctx.add_singleton_model(TeamTesterStatus::new);
-
-    ctx.add_singleton_model(|ctx| {
-        TeamUpdateManager::new(
-            server_api_provider.as_ref(ctx).get_team_client(),
-            persistence_writer.sender(),
-            ctx,
-        )
-    });
 
     ctx.add_singleton_model(|ctx| {
         UpdateManager::new(
@@ -1585,7 +1540,7 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(DefaultTerminal::new);
 
     ctx.add_singleton_model(|ctx| {
-        let should_restore_indices = UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx);
+        let should_restore_indices = CodeSettings::is_codebase_context_enabled(ctx);
         let indices_to_restore = if should_restore_indices {
             persisted_workspaces.clone()
         } else {

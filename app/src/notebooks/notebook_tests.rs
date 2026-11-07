@@ -46,7 +46,6 @@ use crate::workflows::{WorkflowSource, WorkflowType};
 use crate::workspace::ActiveSession;
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::{UserProfileWithUID, UserProfiles};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider, PrivacySettings};
 
 fn initialize_app(app: &mut App) {
@@ -65,7 +64,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(NotebookKeybindings::new);
     app.add_singleton_model(TerminalKeybindings::new);
     app.add_singleton_model(PrivacySettings::mock);
-    app.add_singleton_model(UserWorkspaces::default_mock);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(TeamTesterStatus::mock);
     app.add_singleton_model(UpdateManager::mock);

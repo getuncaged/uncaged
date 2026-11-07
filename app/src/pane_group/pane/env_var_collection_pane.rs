@@ -1,4 +1,3 @@
-use anyhow::Context;
 use warpui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 
 use super::view::PaneView;
@@ -7,13 +6,13 @@ use super::{
     ShareableLinkError,
 };
 use crate::app_state::{EnvVarCollectionPaneSnapshot, LeafContents};
+use crate::cloud_object::Owner;
 use crate::drive::items::WarpDriveItemId;
 use crate::env_vars::manager::{EnvVarCollectionManager, EnvVarCollectionSource};
 use crate::env_vars::view::env_var_collection::{EnvVarCollectionEvent, EnvVarCollectionView};
 use crate::env_vars::EnvVarCollectionType;
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::server::ids::SyncId;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub struct EnvVarCollectionPane {
     view: ViewHandle<PaneView<EnvVarCollectionView>>,
@@ -55,9 +54,7 @@ impl EnvVarCollectionPane {
             Some(id) => EnvVarCollectionSource::Existing(id),
             None => EnvVarCollectionSource::New {
                 title: None,
-                owner: UserWorkspaces::as_ref(ctx)
-                    .personal_drive(ctx)
-                    .context("personal drive unavailable")?,
+                owner: Owner::local_user(),
                 initial_folder_id: None,
             },
         };

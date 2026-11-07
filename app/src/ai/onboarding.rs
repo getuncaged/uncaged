@@ -8,7 +8,6 @@ use warpui::{AppContext, SingletonEntity};
 
 use super::llms::{LLMInfo, LLMPreferences};
 use crate::auth::AuthStateProvider;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 impl From<&LLMInfo> for OnboardingModelInfo {
     fn from(llm: &LLMInfo) -> Self {
@@ -21,13 +20,10 @@ impl From<&LLMInfo> for OnboardingModelInfo {
     }
 }
 
-pub fn build_onboarding_models(
-    prefs: &LLMPreferences,
-    app: &AppContext,
-) -> (Vec<OnboardingModelInfo>, LLMId) {
+pub fn build_onboarding_models(prefs: &LLMPreferences) -> (Vec<OnboardingModelInfo>, LLMId) {
     let default_id = prefs.get_default_base_model().id.clone();
     let models: Vec<OnboardingModelInfo> = prefs
-        .get_base_llm_choices_for_agent_mode(app)
+        .get_base_llm_choices_for_agent_mode()
         .map(|llm| {
             let mut info = OnboardingModelInfo::from(llm);
             info.is_default = info.id == default_id;
@@ -42,13 +38,6 @@ pub fn current_onboarding_auth_state(ctx: &AppContext) -> OnboardingAuthState {
     if auth_state.is_anonymous_or_logged_out() {
         return OnboardingAuthState::LoggedOut;
     }
-    let is_on_paid_plan = UserWorkspaces::as_ref(ctx)
-        .current_workspace()
-        .map(|w| w.billing_metadata.is_user_on_paid_plan())
-        .unwrap_or(false);
-    if is_on_paid_plan {
-        OnboardingAuthState::PayingUser
-    } else {
-        OnboardingAuthState::FreeUser
-    }
+    // Uncaged has no workspace billing, so no one is on a paid plan.
+    OnboardingAuthState::FreeUser
 }

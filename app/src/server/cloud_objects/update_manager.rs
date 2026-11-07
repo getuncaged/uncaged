@@ -83,9 +83,7 @@ use crate::workflows::workflow::Workflow;
 use crate::workflows::workflow_enum::{CloudWorkflowEnum, CloudWorkflowEnumModel, WorkflowEnum};
 use crate::workflows::{CloudWorkflowModel, WorkflowId};
 use crate::workspaces::team_tester::{TeamTesterStatus, TeamTesterStatusEvent};
-use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_profiles::{UserProfileWithUID, UserProfiles};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 lazy_static! {
     /// For online-only operations, we want to quickly determine if the operation can succeed,
@@ -279,12 +277,9 @@ impl UpdateManager {
         let cloud_model = CloudModel::handle(ctx);
         let objects_to_remove = cloud_model
             .as_ref(ctx)
-            .all_cloud_objects_in_space(
-                Space::Team {
-                    team_uid: left_team_uid,
-                },
-                ctx,
-            )
+            .all_cloud_objects_in_space(Space::Team {
+                team_uid: left_team_uid,
+            })
             .map(|object| object.cloud_object_type_and_id())
             .collect_vec();
 
@@ -1056,10 +1051,6 @@ impl UpdateManager {
     }
 
     fn handle_team_memberships_changed(&mut self, ctx: &mut ModelContext<UpdateManager>) {
-        // Immediately check for updates in workspace metadata
-        TeamUpdateManager::handle(ctx).update(ctx, |manager, ctx| {
-            std::mem::drop(manager.refresh_workspace_metadata(ctx));
-        });
         self.refresh_updated_objects(ctx);
     }
 
@@ -1567,17 +1558,17 @@ impl UpdateManager {
     fn handle_creation_denied_response(&self, client_id: &ClientId, ctx: &mut ModelContext<Self>) {
         let uid = client_id.to_string();
 
-        let in_personal_drive = CloudModel::handle(ctx).read(ctx, |cloud_model, ctx| {
+        let in_personal_drive = CloudModel::handle(ctx).read(ctx, |cloud_model, _| {
             cloud_model
                 .get_by_uid(&uid)
-                .is_none_or(|object| object.space(ctx) == Space::Personal)
+                .is_none_or(|object| object.space() == Space::Personal)
         });
 
         // If not in personal space, move object to personal space and attempt to re-create it.
         if !in_personal_drive {
             // Update in-memory model. Move object to personal space.
             CloudModel::handle(ctx).update(ctx, |cloud_model, ctx| {
-                let personal_drive = UserWorkspaces::as_ref(ctx).personal_drive(ctx);
+                let personal_drive = Some(Owner::local_user());
                 cloud_model.update_object_location(&uid, personal_drive, None, ctx);
             });
 
@@ -2918,7 +2909,7 @@ impl UpdateManager {
         let mut not_supported = false;
         match new_location {
             CloudObjectLocation::Space(destination_space) => {
-                match UserWorkspaces::as_ref(ctx).space_to_owner(destination_space, ctx) {
+                match destination_space.owner() {
                     Some(destination_owner) => {
                         if destination_owner == object_current_owner {
                             // If the space is staying the same, then the move must be to move to the root of the space.
@@ -3060,7 +3051,7 @@ impl UpdateManager {
             let entrypoint = CloudObjectEventEntrypoint::Unknown;
             let mut duplicate_model = object.model().clone();
             let duplicate_name =
-                self.get_next_duplicate_object_name(&object as &dyn CloudObject, cloud_model, ctx);
+                self.get_next_duplicate_object_name(&object as &dyn CloudObject, cloud_model);
             duplicate_model.set_display_name(&duplicate_name);
             (
                 duplicate_model,
@@ -3189,9 +3180,9 @@ impl UpdateManager {
         force_expand: bool,
         ctx: &mut ModelContext<Self>,
     ) {
-        let count = CloudModel::handle(ctx).read(ctx, |model, ctx| {
+        let count = CloudModel::handle(ctx).read(ctx, |model, _| {
             model
-                .active_non_welcome_notebooks_in_space(Space::Personal, ctx)
+                .active_non_welcome_notebooks_in_space(Space::Personal)
                 .count()
         });
         if AuthStateProvider::handle(ctx).read(ctx, |auth_state_provider, _ctx| {
@@ -3224,7 +3215,6 @@ impl UpdateManager {
         &self,
         original_cloud_object: &dyn CloudObject,
         cloud_model: &CloudModel,
-        app: &AppContext,
     ) -> String {
         let original_name = original_cloud_object.display_name();
 
@@ -3232,8 +3222,7 @@ impl UpdateManager {
         // same type, and populate a hashset with those names.
         let same_type_and_folder_names = cloud_model
             .active_cloud_objects_in_location_without_descendents(
-                original_cloud_object.location(cloud_model, app),
-                app,
+                original_cloud_object.location(cloud_model),
             )
             .filter(|&object| object.object_type() == original_cloud_object.object_type())
             .map(|object| object.display_name())
@@ -3260,9 +3249,9 @@ impl UpdateManager {
         force_expand: bool,
         ctx: &mut ModelContext<Self>,
     ) {
-        let count = CloudModel::handle(ctx).read(ctx, |model, ctx| {
+        let count = CloudModel::handle(ctx).read(ctx, |model, _| {
             model
-                .active_non_welcome_workflows_in_space(Space::Personal, ctx)
+                .active_non_welcome_workflows_in_space(Space::Personal)
                 .count()
         });
         if AuthStateProvider::handle(ctx).read(ctx, |auth_state_provider, _ctx| {
@@ -3326,9 +3315,9 @@ impl UpdateManager {
         force_expand: bool,
         ctx: &mut ModelContext<Self>,
     ) {
-        let count = CloudModel::handle(ctx).read(ctx, |model, ctx| {
+        let count = CloudModel::handle(ctx).read(ctx, |model, _| {
             model
-                .active_non_welcome_env_var_collections_in_space(Space::Personal, ctx)
+                .active_non_welcome_env_var_collections_in_space(Space::Personal)
                 .count()
         });
         if AuthStateProvider::handle(ctx).read(ctx, |auth_state_provider, _ctx| {
@@ -4459,7 +4448,7 @@ impl UpdateManager {
     pub fn empty_trash(&mut self, space: Space, ctx: &mut ModelContext<Self>) {
         let object_client = self.object_client.clone();
 
-        let owner = match UserWorkspaces::as_ref(ctx).space_to_owner(space, ctx) {
+        let owner = match space.owner() {
             Some(owner) => owner,
             None => {
                 // TODO: For the Shared space, this should delete every object that's shared with the user

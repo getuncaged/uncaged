@@ -77,12 +77,15 @@ use crate::server::graphql::{get_request_context, get_user_facing_error_message}
 use crate::terminal::model::block::SerializedBlock;
 #[cfg(not(feature = "agent_mode_evals"))]
 use crate::{
-    ai::request_usage_model::BonusGrantScope,
-    server::ids::ServerId,
-    workspaces::{gql_convert::PLACEHOLDER_WORKSPACE_UID, workspace::WorkspaceUid},
+    ai::request_usage_model::BonusGrantScope, server::ids::ServerId,
+    workspaces::workspace::WorkspaceUid,
 };
 
 const AI_ASSISTANT_REQUEST_TIMEOUT_SECONDS: u64 = 30;
+
+/// The workspace uid the server returns for users without a real workspace.
+#[cfg(not(feature = "agent_mode_evals"))]
+const PLACEHOLDER_WORKSPACE_UID: &str = "NOT_A_REAL_WORKSPACE_UID";
 
 /// A status update for a task, optionally including a platform error code.
 pub struct TaskStatusUpdate {
@@ -1731,6 +1734,44 @@ impl TryFrom<warp_graphql::queries::list_ai_conversations::AIConversationMetadat
             server_conversation_token,
             artifacts,
         })
+    }
+}
+
+#[cfg(not(feature = "agent_mode_evals"))]
+impl BonusGrant {
+    pub fn from_gql_bonus_grant(
+        bonus_grant: warp_graphql::billing::BonusGrant,
+        scope: BonusGrantScope,
+    ) -> Self {
+        Self {
+            created_at: bonus_grant.created_at.utc(),
+            cost_cents: bonus_grant.cost_cents,
+            expiration: bonus_grant.expiration.map(|exp| exp.utc()),
+            grant_type: bonus_grant.grant_type,
+            reason: bonus_grant.reason,
+            user_facing_message: bonus_grant.user_facing_message,
+            request_credits_granted: bonus_grant.request_credits_granted,
+            request_credits_remaining: bonus_grant.request_credits_remaining,
+            scope,
+        }
+    }
+}
+
+impl From<warp_graphql::workspace::LlmModelHost> for crate::ai::llms::LLMModelHost {
+    fn from(gql_host: warp_graphql::workspace::LlmModelHost) -> Self {
+        use warp_graphql::workspace::LlmModelHost as GqlLlmModelHost;
+        match gql_host {
+            GqlLlmModelHost::DirectApi => Self::DirectApi,
+            GqlLlmModelHost::AwsBedrock => Self::AwsBedrock,
+            GqlLlmModelHost::CustomEndpoint => Self::CustomEndpoint,
+            GqlLlmModelHost::GeminiEnterprise => Self::GeminiEnterprise,
+            GqlLlmModelHost::Other(value) => {
+                log::warn!(
+                    "Unknown LlmModelHost '{value}'. Make sure to update client GraphQL types!"
+                );
+                Self::Unknown
+            }
+        }
     }
 }
 

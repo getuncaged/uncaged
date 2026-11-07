@@ -20,7 +20,6 @@ use crate::server::ids::SyncId;
 use crate::workflows::workflow::Workflow;
 use crate::workflows::{CloudWorkflow, CloudWorkflowModel, WorkflowId};
 use crate::workspace::ToastStack;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 struct ExportTest {
     target_dir: TempDir,
@@ -89,7 +88,7 @@ impl ExportTest {
     /// Get an export path, given the expected name.
     fn path(&self, name: impl AsRef<Path>, space: Option<Space>, app: &App) -> PathBuf {
         if let Some(space) = space {
-            let space_name = app.read(|ctx| space.name(ctx));
+            let space_name = app.read(|_| space.name());
             self.target_dir.path().join(space_name).join(name)
         } else {
             self.target_dir.path().join(name)
@@ -100,7 +99,6 @@ impl ExportTest {
 fn initialize_app(app: &mut App) {
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(ExportManager::new);
-    app.add_singleton_model(UserWorkspaces::default_mock);
     app.add_singleton_model(|_| ToastStack);
 }
 

@@ -22,7 +22,6 @@ use crate::terminal::event::{BlockType, UserBlockCompleted};
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model::terminal_model::TerminalModel;
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
@@ -759,12 +758,10 @@ fn file_edits_to_passive_diffs(file_edits: &[FileEdit]) -> Vec<PassiveCodeDiffEn
 
 fn is_passive_code_diffs_enabled(ctx: &ModelContext<PassiveSuggestionsModel>) -> bool {
     AISettings::as_ref(ctx).is_code_suggestions_enabled(ctx)
-        && UserWorkspaces::as_ref(ctx).is_code_suggestions_toggleable()
 }
 
 fn is_prompt_suggestions_enabled(ctx: &ModelContext<PassiveSuggestionsModel>) -> bool {
     AISettings::as_ref(ctx).is_prompt_suggestions_enabled(ctx)
-        && UserWorkspaces::as_ref(ctx).is_prompt_suggestions_toggleable()
 }
 
 #[cfg(feature = "local_fs")]

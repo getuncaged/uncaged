@@ -306,6 +306,11 @@ impl From<DateTime<Utc>> for Revision {
     }
 }
 
+/// The uid that owns every object in the local user's personal drive. Uncaged
+/// has no accounts, so this never changes; Drive rows in sqlite persist it as
+/// their owner, so it must stay exactly this string.
+pub const LOCAL_USER_UID: &str = "test_user_uid";
+
 /// The owner for a given object.
 #[derive(Copy, Clone, Debug, Eq, Serialize, Deserialize, Derivative)]
 #[derivative(PartialEq)]
@@ -317,6 +322,13 @@ pub enum Owner {
 }
 
 impl Owner {
+    /// The owner of the local user's personal drive.
+    pub fn local_user() -> Owner {
+        Owner::User {
+            user_uid: UserUid::new(LOCAL_USER_UID),
+        }
+    }
+
     /// A mock [`Owner`] ID for testing.
     #[cfg(any(test, feature = "test-util"))]
     pub fn mock_current_user() -> Owner {

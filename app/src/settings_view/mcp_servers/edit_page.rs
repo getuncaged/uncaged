@@ -53,7 +53,6 @@ use crate::view_components::action_button::{
 };
 use crate::view_components::DismissibleToast;
 use crate::workspace::ToastStack;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::GlobalResourceHandlesProvider;
 
 const DEFAULT_JSON_TEXT: &str = r#"{
@@ -386,12 +385,11 @@ impl MCPServersEditPageView {
     fn is_shared(item_id: ServerCardItemId, app: &AppContext) -> bool {
         match item_id {
             ServerCardItemId::TemplatableMCP(template_uuid) => {
-                TemplatableMCPServerManager::as_ref(app)
-                    .is_server_template_shared(template_uuid, app)
+                TemplatableMCPServerManager::as_ref(app).is_server_template_shared(template_uuid)
             }
             ServerCardItemId::TemplatableMCPInstallation(installation_uuid) => {
                 TemplatableMCPServerManager::as_ref(app)
-                    .is_server_installation_shared(installation_uuid, app)
+                    .is_server_installation_shared(installation_uuid)
             }
             ServerCardItemId::GalleryMCP(_) | ServerCardItemId::FileBasedMCP(_) => false,
         }
@@ -407,7 +405,7 @@ impl MCPServersEditPageView {
                     let is_authorized_editor = TemplatableMCPServerManager::as_ref(app)
                         .is_authorized_editor(template_uuid, app);
                     let is_shared = TemplatableMCPServerManager::as_ref(app)
-                        .is_server_template_shared(template_uuid, app);
+                        .is_server_template_shared(template_uuid);
 
                     is_authorized_editor || !is_shared
                 } else {
@@ -416,7 +414,7 @@ impl MCPServersEditPageView {
             }
             Some(ServerCardItemId::TemplatableMCP(template_uuid)) => {
                 let is_shared = TemplatableMCPServerManager::as_ref(app)
-                    .is_server_template_shared(template_uuid, app);
+                    .is_server_template_shared(template_uuid);
                 let is_authorized_editor = TemplatableMCPServerManager::as_ref(app)
                     .is_authorized_editor(template_uuid, app);
 
@@ -529,12 +527,10 @@ impl MCPServersEditPageView {
         templatable_mcp_server: &TemplatableMCPServer,
     ) -> Result<(), String> {
         let safe_mode_enabled = *SafeModeSettings::as_ref(ctx).safe_mode_enabled.value();
-        let enterprise_enforced =
-            UserWorkspaces::as_ref(ctx).is_enterprise_secret_redaction_enabled();
         let contains_secrets =
             !find_secrets_in_text(&templatable_mcp_server.template.json).is_empty();
 
-        if should_block_save_for_secrets(safe_mode_enabled, enterprise_enforced, contains_secrets) {
+        if should_block_save_for_secrets(safe_mode_enabled, contains_secrets) {
             let window_id = ctx.window_id();
             ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
                 toast_stack.add_ephemeral_toast(
@@ -958,16 +954,11 @@ impl TypedActionView for MCPServersEditPageView {
 /// Decide whether to block saving an MCP server config because secret
 /// redaction is in force AND the parsed config contains secret-shaped strings.
 ///
-/// We block only when redaction is actually active — either the user-level
-/// Settings > Privacy > Secret redaction toggle is on, or the user's workspace
-/// has enterprise enforcement enabled. With both off, the user has explicitly
-/// opted to embed secrets in the config and we save it as written (#8761).
-fn should_block_save_for_secrets(
-    safe_mode_enabled: bool,
-    enterprise_enforced: bool,
-    contains_secrets: bool,
-) -> bool {
-    (safe_mode_enabled || enterprise_enforced) && contains_secrets
+/// We block only when redaction is actually active — the user-level
+/// Settings > Privacy > Secret redaction toggle is on. With it off, the user has
+/// explicitly opted to embed secrets in the config and we save it as written (#8761).
+fn should_block_save_for_secrets(safe_mode_enabled: bool, contains_secrets: bool) -> bool {
+    safe_mode_enabled && contains_secrets
 }
 
 #[cfg(test)]

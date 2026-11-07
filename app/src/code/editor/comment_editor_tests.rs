@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::RepoMetadataModel;
 use warpui::platform::WindowStyle;
@@ -14,13 +12,11 @@ use crate::notebooks::editor::keys::NotebookKeybindings;
 use crate::notebooks::editor::view::RichTextEditorView;
 use crate::notebooks::link::{NotebookLinks, SessionSource};
 use crate::search::files::model::FileSearchModel;
-use crate::server::server_api::team::MockTeamClient;
-use crate::server::server_api::workspace::MockWorkspaceClient;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::terminal::keys::TerminalKeybindings;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspace::ActiveSession;
-use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider, UserWorkspaces};
+use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 struct TestView {
     editor: ViewHandle<RichTextEditorView>,
@@ -71,17 +67,6 @@ fn initialize_editor(
     app.add_singleton_model(TerminalKeybindings::new);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
-
-    let team_client_mock = Arc::new(MockTeamClient::new());
-    let workspace_client_mock = Arc::new(MockWorkspaceClient::new());
-    app.add_singleton_model(|ctx| {
-        UserWorkspaces::mock(
-            team_client_mock.clone(),
-            workspace_client_mock.clone(),
-            vec![],
-            ctx,
-        )
-    });
 
     let (window, test_view) = app.add_window(WindowStyle::NotStealFocus, |ctx| {
         let window_id = ctx.window_id();

@@ -30,7 +30,6 @@ use crate::terminal::event::UserBlockCompleted;
 use crate::terminal::input::CompleterData;
 use crate::terminal::model::session::Sessions;
 use crate::terminal::{History, HistoryEntry};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
@@ -53,7 +52,6 @@ const ARG_GENERATOR_VALIDATION_TIMEOUT: Duration = Duration::from_millis(150);
 
 pub fn is_next_command_enabled(app: &warpui::AppContext) -> bool {
     AISettings::as_ref(app).is_intelligent_autosuggestions_enabled(app)
-        && UserWorkspaces::as_ref(app).is_next_command_enabled()
 }
 
 #[derive(Clone, Default, PartialEq)]

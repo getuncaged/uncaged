@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use chrono::Utc;
 use cloud_object_client::MockObjectClient;
-use lazy_static::lazy_static;
 use mockall::Sequence;
 use rand::Rng;
 use settings::{RespectUserSyncSetting, SyncToCloud};
@@ -30,18 +29,13 @@ use crate::server::cloud_objects::listener::ObjectUpdateMessage;
 use crate::server::cloud_objects::update_manager::InitialLoadResponse;
 use crate::server::ids::{ServerId, ServerIdAndType};
 use crate::server::server_api::object::ObjectClient;
-use crate::server::server_api::team::MockTeamClient;
-use crate::server::server_api::workspace::MockWorkspaceClient;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
 use crate::settings::{init_and_register_user_preferences, Preference};
 use crate::system::SystemStats;
 use crate::workflows::CloudWorkflowModel;
-use crate::workspaces::team::Team;
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::UserProfiles;
-use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::workspaces::workspace::{Workspace, WorkspaceUid};
 use crate::{NetworkStatus, UpdateManager};
 
 fn create_cloud_model(
@@ -53,46 +47,17 @@ fn create_cloud_model(
     app.add_singleton_model(|_ctx| CloudModel::new(None, objects, None))
 }
 
-lazy_static! {
-    /// Mock the user being on _a_ team in tests, so that the team drive is available.
-    /// Otherwise, any team objects will appear shared.
-    static ref TEST_TEAM: Team = Team::from_local_cache(
-        ServerId::from(1),
-        "Test Team".to_string(),
-        None,
-        None,
-        None,
-    );
-
-    static ref TEST_WORKSPACE: Workspace = Workspace::from_local_cache(
-        WorkspaceUid::from(ServerId::from(1)),
-        "Test Workspace".to_string(),
-        Some(vec![TEST_TEAM.clone()]),
-    );
-}
-
 fn initialize_app(
     app: &mut App,
     cached_objects: Vec<Box<dyn CloudObject>>,
     cloud_object_server_api_mock: Arc<impl ObjectClient>,
 ) {
-    let team_client_mock = Arc::new(MockTeamClient::new());
-    let workspace_client_mock = Arc::new(MockWorkspaceClient::new());
-
     // Add the necessary singleton models to the App
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.add_singleton_model(AuthManager::new_for_test);
-    app.add_singleton_model(|ctx| {
-        UserWorkspaces::mock(
-            team_client_mock.clone(),
-            workspace_client_mock.clone(),
-            vec![TEST_WORKSPACE.clone()],
-            ctx,
-        )
-    });
     app.add_singleton_model(TeamTesterStatus::new);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_ctx| CloudModel::new(None, cached_objects, None));
@@ -1018,7 +983,6 @@ fn test_collapse_all_in_location() {
     .collect();
 
     App::test((), |mut app| async move {
-        app.add_singleton_model(UserWorkspaces::default_mock);
         let cloud_model = create_cloud_model(&mut app, folders);
 
         cloud_model.update(&mut app, |model, ctx| {
@@ -1116,7 +1080,6 @@ fn test_collapse_all_in_trash() {
     .collect();
 
     App::test((), |mut app| async move {
-        app.add_singleton_model(UserWorkspaces::default_mock);
         let cloud_model = create_cloud_model(&mut app, folders);
 
         cloud_model.update(&mut app, |model, ctx| {
@@ -1593,13 +1556,13 @@ fn test_shared_personal_object() {
             },
         );
 
-        CloudModel::handle(&app).update(&mut app, |cloud_model, ctx| {
+        CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
             cloud_model.add_object(shared_notebook_id, shared_notebook);
 
             let space = cloud_model
                 .get_notebook(&shared_notebook_id)
                 .expect("Notebook is in CloudModel")
-                .space(ctx);
+                .space();
             assert_eq!(space, Space::Shared);
         });
     });
@@ -1635,13 +1598,13 @@ fn test_unshared_personal_object() {
             },
         );
 
-        CloudModel::handle(&app).update(&mut app, |cloud_model, ctx| {
+        CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
             cloud_model.add_object(shared_notebook_id, shared_notebook);
 
             let space = cloud_model
                 .get_notebook(&shared_notebook_id)
                 .expect("Notebook is in CloudModel")
-                .space(ctx);
+                .space();
             assert_eq!(space, Space::Personal);
         });
     });
@@ -1678,57 +1641,14 @@ fn test_shared_team_object() {
             },
         );
 
-        CloudModel::handle(&app).update(&mut app, |cloud_model, ctx| {
+        CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
             cloud_model.add_object(shared_notebook_id, shared_notebook);
 
             let space = cloud_model
                 .get_notebook(&shared_notebook_id)
                 .expect("Notebook is in CloudModel")
-                .space(ctx);
+                .space();
             assert_eq!(space, Space::Shared);
-        });
-    });
-}
-
-#[test]
-fn test_unshared_team_object() {
-    let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
-    App::test((), |mut app| async move {
-        app.update(init_and_register_user_preferences);
-        initialize_app(
-            &mut app,
-            Vec::new(),
-            Arc::new(base_mock_cloud_object_server_api()),
-        );
-
-        // Use the current user's team.
-        let team_uid = TEST_TEAM.uid;
-        let shared_notebook_id = SyncId::ServerId(123.into());
-        let shared_notebook = CloudNotebook::new(
-            shared_notebook_id,
-            CloudNotebookModel {
-                title: "Shared Notebook".to_string(),
-                data: "Hello".to_string(),
-                ai_document_id: None,
-                conversation_id: None,
-            },
-            CloudObjectMetadata::new_from_server(mock_server_metadata()),
-            CloudObjectPermissions {
-                owner: Owner::Team { team_uid },
-                guests: Vec::new(),
-                permissions_last_updated_ts: None,
-                anyone_with_link: None,
-            },
-        );
-
-        CloudModel::handle(&app).update(&mut app, |cloud_model, ctx| {
-            cloud_model.add_object(shared_notebook_id, shared_notebook);
-
-            let space = cloud_model
-                .get_notebook(&shared_notebook_id)
-                .expect("Notebook is in CloudModel")
-                .space(ctx);
-            assert_eq!(space, Space::Team { team_uid });
         });
     });
 }
@@ -1767,19 +1687,19 @@ fn test_shared_object_in_unshared_folder() {
         );
         shared_notebook.metadata_mut().folder_id = Some(unshared_folder_id);
 
-        CloudModel::handle(&app).update(&mut app, |cloud_model, ctx| {
+        CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
             cloud_model.add_object(shared_notebook_id, shared_notebook);
             let notebook = cloud_model
                 .get_notebook(&shared_notebook_id)
                 .expect("Notebook is in CloudModel");
 
             // Check space-based APIs.
-            assert_eq!(notebook.space(ctx), Space::Shared);
-            assert!(notebook.is_in_space(Space::Shared, ctx));
+            assert_eq!(notebook.space(), Space::Shared);
+            assert!(notebook.is_in_space(Space::Shared));
 
             // Check location-based APIs.
             assert_eq!(
-                notebook.location(cloud_model, ctx),
+                notebook.location(cloud_model),
                 CloudObjectLocation::Space(Space::Shared)
             );
             assert!(notebook.metadata.folder_id.is_some());
@@ -1789,25 +1709,23 @@ fn test_shared_object_in_unshared_folder() {
 
             // Check that iteration APIs include the notebook where it's expected.
             assert!(cloud_model
-                .active_cloud_objects_in_space(Space::Shared, ctx)
+                .active_cloud_objects_in_space(Space::Shared)
                 .any(|obj| obj.uid() == notebook.uid()));
             assert!(cloud_model
-                .active_cloud_objects_in_location_without_descendents(
-                    CloudObjectLocation::Space(Space::Shared),
-                    ctx
-                )
+                .active_cloud_objects_in_location_without_descendents(CloudObjectLocation::Space(
+                    Space::Shared
+                ))
                 .any(|obj| obj.uid() == notebook.uid()));
             assert_eq!(
                 cloud_model
-                    .trashed_cloud_objects_in_space(Space::Shared, ctx)
+                    .trashed_cloud_objects_in_space(Space::Shared)
                     .count(),
                 0
             );
             assert_eq!(
                 cloud_model
                     .trashed_cloud_objects_in_location_without_descendents(
-                        CloudObjectLocation::Space(Space::Shared),
-                        ctx
+                        CloudObjectLocation::Space(Space::Shared)
                     )
                     .count(),
                 0
@@ -1816,13 +1734,13 @@ fn test_shared_object_in_unshared_folder() {
             let folder_location = CloudObjectLocation::Folder(unshared_folder_id);
             assert_eq!(
                 cloud_model
-                    .active_cloud_objects_in_location_without_descendents(folder_location, ctx)
+                    .active_cloud_objects_in_location_without_descendents(folder_location)
                     .count(),
                 0
             );
             assert_eq!(
                 cloud_model
-                    .trashed_cloud_objects_in_location_without_descendents(folder_location, ctx)
+                    .trashed_cloud_objects_in_location_without_descendents(folder_location)
                     .count(),
                 0
             );

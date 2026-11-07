@@ -45,11 +45,10 @@ use crate::persistence::{
     database_file_path_for_scope, establish_ro_connection, ModelEvent, PersistenceScope,
 };
 use crate::server::cloud_objects::update_manager::{InitiatedBy, UpdateManager};
-use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::server::ids::{ClientId, SyncId};
 use crate::settings::AISettings;
 use crate::view_components::DismissibleToast;
 use crate::workspace::ToastStack;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::GlobalResourceHandlesProvider;
 
 /// Controls the behavior of `spawn_server_impl`.
@@ -420,9 +419,9 @@ impl TemplatableMCPServerManager {
         self.cloud_templatable_mcp_servers.get(&template_uuid)
     }
 
-    pub fn is_server_installation_shared(&self, installation_uuid: Uuid, app: &AppContext) -> bool {
+    pub fn is_server_installation_shared(&self, installation_uuid: Uuid) -> bool {
         match self.get_installed_server(&installation_uuid) {
-            Some(installation) => self.is_server_template_shared(installation.template_uuid(), app),
+            Some(installation) => self.is_server_template_shared(installation.template_uuid()),
             None => false,
         }
     }
@@ -448,8 +447,8 @@ impl TemplatableMCPServerManager {
         });
     }
 
-    pub fn is_server_template_shared(&self, template_uuid: Uuid, app: &AppContext) -> bool {
-        match self.get_space(template_uuid, app) {
+    pub fn is_server_template_shared(&self, template_uuid: Uuid) -> bool {
+        match self.get_space(template_uuid) {
             Some(Space::Personal) => false,
             Some(Space::Team { team_uid: _ }) => true,
             Some(Space::Shared) => true,
@@ -457,10 +456,10 @@ impl TemplatableMCPServerManager {
         }
     }
 
-    fn get_space(&self, template_uuid: Uuid, app: &AppContext) -> Option<Space> {
+    fn get_space(&self, template_uuid: Uuid) -> Option<Space> {
         self.cloud_templatable_mcp_servers
             .get(&template_uuid)
-            .map(|template| template.space(app))
+            .map(|template| template.space())
     }
 
     /// Gets a CloudTemplatableMCPServer by its UUID.
@@ -492,7 +491,7 @@ impl TemplatableMCPServerManager {
         initiated_by: InitiatedBy,
         ctx: &mut ModelContext<Self>,
     ) {
-        let owner = UserWorkspaces::as_ref(ctx).space_to_owner(space, ctx);
+        let owner = space.owner();
         if let Some(owner) = owner {
             let update_manager = UpdateManager::handle(ctx);
             update_manager.update(ctx, |update_manager, ctx| {
@@ -1399,15 +1398,8 @@ impl TemplatableMCPServerManager {
 
         if let Some(cloud_templatable_mcp_server) = cloud_templatable_mcp_server {
             let auth_state = AuthStateProvider::as_ref(ctx).get();
-            let current_team = UserWorkspaces::as_ref(ctx).current_team();
-
-            let has_admin_permissions = current_team.is_some_and(|team| {
-                team.has_admin_permissions(&auth_state.user_email().unwrap_or_default())
-            });
-            let is_author = cloud_templatable_mcp_server.metadata().creator_uid
-                == auth_state.user_id().map(|user_id| user_id.as_string());
-
-            has_admin_permissions || is_author
+            cloud_templatable_mcp_server.metadata().creator_uid
+                == auth_state.user_id().map(|user_id| user_id.as_string())
         } else {
             false
         }
@@ -1530,46 +1522,6 @@ impl TemplatableMCPServerManager {
         }
     }
 
-    pub fn share_templatable_mcp_server(
-        &mut self,
-        template_uuid: Uuid,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let sync_id = self
-            .get_cloud_templatable_mcp_server(template_uuid)
-            .map(|server| server.sync_id());
-        let team_uid = TemplatableMCPServerManager::get_first_team_space_id(ctx);
-
-        if let Some(sync_id) = sync_id {
-            if let Some(team_uid) = team_uid {
-                let object_type_and_id = CloudObjectTypeAndId::GenericStringObject {
-                    object_type: GenericStringObjectFormat::Json(
-                        JsonObjectType::TemplatableMCPServer,
-                    ),
-                    id: sync_id,
-                };
-                UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
-                    update_manager.move_object_to_location(
-                        object_type_and_id,
-                        CloudObjectLocation::Space(Space::Team { team_uid }),
-                        ctx,
-                    );
-                });
-            }
-        }
-    }
-
-    pub fn share_templatable_mcp_server_installation(
-        &mut self,
-        installation_uuid: Uuid,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let template_uuid = self.get_template_uuid(installation_uuid);
-        if let Some(template_uuid) = template_uuid {
-            self.share_templatable_mcp_server(template_uuid, ctx);
-        }
-    }
-
     pub fn unshare_templatable_mcp_server(
         &mut self,
         template_uuid: Uuid,
@@ -1603,15 +1555,6 @@ impl TemplatableMCPServerManager {
         if let Some(template_uuid) = template_uuid {
             self.unshare_templatable_mcp_server(template_uuid, ctx);
         }
-    }
-
-    pub fn get_first_team_space_id(app: &AppContext) -> Option<ServerId> {
-        let user_workspaces = UserWorkspaces::as_ref(app);
-        let all_user_spaces = user_workspaces.all_user_spaces(app);
-        all_user_spaces.into_iter().find_map(|space| match space {
-            Space::Team { team_uid } => Some(team_uid),
-            _ => None,
-        })
     }
 
     pub fn has_oauth_credentials_for_server(&self, template_uuid: Uuid) -> bool {

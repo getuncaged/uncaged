@@ -100,8 +100,6 @@ use crate::themes::theme::AnsiColorIdentifier;
 use crate::warp_managed_paths_watcher::WarpManagedPathsWatcher;
 use crate::workspace::{ActiveSession, OneTimeModalModel, ToastStack, WorkspaceRegistry};
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::workspaces::update_manager::TeamUpdateManager;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 #[test]
@@ -225,9 +223,7 @@ pub fn initialize_app(app: &mut App) {
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(ImportedConfigModel::new);
-    app.add_singleton_model(UserWorkspaces::default_mock);
     app.add_singleton_model(TeamTesterStatus::mock);
-    app.add_singleton_model(TeamUpdateManager::mock);
     app.add_singleton_model(UpdateManager::mock);
     app.add_singleton_model(MCPGalleryManager::new);
     app.add_singleton_model(Listener::mock);

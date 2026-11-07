@@ -153,7 +153,7 @@ impl CloudViewModel {
     pub fn object_space(&self, id: &ObjectUid, app: &AppContext) -> Option<Space> {
         CloudModel::as_ref(app)
             .get_by_uid(id)
-            .map(|object| object.space(app))
+            .map(|object| object.space())
     }
 
     /// Get the current user's access level on a Warp Drive object.
@@ -169,7 +169,7 @@ impl CloudViewModel {
     }
 
     fn object_access_level(object: &dyn CloudObject, app: &AppContext) -> SharingAccessLevel {
-        match object.space(app) {
+        match object.space() {
             // For now, users have full access to all objects in their own drives. We may introduce
             // drive-level ACLs in the future.
             Space::Personal | Space::Team { .. } => SharingAccessLevel::Full,
@@ -222,7 +222,7 @@ impl CloudViewModel {
                     .is_anonymous_or_logged_out()
                 {
                     // The object is editable, but the user is not logged in.
-                    if object.space(app) == Space::Personal {
+                    if object.space() == Space::Personal {
                         ContentEditability::Editable
                     } else {
                         ContentEditability::RequiresLogin
@@ -251,7 +251,7 @@ impl CloudViewModel {
             // When sorting in the main index, we consider all of the children of a folder. This
             // can be expensive, so it's cached.
             UpdateTimestamp::Revision => {
-                self.sorting_timestamp_rec(object, CloudModel::as_ref(app), app)
+                self.sorting_timestamp_rec(object, CloudModel::as_ref(app))
             }
         }
     }
@@ -264,7 +264,6 @@ impl CloudViewModel {
         &self,
         object: &dyn CloudObject,
         cloud_model: &CloudModel,
-        app: &AppContext,
     ) -> Option<ServerTimestamp> {
         let folder: Option<&CloudFolder> = object.into();
         match folder {
@@ -281,11 +280,10 @@ impl CloudViewModel {
                     let max_child_timestamp = cloud_model
                         .active_cloud_objects_in_location_without_descendents(
                             CloudObjectLocation::Folder(folder.id),
-                            app,
                         )
                         // TODO(ben): This check won't be needed soon.
                         .filter(|child| child.permissions().owner == folder.permissions().owner)
-                        .filter_map(|child| self.sorting_timestamp_rec(child, cloud_model, app))
+                        .filter_map(|child| self.sorting_timestamp_rec(child, cloud_model))
                         .max();
                     // The `Ord` implementation of `Option` always considers `None` less than
                     // `Some`.

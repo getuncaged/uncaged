@@ -4,7 +4,7 @@ use warpui::{async_assert, SingletonEntity, WindowId};
 
 use super::open_workflow_count;
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::cloud_object::{CloudObjectEventEntrypoint, Space};
+use crate::cloud_object::{CloudObjectEventEntrypoint, Owner, Space};
 use crate::drive::OpenWarpDriveObjectSettings;
 use crate::integration_testing::view_getters::workspace_view;
 use crate::server::cloud_objects::update_manager::UpdateManager;
@@ -12,7 +12,6 @@ use crate::server::ids::{ClientId, SyncId};
 use crate::workflows::manager::WorkflowOpenSource;
 use crate::workflows::workflow::Workflow;
 use crate::workflows::WorkflowViewMode;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// Create a personal workflow and save its sync ID into the step data.
 pub fn create_a_personal_workflow(key: impl Into<String>) -> TestStep {
@@ -25,9 +24,7 @@ pub fn create_a_personal_workflow(key: impl Into<String>) -> TestStep {
             UpdateManager::handle(app).update(app, |update_manager, ctx| {
                 update_manager.create_workflow(
                     workflow.clone(),
-                    UserWorkspaces::as_ref(ctx)
-                        .personal_drive(ctx)
-                        .expect("User UID must be set in tests"),
+                    Owner::local_user(),
                     None,
                     client_id,
                     CloudObjectEventEntrypoint::ManagementUI,
@@ -39,10 +36,10 @@ pub fn create_a_personal_workflow(key: impl Into<String>) -> TestStep {
             data.insert(key.clone(), sync_id);
         })
         .add_assertion(move |app, _| {
-            CloudModel::handle(app).read(app, |cloud_model, ctx| {
+            CloudModel::handle(app).read(app, |cloud_model, _| {
                 async_assert!(
                     cloud_model
-                        .active_cloud_objects_in_space(Space::Personal, ctx)
+                        .active_cloud_objects_in_space(Space::Personal)
                         .count()
                         > 0,
                     "Workflow exists"

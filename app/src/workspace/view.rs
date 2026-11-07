@@ -196,9 +196,6 @@ use crate::autoupdate::{
     is_incoming_version_past_current, AutoupdateState, AutoupdateStateEvent, RelaunchModel,
 };
 use crate::banner::BannerState;
-use crate::billing::shared_objects_creation_denied_modal::{
-    SharedObjectsCreationDeniedModal, SharedObjectsCreationDeniedModalEvent,
-};
 use crate::changelog_model::{ChangelogModel, ChangelogRequestType, Event as ChangelogEvent};
 use crate::channel::{Channel, ChannelState};
 use crate::cloud_object::model::persistence::CloudModel;
@@ -274,7 +271,7 @@ use crate::search::{self, QueryFilter};
 use crate::server::cloud_objects::update_manager::{
     ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
 };
-use crate::server::ids::{ObjectUid, ServerId, SyncId};
+use crate::server::ids::{ObjectUid, SyncId};
 use crate::server::network_log_pane_manager::NetworkLogPaneManager;
 use crate::server::server_api::ai::AIClient;
 use crate::server::server_api::{ServerApi, ServerApiProvider, ServerTime};
@@ -434,10 +431,8 @@ use crate::workspace::view::orchestration_launch_modal::{
 };
 use crate::workspace::view::right_panel::{RightPanelEvent, RightPanelView};
 use crate::workspace::{ForkFromExchange, ForkedConversationDestination};
-use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::workspaces::workspace::AdminEnablementSetting;
 use crate::{
-    autoupdate, report_if_error, AgentNotificationsModel, BlocklistAIHistoryModel,
+    autoupdate, billing, report_if_error, AgentNotificationsModel, BlocklistAIHistoryModel,
     GlobalResourceHandles,
 };
 
@@ -1003,7 +998,6 @@ pub struct Workspace {
     tab_bar_pinned_by_popup: bool,
     user_menu: ViewHandle<Menu<WorkspaceAction>>,
     native_modal: ViewHandle<NativeModal>,
-    shared_objects_creation_denied_modal: ViewHandle<SharedObjectsCreationDeniedModal>,
     shown_staging_banner_count: u32,
 
     // When user's open WEB for the first time, we ask them to select a preference of
@@ -2916,19 +2910,6 @@ impl Workspace {
 
         let native_modal = Self::build_native_modal_view(ctx);
 
-        let shared_objects_creation_denied_modal =
-            ctx.add_typed_action_view(|ctx| SharedObjectsCreationDeniedModal::new(None, ctx));
-        ctx.subscribe_to_view(
-            &shared_objects_creation_denied_modal,
-            |me, _, event, ctx| match event {
-                SharedObjectsCreationDeniedModalEvent::Close => {
-                    me.current_workspace_state
-                        .is_shared_objects_creation_denied_modal_open = false;
-                    ctx.notify();
-                }
-            },
-        );
-
         ctx.subscribe_to_model(&AISettings::handle(ctx), |me, _, event, ctx| match event {
             AISettingsChangedEvent::IsAnyAIEnabled { .. }
             | AISettingsChangedEvent::ShowConversationHistory { .. } => {
@@ -3075,7 +3056,6 @@ impl Workspace {
             tab_bar_pinned_by_popup: false,
             user_menu,
             native_modal,
-            shared_objects_creation_denied_modal,
             file_upload_sessions: Default::default(),
             ai_fact_view,
             left_panel_open: false,
@@ -10072,10 +10052,8 @@ impl Workspace {
             WorkflowModalEvent::ViewInWarpDrive(id) => {
                 self.view_in_and_focus_warp_drive(*id, ctx);
             }
-            WorkflowModalEvent::AiAssistUpgradeError(team_uid, user_id) => {
-                let upgrade_link = team_uid
-                    .map(UserWorkspaces::upgrade_link_for_team)
-                    .unwrap_or_else(|| UserWorkspaces::upgrade_link(*user_id));
+            WorkflowModalEvent::AiAssistUpgradeError(user_id) => {
+                let upgrade_link = billing::upgrade_link(*user_id);
 
                 self.toast_stack.update(ctx, |view, ctx| {
                     let new_toast =
@@ -14743,26 +14721,24 @@ impl Workspace {
                 );
             }
             pane_group::Event::OpenAddPromptPane { initial_content } => {
-                if UserWorkspaces::as_ref(ctx).personal_drive(ctx).is_some() {
-                    self.update_warp_drive_view(ctx, |drive_view, ctx| {
-                        if let Some(initial_content) = initial_content {
-                            drive_view.create_workflow_with_content(
-                                Space::Personal,
-                                None,
-                                initial_content.clone(),
-                                true, // is_for_agent_mode
-                                ctx,
-                            );
-                        } else {
-                            drive_view.open_cloud_object_dialog(
-                                DriveObjectType::AgentModeWorkflow,
-                                Space::Personal,
-                                None,
-                                ctx,
-                            );
-                        }
-                    });
-                }
+                self.update_warp_drive_view(ctx, |drive_view, ctx| {
+                    if let Some(initial_content) = initial_content {
+                        drive_view.create_workflow_with_content(
+                            Space::Personal,
+                            None,
+                            initial_content.clone(),
+                            true, // is_for_agent_mode
+                            ctx,
+                        );
+                    } else {
+                        drive_view.open_cloud_object_dialog(
+                            DriveObjectType::AgentModeWorkflow,
+                            Space::Personal,
+                            None,
+                            ctx,
+                        );
+                    }
+                });
             }
             pane_group::Event::OpenFilesPalette { source } => {
                 self.open_palette_action(PaletteMode::Files, *source, None, ctx);
@@ -15262,9 +15238,6 @@ impl Workspace {
             }
             DrivePanelEvent::FocusWarpDrive => {
                 ctx.focus(&self.left_panel_view);
-            }
-            DrivePanelEvent::OpenSharedObjectsCreationDeniedModal(object_type, team_uid) => {
-                self.open_shared_objects_creation_denied_modal(*object_type, *team_uid, ctx)
             }
             DrivePanelEvent::AttachPlanAsContext(id) => {
                 self.attach_plan_as_context(*id, ctx);
@@ -16752,39 +16725,6 @@ impl Workspace {
         ctx.focus(&self.agent_toolbar_editor_modal);
     }
 
-    fn open_shared_objects_creation_denied_modal(
-        &mut self,
-        object_type: DriveObjectType,
-        team_uid: ServerId,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let team = UserWorkspaces::as_ref(ctx).team_from_uid(team_uid);
-        if let Some(team) = team {
-            let current_user_email = self.auth_state.user_email().unwrap_or_default();
-            let has_admin_permissions = team.has_admin_permissions(&current_user_email);
-            let team_uid = team.uid;
-            let is_delinquent_due_to_payment_issue =
-                team.billing_metadata.is_delinquent_due_to_payment_issue();
-            let customer_type = team.billing_metadata.customer_type;
-
-            self.current_workspace_state
-                .is_shared_objects_creation_denied_modal_open = true;
-            self.shared_objects_creation_denied_modal
-                .update(ctx, |modal, ctx| {
-                    modal.update_modal_state(
-                        team_uid,
-                        object_type,
-                        has_admin_permissions,
-                        is_delinquent_due_to_payment_issue,
-                        customer_type,
-                        ctx,
-                    );
-                });
-            ctx.focus(&self.shared_objects_creation_denied_modal);
-            ctx.notify();
-        }
-    }
-
     /// Opens the workflow modal in the provided space and folder with no existing content (i.e. a new workflow modal).
     fn open_workflow_modal(
         &mut self,
@@ -16799,30 +16739,13 @@ impl Workspace {
         // - open_workflow_modal_with_temporary
         // - open_workflow_modal_with_command
         let owner = match space {
-            Space::Team { team_uid } => {
-                if !UserWorkspaces::has_capacity_for_shared_workflows(team_uid, ctx, 1) {
-                    self.open_shared_objects_creation_denied_modal(
-                        DriveObjectType::Workflow,
-                        team_uid,
-                        ctx,
-                    );
-                    return;
-                }
-
-                Owner::Team { team_uid }
-            }
+            Space::Team { team_uid } => Owner::Team { team_uid },
             Space::Shared => {
                 // TODO(ben): Use an owner-or-folder API, so we can check on creating an object in
                 // the folder.
                 return;
             }
-            Space::Personal => match UserWorkspaces::as_ref(ctx).personal_drive(ctx) {
-                Some(drive) => drive,
-                None => {
-                    log::warn!("Unable to open workflow modal due to unset personal drive");
-                    return;
-                }
-            },
+            Space::Personal => Owner::local_user(),
         };
         self.current_workspace_state.is_workflow_modal_open = true;
         self.workflow_modal.update(ctx, |workflow_modal, ctx| {
@@ -16845,10 +16768,7 @@ impl Workspace {
 
     /// Opens the workflow using a mocked [`Workflow`] object as the base
     fn open_workflow_with_temporary(&mut self, workflow: Workflow, ctx: &mut ViewContext<Self>) {
-        let Some(owner) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) else {
-            log::warn!("Unable to open temporary workflow - unset personal drive");
-            return;
-        };
+        let owner = Owner::local_user();
         let source = WorkflowOpenSource::NewFromWorkflow {
             workflow: workflow.into(),
             owner,
@@ -16864,10 +16784,7 @@ impl Workspace {
 
     /// Opens the workflow for create with a prepopulated command specified
     fn open_workflow_with_command(&mut self, command: String, ctx: &mut ViewContext<Self>) {
-        let Some(owner) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) else {
-            log::warn!("Unable to open workflow with command - unset personal drive");
-            return;
-        };
+        let owner = Owner::local_user();
         let source = WorkflowOpenSource::New {
             title: None,
             content: Some(command),
@@ -20142,14 +20059,9 @@ impl Workspace {
         if *safe_mode_settings.safe_mode_enabled.value() {
             context.set.insert(flags::SAFE_MODE_FLAG);
         }
-        if matches!(
-            UserWorkspaces::as_ref(app).get_cloud_conversation_storage_enablement_setting(),
-            AdminEnablementSetting::RespectUserSetting
-        ) {
-            context
-                .set
-                .insert(flags::CLOUD_CONVERSATION_STORAGE_EDITABLE_FLAG);
-        }
+        context
+            .set
+            .insert(flags::CLOUD_CONVERSATION_STORAGE_EDITABLE_FLAG);
         if privacy_settings.is_cloud_conversation_storage_enabled {
             context.set.insert(flags::CLOUD_CONVERSATION_STORAGE_FLAG);
         }
@@ -20602,12 +20514,6 @@ impl Workspace {
         self.tab_views().map(|tab| tab.id())
     }
 
-    fn team_uid(&self, app: &AppContext) -> Option<ServerId> {
-        // TODO this is a stop gap for now - ideally a specific team uid should
-        // be passed into each event
-        UserWorkspaces::as_ref(app).current_team_uid()
-    }
-
     fn initiate_user_signup(&mut self, ctx: &mut ViewContext<Self>) {
         // Uncaged (Oss): no accounts — never open a Warp sign-up page or the
         // login modal. Any stray "Sign up" entrypoint is inert locally.
@@ -20829,14 +20735,6 @@ impl TypedActionView for Workspace {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         use WorkspaceAction::*;
         let window_id = ctx.window_id();
-
-        if self.auth_state.is_anonymous_or_logged_out() && action.blocked_for_anonymous_user() {
-            AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                auth_manager
-                    .attempt_login_gated_feature(AuthViewVariant::RequireLoginCloseable, ctx)
-            });
-            return;
-        }
 
         match action {
             ActivateTab(index) => {
@@ -21349,15 +21247,11 @@ impl TypedActionView for Workspace {
                 source,
             } => self.toggle_palette(*palette_mode, *source, ctx),
             ShowUpgrade => {
-                let auth_state = AuthStateProvider::as_ref(ctx).get();
-                let user_workspaces = UserWorkspaces::as_ref(ctx);
-
-                let upgrade_url = if let Some(team) = user_workspaces.current_team() {
-                    UserWorkspaces::upgrade_link_for_team(team.uid)
-                } else {
-                    let user_id = auth_state.user_id().unwrap_or_default();
-                    UserWorkspaces::upgrade_link(user_id)
-                };
+                let user_id = AuthStateProvider::as_ref(ctx)
+                    .get()
+                    .user_id()
+                    .unwrap_or_default();
+                let upgrade_url = billing::upgrade_link(user_id);
 
                 ctx.open_url(&upgrade_url);
             }
@@ -21406,109 +21300,49 @@ impl TypedActionView for Workspace {
                 init_content,
             }) => self.show_command_search(*filter, init_content, ctx),
             ImportToPersonalDrive => {
-                if let Some(personal_drive) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) {
-                    self.open_import_modal(personal_drive, &None, ctx);
-                }
-            }
-            ImportToTeamDrive => {
-                let team_uid = self.team_uid(ctx);
-                if let Some(team_uid) = team_uid {
-                    self.open_import_modal(Owner::Team { team_uid }, &None, ctx);
-                }
+                let personal_drive = Owner::local_user();
+                self.open_import_modal(personal_drive, &None, ctx);
             }
             CreatePersonalNotebook => {
-                if let Some(personal_drive) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) {
-                    self.open_notebook(
-                        &NotebookSource::New {
-                            title: None,
-                            owner: personal_drive,
-                            initial_folder_id: None,
-                        },
-                        &OpenWarpDriveObjectSettings::default(),
-                        ctx,
-                        true,
-                    );
-                }
-            }
-            CreateTeamNotebook => {
-                let team_uid = self.team_uid(ctx);
-                if let Some(team_uid) = team_uid {
-                    self.update_warp_drive_view(ctx, |drive_panel, ctx| {
-                        drive_panel.open_cloud_object_dialog(
-                            DriveObjectType::Notebook {
-                                is_ai_document: false,
-                            },
-                            Space::Team { team_uid },
-                            None,
-                            ctx,
-                        );
-                    });
-                    self.current_workspace_state.is_warp_drive_open = true;
-                    ctx.notify();
-                }
-            }
-            CreatePersonalEnvVarCollection => {
-                if let Some(personal_drive) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) {
-                    self.open_env_var_collection(
-                        &EnvVarCollectionSource::New {
-                            title: None,
-                            owner: personal_drive,
-                            initial_folder_id: None,
-                        },
-                        false,
-                        ctx,
-                    );
-                }
-            }
-            CreateTeamEnvVarCollection => {
-                let team_uid = self.team_uid(ctx);
-                if let Some(team_uid) = team_uid {
-                    self.update_warp_drive_view(ctx, |drive_panel, ctx| {
-                        drive_panel.open_cloud_object_dialog(
-                            DriveObjectType::EnvVarCollection,
-                            Space::Team { team_uid },
-                            None,
-                            ctx,
-                        );
-                    });
-                    self.current_workspace_state.is_warp_drive_open = true;
-                    ctx.notify();
-                }
-            }
-            CreatePersonalWorkflow => {
-                if let Some(personal_drive) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) {
-                    let source = WorkflowOpenSource::New {
+                let personal_drive = Owner::local_user();
+                self.open_notebook(
+                    &NotebookSource::New {
                         title: None,
-                        content: None,
                         owner: personal_drive,
                         initial_folder_id: None,
-                        is_for_agent_mode: false,
-                    };
-                    self.open_workflow_in_pane(
-                        &source,
-                        &OpenWarpDriveObjectSettings::default(),
-                        WorkflowViewMode::Create,
-                        ctx,
-                    );
-                }
+                    },
+                    &OpenWarpDriveObjectSettings::default(),
+                    ctx,
+                    true,
+                );
             }
-            CreateTeamWorkflow => {
-                let team_uid = self.team_uid(ctx);
-                if let Some(team_uid) = team_uid {
-                    let source = WorkflowOpenSource::New {
+            CreatePersonalEnvVarCollection => {
+                let personal_drive = Owner::local_user();
+                self.open_env_var_collection(
+                    &EnvVarCollectionSource::New {
                         title: None,
-                        content: None,
-                        owner: Owner::Team { team_uid },
+                        owner: personal_drive,
                         initial_folder_id: None,
-                        is_for_agent_mode: false,
-                    };
-                    self.open_workflow_in_pane(
-                        &source,
-                        &OpenWarpDriveObjectSettings::default(),
-                        WorkflowViewMode::Create,
-                        ctx,
-                    );
-                }
+                    },
+                    false,
+                    ctx,
+                );
+            }
+            CreatePersonalWorkflow => {
+                let personal_drive = Owner::local_user();
+                let source = WorkflowOpenSource::New {
+                    title: None,
+                    content: None,
+                    owner: personal_drive,
+                    initial_folder_id: None,
+                    is_for_agent_mode: false,
+                };
+                self.open_workflow_in_pane(
+                    &source,
+                    &OpenWarpDriveObjectSettings::default(),
+                    WorkflowViewMode::Create,
+                    ctx,
+                );
             }
             CreatePersonalFolder => {
                 self.update_warp_drive_view(ctx, |drive_panel, ctx| {
@@ -21521,21 +21355,6 @@ impl TypedActionView for Workspace {
                 });
                 self.current_workspace_state.is_warp_drive_open = true;
                 ctx.notify();
-            }
-            CreateTeamFolder => {
-                let team_uid = self.team_uid(ctx);
-                if let Some(team_uid) = team_uid {
-                    self.update_warp_drive_view(ctx, |drive_panel, ctx| {
-                        drive_panel.open_cloud_object_dialog(
-                            DriveObjectType::Folder,
-                            Space::Team { team_uid },
-                            None,
-                            ctx,
-                        );
-                    });
-                    self.current_workspace_state.is_warp_drive_open = true;
-                    ctx.notify();
-                }
             }
             ToggleMouseReporting => self.toggle_mouse_reporting(ctx),
             ToggleScrollReporting => self.toggle_scroll_reporting(ctx),
@@ -22341,39 +22160,20 @@ impl TypedActionView for Workspace {
                 });
             }
             CreatePersonalAIPrompt => {
-                if let Some(personal_drive) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) {
-                    let source = WorkflowOpenSource::New {
-                        title: None,
-                        content: None,
-                        owner: personal_drive,
-                        initial_folder_id: None,
-                        is_for_agent_mode: true,
-                    };
-                    self.open_workflow_in_pane(
-                        &source,
-                        &OpenWarpDriveObjectSettings::default(),
-                        WorkflowViewMode::Create,
-                        ctx,
-                    );
-                }
-            }
-            CreateTeamAIPrompt => {
-                let team_uid = self.team_uid(ctx);
-                if let Some(team_uid) = team_uid {
-                    let source = WorkflowOpenSource::New {
-                        title: None,
-                        content: None,
-                        owner: Owner::Team { team_uid },
-                        initial_folder_id: None,
-                        is_for_agent_mode: true,
-                    };
-                    self.open_workflow_in_pane(
-                        &source,
-                        &OpenWarpDriveObjectSettings::default(),
-                        WorkflowViewMode::Create,
-                        ctx,
-                    );
-                }
+                let personal_drive = Owner::local_user();
+                let source = WorkflowOpenSource::New {
+                    title: None,
+                    content: None,
+                    owner: personal_drive,
+                    initial_folder_id: None,
+                    is_for_agent_mode: true,
+                };
+                self.open_workflow_in_pane(
+                    &source,
+                    &OpenWarpDriveObjectSettings::default(),
+                    WorkflowViewMode::Create,
+                    ctx,
+                );
             }
             #[cfg(feature = "local_fs")]
             FileRenamed { old_path, new_path } => {
@@ -22945,10 +22745,6 @@ impl View for Workspace {
         }
         if *CodeSettings::as_ref(app).show_hidden_files {
             context.set.insert(flags::SHOW_HIDDEN_FILES);
-        }
-
-        if self.team_uid(app).is_some() {
-            context.set.insert("WarpDrive_BelongsToTeam");
         }
 
         if self.auth_state.is_anonymous_or_logged_out() {
@@ -23694,13 +23490,6 @@ impl View for Workspace {
 
         if self.current_workspace_state.is_import_modal_open {
             stack.add_child(ChildView::new(&self.import_modal).finish());
-        }
-
-        if self
-            .current_workspace_state
-            .is_shared_objects_creation_denied_modal_open
-        {
-            stack.add_child(ChildView::new(&self.shared_objects_creation_denied_modal).finish());
         }
 
         if self.launch_config_save_modal.is_open() {

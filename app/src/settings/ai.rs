@@ -28,7 +28,6 @@ use crate::auth::AuthStateProvider;
 use crate::report_if_error;
 use crate::settings::PrivacySettings;
 use crate::terminal::CLIAgent;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub enum FocusedTerminalInfoEvent {
     TerminalInfoUpdated,
@@ -919,8 +918,7 @@ define_settings_group!(AISettings, settings: [
     // Whether to mint and attach Gemini Enterprise (GEAP) credentials to eligible agent
     // requests, routing them through the workspace's Google Cloud project. Only consulted
     // when the admin sets the GEAP host to RESPECT_USER_SETTING; ENFORCE bypasses it.
-    // Prefer [`UserWorkspaces::is_gemini_enterprise_credentials_enabled`] to interpret
-    // this setting.
+    // Uncaged has no workspace, so credentials are never minted.
     gemini_enterprise_credentials_enabled: GeminiEnterpriseCredentialsEnabled {
         type: bool,
         default: false,
@@ -1345,9 +1343,7 @@ define_settings_group!(AISettings, settings: [
     }
 
     // Whether Oz should add attribution (co-author line) to commit messages and PRs.
-    // This is the user-level preference; it may be overridden by the team-level
-    // `enable_warp_attribution` AdminEnablementSetting (see
-    // `UserWorkspaces::get_agent_attribution_setting`).
+    // This is the user-level preference.
     agent_attribution_enabled: AgentAttributionEnabled {
         type: bool,
         default: true,
@@ -1426,8 +1422,7 @@ impl AISettings {
         let contains_restored_remote_blocks =
             FocusedTerminalInfo::as_ref(app).contains_any_restored_remote_blocks();
 
-        let is_ai_allowed_in_remote_sessions =
-            UserWorkspaces::as_ref(app).is_ai_allowed_in_remote_sessions();
+        let is_ai_allowed_in_remote_sessions = true;
 
         if is_ai_allowed_in_remote_sessions {
             return false;
@@ -1588,14 +1583,7 @@ impl AISettings {
         {
             return false;
         }
-        let privacy = PrivacySettings::as_ref(app);
-        if !privacy.is_cloud_conversation_storage_enabled {
-            return false;
-        }
-        !matches!(
-            UserWorkspaces::as_ref(app).get_cloud_conversation_storage_enablement_setting(),
-            crate::workspaces::workspace::AdminEnablementSetting::Disable
-        )
+        PrivacySettings::as_ref(app).is_cloud_conversation_storage_enabled
     }
     pub fn is_ampersand_handoff_enabled(&self, app: &warpui::AppContext) -> bool {
         self.is_cloud_handoff_enabled(app) && !*self.should_force_disable_ampersand_handoff
@@ -1699,57 +1687,31 @@ impl AISettings {
     }
 
     pub fn is_command_allowlist_editable(&self, app: &AppContext) -> bool {
-        let set_by_workspace = UserWorkspaces::as_ref(app)
-            .ai_autonomy_settings()
-            .has_override_for_execute_commands_allowlist();
-
-        self.is_any_ai_enabled(app) && !set_by_workspace
+        self.is_any_ai_enabled(app)
     }
 
     pub fn is_directory_allowlist_editable(&self, app: &AppContext) -> bool {
-        let set_by_workspace = UserWorkspaces::as_ref(app)
-            .ai_autonomy_settings()
-            .has_override_for_read_files_allowlist();
-
-        self.is_any_ai_enabled(app) && !set_by_workspace
+        self.is_any_ai_enabled(app)
     }
 
     pub fn is_execute_commands_permissions_editable(&self, app: &AppContext) -> bool {
-        let set_by_workspace = UserWorkspaces::as_ref(app)
-            .ai_autonomy_settings()
-            .has_override_for_execute_commands();
-
-        self.is_any_ai_enabled(app) && !set_by_workspace
+        self.is_any_ai_enabled(app)
     }
 
     pub fn is_write_to_pty_permissions_editable(&self, app: &AppContext) -> bool {
-        let set_by_workspace = UserWorkspaces::as_ref(app)
-            .ai_autonomy_settings()
-            .has_override_for_write_to_pty();
-        self.is_any_ai_enabled(app) && !set_by_workspace
+        self.is_any_ai_enabled(app)
     }
 
     pub fn is_computer_use_permissions_editable(&self, app: &AppContext) -> bool {
-        let set_by_workspace = UserWorkspaces::as_ref(app)
-            .ai_autonomy_settings()
-            .has_override_for_computer_use();
-        self.is_any_ai_enabled(app) && !set_by_workspace
+        self.is_any_ai_enabled(app)
     }
 
     pub fn is_read_files_permissions_editable(&self, app: &AppContext) -> bool {
-        let set_by_workspace = UserWorkspaces::as_ref(app)
-            .ai_autonomy_settings()
-            .has_override_for_read_files();
-
-        self.is_any_ai_enabled(app) && !set_by_workspace
+        self.is_any_ai_enabled(app)
     }
 
     pub fn is_code_diffs_permissions_editable(&self, app: &AppContext) -> bool {
-        let set_by_workspace = UserWorkspaces::as_ref(app)
-            .ai_autonomy_settings()
-            .has_override_for_code_diffs();
-
-        self.is_any_ai_enabled(app) && !set_by_workspace
+        self.is_any_ai_enabled(app)
     }
 
     pub fn is_ask_user_question_permissions_editable(&self, app: &AppContext) -> bool {

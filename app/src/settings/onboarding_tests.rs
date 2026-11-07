@@ -20,7 +20,6 @@ use crate::server::sync_queue::SyncQueue;
 use crate::settings::{apply_onboarding_settings, AISettings, PrivacySettings};
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
     ServerMetadata {
@@ -64,7 +63,6 @@ fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_l
         app.add_singleton_model(CloudModel::mock);
         app.add_singleton_model(|_| TemplatableMCPServerManager::default());
         app.add_singleton_model(PrivacySettings::mock);
-        app.add_singleton_model(UserWorkspaces::default_mock);
         let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         // The existing user's stored cloud default profile. Values are
@@ -187,7 +185,6 @@ fn apply_onboarding_settings_enables_ai_for_agent_intent_with_account() {
         app.add_singleton_model(CloudModel::mock);
         app.add_singleton_model(|_| TemplatableMCPServerManager::default());
         app.add_singleton_model(PrivacySettings::mock);
-        app.add_singleton_model(UserWorkspaces::default_mock);
         app.add_singleton_model(AIExecutionProfilesModel::new);
 
         let onboarding_settings = SelectedSettings::AgentDrivenDevelopment {

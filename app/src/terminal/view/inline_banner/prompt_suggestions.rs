@@ -29,7 +29,6 @@ use crate::ai::blocklist::BlocklistAIInputModel;
 use crate::ai::predict::prompt_suggestions::ACCEPT_PROMPT_SUGGESTION_KEYBINDING;
 use crate::ai::AIRequestUsageModel;
 use crate::appearance::Appearance;
-use crate::server::ids::ServerId;
 use crate::settings::InputSettings;
 use crate::terminal::view::passive_suggestions::PromptSuggestionResolution;
 use crate::terminal::view::{ContextMenuAction, InputType, PromptSuggestion, TerminalAction};
@@ -37,12 +36,10 @@ use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon as WarpUIIcon;
 use crate::util::bindings::keybinding_name_to_keystroke;
 use crate::workspace::WorkspaceAction;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const INLINE_BANNER_SPACING: f32 = 8.;
 const INLINE_BANNER_BUTTON_PADDING: f32 = 8.;
 
-const DELINQUENT_DUE_TO_PAYMENT_ISSUE_TOOLTIP_MESSAGE: &str = "Restricted due to payment issue";
 const OUT_OF_REQUESTS_TOOLTIP_MESSAGE: &str = "Out of credits";
 
 /// Types of zero-state prompt suggestions.
@@ -140,9 +137,6 @@ fn render_button(
         prompt_alert_state,
         PromptAlertState::NoConnection
             | PromptAlertState::AnonymousUserRequestLimitHardGate
-            | PromptAlertState::DelinquentDueToPaymentIssue
-            | PromptAlertState::OveragesToggleableButNotEnabled
-            | PromptAlertState::MonthlyOveragesSpendLimitReached
             | PromptAlertState::RequestLimitReached
     ) && !force_enabled;
     let opacity: f32 = if is_button_disabled { 0.5 } else { 1.0 };
@@ -302,14 +296,9 @@ fn get_tooltip_text_for_alert_state(alert_state: &PromptAlertState) -> Option<St
     // This is not an exhaustive list; the actual prompt alert component will have more information,
     // so we can keep the tooltip's text relatively minimal and just capture broad groups.
     match alert_state {
-        PromptAlertState::DelinquentDueToPaymentIssue => {
-            Some(DELINQUENT_DUE_TO_PAYMENT_ISSUE_TOOLTIP_MESSAGE.to_string())
-        }
         PromptAlertState::RequestLimitReached
         | PromptAlertState::AnonymousUserRequestLimitHardGate
-        | PromptAlertState::AnonymousUserRequestLimitSoftGate
-        | PromptAlertState::OveragesToggleableButNotEnabled
-        | PromptAlertState::MonthlyOveragesSpendLimitReached => {
+        | PromptAlertState::AnonymousUserRequestLimitSoftGate => {
             Some(OUT_OF_REQUESTS_TOOLTIP_MESSAGE.to_string())
         }
         _ => None,
@@ -318,13 +307,10 @@ fn get_tooltip_text_for_alert_state(alert_state: &PromptAlertState) -> Option<St
 
 /// Free-plan users who run out of Warp-provided AI credits should get a modal
 /// offering BYO/upgrade instead of a disabled button. Other disabled states
-/// (offline, payment issues, team overage gates) keep the disabled treatment.
+/// (offline, anonymous hard gate) keep the disabled treatment.
 fn should_open_unavailable_modal(state: &PromptAlertState, app: &AppContext) -> bool {
     FeatureFlag::OpenWarpNewSettingsModes.is_enabled()
         && matches!(state, PromptAlertState::RequestLimitReached)
-        && !UserWorkspaces::as_ref(app)
-            .current_workspace()
-            .is_some_and(|workspace| workspace.billing_metadata.is_user_on_paid_plan())
         // ICPs who still receive base credits on the Free plan keep the disabled
         // button; only offer the modal once the base allowance is gone.
         && AIRequestUsageModel::as_ref(app).request_limit() == 0
@@ -333,7 +319,6 @@ fn should_open_unavailable_modal(state: &PromptAlertState, app: &AppContext) -> 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptSuggestionsEvent {
     SignupAnonymousUser,
-    OpenBillingPortal { team_uid: ServerId },
 }
 
 pub struct PromptSuggestionsView {
@@ -371,11 +356,6 @@ impl PromptSuggestionsView {
         match event {
             PromptAlertEvent::SignupAnonymousUser => {
                 ctx.emit(PromptSuggestionsEvent::SignupAnonymousUser);
-            }
-            PromptAlertEvent::OpenBillingPortal { team_uid } => {
-                ctx.emit(PromptSuggestionsEvent::OpenBillingPortal {
-                    team_uid: *team_uid,
-                });
             }
         }
     }
@@ -477,11 +457,6 @@ impl TypedActionView for PromptSuggestionsView {
         match action {
             PromptSuggestionsEvent::SignupAnonymousUser => {
                 ctx.emit(PromptSuggestionsEvent::SignupAnonymousUser);
-            }
-            PromptSuggestionsEvent::OpenBillingPortal { team_uid } => {
-                ctx.emit(PromptSuggestionsEvent::OpenBillingPortal {
-                    team_uid: *team_uid,
-                });
             }
         }
     }

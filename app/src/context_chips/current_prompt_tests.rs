@@ -259,7 +259,6 @@ fn test_shell_chip_is_disabled_when_required_executable_is_missing() {
         app.add_singleton_model(|_| crate::settings::manager::SettingsManager::default());
         crate::settings::InputSettings::register(&mut app);
         app.update(crate::settings::AISettings::register_and_subscribe_to_events);
-        app.add_singleton_model(crate::workspaces::user_workspaces::UserWorkspaces::default_mock);
         #[cfg(windows)]
         app.add_singleton_model(SystemInfo::new);
 
@@ -409,7 +408,6 @@ fn test_disabling_chips() {
         app.add_singleton_model(|_| crate::settings::manager::SettingsManager::default());
         crate::settings::InputSettings::register(&mut app);
         app.update(crate::settings::AISettings::register_and_subscribe_to_events);
-        app.add_singleton_model(crate::workspaces::user_workspaces::UserWorkspaces::default_mock);
         #[cfg(windows)]
         app.add_singleton_model(SystemInfo::new);
 

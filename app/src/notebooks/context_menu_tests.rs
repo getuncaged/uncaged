@@ -25,7 +25,6 @@ use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspace::ActiveSession;
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::UserProfiles;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 fn initialize_app(app: &mut App) {
@@ -37,7 +36,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| Appearance::mock());
 
-    app.add_singleton_model(UserWorkspaces::default_mock);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(TeamTesterStatus::mock);
     app.add_singleton_model(UpdateManager::mock);

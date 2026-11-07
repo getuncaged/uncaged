@@ -46,8 +46,7 @@ use crate::view_components::{
     Dropdown, DropdownItem, FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent,
 };
 use crate::workspace::WorkspaceAction;
-use crate::workspaces::user_workspaces::UserWorkspacesEvent;
-use crate::{Appearance, TemplatableMCPServerManager, UserWorkspaces};
+use crate::{Appearance, TemplatableMCPServerManager};
 
 const MODEL_MENU_WIDTH: f32 = 250.;
 
@@ -262,7 +261,6 @@ pub struct ExecutionProfileEditorView {
     directory_allowlist_editor: ViewHandle<SubmittableTextInput>,
     command_allowlist_mouse_state_handles: Vec<MouseStateHandle>,
     command_denylist_mouse_state_handles: Vec<MouseStateHandle>,
-    command_denylist_tooltip_mouse_state_handles: Vec<MouseStateHandle>,
     directory_allowlist_mouse_state_handles: Vec<MouseStateHandle>,
     mcp_allowlist_dropdown: ViewHandle<FilterableDropdown<ExecutionProfileEditorViewAction>>,
     mcp_allowlist_mouse_state_handles: Vec<MouseStateHandle>,
@@ -667,11 +665,6 @@ impl ExecutionProfileEditorView {
             directory_allowlist_editor,
             command_allowlist_mouse_state_handles,
             command_denylist_mouse_state_handles,
-            command_denylist_tooltip_mouse_state_handles: profile_data
-                .command_denylist
-                .iter()
-                .map(|_| Default::default())
-                .collect(),
             directory_allowlist_mouse_state_handles,
             mcp_allowlist_dropdown,
             mcp_allowlist_mouse_state_handles,
@@ -753,7 +746,7 @@ impl ExecutionProfileEditorView {
                     Self::refresh_filterable_model_dropdown(
                         &me.base_model_dropdown,
                         current_permissions.base_model.clone(),
-                        |prefs, app| prefs.get_base_llm_choices_for_agent_mode(app).collect_vec(),
+                        |prefs, _| prefs.get_base_llm_choices_for_agent_mode().collect_vec(),
                         |id| ExecutionProfileEditorViewAction::SetBaseModel { id },
                         |prefs| prefs.get_default_base_model().id.clone(),
                         &me.upgrade_footer_mouse_state,
@@ -767,7 +760,7 @@ impl ExecutionProfileEditorView {
                     Self::refresh_filterable_model_dropdown(
                         &me.full_terminal_use_model_dropdown,
                         current_permissions.cli_agent_model.clone(),
-                        |prefs, app| prefs.get_cli_agent_llm_choices(app).collect_vec(),
+                        |prefs, _| prefs.get_cli_agent_llm_choices().collect_vec(),
                         |id| ExecutionProfileEditorViewAction::SetFullTerminalUseModel { id },
                         |prefs| prefs.get_default_cli_agent_model().id.clone(),
                         &me.upgrade_footer_mouse_state,
@@ -788,7 +781,7 @@ impl ExecutionProfileEditorView {
                     Self::refresh_filterable_model_dropdown(
                         &me.base_model_dropdown,
                         current_permissions.base_model.clone(),
-                        |prefs, app| prefs.get_base_llm_choices_for_agent_mode(app).collect_vec(),
+                        |prefs, _| prefs.get_base_llm_choices_for_agent_mode().collect_vec(),
                         |id| ExecutionProfileEditorViewAction::SetBaseModel { id },
                         |prefs| prefs.get_default_base_model().id.clone(),
                         &me.upgrade_footer_mouse_state,
@@ -816,7 +809,7 @@ impl ExecutionProfileEditorView {
                 Self::refresh_filterable_model_dropdown(
                     &me.base_model_dropdown,
                     current_permissions.base_model.clone(),
-                    |prefs, app| prefs.get_base_llm_choices_for_agent_mode(app).collect_vec(),
+                    |prefs, _| prefs.get_base_llm_choices_for_agent_mode().collect_vec(),
                     |id| ExecutionProfileEditorViewAction::SetBaseModel { id },
                     |prefs| prefs.get_default_base_model().id.clone(),
                     &me.upgrade_footer_mouse_state,
@@ -842,24 +835,15 @@ impl ExecutionProfileEditorView {
             },
         );
 
-        let workspace = UserWorkspaces::handle(ctx);
-        ctx.subscribe_to_model(&workspace, |me, workspace, event, ctx| {
-            if let UserWorkspacesEvent::TeamsChanged = event {
-                Self::update_all_editor_interaction_states(me, workspace, ctx);
-                me.update_mouse_state_handles(ctx);
-                ctx.notify();
-            }
-        });
         ctx.subscribe_to_model(&AISettings::handle(ctx), |me, _, event, ctx| {
             if let AISettingsChangedEvent::IsAnyAIEnabled { .. } = event {
-                let workspace = UserWorkspaces::handle(ctx);
-                Self::update_all_editor_interaction_states(me, workspace, ctx);
+                Self::update_all_editor_interaction_states(me, ctx);
                 me.sync_context_window_editor(ctx, true);
                 ctx.notify();
             }
         });
 
-        Self::update_all_editor_interaction_states(&view, workspace, ctx);
+        Self::update_all_editor_interaction_states(&view, ctx);
 
         view.refresh_profile_state(ctx);
 
@@ -884,12 +868,6 @@ impl ExecutionProfileEditorView {
             .collect();
 
         self.command_denylist_mouse_state_handles = current_permissions
-            .command_denylist
-            .iter()
-            .map(|_| Default::default())
-            .collect();
-
-        self.command_denylist_tooltip_mouse_state_handles = current_permissions
             .command_denylist
             .iter()
             .map(|_| Default::default())
@@ -932,7 +910,7 @@ impl ExecutionProfileEditorView {
         Self::refresh_filterable_model_dropdown(
             &self.base_model_dropdown,
             current_permissions.base_model.clone(),
-            |prefs, app| prefs.get_base_llm_choices_for_agent_mode(app).collect_vec(),
+            |prefs, _| prefs.get_base_llm_choices_for_agent_mode().collect_vec(),
             |id| ExecutionProfileEditorViewAction::SetBaseModel { id },
             |prefs| prefs.get_default_base_model().id.clone(),
             &self.upgrade_footer_mouse_state,
@@ -946,7 +924,7 @@ impl ExecutionProfileEditorView {
         Self::refresh_filterable_model_dropdown(
             &self.full_terminal_use_model_dropdown,
             current_permissions.cli_agent_model.clone(),
-            |prefs, app| prefs.get_cli_agent_llm_choices(app).collect_vec(),
+            |prefs, _| prefs.get_cli_agent_llm_choices().collect_vec(),
             |id| ExecutionProfileEditorViewAction::SetFullTerminalUseModel { id },
             |prefs| prefs.get_default_cli_agent_model().id.clone(),
             &self.upgrade_footer_mouse_state,
@@ -1225,7 +1203,7 @@ impl ExecutionProfileEditorView {
             }
 
             let choices = LLMPreferences::as_ref(ctx)
-                .get_coding_llm_choices(ctx)
+                .get_coding_llm_choices()
                 .collect_vec();
 
             let items = available_model_menu_items(
@@ -1345,13 +1323,8 @@ impl ExecutionProfileEditorView {
         });
     }
 
-    fn update_all_editor_interaction_states(
-        view: &Self,
-        workspace: ModelHandle<UserWorkspaces>,
-        ctx: &mut ViewContext<Self>,
-    ) {
+    fn update_all_editor_interaction_states(view: &Self, ctx: &mut ViewContext<Self>) {
         let is_any_ai_enabled = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
-        let ai_autonomy_settings = workspace.as_ref(ctx).ai_autonomy_settings();
 
         Self::update_editor_interaction_state(
             view.command_denylist_editor.as_ref(ctx).editor().clone(),
@@ -1361,14 +1334,13 @@ impl ExecutionProfileEditorView {
 
         Self::update_editor_interaction_state(
             view.command_allowlist_editor.as_ref(ctx).editor().clone(),
-            is_any_ai_enabled
-                && !ai_autonomy_settings.has_override_for_execute_commands_allowlist(),
+            is_any_ai_enabled,
             ctx,
         );
 
         Self::update_editor_interaction_state(
             view.directory_allowlist_editor.as_ref(ctx).editor().clone(),
-            is_any_ai_enabled && !ai_autonomy_settings.has_override_for_read_files_allowlist(),
+            is_any_ai_enabled,
             ctx,
         );
     }

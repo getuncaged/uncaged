@@ -9,7 +9,6 @@ pub mod response_stream;
 mod slash_command;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::Duration;
 
 use ai::skills::SkillPathOrigin;
 use anyhow::anyhow;
@@ -21,7 +20,7 @@ use pending_response_streams::PendingResponseStreams;
 pub use slash_command::*;
 use warp_core::assertions::safe_assert;
 use warp_multi_agent_api::{message, Task, ToolType};
-use warpui::r#async::{SpawnedFutureHandle, Timer};
+use warpui::r#async::SpawnedFutureHandle;
 use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use self::response_stream::{ResponseStream, ResponseStreamEvent};
@@ -56,7 +55,6 @@ use crate::global_resource_handles::GlobalResourceHandlesProvider;
 use crate::network::NetworkStatus;
 use crate::notebooks::editor::model::FileLinkResolutionContext;
 use crate::persistence::ModelEvent;
-use crate::server::server_api::AIApiError;
 use crate::terminal::model::block::{
     formatted_terminal_contents_for_input, BlockId, CURSOR_MARKER,
 };
@@ -66,8 +64,6 @@ use crate::terminal::model::terminal_model::TerminalModel;
 use crate::terminal::view::inline_banner::ZeroStatePromptSuggestionType;
 use crate::terminal::ShellLaunchData;
 use crate::workspace::OneTimeModalModel;
-use crate::workspaces::update_manager::TeamUpdateManager;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 #[derive(Debug, Clone)]
 pub struct SessionContext {
@@ -2045,17 +2041,13 @@ impl BlocklistAIController {
         // nearing or past expiry, kick off a background refresh so upcoming
         // requests can authenticate even when the proactive refresh loop
         // isn't running. This request still carries the currently stored
-        // token; the server is the authority on its validity. The Gemini
-        // Enterprise (GEAP) analog re-arms a parked or never-armed WIF
-        // credential refresh chain the same way.
+        // token; the server is the authority on its validity.
         #[cfg(not(target_family = "wasm"))]
         {
             use ::ai::api_keys::ApiKeyManager;
 
-            let byo_allowed = UserWorkspaces::as_ref(ctx).is_byo_api_key_enabled(ctx);
             ApiKeyManager::handle(ctx).update(ctx, |manager, ctx| {
-                manager.refresh_grok_tokens_if_needed(byo_allowed, ctx);
-                crate::ai::geap_credentials::refresh_geap_credentials_if_needed(manager, ctx);
+                manager.refresh_grok_tokens_if_needed(false, ctx);
             });
         }
 
@@ -2411,19 +2403,6 @@ impl BlocklistAIController {
                         }
                     }
                     Err(e) => {
-                        if matches!(e.as_ref(), AIApiError::QuotaLimit { .. }) {
-                            // If the error is a quota limit, we want to refresh workspace metadata
-                            // So the current state of AI overages is immediately up to date.
-                            TeamUpdateManager::handle(ctx).update(
-                                ctx,
-                                |team_update_manager, ctx| {
-                                    std::mem::drop(
-                                        team_update_manager.refresh_workspace_metadata(ctx),
-                                    );
-                                },
-                            );
-                        }
-
                         // A resume scheduled for this failure keeps the conversation in
                         // the non-terminal TransientError status instead of Error.
                         let recovery_pending = response_stream
@@ -2617,8 +2596,6 @@ impl BlocklistAIController {
                 AIRequestUsageModel::handle(ctx).update(ctx, |request_usage_model, ctx| {
                     request_usage_model.refresh_request_usage_async(ctx);
                 });
-
-                self.maybe_refresh_ai_overages(ctx);
             }
         }
     }
@@ -2639,38 +2616,6 @@ impl BlocklistAIController {
                 ctx,
             );
         });
-    }
-
-    /// Checks if we should refresh AI overage information after an AI request completes.
-    /// This is used to ensure the UI matches the state of the workspace,
-    /// especially because overages are not real-time communicated to clients.
-    fn maybe_refresh_ai_overages(&mut self, ctx: &mut ModelContext<Self>) {
-        let workspace = UserWorkspaces::as_ref(ctx).current_workspace();
-        let Some(workspace) = workspace else {
-            return;
-        };
-
-        // We want to minimize the number of times we ping our backend for updated usage information;
-        // doing it after every AI query finishes would be very expensive.
-
-        // If a user is below their personal limits, then we know that they won't eat into overages,
-        // so we don't need to refresh.
-        let has_no_requests_remaining = !AIRequestUsageModel::as_ref(ctx).has_requests_remaining();
-        // If overages aren't enabled, we're not going to reap the benefit of refreshing at all anyway.
-        let are_overages_enabled = workspace.are_overages_enabled();
-
-        if are_overages_enabled && has_no_requests_remaining {
-            // Give a one second delay to ensure that Stripe has been charged and the database is completely updated,
-            // before syncing new AI overages data.
-            ctx.spawn(
-                async move { Timer::after(Duration::from_secs(1)).await },
-                |_, _, ctx| {
-                    UserWorkspaces::handle(ctx).update(ctx, |user_workspaces, ctx| {
-                        user_workspaces.refresh_ai_overages(ctx);
-                    });
-                },
-            );
-        }
     }
 
     pub(super) fn handle_response_stream_finished(

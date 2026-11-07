@@ -15,7 +15,6 @@ use crate::report_error;
 use crate::server::retry_strategies::LISTENER_RETRY_STRATEGY;
 use crate::server::server_api::object::ObjectClient;
 use crate::system::{SystemStats, SystemStatsEvent};
-use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 
 lazy_static::lazy_static! {
     /// Between successful websocket connections, we ensured at least this amount of time
@@ -99,18 +98,12 @@ impl Listener {
             Self::handle_network_status_changed_event,
         );
 
-        // To prevent creating unnecessary websockets, we only open a websocket if
-        // - a user is known to be part of a team
-        // - or a user has access to >= 1 cloud object
-        // In either of these cases, it's worth creating a websocket for cloud object updates.
+        // To prevent creating unnecessary websockets, we only open a websocket if a user has
+        // access to >= 1 cloud object.
         //
         // Note that we also want a websocket for CloudPreferences, but this is handled via listening
         // to the cloud model for the creation of cloud preferences objects (which happens when settings sync
         // is enabled for the first time).
-        ctx.subscribe_to_model(
-            &UserWorkspaces::handle(ctx),
-            Self::handle_user_workspaces_event,
-        );
         ctx.subscribe_to_model(&CloudModel::handle(ctx), Self::handle_cloud_model_event);
 
         // We need to do a one-time check of cloud objects when starting
@@ -128,24 +121,6 @@ impl Listener {
         use crate::server::server_api::ServerApiProvider;
 
         Self::new(ServerApiProvider::new_for_test().get(), ctx)
-    }
-
-    fn is_part_of_some_team(&self, ctx: &ModelContext<Self>) -> bool {
-        UserWorkspaces::as_ref(ctx).has_teams()
-    }
-
-    // If the user is part of a team, we should start subscribing for updates.
-    fn handle_user_workspaces_event(
-        &mut self,
-        _: ModelHandle<UserWorkspaces>,
-        event: &UserWorkspacesEvent,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if let UserWorkspacesEvent::TeamsChanged = event {
-            if self.is_part_of_some_team(ctx) {
-                self.start_listener(ctx);
-            }
-        }
     }
 
     /// Returns true if the user has any object that is not a welcome object. If the user only has objects

@@ -182,8 +182,6 @@ integration_tests! {
     #[ignore]
     test_create_session_with_split_pane_while_bootstrapping,
 
-    test_create_folder_from_command_palette,
-
     test_tab_behavior_setting,
 
     test_private_public_settings_routing_with_flag_enabled,
@@ -194,7 +192,6 @@ integration_tests! {
 
     test_websocket_begins_on_startup,
     test_websocket_does_not_begin_on_startup,
-    test_websocket_begins_after_joining_a_team,
     test_websocket_begins_after_creating_an_object,
 
     test_secret_is_obfuscated_on_copy,

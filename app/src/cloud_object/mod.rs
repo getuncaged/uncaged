@@ -35,7 +35,6 @@ use crate::server::sync_queue::{QueueItem, SerializedModel};
 use crate::util::time_format::format_approx_duration_from_now_utc;
 use crate::workflows::{CloudWorkflow, WorkflowSource};
 use crate::workspaces::user_profiles::UserProfiles;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub mod breadcrumbs;
 pub mod grab_edit_access_modal;
@@ -112,7 +111,7 @@ pub trait CloudObject: Debug {
     fn set_server_id(&mut self, server_id: ServerId);
 
     /// Returns whether this object can be moved to the given space.
-    fn can_move_to_space(&self, _space: Space, _app: &AppContext) -> bool {
+    fn can_move_to_space(&self, _space: Space) -> bool {
         true
     }
 
@@ -177,14 +176,14 @@ pub trait CloudObject: Debug {
     ///
     /// If the object is shared with the current user, the space will reflect that, not the
     /// object's actual owner.
-    fn space(&self, app: &AppContext) -> Space {
-        UserWorkspaces::as_ref(app).owner_to_space(self.permissions().owner, app)
+    fn space(&self) -> Space {
+        Space::from_owner(self.permissions().owner)
     }
 
     /// Whether or not this object can be "left". For shared objects, this removes all ACLs for the
     /// current user. Only top-level items in the shared space can be left.
     fn can_leave(&self, app: &AppContext) -> bool {
-        if self.space(app) == Space::Shared {
+        if self.space() == Space::Shared {
             self.metadata()
                 .folder_id
                 .is_none_or(|parent| CloudModel::as_ref(app).get_folder(&parent).is_none())
@@ -207,7 +206,7 @@ pub trait CloudObject: Debug {
     // Returns the path of all the containing "objects" for this object.
     // This could include folders or spaces.
     fn containing_objects_path(&self, app: &AppContext) -> Vec<ContainingObject> {
-        let space = self.space(app);
+        let space = self.space();
 
         match self.metadata().folder_id {
             Some(folder_id) => {
@@ -221,10 +220,10 @@ pub trait CloudObject: Debug {
                 } else {
                     // if for whatever reason the folder id is messed up,
                     // just default to showing the top-level space it wound up in
-                    vec![space.into_containing_object(app)]
+                    vec![space.into_containing_object()]
                 }
             }
-            None => vec![space.into_containing_object(app)],
+            None => vec![space.into_containing_object()],
         }
     }
 
@@ -237,8 +236,8 @@ pub trait CloudObject: Debug {
     }
 
     /// Returns whether this CloudObject is in the given space
-    fn is_in_space(&self, space: Space, app: &AppContext) -> bool {
-        self.space(app) == space
+    fn is_in_space(&self, space: Space) -> bool {
+        self.space() == space
     }
 
     fn is_welcome_object(&self) -> bool {
@@ -248,14 +247,14 @@ pub trait CloudObject: Debug {
     /// Returns the direct location of the object. If the object
     /// is not in a folder, this will be the object's space. Otherwise, it will
     /// be the folder the object is placed in directly, even if that folder is nested.
-    fn location(&self, cloud_model: &CloudModel, app: &AppContext) -> CloudObjectLocation {
+    fn location(&self, cloud_model: &CloudModel) -> CloudObjectLocation {
         if let Some(folder_id) = self.metadata().folder_id {
             if cloud_model.get_folder(&folder_id).is_some() {
                 return CloudObjectLocation::Folder(folder_id);
             }
         }
 
-        CloudObjectLocation::Space(self.space(app))
+        CloudObjectLocation::Space(self.space())
     }
 
     /// Return true is this object or any of its ancestors are trashed. Also returns true
@@ -644,8 +643,8 @@ where
         self.model().should_clear_on_unique_key_conflict()
     }
 
-    fn can_move_to_space(&self, space: Space, app: &AppContext) -> bool {
-        self.model().can_move_to_space(self.space(app), space)
+    fn can_move_to_space(&self, space: Space) -> bool {
+        self.model().can_move_to_space(self.space(), space)
     }
 
     fn has_conflicting_changes(&self) -> bool {
@@ -999,19 +998,57 @@ pub enum Space {
 }
 
 impl Space {
-    pub fn name(&self, app: &AppContext) -> String {
+    pub fn name(&self) -> String {
         match self {
             Space::Personal => "Personal".to_string(),
-            Space::Team { team_uid, .. } => {
-                let user_workspaces = UserWorkspaces::as_ref(app);
-                if let Some(team) = user_workspaces.team_from_uid(*team_uid) {
-                    team.name.clone()
-                } else {
-                    "Team".to_string()
-                }
-            }
+            Space::Team { .. } => "Team".to_string(),
             Space::Shared => "Shared with me".to_string(),
         }
+    }
+
+    /// The space an object owned by `owner` shows in. Uncaged has no teams, so
+    /// with Shared with me on, a team owner is a drive the user isn't on.
+    pub fn from_owner(owner: Owner) -> Space {
+        let shared_with_me = FeatureFlag::SharedWithMe.is_enabled();
+        match owner {
+            Owner::User { user_uid } => {
+                if !shared_with_me || user_uid == UserUid::new(LOCAL_USER_UID) {
+                    Space::Personal
+                } else {
+                    Space::Shared
+                }
+            }
+            Owner::Team { team_uid } => {
+                if shared_with_me {
+                    Space::Shared
+                } else {
+                    Space::Team { team_uid }
+                }
+            }
+        }
+    }
+
+    /// The owner of objects created in this space, or `None` for the space of
+    /// objects shared with the user, which doesn't identify one.
+    pub fn owner(self) -> Option<Owner> {
+        match self {
+            Space::Team { team_uid } => Some(Owner::Team { team_uid }),
+            Space::Personal => Some(Owner::local_user()),
+            Space::Shared => None,
+        }
+    }
+
+    /// The spaces the user has: the personal drive, plus objects shared with
+    /// them when there are any.
+    pub fn all_user_spaces(app: &AppContext) -> Vec<Space> {
+        let mut spaces = Vec::new();
+        if FeatureFlag::SharedWithMe.is_enabled()
+            && CloudModel::as_ref(app).has_directly_shared_objects(app)
+        {
+            spaces.push(Space::Shared);
+        }
+        spaces.push(Space::Personal);
+        spaces
     }
 }
 
@@ -1044,3 +1081,7 @@ impl From<Owner> for WorkflowSource {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "mod_test.rs"]
+mod tests;

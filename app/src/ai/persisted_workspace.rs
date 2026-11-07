@@ -42,11 +42,10 @@ use crate::persistence::ModelEvent;
 use crate::report_if_error;
 #[cfg(feature = "local_fs")]
 use crate::server::server_api::ServerApiProvider;
-use crate::settings::CodeSettings;
+use crate::settings::{AISettings, AISettingsChangedEvent, CodeSettings, CodeSettingsChangedEvent};
 #[cfg(feature = "local_fs")]
 use crate::terminal::local_shell::LocalShellState;
 use crate::terminal::TerminalView;
-use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 #[cfg(feature = "local_fs")]
 use crate::{view_components::DismissibleToast, workspace::ToastStack};
 
@@ -266,17 +265,19 @@ impl PersistedWorkspace {
                 },
             );
 
-            // Subscribe to changes in workspace settings.
-            ctx.subscribe_to_model(
-                &UserWorkspaces::handle(ctx),
-                |me, _, user_workspaces_event, ctx| {
-                    if let UserWorkspacesEvent::CodebaseContextEnablementChanged =
-                        user_workspaces_event
-                    {
-                        me.on_settings_changed(ctx);
-                    }
-                },
-            );
+            // Subscribe to the settings that decide whether codebase context is enabled.
+            ctx.subscribe_to_model(&CodeSettings::handle(ctx), |me, _, event, ctx| {
+                if let CodeSettingsChangedEvent::CodebaseContextEnabled { .. }
+                | CodeSettingsChangedEvent::AutoIndexingEnabled { .. } = event
+                {
+                    me.on_settings_changed(ctx);
+                }
+            });
+            ctx.subscribe_to_model(&AISettings::handle(ctx), |me, _, event, ctx| {
+                if let AISettingsChangedEvent::IsAnyAIEnabled { .. } = event {
+                    me.on_settings_changed(ctx);
+                }
+            });
 
             // Subscribe to ProjectContextModel events to persist rule changes
             ctx.subscribe_to_model(&ProjectContextModel::handle(ctx), |me, _, event, _ctx| {
@@ -630,8 +631,7 @@ impl PersistedWorkspace {
             if !manager.is_indexing_enabled() {
                 return;
             }
-            let codebase_context_enabled =
-                UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx);
+            let codebase_context_enabled = CodeSettings::is_codebase_context_enabled(ctx);
             if codebase_context_enabled {
                 Self::enable_codebase_indexing(manager, ctx);
             } else {
@@ -676,7 +676,7 @@ impl PersistedWorkspace {
             );
         });
         if FeatureFlag::FullSourceCodeEmbedding.is_enabled()
-            && UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx)
+            && CodeSettings::is_codebase_context_enabled(ctx)
             && *CodeSettings::as_ref(ctx).auto_indexing_enabled
         {
             CodebaseIndexManager::handle(ctx).update(ctx, |manager, ctx| {
@@ -817,7 +817,7 @@ impl PersistedWorkspace {
         terminal_view_id: warpui::EntityId,
         ctx: &mut ModelContext<Self>,
     ) {
-        if !UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx) {
+        if !CodeSettings::is_codebase_context_enabled(ctx) {
             return;
         }
 

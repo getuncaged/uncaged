@@ -46,7 +46,7 @@ use crate::editor::{
 use crate::menu::{Event, Menu, MenuItem, MenuItemFields};
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
-use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::server::ids::{ClientId, SyncId};
 use crate::server::server_api::ai::AIClient;
 use crate::themes::theme::AnsiColorIdentifier;
 use crate::ui_components::blended_colors;
@@ -179,7 +179,7 @@ pub enum WorkflowModalEvent {
     Close,
     UpdatedWorkflow(SyncId),
     AiAssistError(String),
-    AiAssistUpgradeError(Option<ServerId>, UserUid),
+    AiAssistUpgradeError(UserUid),
     ViewInWarpDrive(WarpDriveItemId),
 }
 

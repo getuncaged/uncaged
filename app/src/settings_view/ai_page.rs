@@ -1,4 +1,4 @@
-use ::ai::api_keys::{ApiKeyManager, ApiKeys};
+use ::ai::api_keys::ApiKeyManager;
 #[cfg(not(target_family = "wasm"))]
 use ::ai::grok_subscription::oauth::{self, ManualCodeExchange};
 use enum_iterator::all;
@@ -6,7 +6,6 @@ use itertools::Itertools;
 use regex::Regex;
 use settings::{Setting, ToggleableSetting};
 use strum::IntoEnumIterator;
-use warp_core::channel::ChannelState;
 use warp_core::context_flag::ContextFlag;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::theme::color::internal_colors;
@@ -30,17 +29,13 @@ use super::custom_inference_modal::{
     CustomEndpointModal, CustomEndpointModalEvent, CustomEndpointModalViewState, EndpointKind,
 };
 use super::execution_profile_view::{ExecutionProfileView, ExecutionProfileViewEvent};
-use super::remove_custom_endpoint_confirmation_dialog::{
-    RemoveCustomEndpointConfirmationDialog, RemoveCustomEndpointConfirmationDialogEvent,
-};
-use super::set_default_model_modal::{SetDefaultModelModalBody, SetDefaultModelModalBodyEvent};
 use super::settings_page::{
     build_sub_header, build_toggle_element, render_body_item_label,
     render_body_item_label_with_icon, render_custom_size_header, render_dropdown_item,
     render_dropdown_item_label, render_full_pane_width_ai_button, render_input_list,
-    render_separator, render_settings_info_banner, InputListItem, LocalOnlyIconState, MatchData,
-    PageType, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget, ToggleState,
-    HEADER_PADDING, TOGGLE_BUTTON_RIGHT_PADDING,
+    render_separator, InputListItem, LocalOnlyIconState, MatchData, PageType, SettingsPageMeta,
+    SettingsPageViewHandle, SettingsWidget, ToggleState, HEADER_PADDING,
+    TOGGLE_BUTTON_RIGHT_PADDING,
 };
 use super::{
     editor_text_colors, flags, SettingActionPairContexts, SettingActionPairDescriptions,
@@ -58,10 +53,7 @@ use crate::ai::execution_profiles::{
     long_context_pricing_warning_title, AIExecutionProfile, AIExecutionProfileAppExt,
     ActionPermission, WriteToPtyPermission,
 };
-use crate::ai::llms::{
-    is_using_api_key_for_provider, LLMContextWindow, LLMId, LLMPreferences, LLMPreferencesEvent,
-    LLMProvider,
-};
+use crate::ai::llms::{LLMContextWindow, LLMId, LLMPreferences, LLMPreferencesEvent};
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::ai::paths::host_native_absolute_path;
 use crate::auth::auth_manager::AuthManager;
@@ -92,7 +84,6 @@ use crate::view_components::{
     render_warning_box, FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent,
     WarningBoxConfig,
 };
-use crate::workspaces::user_workspaces::UserWorkspacesEvent;
 
 /// Identifies which subpage of the AI settings the user is viewing.
 /// When `None`, the page shows all widgets (legacy/full view).
@@ -137,8 +128,7 @@ use crate::ui_components::icons::Icon;
 use crate::util::bindings;
 use crate::view_components::dropdown::DropdownAction;
 use crate::view_components::{Dropdown, DropdownItem};
-use crate::workspaces::workspace::{AdminEnablementSetting, CustomerType};
-use crate::{report_error, report_if_error, UserWorkspaces};
+use crate::{report_error, report_if_error};
 
 const CONTENT_FONT_SIZE: f32 = 12.;
 
@@ -421,8 +411,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         .is_supported_on_current_platform(
             AISettings::as_ref(app)
                 .git_operations_autogen_enabled_internal
-                .is_supported_on_current_platform()
-                && UserWorkspaces::as_ref(app).is_git_operations_ai_enabled(),
+                .is_supported_on_current_platform(),
         )],
         app,
     );
@@ -613,7 +602,6 @@ pub struct AISettingsPageView {
 
     // Denylisting commands (default profile)
     command_denylist_mouse_state_handles: Vec<MouseStateHandle>,
-    command_denylist_tooltip_mouse_state_handles: Vec<MouseStateHandle>,
     command_denylist_editor: ViewHandle<SubmittableTextInput>,
 
     mcp_allowlist_mouse_state_handles: Vec<MouseStateHandle>,
@@ -649,10 +637,6 @@ pub struct AISettingsPageView {
 
     // Custom inference (custom endpoints)
     custom_endpoint_modal_state: CustomEndpointModalViewState,
-    remove_custom_endpoint_confirmation_dialog: ViewHandle<RemoveCustomEndpointConfirmationDialog>,
-    pending_remove_custom_endpoint_index: Option<usize>,
-    custom_inference_add_button: ViewHandle<ActionButton>,
-    custom_endpoint_edit_buttons: Vec<ViewHandle<ActionButton>>,
 
     // Uncaged "Connect a model": one "Connect" button per catalog preset (in
     // flattened catalog order), plus fixed pools of per-row "Use"/"Edit"
@@ -663,13 +647,6 @@ pub struct AISettingsPageView {
     uncaged_use_buttons: Vec<ViewHandle<ActionButton>>,
     uncaged_edit_buttons: Vec<ViewHandle<ActionButton>>,
     pending_uncaged_connection_id: Option<String>,
-
-    // Prompt offering to switch the default Agent Mode model after a BYO key or
-    // custom endpoint is saved while the default isn't backed by a credential.
-    set_default_model_modal: ModalViewState<Modal<SetDefaultModelModalBody>>,
-    // Snapshot of the provider keys from the last `KeysUpdated`, used to detect a
-    // newly added key and prompt the user to switch their default model.
-    last_seen_provider_keys: ApiKeys,
 
     // In-flight fallback exchange for a pasted SuperGrok authorization code.
     // This stores only the PKCE verifier clone needed by the manual path while
@@ -683,41 +660,6 @@ pub struct AISettingsPageView {
 impl AISettingsPageView {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
         let is_any_ai_enabled = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
-
-        let workspace = UserWorkspaces::handle(ctx);
-        let ai_autonomy_settings = workspace.as_ref(ctx).ai_autonomy_settings();
-        ctx.subscribe_to_model(&workspace, |me, workspace, event, ctx| {
-            if let UserWorkspacesEvent::TeamsChanged = event {
-                me.refresh_all_execution_profile_ui(ctx);
-                me.reset_execution_profile_mouse_state_handles(ctx);
-
-                let is_any_ai_enabled = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
-                let ai_autonomy_settings = workspace.as_ref(ctx).ai_autonomy_settings();
-
-                Self::update_editor_interaction_state(
-                    me.command_denylist_editor.as_ref(ctx).editor().clone(),
-                    is_any_ai_enabled,
-                    ctx,
-                );
-
-                Self::update_editor_interaction_state(
-                    me.command_allowlist_editor.as_ref(ctx).editor().clone(),
-                    is_any_ai_enabled
-                        && !ai_autonomy_settings.has_override_for_execute_commands_allowlist(),
-                    ctx,
-                );
-
-                Self::update_editor_interaction_state(
-                    me.directory_allowlist_editor.as_ref(ctx).editor().clone(),
-                    is_any_ai_enabled
-                        && !ai_autonomy_settings.has_override_for_read_files_allowlist(),
-                    ctx,
-                );
-
-                me.sync_custom_endpoint_buttons(ctx);
-                ctx.notify();
-            }
-        });
 
         let coding_model_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = Dropdown::new(ctx);
@@ -1012,14 +954,6 @@ impl AISettingsPageView {
             ctx.notify();
         });
 
-        ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |me, _handle, _event, ctx| {
-            // Re-render if teams-related data changed that may affect which features are enabled.
-            Self::refresh_base_model_menu(&me.base_model_dropdown, ctx);
-            Self::refresh_coding_model_menu(&me.coding_model_dropdown, ctx);
-            me.sync_custom_endpoint_buttons(ctx);
-            ctx.notify();
-        });
-
         ctx.subscribe_to_model(
             &AIExecutionProfilesModel::handle(ctx),
             |me, _, event, ctx| {
@@ -1087,11 +1021,6 @@ impl AISettingsPageView {
             Self::refresh_base_model_menu(&me.base_model_dropdown, ctx);
             Self::refresh_coding_model_menu(&me.coding_model_dropdown, ctx);
             me.sync_context_window_editor(ctx, false);
-            me.sync_custom_endpoint_buttons(ctx);
-            // Driving the prompt off the key-store update (rather than the editor's
-            // blur/Enter) means it fires reliably however the key was committed —
-            // clicking outside the field, pressing Enter, or tabbing away.
-            me.maybe_prompt_for_newly_added_provider_key(ctx);
             ctx.notify();
         });
 
@@ -1108,7 +1037,6 @@ impl AISettingsPageView {
                 }
                 AISettingsChangedEvent::IsAnyAIEnabled { .. } => {
                     let is_enabled = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
-                    let ai_autonomy_settings = UserWorkspaces::as_ref(ctx).ai_autonomy_settings();
 
                     Self::update_editor_interaction_state(
                         me.autodetection_denylist_editor.clone(),
@@ -1139,7 +1067,7 @@ impl AISettingsPageView {
 
                     Self::update_editor_interaction_state(
                         me.directory_allowlist_editor.as_ref(ctx).editor().clone(),
-                        is_enabled && !ai_autonomy_settings.has_override_for_read_files_allowlist(),
+                        is_enabled,
                         ctx,
                     );
 
@@ -1151,8 +1079,7 @@ impl AISettingsPageView {
 
                     Self::update_editor_interaction_state(
                         me.command_allowlist_editor.as_ref(ctx).editor().clone(),
-                        is_enabled
-                            && !ai_autonomy_settings.has_override_for_execute_commands_allowlist(),
+                        is_enabled,
                         ctx,
                     );
 
@@ -1169,7 +1096,6 @@ impl AISettingsPageView {
                     Self::refresh_mcp_allowlist_dropdown(&me.mcp_allowlist_dropdown, ctx);
                     Self::refresh_mcp_denylist_dropdown(&me.mcp_denylist_dropdown, ctx);
                     me.sync_context_window_editor(ctx, true);
-                    me.sync_custom_endpoint_buttons(ctx);
                 }
                 AISettingsChangedEvent::AgentModeExecuteReadonlyCommands { .. } => {
                     Self::refresh_autonomy_dropdown_menu(&me.autonomy_dropdown_menu, ctx);
@@ -1520,14 +1446,11 @@ impl AISettingsPageView {
             }
         });
 
-        let org_denylist = BlocklistAIPermissions::get_org_execute_commands_denylist(ctx);
         let command_denylist_mouse_state_handles = current_permission
             .command_denylist
             .iter()
             .map(|_| Default::default())
             .collect();
-        let command_denylist_tooltip_mouse_state_handles: Vec<MouseStateHandle> =
-            org_denylist.iter().map(|_| Default::default()).collect();
 
         let command_denylist_editor = ctx.add_typed_action_view(|ctx| {
             let mut input =
@@ -1537,7 +1460,7 @@ impl AISettingsPageView {
         });
         Self::update_editor_interaction_state(
             command_denylist_editor.as_ref(ctx).editor().clone(),
-            is_any_ai_enabled && !ai_autonomy_settings.has_override_for_execute_commands_denylist(),
+            is_any_ai_enabled,
             ctx,
         );
 
@@ -1575,8 +1498,7 @@ impl AISettingsPageView {
         });
         Self::update_editor_interaction_state(
             command_allowlist_editor.as_ref(ctx).editor().clone(),
-            is_any_ai_enabled
-                && !ai_autonomy_settings.has_override_for_execute_commands_allowlist(),
+            is_any_ai_enabled,
             ctx,
         );
 
@@ -1646,20 +1568,6 @@ impl AISettingsPageView {
             button.set_disabled(!is_any_ai_enabled, ctx);
         });
 
-        // Custom inference
-        let custom_inference_controls_enabled =
-            is_any_ai_enabled && UserWorkspaces::as_ref(ctx).is_custom_inference_enabled(ctx);
-        let custom_inference_add_button = ctx.add_typed_action_view(|_| {
-            ActionButton::new("+ Add custom model", SecondaryTheme)
-                .with_size(ButtonSize::Small)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(AISettingsPageAction::OpenAddCustomEndpointModal);
-                })
-        });
-        custom_inference_add_button.update(ctx, |button, ctx| {
-            button.set_disabled(!custom_inference_controls_enabled, ctx);
-        });
-
         let custom_endpoint_modal_body =
             ctx.add_typed_action_view(|ctx| CustomEndpointModal::new(None, None, ctx));
         ctx.subscribe_to_view(&custom_endpoint_modal_body, |me, _, event, ctx| {
@@ -1707,53 +1615,6 @@ impl AISettingsPageView {
 
         let custom_endpoint_modal_state =
             CustomEndpointModalViewState::new(ModalViewState::new(custom_endpoint_modal_view));
-
-        let set_default_model_modal_body = ctx.add_typed_action_view(SetDefaultModelModalBody::new);
-        ctx.subscribe_to_view(&set_default_model_modal_body, |me, _, event, ctx| {
-            me.handle_set_default_model_modal_event(event, ctx);
-        });
-        let set_default_model_modal_view = ctx.add_typed_action_view(|ctx| {
-            Modal::new(
-                Some("Change your default model?".to_string()),
-                set_default_model_modal_body.clone(),
-                ctx,
-            )
-            .with_modal_style(UiComponentStyles {
-                width: Some(480.),
-                height: Some(380.),
-                ..Default::default()
-            })
-            .with_body_style(UiComponentStyles {
-                height: Some(300.),
-                ..Default::default()
-            })
-            .with_background_opacity(100)
-            .with_dismiss_on_click()
-            .with_dismiss_keystroke(Keystroke::parse("escape").unwrap())
-        });
-        ctx.subscribe_to_view(
-            &set_default_model_modal_view,
-            |me, _, event, ctx| match event {
-                ModalEvent::Close => me.hide_set_default_model_modal(ctx),
-            },
-        );
-        let set_default_model_modal = ModalViewState::new(set_default_model_modal_view);
-        let last_seen_provider_keys = ApiKeyManager::as_ref(ctx).keys().clone();
-
-        let remove_custom_endpoint_confirmation_dialog =
-            ctx.add_typed_action_view(RemoveCustomEndpointConfirmationDialog::new);
-        ctx.subscribe_to_view(
-            &remove_custom_endpoint_confirmation_dialog,
-            |me, _, event, ctx| {
-                me.handle_remove_custom_endpoint_confirmation_dialog_event(event, ctx);
-            },
-        );
-
-        let custom_endpoint_edit_buttons = Self::create_custom_endpoint_edit_buttons(
-            ApiKeyManager::as_ref(ctx).keys().custom_endpoints.len(),
-            custom_inference_controls_enabled,
-            ctx,
-        );
 
         let uncaged_connect_buttons = Self::create_uncaged_connect_buttons(ctx);
         let uncaged_use_buttons = Self::create_uncaged_row_buttons(true, ctx);
@@ -1868,7 +1729,6 @@ impl AISettingsPageView {
             directory_allowlist_mouse_state_handles,
             directory_allowlist_editor,
             command_denylist_mouse_state_handles,
-            command_denylist_tooltip_mouse_state_handles,
             command_denylist_editor,
             command_allowlist_mouse_state_handles,
             command_allowlist_editor,
@@ -1889,16 +1749,10 @@ impl AISettingsPageView {
             #[cfg(feature = "local_fs")]
             add_router_button,
             custom_endpoint_modal_state,
-            remove_custom_endpoint_confirmation_dialog,
-            pending_remove_custom_endpoint_index: None,
-            custom_inference_add_button,
-            custom_endpoint_edit_buttons,
             uncaged_connect_buttons,
             uncaged_use_buttons,
             uncaged_edit_buttons,
             pending_uncaged_connection_id: None,
-            set_default_model_modal,
-            last_seen_provider_keys,
             #[cfg(not(target_family = "wasm"))]
             grok_oauth_attempt: None,
             #[cfg(not(target_family = "wasm"))]
@@ -1906,284 +1760,12 @@ impl AISettingsPageView {
         }
     }
 
-    pub fn get_modal_content(&self, app: &AppContext) -> Option<Box<dyn Element>> {
+    pub fn get_modal_content(&self) -> Option<Box<dyn Element>> {
         if self.custom_endpoint_modal_state.is_open() {
             Some(self.custom_endpoint_modal_state.render())
-        } else if self.set_default_model_modal.is_open() {
-            Some(self.set_default_model_modal.render())
-        } else if self
-            .remove_custom_endpoint_confirmation_dialog
-            .as_ref(app)
-            .is_visible()
-        {
-            Some(ChildView::new(&self.remove_custom_endpoint_confirmation_dialog).finish())
         } else {
             None
         }
-    }
-
-    fn handle_set_default_model_modal_event(
-        &mut self,
-        event: &SetDefaultModelModalBodyEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            SetDefaultModelModalBodyEvent::Close => self.hide_set_default_model_modal(ctx),
-            SetDefaultModelModalBodyEvent::SetDefault(id) => {
-                // Mirror `AISettingsPageAction::SetBaseModel`: set the active
-                // profile's base model and clear any stale context-window limit.
-                AIExecutionProfilesModel::handle(ctx).update(ctx, |profiles_model, ctx| {
-                    let profile_id = *profiles_model.active_profile(None, ctx).id();
-                    profiles_model.set_base_model(profile_id, Some(id.clone()), ctx);
-                    profiles_model.set_context_window_limit(profile_id, None, ctx);
-                });
-                self.sync_context_window_editor(ctx, true);
-                self.hide_set_default_model_modal(ctx);
-
-                let window_id = ctx.window_id();
-                crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::success(
-                        "Default model updated".to_string(),
-                    );
-                    toast_stack.add_ephemeral_toast(toast, window_id, ctx);
-                });
-                ctx.notify();
-            }
-        }
-    }
-
-    fn hide_set_default_model_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        self.set_default_model_modal.close();
-        ctx.emit(AISettingsPageEvent::HideModal);
-        ctx.notify();
-    }
-
-    fn show_set_default_model_modal(
-        &mut self,
-        description: String,
-        choices: Vec<(LLMId, String)>,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.set_default_model_modal.view.update(ctx, |modal, ctx| {
-            modal.body().update(ctx, |body, ctx| {
-                body.set_choices(description, choices, ctx);
-            });
-        });
-        self.set_default_model_modal.open();
-        // Focus the modal so Escape closes it (the modal's escape binding only
-        // fires while something inside the modal holds focus).
-        ctx.focus(&self.set_default_model_modal.view);
-        ctx.emit(AISettingsPageEvent::ShowModal);
-        ctx.notify();
-    }
-
-    /// Returns `true` when the active Agent Mode default model is already served
-    /// by a credential the user has: a BYO key/subscription for its provider, or
-    /// one of their custom-endpoint models. `auto` models report `false` since
-    /// they always consume Warp credits.
-    fn active_base_model_is_byo_covered(ctx: &AppContext) -> bool {
-        let (active_id, active_provider) = {
-            let prefs = LLMPreferences::as_ref(ctx);
-            let active = prefs.get_active_base_model(ctx, None);
-            (active.id.clone(), active.provider.clone())
-        };
-        if LLMPreferences::as_ref(ctx)
-            .custom_llm_info_for_id(&active_id)
-            .is_some()
-        {
-            return true;
-        }
-        is_using_api_key_for_provider(&active_provider, ctx)
-    }
-
-    /// The display name of the user's current default Agent Mode model, used in
-    /// the prompt copy (e.g. "auto (cost-efficient)").
-    fn active_base_model_display_name(ctx: &AppContext) -> String {
-        LLMPreferences::as_ref(ctx)
-            .get_active_base_model(ctx, None)
-            .display_name
-            .clone()
-    }
-
-    /// Whether to offer switching the default model. Scoped to free-plan users
-    /// who are out of monthly (base-plan) credits, since only they hit the
-    /// "no credits" error with an `auto` model. Also skips when the current
-    /// default is already served by a BYO credential.
-    fn should_offer_default_model_switch(ctx: &AppContext) -> bool {
-        // Exclude only confirmed paid plans. Solo/individual users have no
-        // `current_workspace`, and billing may not have loaded yet (Unknown), so
-        // treat both as eligible and rely on the out-of-credits check below to
-        // filter anyone who can still run Warp-hosted models. (A strict
-        // `is_free_plan()` check here meant solo free users — the common case —
-        // never saw the prompt.)
-        let on_paid_plan = UserWorkspaces::as_ref(ctx)
-            .current_workspace()
-            .is_some_and(|workspace| workspace.billing_metadata.is_user_on_paid_plan());
-        let out_of_monthly_credits = !AIRequestUsageModel::as_ref(ctx).has_requests_remaining();
-        !on_paid_plan && out_of_monthly_credits && !Self::active_base_model_is_byo_covered(ctx)
-    }
-
-    /// Detects a provider key that was just added (absent -> present) by diffing
-    /// against the last-seen keys, then offers to switch the default model. Run
-    /// from `ApiKeyManagerEvent::KeysUpdated` so it fires regardless of how the
-    /// key editor was committed.
-    fn maybe_prompt_for_newly_added_provider_key(&mut self, ctx: &mut ViewContext<Self>) {
-        let current = ApiKeyManager::as_ref(ctx).keys().clone();
-        let newly_added = [
-            (
-                LLMProvider::OpenAI,
-                &self.last_seen_provider_keys.openai,
-                &current.openai,
-            ),
-            (
-                LLMProvider::Anthropic,
-                &self.last_seen_provider_keys.anthropic,
-                &current.anthropic,
-            ),
-            (
-                LLMProvider::Google,
-                &self.last_seen_provider_keys.google,
-                &current.google,
-            ),
-        ]
-        .into_iter()
-        .find_map(|(provider, previous_key, current_key)| {
-            let was_present = previous_key
-                .as_deref()
-                .is_some_and(|key| !key.trim().is_empty());
-            let now_present = current_key
-                .as_deref()
-                .is_some_and(|key| !key.trim().is_empty());
-            (!was_present && now_present).then_some(provider)
-        });
-        self.last_seen_provider_keys = current;
-        if let Some(provider) = newly_added {
-            self.maybe_prompt_set_default_model_for_provider(provider, ctx);
-        }
-    }
-
-    /// After a BYO provider key is added, offer to switch the default Agent Mode
-    /// model to one from that provider.
-    fn maybe_prompt_set_default_model_for_provider(
-        &mut self,
-        provider: LLMProvider,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        // Only prompt when the key is actually usable for requests (BYO enabled).
-        if !is_using_api_key_for_provider(&provider, ctx) {
-            return;
-        }
-        if !Self::should_offer_default_model_switch(ctx) {
-            return;
-        }
-        let choices: Vec<(LLMId, String)> = LLMPreferences::as_ref(ctx)
-            .get_base_llm_choices_for_agent_mode(ctx)
-            .filter(|llm| llm.provider == provider)
-            .map(|llm| (llm.id.clone(), llm.menu_display_name()))
-            .collect();
-        if choices.is_empty() {
-            return;
-        }
-        let provider_name = provider.display_name();
-        let current_default = Self::active_base_model_display_name(ctx);
-        let description = format!(
-            "You added your own {provider_name} API key, but your default model is currently set \
-             to {current_default}, which won't work without Warp credits. Would you like to change \
-             your default model?"
-        );
-        self.show_set_default_model_modal(description, choices, ctx);
-    }
-
-    /// After a custom endpoint is added or saved, offer to switch the default
-    /// Agent Mode model to one of its models.
-    fn maybe_prompt_set_default_model_for_custom_endpoint(
-        &mut self,
-        endpoint_index: usize,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if !Self::can_use_custom_inference_controls(ctx) {
-            return;
-        }
-        if !Self::should_offer_default_model_switch(ctx) {
-            return;
-        }
-        let Some(endpoint) = ApiKeyManager::as_ref(ctx)
-            .keys()
-            .custom_endpoints
-            .get(endpoint_index)
-            .cloned()
-        else {
-            return;
-        };
-        // Build directly from the endpoint's models rather than the synthetic
-        // `custom_llms`, which are rebuilt asynchronously on `KeysUpdated`.
-        let choices: Vec<(LLMId, String)> = endpoint
-            .models
-            .iter()
-            .filter(|m| !m.name.trim().is_empty() && !m.config_key.is_empty())
-            .map(|m| {
-                (
-                    LLMId::from(m.config_key.clone()),
-                    m.display_label().to_string(),
-                )
-            })
-            .collect();
-        if choices.is_empty() {
-            return;
-        }
-        let current_default = Self::active_base_model_display_name(ctx);
-        let description = format!(
-            "You added the \"{}\" custom endpoint, but your default model is currently set to \
-             {current_default}, which won't work without Warp credits. Would you like to change \
-             your default model?",
-            endpoint.name
-        );
-        self.show_set_default_model_modal(description, choices, ctx);
-    }
-
-    fn sync_custom_endpoint_buttons(&mut self, ctx: &mut ViewContext<Self>) {
-        let enabled = Self::can_use_custom_inference_controls(ctx);
-
-        self.custom_inference_add_button.update(ctx, |button, ctx| {
-            button.set_disabled(!enabled, ctx);
-        });
-
-        let endpoint_count = ApiKeyManager::as_ref(ctx).keys().custom_endpoints.len();
-        if self.custom_endpoint_edit_buttons.len() != endpoint_count {
-            self.custom_endpoint_edit_buttons =
-                Self::create_custom_endpoint_edit_buttons(endpoint_count, enabled, ctx);
-        } else {
-            for button in &self.custom_endpoint_edit_buttons {
-                button.update(ctx, |button, ctx| {
-                    button.set_disabled(!enabled, ctx);
-                });
-            }
-        }
-    }
-
-    fn create_custom_endpoint_edit_buttons(
-        count: usize,
-        enabled: bool,
-        ctx: &mut ViewContext<Self>,
-    ) -> Vec<ViewHandle<ActionButton>> {
-        (0..count)
-            .map(|index| {
-                let button = ctx.add_typed_action_view(move |_| {
-                    ActionButton::new("Edit", SecondaryTheme)
-                        .with_icon(Icon::Pencil)
-                        .with_size(ButtonSize::Small)
-                        .on_click(move |ctx| {
-                            ctx.dispatch_typed_action(
-                                AISettingsPageAction::OpenEditCustomEndpointModal(index),
-                            );
-                        })
-                });
-                button.update(ctx, |button, ctx| {
-                    button.set_disabled(!enabled, ctx);
-                });
-                button
-            })
-            .collect()
     }
 
     // ── Uncaged "Connect a model" ──────────────────────────────────────────
@@ -2390,58 +1972,6 @@ impl AISettingsPageView {
         });
     }
 
-    fn can_use_custom_inference_controls(app: &AppContext) -> bool {
-        FeatureFlag::CustomInferenceEndpoints.is_enabled()
-            && AISettings::as_ref(app).is_any_ai_enabled(app)
-            && UserWorkspaces::as_ref(app).is_custom_inference_enabled(app)
-    }
-
-    fn show_add_custom_endpoint_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        if !Self::can_use_custom_inference_controls(ctx) {
-            return;
-        }
-        self.remove_custom_endpoint_confirmation_dialog
-            .update(ctx, |dialog, ctx| {
-                dialog.hide(ctx);
-            });
-        self.pending_remove_custom_endpoint_index = None;
-
-        self.custom_endpoint_modal_state
-            .set_title(Some("Add custom endpoint".to_string()), ctx);
-        self.custom_endpoint_modal_state.prefill(None, None, ctx);
-        self.custom_endpoint_modal_state.open(ctx);
-        ctx.emit(AISettingsPageEvent::ShowModal);
-        ctx.notify();
-    }
-
-    fn show_edit_custom_endpoint_modal(&mut self, index: usize, ctx: &mut ViewContext<Self>) {
-        if !Self::can_use_custom_inference_controls(ctx) {
-            return;
-        }
-        let endpoint = ApiKeyManager::as_ref(ctx)
-            .keys()
-            .custom_endpoints
-            .get(index)
-            .cloned();
-        if endpoint.is_none() {
-            return;
-        }
-
-        self.remove_custom_endpoint_confirmation_dialog
-            .update(ctx, |dialog, ctx| {
-                dialog.hide(ctx);
-            });
-        self.pending_remove_custom_endpoint_index = None;
-
-        self.custom_endpoint_modal_state
-            .set_title(Some("Edit custom endpoint".to_string()), ctx);
-        self.custom_endpoint_modal_state
-            .prefill(endpoint.as_ref(), Some(index), ctx);
-        self.custom_endpoint_modal_state.open(ctx);
-        ctx.emit(AISettingsPageEvent::ShowModal);
-        ctx.notify();
-    }
-
     fn hide_custom_endpoint_modal(&mut self, ctx: &mut ViewContext<Self>) {
         // Closing the modal ends any in-progress Uncaged connection edit.
         self.pending_uncaged_connection_id = None;
@@ -2477,170 +2007,30 @@ impl AISettingsPageView {
                 api_key,
                 models,
             } => {
-                // When configuring an Uncaged connection, route to the roster
-                // instead of Warp's custom endpoints.
-                if let Some(id) = self.pending_uncaged_connection_id.clone() {
-                    self.commit_uncaged_connection(&id, name, url, api_key, models, ctx);
-                    return;
+                // Uncaged has no custom inference entitlement, so the modal only
+                // configures roster connections.
+                match self.pending_uncaged_connection_id.clone() {
+                    Some(id) => {
+                        self.commit_uncaged_connection(&id, name, url, api_key, models, ctx)
+                    }
+                    None => self.hide_custom_endpoint_modal(ctx),
                 }
-                if !Self::can_use_custom_inference_controls(ctx) {
-                    self.hide_custom_endpoint_modal(ctx);
-                    return;
-                }
-                ApiKeyManager::handle(ctx).update(ctx, |manager, ctx| {
-                    manager.add_custom_endpoint(
-                        name.clone(),
-                        url.clone(),
-                        api_key.clone(),
-                        models.clone(),
-                        ctx,
-                    );
-                });
-                self.hide_custom_endpoint_modal(ctx);
-
-                let window_id = ctx.window_id();
-                crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::success(
-                        "Endpoint added".to_string(),
-                    );
-                    toast_stack.add_ephemeral_toast(toast, window_id, ctx);
-                });
-
-                // The new endpoint is appended last.
-                let new_index = ApiKeyManager::as_ref(ctx)
-                    .keys()
-                    .custom_endpoints
-                    .len()
-                    .saturating_sub(1);
-                self.maybe_prompt_set_default_model_for_custom_endpoint(new_index, ctx);
-                ctx.notify();
             }
             CustomEndpointModalEvent::SaveEndpoint {
-                index,
                 name,
                 url,
                 api_key,
                 models,
-            } => {
-                if let Some(id) = self.pending_uncaged_connection_id.clone() {
-                    self.commit_uncaged_connection(&id, name, url, api_key, models, ctx);
-                    return;
+                ..
+            } => match self.pending_uncaged_connection_id.clone() {
+                Some(id) => self.commit_uncaged_connection(&id, name, url, api_key, models, ctx),
+                None => self.hide_custom_endpoint_modal(ctx),
+            },
+            CustomEndpointModalEvent::RemoveEndpoint { .. } => {
+                match self.pending_uncaged_connection_id.clone() {
+                    Some(id) => self.remove_uncaged_connection(&id, ctx),
+                    None => self.hide_custom_endpoint_modal(ctx),
                 }
-                if !Self::can_use_custom_inference_controls(ctx) {
-                    self.hide_custom_endpoint_modal(ctx);
-                    return;
-                }
-                ApiKeyManager::handle(ctx).update(ctx, |manager, ctx| {
-                    manager.save_custom_endpoint(
-                        *index,
-                        name.clone(),
-                        url.clone(),
-                        api_key.clone(),
-                        models.clone(),
-                        ctx,
-                    );
-                });
-                self.hide_custom_endpoint_modal(ctx);
-
-                let window_id = ctx.window_id();
-                crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::success(
-                        "Endpoint saved".to_string(),
-                    );
-                    toast_stack.add_ephemeral_toast(toast, window_id, ctx);
-                });
-                self.maybe_prompt_set_default_model_for_custom_endpoint(*index, ctx);
-                ctx.notify();
-            }
-            CustomEndpointModalEvent::RemoveEndpoint { index } => {
-                if let Some(id) = self.pending_uncaged_connection_id.clone() {
-                    self.remove_uncaged_connection(&id, ctx);
-                    return;
-                }
-                if !Self::can_use_custom_inference_controls(ctx) {
-                    self.hide_custom_endpoint_modal(ctx);
-                    return;
-                }
-                self.hide_custom_endpoint_modal(ctx);
-                self.show_remove_custom_endpoint_confirmation_dialog(*index, ctx);
-            }
-        }
-    }
-
-    fn show_remove_custom_endpoint_confirmation_dialog(
-        &mut self,
-        index: usize,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if !Self::can_use_custom_inference_controls(ctx) {
-            return;
-        }
-        let endpoint = ApiKeyManager::as_ref(ctx)
-            .keys()
-            .custom_endpoints
-            .get(index)
-            .cloned();
-        let Some(endpoint) = endpoint else {
-            return;
-        };
-
-        let model_labels = endpoint
-            .models
-            .iter()
-            .map(|model| model.alias.clone().unwrap_or_else(|| model.name.clone()))
-            .filter(|s| !s.trim().is_empty())
-            .collect();
-
-        self.pending_remove_custom_endpoint_index = Some(index);
-        self.remove_custom_endpoint_confirmation_dialog
-            .update(ctx, |dialog, ctx| {
-                dialog.show(index, endpoint.name.clone(), model_labels, ctx);
-            });
-        ctx.notify();
-    }
-
-    fn handle_remove_custom_endpoint_confirmation_dialog_event(
-        &mut self,
-        event: &RemoveCustomEndpointConfirmationDialogEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            RemoveCustomEndpointConfirmationDialogEvent::Cancel => {
-                self.pending_remove_custom_endpoint_index = None;
-                self.remove_custom_endpoint_confirmation_dialog
-                    .update(ctx, |dialog, ctx| {
-                        dialog.hide(ctx);
-                    });
-                ctx.notify();
-            }
-            RemoveCustomEndpointConfirmationDialogEvent::Confirm(index) => {
-                if !Self::can_use_custom_inference_controls(ctx) {
-                    self.pending_remove_custom_endpoint_index = None;
-                    self.remove_custom_endpoint_confirmation_dialog
-                        .update(ctx, |dialog, ctx| {
-                            dialog.hide(ctx);
-                        });
-                    ctx.notify();
-                    return;
-                }
-                ApiKeyManager::handle(ctx).update(ctx, |manager, ctx| {
-                    manager.remove_custom_endpoint(*index, ctx);
-                });
-                self.pending_remove_custom_endpoint_index = None;
-                self.remove_custom_endpoint_confirmation_dialog
-                    .update(ctx, |dialog, ctx| {
-                        dialog.hide(ctx);
-                    });
-                self.sync_custom_endpoint_buttons(ctx);
-
-                let window_id = ctx.window_id();
-                crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast = crate::view_components::DismissibleToast::success(
-                        "Endpoint removed".to_string(),
-                    );
-                    toast_stack.add_ephemeral_toast(toast, window_id, ctx);
-                });
-                ctx.notify();
             }
         }
     }
@@ -3145,7 +2535,7 @@ impl AISettingsPageView {
             }
 
             let choices = LLMPreferences::as_ref(ctx)
-                .get_base_llm_choices_for_agent_mode(ctx)
+                .get_base_llm_choices_for_agent_mode()
                 .collect_vec();
 
             let items = available_model_menu_items(
@@ -3184,7 +2574,7 @@ impl AISettingsPageView {
             }
 
             let choices = LLMPreferences::as_ref(ctx)
-                .get_coding_llm_choices(ctx)
+                .get_coding_llm_choices()
                 .collect_vec();
 
             let items = available_model_menu_items(
@@ -3319,10 +2709,6 @@ impl AISettingsPageView {
             .iter()
             .map(|_| Default::default())
             .collect();
-
-        let org_denylist = BlocklistAIPermissions::get_org_execute_commands_denylist(ctx);
-        self.command_denylist_tooltip_mouse_state_handles =
-            org_denylist.iter().map(|_| Default::default()).collect();
 
         self.command_allowlist_mouse_state_handles = blocklist_permissions
             .get_execute_commands_allowlist(ctx, None)
@@ -3741,8 +3127,6 @@ pub enum AISettingsPageAction {
     OpenAddCustomRouter,
 
     // Custom inference
-    OpenAddCustomEndpointModal,
-    OpenEditCustomEndpointModal(usize),
     ConnectGrokSubscription,
     DisconnectGrokSubscription,
 
@@ -3804,9 +3188,6 @@ impl TypedActionView for AISettingsPageView {
                 ctx.notify();
             }
             AISettingsPageAction::TogglePromptSuggestions => {
-                if !UserWorkspaces::as_ref(ctx).is_prompt_suggestions_toggleable() {
-                    return;
-                }
                 if let Err(e) = AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     settings
                         .prompt_suggestions_enabled_internal
@@ -3851,9 +3232,6 @@ impl TypedActionView for AISettingsPageView {
                 ctx.notify();
             }
             AISettingsPageAction::ToggleGitOperationsAutogen => {
-                if !UserWorkspaces::as_ref(ctx).is_git_operations_ai_enabled() {
-                    return;
-                }
                 if let Err(e) = AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     settings
                         .git_operations_autogen_enabled_internal
@@ -4313,12 +3691,6 @@ impl TypedActionView for AISettingsPageView {
             AISettingsPageAction::OpenAddCustomRouter => {
                 ctx.emit(AISettingsPageEvent::OpenCustomRouterEditor(None));
             }
-            AISettingsPageAction::OpenAddCustomEndpointModal => {
-                self.show_add_custom_endpoint_modal(ctx);
-            }
-            AISettingsPageAction::OpenEditCustomEndpointModal(index) => {
-                self.show_edit_custom_endpoint_modal(*index, ctx);
-            }
             AISettingsPageAction::UncagedConnectPreset(preset_id) => {
                 self.uncaged_connect_preset(preset_id, ctx);
             }
@@ -4677,25 +4049,21 @@ struct ActiveAIWidget {
 
 impl ActiveAIWidget {
     fn is_next_command_toggleable(&self, app: &AppContext) -> bool {
-        UserWorkspaces::as_ref(app).is_next_command_enabled()
-            && AISettings::as_ref(app)
-                .intelligent_autosuggestions_enabled_internal
-                .is_supported_on_current_platform()
+        AISettings::as_ref(app)
+            .intelligent_autosuggestions_enabled_internal
+            .is_supported_on_current_platform()
     }
 
     fn is_prompt_suggestions_toggleable(&self, app: &AppContext) -> bool {
-        UserWorkspaces::as_ref(app).is_prompt_suggestions_toggleable()
-            && AISettings::as_ref(app)
-                .prompt_suggestions_enabled_internal
-                .is_supported_on_current_platform()
+        AISettings::as_ref(app)
+            .prompt_suggestions_enabled_internal
+            .is_supported_on_current_platform()
     }
 
     fn is_suggested_code_banners_toggleable(&self, app: &AppContext) -> bool {
-        (self.is_prompt_suggestions_toggleable(app)
-            || UserWorkspaces::as_ref(app).is_code_suggestions_toggleable())
-            && AISettings::as_ref(app)
-                .code_suggestions_enabled_internal
-                .is_supported_on_current_platform()
+        AISettings::as_ref(app)
+            .code_suggestions_enabled_internal
+            .is_supported_on_current_platform()
     }
 
     fn is_natural_language_autosuggestions_toggleable(&self, app: &AppContext) -> bool {
@@ -4711,14 +4079,6 @@ impl ActiveAIWidget {
             && AISettings::as_ref(app)
                 .shared_block_title_generation_enabled_internal
                 .is_supported_on_current_platform()
-            && (!UserWorkspaces::as_ref(app)
-                .current_team()
-                .is_some_and(|team| {
-                    team.billing_metadata.customer_type == CustomerType::Enterprise
-                })
-                // Override the enterprise check for dogfood builds, as our dogfood team
-                // is an enterprise team.
-                || ChannelState::channel().is_dogfood())
     }
 
     fn is_git_operations_autogen_toggleable(&self, app: &AppContext) -> bool {
@@ -4726,7 +4086,6 @@ impl ActiveAIWidget {
             && AISettings::as_ref(app)
                 .git_operations_autogen_enabled_internal
                 .is_supported_on_current_platform()
-            && UserWorkspaces::as_ref(app).is_git_operations_ai_enabled()
     }
 
     fn render_next_command_section(
@@ -5379,21 +4738,6 @@ impl AgentsWidget {
 
         let mut widget_children = vec![permissions_subheader];
 
-        if UserWorkspaces::as_ref(app)
-            .ai_autonomy_settings()
-            .has_any_overrides()
-        {
-            widget_children.push(
-                Container::new(render_settings_info_banner(
-                    "Some of your permissions are managed by your workspace.",
-                    None,
-                    appearance,
-                ))
-                .with_margin_bottom(12.0)
-                .finish(),
-            );
-        }
-
         widget_children.extend([code_diffs, read_files, execute_commands]);
 
         let write_to_pty_setting =
@@ -5501,35 +4845,18 @@ impl AgentsWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         let ai_disabled = !ai_settings.is_any_ai_enabled(app);
-        let org_denylist = BlocklistAIPermissions::get_org_execute_commands_denylist(app);
-        let mut tooltip_idx = 0usize;
         let list = render_input_list(
             None,
             command_denylist
                 .into_iter()
                 .zip(view.command_denylist_mouse_state_handles.clone())
                 .rev()
-                .map(|(cmd, mouse_state_handle)| {
-                    let is_org = org_denylist.contains(&cmd);
-                    let tooltip_mouse_state = if is_org {
-                        let handle = view
-                            .command_denylist_tooltip_mouse_state_handles
-                            .get(tooltip_idx)
-                            .cloned();
-                        tooltip_idx += 1;
-                        handle
-                    } else {
-                        None
-                    };
-                    InputListItem {
-                        item: cmd.to_string(),
-                        mouse_state_handle,
-                        on_remove_action: AISettingsPageAction::RemoveFromProfileCommandDenylist(
-                            cmd,
-                        ),
-                        is_disabled: is_org || ai_disabled,
-                        tooltip_mouse_state,
-                    }
+                .map(|(cmd, mouse_state_handle)| InputListItem {
+                    item: cmd.to_string(),
+                    mouse_state_handle,
+                    on_remove_action: AISettingsPageAction::RemoveFromProfileCommandDenylist(cmd),
+                    is_disabled: ai_disabled,
+                    tooltip_mouse_state: None,
                 }),
             Some(&view.command_denylist_editor),
             appearance,
@@ -7212,42 +6539,6 @@ impl SettingsWidget for CLIAgentWidget {
     }
 }
 
-/// The presentation state of the agent attribution toggle, derived from the
-/// org-level [`AdminEnablementSetting`], the user's stored preference, and
-/// whether AI is globally enabled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct AgentAttributionToggleState {
-    /// Whether the toggle is rendered in the checked state.
-    pub(crate) is_enabled: bool,
-    /// Whether the org has forced the value (locking the toggle with a tooltip).
-    pub(crate) is_forced_by_org: bool,
-    /// Whether the toggle should be rendered as non-interactive overall
-    /// (forced by the org, or AI globally disabled).
-    pub(crate) is_disabled: bool,
-}
-
-/// Derive the toggle state from its three inputs.
-pub(crate) fn derive_agent_attribution_toggle_state(
-    org_setting: &AdminEnablementSetting,
-    user_pref: bool,
-    is_any_ai_enabled: bool,
-) -> AgentAttributionToggleState {
-    let is_forced_by_org = match org_setting {
-        AdminEnablementSetting::Enable | AdminEnablementSetting::Disable => true,
-        AdminEnablementSetting::RespectUserSetting => false,
-    };
-    let is_enabled = match org_setting {
-        AdminEnablementSetting::Enable => true,
-        AdminEnablementSetting::Disable => false,
-        AdminEnablementSetting::RespectUserSetting => user_pref,
-    };
-    AgentAttributionToggleState {
-        is_enabled,
-        is_forced_by_org,
-        is_disabled: is_forced_by_org || !is_any_ai_enabled,
-    }
-}
-
 #[derive(Default)]
 struct AgentAttributionWidget {
     toggle: SwitchStateHandle,
@@ -7269,36 +6560,20 @@ impl SettingsWidget for AgentAttributionWidget {
         let ai_settings = AISettings::as_ref(app);
         let is_any_ai_enabled = ai_settings.is_any_ai_enabled(app);
 
-        let org_setting = UserWorkspaces::as_ref(app).get_agent_attribution_setting();
-        let state = derive_agent_attribution_toggle_state(
-            &org_setting,
-            *ai_settings.agent_attribution_enabled,
-            is_any_ai_enabled,
-        );
+        let is_enabled = *ai_settings.agent_attribution_enabled;
 
         let ui_builder = appearance.ui_builder();
-        let toggle = if state.is_forced_by_org {
+        let toggle = if !is_any_ai_enabled {
             ui_builder
                 .switch(self.toggle.clone())
-                .check(state.is_enabled)
-                .with_tooltip(TooltipConfig {
-                    text: "This option is enforced by your organization's settings and cannot be customized.".to_string(),
-                    styles: ui_builder.default_tool_tip_styles(),
-                })
-                .disable()
-                .build()
-                .finish()
-        } else if !is_any_ai_enabled {
-            ui_builder
-                .switch(self.toggle.clone())
-                .check(state.is_enabled)
+                .check(is_enabled)
                 .with_disabled(true)
                 .build()
                 .finish()
         } else {
             ui_builder
                 .switch(self.toggle.clone())
-                .check(state.is_enabled)
+                .check(is_enabled)
                 .build()
                 .on_click(move |ctx, _, _| {
                     ctx.dispatch_typed_action(AISettingsPageAction::ToggleAgentAttribution);
@@ -7309,7 +6584,7 @@ impl SettingsWidget for AgentAttributionWidget {
         let toggle_row = build_toggle_element(
             render_body_item_label::<AISettingsPageAction>(
                 "Enable agent attribution".to_string(),
-                Some(styles::header_font_color(!state.is_disabled, app)),
+                Some(styles::header_font_color(is_any_ai_enabled, app)),
                 None,
                 LocalOnlyIconState::Hidden,
                 ToggleState::Enabled,
@@ -7334,16 +6609,12 @@ impl SettingsWidget for AgentAttributionWidget {
             .with_child(toggle_row)
             .with_child(render_ai_setting_description(
                 "Uncaged can add attribution to commit messages and pull requests it creates",
-                !state.is_disabled,
+                is_any_ai_enabled,
                 app,
             ))
             .finish()
     }
 }
-
-#[cfg(test)]
-#[path = "ai_page_tests.rs"]
-mod tests;
 
 #[derive(Default)]
 struct CloudAgentComputerUseWidget {
@@ -7476,11 +6747,7 @@ impl SettingsWidget for CloudHandoffWidget {
         let is_any_ai_enabled = ai_settings.is_any_ai_enabled(app);
 
         let privacy = PrivacySettings::as_ref(app);
-        let cloud_convos_off = !privacy.is_cloud_conversation_storage_enabled
-            || matches!(
-                UserWorkspaces::as_ref(app).get_cloud_conversation_storage_enablement_setting(),
-                AdminEnablementSetting::Disable
-            );
+        let cloud_convos_off = !privacy.is_cloud_conversation_storage_enabled;
         let is_force_disabled = !is_any_ai_enabled || cloud_convos_off;
 
         let tooltip_text = if cloud_convos_off {

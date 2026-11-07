@@ -75,14 +75,13 @@ use crate::settings::{
 };
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
 use crate::throttle::throttle;
-use crate::ui_components::icons::{self, Icon};
+use crate::ui_components::icons;
 #[cfg(target_family = "wasm")]
 use crate::uri::web_intent_parser::open_url_on_desktop;
 use crate::util::bindings::{self, CustomAction};
 use crate::view_components::{DismissibleToast, ToastType};
 use crate::workflows::{WorkflowSource, WorkflowType};
 use crate::workspace::ToastStack;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{cmd_or_ctrl_shift, report_if_error, safe_info};
 
 mod details_bar;
@@ -360,9 +359,6 @@ impl NotebookView {
             notebook.handle_grab_edit_access_modal_event(event, ctx);
         });
 
-        let user_workspaces = UserWorkspaces::handle(ctx);
-        ctx.observe(&user_workspaces, Self::on_user_workspaces_update);
-
         let cloud_model = CloudModel::handle(ctx);
         ctx.subscribe_to_model(&cloud_model, |notebook, _handle, event, ctx| {
             notebook.handle_cloud_model_event(event, ctx);
@@ -507,20 +503,6 @@ impl NotebookView {
     #[cfg(test)]
     pub fn title_editor(&self) -> ViewHandle<EditorView> {
         self.title.clone()
-    }
-
-    fn on_user_workspaces_update(
-        &mut self,
-        _user_workspaces: ModelHandle<UserWorkspaces>,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        // TODO Update the notebook after receiving the event from UserWorkspaces model"
-        // Update the notebook view if it's a team notebook (assuming there are non-team
-        // notebooks?) and there's been changes to it
-        self.pane_configuration.update(ctx, |pane_config, ctx| {
-            pane_config.refresh_pane_header_overflow_menu_items(ctx)
-        });
-        ctx.notify();
     }
 
     /// Handle an event from this notebook's [`ActiveNotebookData`] model.
@@ -1118,10 +1100,7 @@ impl NotebookView {
         let copy_client_id = ClientId::new();
         let copy_sync_id = SyncId::ClientId(copy_client_id);
 
-        let Some(personal_drive) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) else {
-            log::warn!("User drive not available for copying notebook");
-            return;
-        };
+        let personal_drive = Owner::local_user();
 
         UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
             update_manager.create_notebook(
@@ -1165,20 +1144,6 @@ impl NotebookView {
         });
     }
 
-    fn online_only_operation_allowed(
-        &self,
-        cloud_object_type_and_id: CloudObjectTypeAndId,
-        app: &AppContext,
-    ) -> bool {
-        if let Some(object) = CloudModel::as_ref(app).get_by_uid(&cloud_object_type_and_id.uid()) {
-            return self.is_online(app)
-                && cloud_object_type_and_id.has_server_id()
-                && !object.metadata().has_pending_online_only_change();
-        }
-
-        false
-    }
-
     pub fn notebook_link(&self, ctx: &AppContext) -> Option<String> {
         let id = self.notebook_id(ctx)?;
 
@@ -1199,35 +1164,6 @@ impl NotebookView {
             || active_notebook_data.trash_status(ctx) != TrashStatus::Active
         {
             return menu_items;
-        }
-
-        // Add "Move to <team> space" to menu
-        let team_spaces = UserWorkspaces::as_ref(ctx).team_spaces();
-
-        if let (Some(space), Some(cloud_id)) =
-            (active_notebook_data.space(ctx), active_notebook_data.id())
-        {
-            let cloud_object_type =
-                CloudObjectTypeAndId::from_id_and_type(cloud_id, ObjectType::Notebook);
-            let can_move = self.online_only_operation_allowed(cloud_object_type, ctx);
-
-            if can_move {
-                match space {
-                    Space::Personal => {
-                        menu_items.extend(team_spaces.iter().map(|space| {
-                            MenuItemFields::new(format!("Move to {}", space.name(ctx)))
-                                .with_on_select_action(NotebookAction::MoveToSpace {
-                                    cloud_object_type_and_id: cloud_object_type,
-                                    new_space: *space,
-                                })
-                                .with_icon(Icon::Move)
-                                .into_item()
-                        }));
-                    }
-                    Space::Shared => {} // TODO: Revisit these menu items with sharing in mind
-                    Space::Team { .. } => {} // TODO: When we do team -> personal sharing
-                }
-            }
         }
 
         if let Some(ai_document_id) = self.active_notebook_data.as_ref(ctx).ai_document_id(ctx) {
@@ -1423,7 +1359,7 @@ impl NotebookView {
         self.input.update(ctx, |editor, ctx| {
             // TODO(ben): This is used for filtering in the embed UI, and should also probably be
             // owner-based.
-            editor.set_space(notebook.space(ctx), ctx);
+            editor.set_space(notebook.space(), ctx);
         });
 
         // Once we've received metadata from the server, check if we can eagerly edit the notebook.
@@ -1498,7 +1434,7 @@ impl NotebookView {
         });
         self.input.update(ctx, |input_editor, ctx| {
             input_editor.system_clear_buffer(ctx);
-            let space = UserWorkspaces::as_ref(ctx).owner_to_space(owner, ctx);
+            let space = Space::from_owner(owner);
             input_editor.set_space(space, ctx);
         });
 

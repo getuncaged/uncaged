@@ -366,7 +366,7 @@ impl WarpDriveSearcher for FuzzyWarpDriveSearcher {
                 if let Some(folder) = folder {
                     let location = CloudObjectLocation::Folder(folder.id);
                     for obj in CloudModel::as_ref(app)
-                        .active_cloud_objects_in_location_without_descendents(location, app)
+                        .active_cloud_objects_in_location_without_descendents(location)
                     {
                         self.insert_searchable_object(obj, obj.object_type(), app)?
                     }
@@ -406,8 +406,7 @@ impl WarpDriveSearcher for FuzzyWarpDriveSearcher {
                 let folder: Option<&CloudFolder> = obj.into();
                 if let Some(folder) = folder {
                     let location = CloudObjectLocation::Folder(folder.id);
-                    for obj in
-                        model.trashed_cloud_objects_in_location_without_descendents(location, app)
+                    for obj in model.trashed_cloud_objects_in_location_without_descendents(location)
                     {
                         self.delete_searchable_object(obj.uid(), obj.object_type(), app)?
                     }
@@ -794,7 +793,7 @@ mod full_text_searcher {
                     if let Some(folder) = folder {
                         let location = CloudObjectLocation::Folder(folder.id);
                         for obj in CloudModel::as_ref(app)
-                            .active_cloud_objects_in_location_without_descendents(location, app)
+                            .active_cloud_objects_in_location_without_descendents(location)
                         {
                             self.insert_searchable_object(obj, obj.object_type(), app)?
                         }
@@ -840,7 +839,7 @@ mod full_text_searcher {
                     if let Some(folder) = folder {
                         let location = CloudObjectLocation::Folder(folder.id);
                         for obj in CloudModel::as_ref(app)
-                            .trashed_cloud_objects_in_location_without_descendents(location, app)
+                            .trashed_cloud_objects_in_location_without_descendents(location)
                         {
                             self.delete_searchable_object(obj.uid(), obj.object_type(), app)?
                         }

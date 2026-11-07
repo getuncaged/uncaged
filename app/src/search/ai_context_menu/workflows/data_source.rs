@@ -7,7 +7,6 @@ use crate::cloud_object::CloudModelType;
 use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::{DataSourceRunErrorWrapper, SyncDataSource};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const MAX_RESULTS: usize = 50;
 /// Base score for zero-state results. Each item gets an additional bonus based on
@@ -35,7 +34,6 @@ impl SyncDataSource for WorkflowDataSource {
 
         // Get all workflows from CloudModel
         let cloud_model = CloudModel::as_ref(app);
-        let _user_workspaces = UserWorkspaces::as_ref(app);
 
         // Get workflows from all spaces the user has access to
         let mut workflow_results = Vec::new();

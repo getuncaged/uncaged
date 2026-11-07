@@ -17,12 +17,11 @@ use crate::ai::mcp::templatable_manager::TemplatableMCPServerManagerEvent;
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::{CloudModelEvent, UpdateSource};
-use crate::cloud_object::{CloudObject as _, GenericStringObjectFormat, JsonObjectType};
+use crate::cloud_object::{CloudObject as _, GenericStringObjectFormat, JsonObjectType, Owner};
 use crate::drive::CloudObjectTypeAndId;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ClientId, SyncId};
 use crate::settings::AgentModeCommandExecutionPredicate;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::CloudModel;
 
 /// ExecutionProfileId is the identifier that users of the AIExecutionProfilesModel use
@@ -128,7 +127,7 @@ impl AIExecutionProfilesModel {
                 let cloud_model = CloudModel::handle(ctx).as_ref(ctx);
                 let all_profiles_from_cloud: Vec<&super::CloudAIExecutionProfile> = cloud_model
                     .get_all_objects_of_type::<GenericStringObjectId, CloudAIExecutionProfileModel>()
-                    .filter(|p| Self::is_owned_by_current_user(p, ctx))
+                    .filter(|p| Self::is_owned_by_current_user(p))
                     .collect();
 
                 let default_profile_from_cloud: Option<&super::CloudAIExecutionProfile> = all_profiles_from_cloud
@@ -216,13 +215,8 @@ impl AIExecutionProfilesModel {
         model
     }
 
-    fn is_owned_by_current_user(
-        profile: &super::CloudAIExecutionProfile,
-        ctx: &AppContext,
-    ) -> bool {
-        UserWorkspaces::as_ref(ctx)
-            .personal_drive(ctx)
-            .is_some_and(|owner| profile.permissions().owner == owner)
+    fn is_owned_by_current_user(profile: &super::CloudAIExecutionProfile) -> bool {
+        profile.permissions().owner == Owner::local_user()
     }
 
     /// This function performs one-time migrations from legacy settings into the default profile.
@@ -261,10 +255,7 @@ impl AIExecutionProfilesModel {
     pub fn create_profile(&mut self, ctx: &mut ModelContext<Self>) -> Option<ClientProfileId> {
         let profile_id = ClientProfileId::new();
 
-        let Some(owner) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) else {
-            log::error!("Failed to create AI execution profile: personal drive not available");
-            return None;
-        };
+        let owner = Owner::local_user();
 
         let mut new_profile = self.default_profile(ctx).data().clone();
         new_profile.name = "".to_string();
@@ -976,43 +967,21 @@ impl AIExecutionProfilesModel {
                     return false;
                 }
 
-                if let Some(owner) = UserWorkspaces::as_ref(ctx).personal_drive(ctx) {
-                    let update_manager = UpdateManager::handle(ctx);
-                    let client_id = ClientId::default();
-                    update_manager.update(ctx, |update_manager, ctx| {
-                        update_manager.create_ai_execution_profile(
-                            new_profile,
-                            client_id,
-                            owner,
-                            ctx,
-                        );
-                    });
+                let owner = Owner::local_user();
+                let update_manager = UpdateManager::handle(ctx);
+                let client_id = ClientId::default();
+                update_manager.update(ctx, |update_manager, ctx| {
+                    update_manager.create_ai_execution_profile(new_profile, client_id, owner, ctx);
+                });
 
-                    // For forever on, the default profile state is synced.
-                    let sync_id = SyncId::ClientId(client_id);
-                    self.default_profile_state = DefaultProfileState::Synced { id: profile_id };
-                    self.profile_id_to_sync_id.insert(profile_id, sync_id);
+                // For forever on, the default profile state is synced.
+                let sync_id = SyncId::ClientId(client_id);
+                self.default_profile_state = DefaultProfileState::Synced { id: profile_id };
+                self.profile_id_to_sync_id.insert(profile_id, sync_id);
 
-                    log::info!(
-                        "Creating a cloud object for the default execution profile: {profile_id:?}"
-                    );
-                } else {
-                    // The user isn't logged in yet (or personal drive isn't available),
-                    // so we can't create a cloud object. Persist the edit locally on the
-                    // Unsynced profile so it isn't silently dropped; it will be promoted
-                    // to a Synced cloud object the next time an edit runs after login.
-                    // Without this, onboarding-driven edits (e.g. autonomy permissions
-                    // written by `apply_agent_settings`) disappear when onboarding is
-                    // completed before login.
-                    self.default_profile_state = DefaultProfileState::Unsynced {
-                        id: profile_id,
-                        profile: new_profile,
-                    };
-
-                    log::info!(
-                        "Updated local unsynced default execution profile (no personal drive yet): {profile_id:?}"
-                    );
-                }
+                log::info!(
+                    "Creating a cloud object for the default execution profile: {profile_id:?}"
+                );
                 ctx.emit(AIExecutionProfilesModelEvent::ProfileUpdated(profile_id));
                 return true;
             }
@@ -1120,7 +1089,7 @@ impl AIExecutionProfilesModel {
         let cloud_model = CloudModel::as_ref(ctx);
         let all_profiles: Vec<(SyncId, bool)> = cloud_model
             .get_all_objects_of_type::<GenericStringObjectId, CloudAIExecutionProfileModel>()
-            .filter(|o| Self::is_owned_by_current_user(o, ctx))
+            .filter(|o| Self::is_owned_by_current_user(o))
             .map(|o| (o.id, o.model().string_model.is_default_profile))
             .collect();
 
@@ -1188,7 +1157,7 @@ impl AIExecutionProfilesModel {
             return;
         };
 
-        if !Self::is_owned_by_current_user(object, ctx) {
+        if !Self::is_owned_by_current_user(object) {
             log::info!("Ignoring non-owned execution profile from cloud: {sync_id:?}");
             return;
         }

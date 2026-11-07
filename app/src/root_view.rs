@@ -92,8 +92,6 @@ use crate::workspace::tab_settings::TabSettings;
 use crate::workspace::view::OnboardingTutorial;
 use crate::workspace::{PaneViewLocator, Workspace, WorkspaceAction, WorkspaceRegistry};
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::workspaces::update_manager::TeamUpdateManager;
-use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 use crate::{
     report_if_error, ChannelState, GlobalResourceHandles, GlobalResourceHandlesProvider,
     UpdateQuakeModeEventArg,
@@ -1723,12 +1721,7 @@ impl RootView {
 
         let themes = onboarding_theme_picker_themes();
         let onboarding_view = ctx.add_typed_action_view(move |ctx| {
-            let (models, default_model_id) =
-                build_onboarding_models(LLMPreferences::as_ref(ctx), ctx);
-
-            let workspace_enforces_autonomy = UserWorkspaces::as_ref(ctx)
-                .ai_autonomy_settings()
-                .has_any_overrides();
+            let (models, default_model_id) = build_onboarding_models(LLMPreferences::as_ref(ctx));
 
             let auth_state = current_onboarding_auth_state(ctx);
 
@@ -1737,7 +1730,8 @@ impl RootView {
                 false, // Always use unskippable onboarding.
                 models,
                 default_model_id,
-                workspace_enforces_autonomy,
+                // Uncaged has no workspace, so nothing enforces autonomy settings.
+                false,
                 FeatureFlag::AgentView.is_enabled(),
                 auth_state,
                 ctx,
@@ -1750,7 +1744,7 @@ impl RootView {
             move |_, llm_preferences, event, ctx| match event {
                 LLMPreferencesEvent::UpdatedAvailableLLMs => {
                     let (models, default_model_id) =
-                        build_onboarding_models(llm_preferences.as_ref(ctx), ctx);
+                        build_onboarding_models(llm_preferences.as_ref(ctx));
                     onboarding_view_clone.update(ctx, |onboarding_view, ctx| {
                         onboarding_view.set_onboarding_models(models, default_model_id, ctx);
                     })
@@ -1758,29 +1752,6 @@ impl RootView {
 
                 LLMPreferencesEvent::UpdatedActiveAgentModeLLM
                 | LLMPreferencesEvent::UpdatedActiveCodingLLM => {}
-            },
-        );
-
-        // Subscribe to workspace changes to update autonomy enforcement state and auth/billing
-        // state (e.g. a free→paid upgrade reflected by the workspace/billing metadata poll).
-        let onboarding_view_for_workspaces = onboarding_view.clone();
-        ctx.subscribe_to_model(
-            &UserWorkspaces::handle(ctx),
-            move |_, user_workspaces, event, ctx| {
-                if matches!(event, UserWorkspacesEvent::UpdateWorkspaceSettingsSuccess) {
-                    let workspace_enforces_autonomy = user_workspaces
-                        .as_ref(ctx)
-                        .ai_autonomy_settings()
-                        .has_any_overrides();
-                    onboarding_view_for_workspaces.update(ctx, |onboarding_view, ctx| {
-                        onboarding_view
-                            .set_workspace_enforces_autonomy(workspace_enforces_autonomy, ctx);
-                    });
-                }
-                let auth_state = current_onboarding_auth_state(ctx);
-                onboarding_view_for_workspaces.update(ctx, |onboarding_view, ctx| {
-                    onboarding_view.set_auth_state(auth_state, ctx);
-                });
             },
         );
 
@@ -1799,9 +1770,6 @@ impl RootView {
                     if matches!(event, AuthManagerEvent::AuthComplete) {
                         LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
                             prefs.refresh_available_models(ctx);
-                        });
-                        TeamUpdateManager::handle(ctx).update(ctx, |manager, ctx| {
-                            drop(manager.refresh_workspace_metadata(ctx));
                         });
                     }
                 }
@@ -2265,13 +2233,10 @@ impl RootView {
                 ctx.notify();
             }
             AgentOnboardingEvent::AppBecameActive => {
-                // fetch the models / workspace metadata when the user tabs/intents back
-                // into the app during onboarding after potentially upgrading
+                // fetch the models when the user tabs/intents back into the app during
+                // onboarding after potentially upgrading
                 LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
                     prefs.refresh_available_models(ctx);
-                });
-                TeamUpdateManager::handle(ctx).update(ctx, |manager, ctx| {
-                    drop(manager.refresh_workspace_metadata(ctx));
                 });
             }
         }

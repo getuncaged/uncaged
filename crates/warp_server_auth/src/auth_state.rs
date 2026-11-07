@@ -589,8 +589,7 @@ impl AuthStateProvider {
 
     /// Constructs a provider backed by a fully logged-out `AuthState` (no user,
     /// no credentials). Used by unit tests that need to exercise code paths
-    /// gated on `AuthState::user_id()` / `UserWorkspaces::personal_drive()`
-    /// returning `None`.
+    /// gated on `AuthState::user_id()` returning `None`.
     #[cfg(any(test, feature = "test-util"))]
     pub fn new_logged_out_for_test() -> Self {
         Self {

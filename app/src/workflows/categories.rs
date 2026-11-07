@@ -31,13 +31,13 @@ use super::workflow::Workflow;
 use super::WorkflowSource;
 use crate::appearance::Appearance;
 use crate::cloud_object::model::persistence::CloudModel;
+use crate::cloud_object::Space;
 use crate::editor::Event as EditorEvent;
 use crate::themes::theme::{self, Blend, WarpTheme};
 use crate::user_config::{WarpConfig, WarpConfigUpdateEvent};
 use crate::util::bindings::CustomAction;
 use crate::voltron::{VoltronFeatureViewMeta, VoltronMetadata};
 use crate::workflows::WorkflowType;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const SCROLLBAR_WIDTH: ScrollbarWidth = ScrollbarWidth::Auto;
 const DESCRIPTION_MARGIN: f32 = 24.;
@@ -398,12 +398,6 @@ impl CategoriesView {
             ),
         );
 
-        // Notify if there were changes to the team workflows, so we can reload
-        let user_workspaces = UserWorkspaces::handle(ctx);
-        ctx.observe(&user_workspaces, |_, _, ctx| {
-            ctx.notify();
-        });
-
         ctx.subscribe_to_model(&WarpConfig::handle(ctx), |me, _, event, ctx| {
             if let WarpConfigUpdateEvent::LocalUserWorkflows = event {
                 me.update_workflows(ctx);
@@ -493,11 +487,10 @@ impl CategoriesView {
     }
 
     pub fn load_cloud_workflows(&mut self, ctx: &mut ViewContext<Self>) {
-        let user_workspaces = UserWorkspaces::as_ref(ctx);
         let cloud_model = CloudModel::as_ref(ctx);
 
-        for space in user_workspaces.all_user_spaces(ctx) {
-            let workflows_in_space = cloud_model.active_workflows_in_space(space, ctx);
+        for space in Space::all_user_spaces(ctx) {
+            let workflows_in_space = cloud_model.active_workflows_in_space(space);
             let new_workflows_in_space = Self::categorize_workflows(
                 // Don't include AI workflows in Voltron.
                 workflows_in_space
@@ -570,7 +563,7 @@ impl CategoriesView {
                 .unwrap_or_default(),
             WorkflowViewType::Team => {
                 // TODO: this only assumes one team
-                let team_uid = UserWorkspaces::as_ref(ctx).current_team_uid();
+                let team_uid = None;
                 if let Some(team_uid) = team_uid {
                     self.workflows_by_source
                         .get(&WorkflowSource::Team { team_uid })

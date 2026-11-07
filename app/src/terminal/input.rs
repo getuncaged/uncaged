@@ -282,7 +282,6 @@ use crate::workspace::{
     CommandSearchOptions, ForkFromExchange, ForkedConversationDestination, InitContent,
     RestoreConversationLayout, ToastStack, WorkspaceAction,
 };
-use crate::workspaces::user_workspaces::UserWorkspaces;
 #[allow(unused_imports)]
 use crate::ASSETS;
 #[allow(unused_imports)]
@@ -4537,7 +4536,7 @@ impl Input {
         suggestion_type: ZeroStatePromptSuggestionType,
         ctx: &mut ViewContext<Self>,
     ) {
-        if !AIRequestUsageModel::as_ref(ctx).has_any_ai_remaining(ctx) {
+        if !AIRequestUsageModel::as_ref(ctx).has_any_ai_remaining() {
             return;
         }
 
@@ -5049,11 +5048,6 @@ impl Input {
         match prompt_alert {
             PromptAlertEvent::SignupAnonymousUser => {
                 ctx.emit(Event::SignupAnonymousUser);
-            }
-            PromptAlertEvent::OpenBillingPortal { team_uid } => {
-                UserWorkspaces::handle(ctx).update(ctx, |user_workspaces, ctx| {
-                    user_workspaces.generate_stripe_billing_portal_link(*team_uid, ctx);
-                });
             }
         }
     }
@@ -12679,11 +12673,6 @@ impl Input {
     ) {
         match event {
             PromptSuggestionsEvent::SignupAnonymousUser => ctx.emit(Event::SignupAnonymousUser),
-            PromptSuggestionsEvent::OpenBillingPortal { team_uid } => {
-                UserWorkspaces::handle(ctx).update(ctx, |user_workspaces, ctx| {
-                    user_workspaces.generate_stripe_billing_portal_link(*team_uid, ctx);
-                });
-            }
         }
     }
 

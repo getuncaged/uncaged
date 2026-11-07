@@ -764,11 +764,7 @@ fn render_command_denylist_section(
     appearance: &Appearance,
     app: &warpui::AppContext,
 ) -> Box<dyn Element> {
-    use crate::ai::blocklist::BlocklistAIPermissions;
-
     let ai_disabled = !AISettings::as_ref(app).is_any_ai_enabled(app);
-    let org_denylist = BlocklistAIPermissions::get_org_execute_commands_denylist(app);
-    let mut tooltip_idx = 0usize;
 
     let input_items: Vec<InputListItem<ExecutionProfileEditorViewAction>> = profile_data
         .command_denylist
@@ -776,27 +772,14 @@ fn render_command_denylist_section(
         .cloned()
         .zip(view.command_denylist_mouse_state_handles.iter().cloned())
         .rev()
-        .map(|(predicate, mouse_state_handle)| {
-            let is_org = org_denylist.contains(&predicate);
-            let tooltip_mouse_state = if is_org {
-                let handle = view
-                    .command_denylist_tooltip_mouse_state_handles
-                    .get(tooltip_idx)
-                    .cloned();
-                tooltip_idx += 1;
-                handle
-            } else {
-                None
-            };
-            InputListItem {
-                item: predicate.to_string(),
-                mouse_state_handle,
-                on_remove_action: ExecutionProfileEditorViewAction::RemoveFromCommandDenylist {
-                    predicate,
-                },
-                is_disabled: is_org || ai_disabled,
-                tooltip_mouse_state,
-            }
+        .map(|(predicate, mouse_state_handle)| InputListItem {
+            item: predicate.to_string(),
+            mouse_state_handle,
+            on_remove_action: ExecutionProfileEditorViewAction::RemoveFromCommandDenylist {
+                predicate,
+            },
+            is_disabled: ai_disabled,
+            tooltip_mouse_state: None,
         })
         .collect();
 

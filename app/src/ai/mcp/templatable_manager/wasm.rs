@@ -224,22 +224,6 @@ impl TemplatableMCPServerManager {
         false
     }
 
-    pub fn share_templatable_mcp_server(
-        &mut self,
-        _template_uuid: Uuid,
-        _ctx: &mut ModelContext<Self>,
-    ) {
-        log::warn!("Sharing a templatable MCP server is not supported in WASM");
-    }
-
-    pub fn share_templatable_mcp_server_installation(
-        &mut self,
-        _installation_uuid: Uuid,
-        _ctx: &mut ModelContext<Self>,
-    ) {
-        log::warn!("Sharing a templatable MCP server installation is not supported in WASM");
-    }
-
     pub fn unshare_templatable_mcp_server(
         &mut self,
         _template_uuid: Uuid,
@@ -254,11 +238,6 @@ impl TemplatableMCPServerManager {
         _ctx: &mut ModelContext<Self>,
     ) {
         log::warn!("Unsharing a templatable MCP server installation is not supported in WASM");
-    }
-
-    pub fn get_first_team_space_id(_app: &AppContext) -> Option<ServerId> {
-        log::warn!("Getting the first team space ID is not supported in WASM");
-        None
     }
 
     pub fn get_installation_by_template_uuid(

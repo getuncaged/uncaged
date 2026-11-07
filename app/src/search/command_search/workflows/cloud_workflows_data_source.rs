@@ -5,6 +5,7 @@ use warpui::{AppContext, SingletonEntity};
 
 use super::WorkflowSearchItem;
 use crate::cloud_object::model::persistence::CloudModel;
+use crate::cloud_object::Space;
 use crate::search::async_snapshot_data_source::AsyncSnapshotDataSource;
 use crate::search::command_search::searcher::CommandSearchItemAction;
 use crate::search::data_source::{Query, QueryResult};
@@ -14,7 +15,6 @@ use crate::search::QueryFilter;
 use crate::server::ids::SyncId;
 use crate::settings::AISettings;
 use crate::workflows::{CloudWorkflowModel, WorkflowSource};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub(crate) struct WorkflowMatchCandidate {
     pub id: SyncId,
@@ -40,15 +40,12 @@ pub fn cloud_workflows_data_source(
                 query.filters.contains(&QueryFilter::Workflows) || !is_ai_enabled;
 
             let cloud_model = CloudModel::as_ref(app);
-            let user_workspaces = UserWorkspaces::as_ref(app);
-
-            let candidates: Vec<WorkflowMatchCandidate> = user_workspaces
-                .all_user_spaces(app)
+            let candidates: Vec<WorkflowMatchCandidate> = Space::all_user_spaces(app)
                 .into_iter()
                 .flat_map(|space| {
                     let source: WorkflowSource = space.into();
                     cloud_model
-                        .active_workflows_in_space(space, app)
+                        .active_workflows_in_space(space)
                         .map(move |cloud_workflow| WorkflowMatchCandidate {
                             id: cloud_workflow.id,
                             model: cloud_workflow.shared_model(),

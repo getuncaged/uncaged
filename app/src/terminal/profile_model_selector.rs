@@ -8,10 +8,10 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use warpui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    DropShadow, Empty, Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize,
-    MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement as _, ParentOffsetBounds,
-    Percentage, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Rect, SavePosition,
-    Stack, Text, DEFAULT_UI_LINE_HEIGHT_RATIO,
+    DropShadow, Empty, Expanded, Flex, Hoverable, MouseStateHandle, OffsetPositioning,
+    ParentAnchor, ParentElement as _, ParentOffsetBounds, Percentage, PositionedElementAnchor,
+    PositionedElementOffsetBounds, Radius, Rect, SavePosition, Stack, Text,
+    DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
 use warpui::platform::Cursor;
 use warpui::text_layout::ClipConfig;
@@ -41,8 +41,7 @@ use crate::ai::execution_profiles::profiles::{
     AIExecutionProfilesModel, AIExecutionProfilesModelEvent, ClientProfileId,
 };
 use crate::ai::llms::{
-    dedupe_model_display_names, is_using_api_key_for_provider, LLMId, LLMInfo, LLMPreferences,
-    LLMPreferencesEvent, LLMSpec,
+    dedupe_model_display_names, LLMId, LLMInfo, LLMPreferences, LLMPreferencesEvent, LLMSpec,
 };
 use crate::appearance::Appearance;
 use crate::cloud_object::model::generic_string_model::StringModel;
@@ -53,11 +52,8 @@ use crate::settings_view::SettingsSection;
 use crate::terminal::input::{MenuPositioning, MenuPositioningProvider};
 use crate::terminal::TerminalModel;
 use crate::ui_components::icons::Icon;
-use crate::view_components::action_button::{
-    ActionButton, ActionButtonTheme, ButtonSize, SecondaryTheme,
-};
+use crate::view_components::action_button::{ActionButton, ActionButtonTheme, ButtonSize};
 use crate::view_components::{FeaturePopup, NewFeaturePopupEvent, NewFeaturePopupLabel};
-use crate::workspace::WorkspaceAction;
 
 const MENU_WIDTH: f32 = 280.;
 /// Uncaged: the effort menu only lists a handful of short levels.
@@ -167,7 +163,6 @@ pub struct ProfileModelSelector {
     input_model: ModelHandle<BlocklistAIInputModel>,
     render_compact: bool,
     hovered_llm_info: Option<LLMInfo>,
-    manage_api_key_button: ViewHandle<ActionButton>,
     terminal_model: Arc<FairMutex<TerminalModel>>,
     all_model_choices: Vec<LLMInfo>,
 }
@@ -796,18 +791,6 @@ impl ProfileModelSelector {
             },
         );
 
-        let manage_api_key_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Manage", SecondaryTheme)
-                .with_tooltip("Manage API keys")
-                .with_size(ButtonSize::XSmall)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(WorkspaceAction::ShowSettingsPageWithSearch {
-                        search_query: "api".to_string(),
-                        section: Some(SettingsSection::WarpAgent),
-                    });
-                })
-        });
-
         let mut me = Self {
             profile_button,
             model_button,
@@ -834,7 +817,6 @@ impl ProfileModelSelector {
             input_model,
             render_compact: false,
             hovered_llm_info: None,
-            manage_api_key_button,
             terminal_model,
             all_model_choices: Vec::new(),
         };
@@ -1120,27 +1102,13 @@ impl ProfileModelSelector {
 
         // Store all model choices for reasoning variant lookups
         self.all_model_choices = llm_preferences
-            .get_base_llm_choices_for_agent_mode(ctx)
+            .get_base_llm_choices_for_agent_mode()
             .cloned()
             .collect();
 
-        // Partition into server-provided choices (subject to auto/reasoning collapsing) and
-        // custom-endpoint choices (rendered separately under a `Custom models` sub-header so
-        // the server-curated list stays visually distinct).
-        let custom_ids: std::collections::HashSet<LLMId> = llm_preferences
-            .custom_llm_choices(ctx)
-            .map(|info| info.id.clone())
-            .collect();
-        let server_choices: Vec<&LLMInfo> = self
-            .all_model_choices
-            .iter()
-            .filter(|llm| !custom_ids.contains(&llm.id))
-            .collect();
-        let custom_choices: Vec<&LLMInfo> = self
-            .all_model_choices
-            .iter()
-            .filter(|llm| custom_ids.contains(&llm.id))
-            .collect();
+        // Uncaged has no custom inference entitlement, so every choice is server-provided
+        // (subject to auto/reasoning collapsing).
+        let server_choices: Vec<&LLMInfo> = self.all_model_choices.iter().collect();
 
         // Group models by base_model_name to collapse reasoning variants.
         // Use "auto" as the key for all auto models so they collapse together.
@@ -1157,7 +1125,7 @@ impl ProfileModelSelector {
             groups.entry(key).or_default().push(*llm);
         }
 
-        // Split collapsed choices so custom models can be placed right after auto models.
+        // Split collapsed choices into auto models and the rest.
         let mut auto_choices: Vec<&LLMInfo> = Vec::new();
         let mut other_choices: Vec<&LLMInfo> = Vec::new();
         for (_, variants) in groups {
@@ -1190,32 +1158,6 @@ impl ProfileModelSelector {
             true,
             ctx,
         );
-
-        // Append the "Custom models" section when the user has any custom endpoints configured.
-        // Each row gets its own atomic `SelectModel(config_key)` action; no auto/reasoning
-        // collapsing applies.
-        if !custom_choices.is_empty() {
-            let appearance = Appearance::as_ref(ctx);
-            if !items.is_empty() {
-                items.push(MenuItem::Separator);
-            }
-            items.push(MenuItem::Header {
-                fields: MenuItemFields::new("Custom models").with_override_text_color(
-                    appearance
-                        .theme()
-                        .sub_text_color(appearance.theme().background())
-                        .into_solid(),
-                ),
-                clickable: false,
-                right_side_fields: None,
-            });
-            for llm in &custom_choices {
-                let fields = MenuItemFields::new(llm.menu_display_name())
-                    .with_right_side_icon(Icon::Key)
-                    .with_on_select_action(ProfileModelSelectorAction::SelectModel(llm.id.clone()));
-                items.push(MenuItem::Item(fields));
-            }
-        }
 
         if !other_choices.is_empty() {
             if !items.is_empty() {
@@ -1264,7 +1206,7 @@ impl ProfileModelSelector {
 
         let items: Vec<MenuItem<ProfileModelSelectorAction>> = match kind {
             ModelSpecSidecarKind::Auto => llm_preferences
-                .get_base_llm_choices_for_agent_mode(ctx)
+                .get_base_llm_choices_for_agent_mode()
                 .filter(|llm| is_auto(llm))
                 .map(|llm| {
                     let is_selected = llm.id == active_llm_id;
@@ -1461,7 +1403,7 @@ impl ProfileModelSelector {
                             // Get the first "auto" variant as the generic auto model
                             let llm_prefs = LLMPreferences::as_ref(ctx);
                             llm_prefs
-                                .get_base_llm_choices_for_agent_mode(ctx)
+                                .get_base_llm_choices_for_agent_mode()
                                 .find(|llm| is_auto(llm))
                                 .cloned()
                         }
@@ -2026,50 +1968,10 @@ impl ProfileModelSelector {
         .finish()
     }
 
-    fn render_model_spec_api_key(&self, app: &AppContext) -> Box<dyn Element> {
-        let appearance = Appearance::as_ref(app);
-        let theme = appearance.theme();
-
-        Container::new(
-            Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(self.render_model_spec_value_label("Cost".to_string(), app))
-                .with_child(
-                    Expanded::new(
-                        1.,
-                        Flex::row()
-                            .with_main_axis_size(MainAxisSize::Max)
-                            .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-                            .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                            .with_child(
-                                Container::new(
-                                    Text::new(
-                                        "Billed to API".to_string(),
-                                        appearance.ui_font_family(),
-                                        14.,
-                                    )
-                                    .with_color(theme.disabled_ui_text_color().into())
-                                    .finish(),
-                                )
-                                .finish(),
-                            )
-                            .with_child(ChildView::new(&self.manage_api_key_button).finish())
-                            .finish(),
-                    )
-                    .finish(),
-                )
-                .finish(),
-        )
-        .with_margin_top(12.)
-        .finish()
-    }
-
     // Renders all model spec values for a given model spec
     fn render_all_model_spec_values(
         &self,
         spec: &LLMSpec,
-        is_using_api_key: bool,
         bg_bar_color: ColorU,
         app: &AppContext,
     ) -> Box<dyn Element> {
@@ -2082,26 +1984,17 @@ impl ProfileModelSelector {
             ),
             self.render_model_spec_value("Speed".to_string(), spec.speed, bg_bar_color, app),
         ];
-        if is_using_api_key {
-            spec_values.push(self.render_model_spec_api_key(app));
-        } else {
-            spec_values.push(self.render_model_spec_value(
-                "Cost".to_string(),
-                spec.cost,
-                bg_bar_color,
-                app,
-            ));
-        }
+        spec_values.push(self.render_model_spec_value(
+            "Cost".to_string(),
+            spec.cost,
+            bg_bar_color,
+            app,
+        ));
         Flex::column().with_children(spec_values).finish()
     }
 
     // Renders entire modal for a given model spec
-    fn render_model_spec(
-        &self,
-        spec: &LLMSpec,
-        is_using_api_key: bool,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
+    fn render_model_spec(&self, spec: &LLMSpec, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
         let header = self.render_model_spec_header(
@@ -2110,12 +2003,7 @@ impl ProfileModelSelector {
                 .to_string(),
             app,
         );
-        let spec = self.render_all_model_spec_values(
-            spec,
-            is_using_api_key,
-            internal_colors::neutral_3(theme),
-            app,
-        );
+        let spec = self.render_all_model_spec_values(spec, internal_colors::neutral_3(theme), app);
 
         ConstrainedBox::new(
             Container::new(
@@ -2159,7 +2047,6 @@ impl ProfileModelSelector {
         let sidecar_menu = ChildView::new(&self.model_spec_sidecar.dropdown).finish();
         let spec_values = self.render_all_model_spec_values(
             &spec.clone().unwrap_or_default(),
-            false,
             internal_colors::neutral_5(theme),
             app,
         );
@@ -2455,11 +2342,10 @@ impl View for ProfileModelSelector {
                         .and_then(|i| i.spec.as_ref())
                         .cloned();
                     Some(self.render_sidecar_spec_panel(&kind, &sidecar_spec, app))
-                } else if let Some(spec) = info.spec.as_ref() {
-                    let is_using_api_key = is_using_api_key_for_provider(&info.provider, app);
-                    Some(self.render_model_spec(spec, is_using_api_key, app))
                 } else {
-                    None
+                    info.spec
+                        .as_ref()
+                        .map(|spec| self.render_model_spec(spec, app))
                 };
 
                 if let Some(model_spec_sidecar) = model_spec_sidecar {

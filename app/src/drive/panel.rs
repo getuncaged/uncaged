@@ -29,10 +29,9 @@ use crate::env_vars::CloudEnvVarCollection;
 use crate::notebooks::manager::NotebookSource;
 use crate::notebooks::CloudNotebook;
 use crate::server::cloud_objects::update_manager::{InitiatedBy, UpdateManager};
-use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::server::ids::{ClientId, SyncId};
 use crate::workflows::manager::WorkflowOpenSource;
 use crate::workflows::{CloudWorkflow, WorkflowViewMode};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub const MIN_SIDEBAR_WIDTH: f32 = 250.;
 pub const MAX_SIDEBAR_WIDTH_RATIO: f32 = 0.75;
@@ -69,7 +68,6 @@ pub enum DrivePanelEvent {
         in_subshell: bool,
     },
     OpenSearch,
-    OpenSharedObjectsCreationDeniedModal(DriveObjectType, ServerId),
     OpenAIFactCollection,
     OpenMCPServerCollection,
     OpenImportModal {
@@ -128,7 +126,7 @@ impl DrivePanel {
             Some(folder_id) => CloudModel::as_ref(app)
                 .get_folder(folder_id)
                 .map(|folder| folder.permissions.owner),
-            None => UserWorkspaces::as_ref(app).space_to_owner(space, app),
+            None => space.owner(),
         }
     }
 
@@ -300,11 +298,6 @@ impl DrivePanel {
                 self.open_workflow_modal_with_existing(*workflow_id, ctx)
             }
             DriveIndexEvent::FocusWarpDrive => ctx.emit(DrivePanelEvent::FocusWarpDrive),
-            DriveIndexEvent::OpenSharedObjectsCreationDeniedModal(object_type, team_uid) => ctx
-                .emit(DrivePanelEvent::OpenSharedObjectsCreationDeniedModal(
-                    *object_type,
-                    *team_uid,
-                )),
             DriveIndexEvent::InvokeEnvVarCollectionInSubshell(id) => {
                 let cloud_model = CloudModel::as_ref(ctx);
                 let object = cloud_model.get_by_uid(&id.uid());
@@ -358,37 +351,8 @@ impl DrivePanel {
             CloudViewModel::as_ref(ctx).object_space(&cloud_object_type_and_id.uid(), ctx)
         {
             match space {
-                Space::Team { team_uid } => {
-                    match cloud_object_type_and_id {
-                        CloudObjectTypeAndId::Notebook(_) => {
-                            if !UserWorkspaces::has_capacity_for_shared_notebooks(team_uid, ctx, 1)
-                            {
-                                // If team has reached the limit for notebooks, show the modal
-                                // and return early.
-                                ctx.emit(DrivePanelEvent::OpenSharedObjectsCreationDeniedModal(
-                                    DriveObjectType::Notebook {
-                                        is_ai_document: false,
-                                    },
-                                    team_uid,
-                                ));
-                                return;
-                            }
-                        }
-                        CloudObjectTypeAndId::Workflow(_) => {
-                            if !UserWorkspaces::has_capacity_for_shared_workflows(team_uid, ctx, 1)
-                            {
-                                // If team has reached the limit for workflows, show the modal
-                                // and return early.
-                                ctx.emit(DrivePanelEvent::OpenSharedObjectsCreationDeniedModal(
-                                    DriveObjectType::Workflow,
-                                    team_uid,
-                                ));
-                                return;
-                            }
-                        }
-                        _ => (),
-                    }
-                }
+                // Uncaged has no teams, so there are no team object limits to check.
+                Space::Team { .. } => (),
                 Space::Personal => match cloud_object_type_and_id {
                     CloudObjectTypeAndId::Notebook(_) => {
                         if has_feature_gated_anonymous_user_reached_notebook_limit(ctx) {

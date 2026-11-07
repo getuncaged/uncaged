@@ -37,7 +37,6 @@ use crate::ui_components::menu_button::{
 use crate::workspace::header_toolbar_item::HeaderToolbarItemKind;
 use crate::workspace::tab_settings::TabSettings;
 use crate::workspaces::user_profiles::UserProfiles;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub(crate) fn tools_panel_menu_direction(app: &AppContext) -> MenuDirection {
     let config = TabSettings::as_ref(app)
@@ -431,11 +430,7 @@ impl<'a> WarpDriveRow<'a> {
                     None => owner_label.push_str("unknown user"),
                 }
             }
-            Owner::Team { team_uid, .. } => owner_label.push_str(
-                UserWorkspaces::as_ref(app)
-                    .team_from_uid(team_uid)
-                    .map_or("unknown team", |team| &team.name),
-            ),
+            Owner::Team { .. } => owner_label.push_str("unknown team"),
         }
 
         let background = appearance.theme().surface_1();
@@ -819,11 +814,10 @@ impl UiComponent for WarpDriveRow<'_> {
                                     return AcceptedByDropTarget::No;
                                 };
                                 let cloud_model = CloudModel::handle(app);
-                                if cloud_model.as_ref(app).can_move_object_to_location(
-                                    &item.uid(),
-                                    *location,
-                                    app,
-                                ) {
+                                if cloud_model
+                                    .as_ref(app)
+                                    .can_move_object_to_location(&item.uid(), *location)
+                                {
                                     AcceptedByDropTarget::Yes
                                 } else {
                                     AcceptedByDropTarget::No

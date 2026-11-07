@@ -11,7 +11,6 @@ use crate::test_util::settings::initialize_settings_for_tests;
 use crate::vim_registers::VimRegisters;
 use crate::workspace::sync_inputs::SyncedInputState;
 use crate::workspace::ToastStack;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);
@@ -22,7 +21,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| VimRegisters::new());
     app.add_singleton_model(|_| KeybindingChangedNotifier::mock());
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
-    app.add_singleton_model(UserWorkspaces::default_mock);
     app.update(|ctx| {
         ThemeSettings::handle(ctx).update(ctx, |settings, ctx| {
             settings.use_system_theme.set_value(false, ctx).unwrap();

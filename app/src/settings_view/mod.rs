@@ -76,8 +76,6 @@ pub mod mcp_servers;
 pub mod mcp_servers_page;
 mod nav;
 pub mod pane_manager;
-mod remove_custom_endpoint_confirmation_dialog;
-mod set_default_model_modal;
 mod setting_toggles;
 mod settings_file_footer;
 pub(crate) mod settings_page;
@@ -2009,9 +2007,7 @@ impl SettingsView {
             SettingsPageViewHandle::MCPServers(view) => {
                 view.read(app, |view, _| view.get_modal_content(app))
             }
-            SettingsPageViewHandle::AI(view) => {
-                view.read(app, |view, _| view.get_modal_content(app))
-            }
+            SettingsPageViewHandle::AI(view) => view.read(app, |view, _| view.get_modal_content()),
             _ => None,
         }
     }

@@ -9,7 +9,6 @@ use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::sync_queue::SyncQueue;
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 #[test]
@@ -20,7 +19,6 @@ fn test_expand_directories() {
         let global_resource_handles = GlobalResourceHandles::mock(&mut app);
         app.add_singleton_model(|_| GlobalResourceHandlesProvider::new(global_resource_handles));
         app.add_singleton_model(CloudModel::mock);
-        app.add_singleton_model(UserWorkspaces::default_mock);
         app.add_singleton_model(|_| Appearance::mock());
         app.add_singleton_model(|_| NetworkStatus::new());
         app.add_singleton_model(SyncQueue::mock);

@@ -8,7 +8,7 @@ use settings::macros::{define_settings_group, maybe_define_setting, register_set
 use settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
 use warp_core::report_if_error;
 use warp_graphql::mutations::update_user_settings::UpdateUserSettingsInput;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
+use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use super::cloud_preferences_syncer::CloudPreferencesSyncer;
 use crate::auth::auth_state::AuthState;
@@ -20,8 +20,6 @@ use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::auth::MockAuthClient;
 use crate::server::server_api::auth::{AuthClient, SyncedUserSettings};
 use crate::server::server_api::ServerApiProvider;
-use crate::terminal::safe_mode_settings::SafeModeSettings;
-use crate::workspaces::workspace::EnterpriseSecretRegex;
 
 pub trait RegexDisplayInfo {
     fn pattern(&self) -> &str;
@@ -51,16 +49,6 @@ impl CustomSecretRegex {
 impl RegexDisplayInfo for CustomSecretRegex {
     fn pattern(&self) -> &str {
         self.pattern.as_str()
-    }
-
-    fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-}
-
-impl RegexDisplayInfo for EnterpriseSecretRegex {
-    fn pattern(&self) -> &str {
-        &self.pattern
     }
 
     fn name(&self) -> Option<&str> {
@@ -253,51 +241,6 @@ impl PrivacySettings {
 
     pub fn is_enterprise_secret_redaction_enabled(&self) -> bool {
         self.is_enterprise_secret_redaction_enabled
-    }
-
-    pub fn set_enterprise_secret_redaction_settings(
-        &mut self,
-        enabled: bool,
-        enterprise_regexes: Vec<EnterpriseSecretRegex>,
-        change_event_reason: ChangeEventReason,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if enabled {
-            // First time: Force enable secret redaction setting (safe mode).
-            if !self.is_enterprise_secret_redaction_enabled {
-                let safe_mode_settings = SafeModeSettings::handle(ctx);
-                ctx.update_model(&safe_mode_settings, |safe_mode_settings, ctx| {
-                    let _ = safe_mode_settings.safe_mode_enabled.set_value(true, ctx);
-                });
-            }
-
-            // Convert EnterpriseSecretRegex to CustomSecretRegex for internal use
-            let mut enterprise_secrets = Vec::new();
-            for enterprise_regex in enterprise_regexes {
-                if let Ok(regex) = Regex::new(&enterprise_regex.pattern) {
-                    enterprise_secrets.push(CustomSecretRegex {
-                        pattern: regex,
-                        name: enterprise_regex.name,
-                    });
-                } else {
-                    log::error!(
-                        "Invalid enterprise secret regex pattern: {}",
-                        enterprise_regex.pattern
-                    );
-                }
-            }
-            self.enterprise_secret_regex_list = enterprise_secrets;
-        } else {
-            // Clear enterprise secrets when disabled
-            self.enterprise_secret_regex_list.clear();
-        }
-
-        self.is_enterprise_secret_redaction_enabled = enabled;
-
-        ctx.emit(PrivacySettingsChangedEvent::CustomSecretRegexList {
-            change_event_reason,
-        });
-        ctx.notify();
     }
 
     pub fn refresh_to_default(&mut self) {

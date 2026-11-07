@@ -83,7 +83,6 @@ use crate::workflows::WorkflowType;
 use crate::workspace::{
     ForkedConversationDestination, RestoreConversationLayout, ToastStack, WorkspaceAction,
 };
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 lazy_static! {
     static ref HASHER: SipHasher = SipHasher::new_with_keys(0, 0);
@@ -158,8 +157,6 @@ pub struct AgentManagementView {
 
     cloud_setup_guide_view: ViewHandle<CloudSetupGuideView>,
 
-    all_filter_button: ViewHandle<ActionButton>,
-    personal_filter_button: ViewHandle<ActionButton>,
     status_dropdown: ViewHandle<Dropdown<AgentManagementViewAction>>,
     source_dropdown: ViewHandle<Dropdown<AgentManagementViewAction>>,
     created_on_dropdown: ViewHandle<Dropdown<AgentManagementViewAction>>,
@@ -205,28 +202,6 @@ impl AgentManagementView {
         );
 
         let list_state = Self::construct_fresh_list_state(ctx.handle());
-
-        let all_filter_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("All", NakedTheme)
-                .with_size(ButtonSize::Small)
-                .with_tooltip("View your agent tasks plus all shared team tasks")
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(AgentManagementViewAction::SetOwnerFilter(
-                        OwnerFilter::All,
-                    ))
-                })
-        });
-
-        let personal_filter_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("Personal", NakedTheme)
-                .with_size(ButtonSize::Small)
-                .with_tooltip("View agent tasks you created")
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(AgentManagementViewAction::SetOwnerFilter(
-                        OwnerFilter::PersonalOnly,
-                    ))
-                })
-        });
 
         let setup_guide_button = CompactibleActionButton::new(
             "Get started".to_string(),
@@ -336,8 +311,6 @@ impl AgentManagementView {
             view_agents_button,
             cloud_setup_guide_view,
             loading_icon_mouse_state: MouseStateHandle::default(),
-            all_filter_button,
-            personal_filter_button,
             status_dropdown,
             source_dropdown,
             created_on_dropdown,
@@ -351,7 +324,6 @@ impl AgentManagementView {
             selected_item_id: None,
         };
 
-        view.update_filter_buttons(ctx);
         view.sync_with_loaded_filters(ctx);
         view.update_creator_dropdown(ctx);
 
@@ -385,16 +357,6 @@ impl AgentManagementView {
         }
 
         ViewState::HasTasks
-    }
-
-    fn update_filter_buttons(&mut self, ctx: &mut ViewContext<Self>) {
-        let owners = self.filters.owners;
-        self.all_filter_button.update(ctx, |button, ctx| {
-            button.set_active(owners == OwnerFilter::All, ctx);
-        });
-        self.personal_filter_button.update(ctx, |button, ctx| {
-            button.set_active(owners == OwnerFilter::PersonalOnly, ctx);
-        });
     }
 
     /// Sync the UI to match the loaded filter states.
@@ -1643,8 +1605,6 @@ impl AgentManagementView {
             .as_ref(app)
             .is_loading();
 
-        let is_on_team = UserWorkspaces::as_ref(app).current_team().is_some();
-
         let size_switch_threshold = MEDIUM_SIZE_SWITCH_THRESHOLD * appearance.monospace_ui_scalar();
 
         let build_header = |use_expanded: bool| {
@@ -1674,11 +1634,6 @@ impl AgentManagementView {
                 .with_main_axis_size(MainAxisSize::Max)
                 .with_spacing(4.)
                 .with_child(Container::new(title).with_margin_right(12.).finish());
-
-            if is_on_team {
-                header_top.add_child(ChildView::new(&self.personal_filter_button).finish());
-                header_top.add_child(ChildView::new(&self.all_filter_button).finish());
-            }
 
             if is_loading {
                 header_top.add_child(self.render_cloud_loading_icon(appearance));
@@ -1955,7 +1910,6 @@ impl View for AgentManagementView {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AgentManagementViewAction {
-    SetOwnerFilter(OwnerFilter),
     SetStatusFilter(StatusFilter),
     SetSourceFilter(SourceFilter),
     SetCreatedOnFilter(CreatedOnFilter),
@@ -1979,11 +1933,6 @@ impl TypedActionView for AgentManagementView {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            AgentManagementViewAction::SetOwnerFilter(filter) => {
-                self.filters.owners = *filter;
-                self.update_filter_buttons(ctx);
-                self.on_filter_changed(ctx);
-            }
             AgentManagementViewAction::SetStatusFilter(filter) => {
                 self.filters.status = *filter;
                 self.on_filter_changed(ctx);

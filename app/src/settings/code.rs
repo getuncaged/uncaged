@@ -1,5 +1,8 @@
 use settings::macros::define_settings_group;
-use settings::{RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};
+use settings::{RespectUserSyncSetting, Setting as _, SupportedPlatforms, SyncToCloud};
+use warpui::{AppContext, SingletonEntity as _};
+
+use super::AISettings;
 
 define_settings_group!(CodeSettings, settings: [
     code_as_default_editor: CodeAsDefaultEditor {
@@ -81,3 +84,13 @@ define_settings_group!(CodeSettings, settings: [
         description: "Whether the language server automatically formats the file on save. Other LSP features (hover, go-to-definition, references, diagnostics) are unaffected.",
     },
 ]);
+
+impl CodeSettings {
+    /// Whether codebase context (indexing and code search) is on: AI must be
+    /// enabled and the user's codebase context toggle must be on.
+    /// Prefer this to determine whether to show indexing-related functionality.
+    pub fn is_codebase_context_enabled(app: &AppContext) -> bool {
+        AISettings::as_ref(app).is_any_ai_enabled(app)
+            && *CodeSettings::as_ref(app).codebase_context_enabled.value()
+    }
+}

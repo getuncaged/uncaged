@@ -7,7 +7,6 @@ use super::*;
 use crate::ai::request_usage_model::{RequestLimitInfo, RequestLimitRefreshDuration};
 use crate::auth::AuthStateProvider;
 use crate::test_util::settings::initialize_settings_for_tests;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 fn create_test_request_limit_info(
     limit: usize,
@@ -34,7 +33,6 @@ fn create_test_request_limit_info(
 
 fn add_ai_enablement_dependencies_for_test(app: &mut App) {
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
-    app.add_singleton_model(UserWorkspaces::default_mock);
 }
 
 // FocusedTerminalInfo Tests

@@ -19,7 +19,6 @@ use crate::server::retry_strategies::{
     is_transient_graphql_or_http_error, OUT_OF_BAND_REQUEST_RETRY_STRATEGY,
 };
 use crate::server::server_api::ServerApiProvider;
-use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 
 const CACHE_KEY: &str = "AvailableHarnesses";
 const AUTH_SECRET_FETCH_FAILURE_COOLDOWN: Duration = Duration::from_secs(60);
@@ -108,12 +107,6 @@ impl HarnessAvailabilityModel {
                 for harness in cached_harnesses {
                     me.invalidate_auth_secrets(harness);
                 }
-                me.refresh(ctx);
-            }
-        });
-
-        ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |me, _, event, ctx| {
-            if let UserWorkspacesEvent::TeamsChanged = event {
                 me.refresh(ctx);
             }
         });

@@ -29,7 +29,6 @@ use crate::terminal::shell::ShellType;
 use crate::terminal::ShellLaunchData;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 fn build_upload_artifact_action(file_path: &str) -> AIAgentAction {
     AIAgentAction {
@@ -61,7 +60,6 @@ fn initialize_upload_artifact_test(
     app.add_singleton_model(UpdateManager::mock);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| TemplatableMCPServerManager::default());
-    app.add_singleton_model(UserWorkspaces::default_mock);
     let profiles = app.add_singleton_model(AIExecutionProfilesModel::new);
     app.add_singleton_model(BlocklistAIPermissions::new);
 

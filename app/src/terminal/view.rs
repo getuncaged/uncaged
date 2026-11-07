@@ -455,7 +455,6 @@ use crate::workspace::{
     CommandSearchOptions, ForkAIConversationParams, ForkFromExchange,
     ForkedConversationDestination, OneTimeModalModel, ToastStack, WorkspaceAction,
 };
-use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 use crate::{
     report_if_error, safe_error, safe_warn, AIAgentActionResultType, AIRequestUsageModel,
     ActiveSession as WindowActiveSession,
@@ -2021,7 +2020,6 @@ enum SecretTooltip {
 
 pub fn is_prompt_suggestions_enabled(app: &AppContext) -> bool {
     AISettings::as_ref(app).is_prompt_suggestions_enabled(app)
-        && UserWorkspaces::as_ref(app).is_prompt_suggestions_toggleable()
 }
 
 type TerminalViewCallback = Box<dyn FnOnce(&mut TerminalView, &mut ViewContext<TerminalView>)>;
@@ -3075,12 +3073,6 @@ impl TerminalView {
                 }
             },
         );
-
-        ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |me, _, event, ctx| {
-            if matches!(event, UserWorkspacesEvent::TeamsChanged) {
-                me.update_focused_terminal_info(ctx);
-            }
-        });
 
         let (resize_tx, resize_rx) = async_channel::unbounded();
         let (find_link_tx, find_link_rx) = async_channel::unbounded();
@@ -6634,8 +6626,7 @@ impl TerminalView {
             return;
         }
 
-        let is_ai_allowed_in_remote_sessions =
-            UserWorkspaces::as_ref(ctx).is_ai_allowed_in_remote_sessions();
+        let is_ai_allowed_in_remote_sessions = true;
 
         // Only update the FocusedTerminalInfo model if the user has disabled AI in remote sessions
         // because it's a potentially expensive operation.
@@ -8039,7 +8030,7 @@ impl TerminalView {
         }
 
         // Return early if we've run out of AI usage.
-        if !AIRequestUsageModel::as_ref(ctx).has_any_ai_remaining(ctx) {
+        if !AIRequestUsageModel::as_ref(ctx).has_any_ai_remaining() {
             return false;
         }
 
@@ -8188,8 +8179,7 @@ impl TerminalView {
         let ai_settings = AISettings::as_ref(ctx);
         let is_prompt_suggestions_enabled = ai_settings.is_prompt_suggestions_enabled(ctx);
         let is_setting_enabled = ai_settings.is_code_suggestions_enabled(ctx);
-        let is_setting_toggleable = UserWorkspaces::as_ref(ctx).is_code_suggestions_toggleable();
-        is_prompt_suggestions_enabled && is_setting_enabled && is_setting_toggleable
+        is_prompt_suggestions_enabled && is_setting_enabled
     }
 
     fn insert_alias_expansion_banner(
@@ -8720,26 +8710,14 @@ impl TerminalView {
     fn active_block_is_considered_remote(&self, app: &AppContext) -> bool {
         let model = self.model.lock();
         let active_block = model.block_list().active_block();
-        self.is_block_considered_remote(
-            active_block.session_id(),
-            Some(&active_block.command_to_string()),
-            app,
-        )
+        self.is_block_considered_remote(active_block.session_id(), app)
     }
 
     /// Returns true if the block is considered remote.
     ///
     /// Note that we don't know for sure if a block is remote, because we can only detect
     /// warpified remote blocks.
-    ///
-    /// For some organizations, we accept a regex list that we run against commands to
-    /// further make the determination.
-    fn is_block_considered_remote(
-        &self,
-        session_id: Option<SessionId>,
-        command: Option<&str>,
-        app: &AppContext,
-    ) -> bool {
+    fn is_block_considered_remote(&self, session_id: Option<SessionId>, app: &AppContext) -> bool {
         let is_warpified_remote = session_id
             .map(|id| {
                 self.sessions
@@ -8750,57 +8728,7 @@ impl TerminalView {
             })
             .unwrap_or_default();
 
-        if is_warpified_remote {
-            return true;
-        }
-
-        // If there's a command present and this user is subject to the regex list policy from their
-        // organization, check the command against the regex list.
-
-        let Some(command) = command else {
-            return false;
-        };
-
-        if UserWorkspaces::as_ref(app).is_ai_allowed_in_remote_sessions() {
-            // We don't check any regexes if the user is allowed to run AI in remote sessions.
-            return false;
-        }
-
-        let remote_session_regex_list = UserWorkspaces::as_ref(app).get_remote_session_regex_list();
-
-        // First check if the command matches any of the regexes in the list.
-        if remote_session_regex_list
-            .iter()
-            .any(|regex| regex.is_match(command))
-        {
-            return true;
-        }
-
-        // Then check if there's an alias for the top level command that matches the regex.
-        let Some(session_id) = session_id else {
-            return false;
-        };
-        let Some(session) = self.sessions.as_ref(app).get(session_id) else {
-            return false;
-        };
-        let escape_char = session.shell_family().escape_char();
-        let Some(top_level_command) =
-            warp_completer::parsers::simple::top_level_command(command, escape_char)
-        else {
-            return false;
-        };
-        let Some(alias) = session.alias_value(top_level_command.as_str()) else {
-            return false;
-        };
-
-        if remote_session_regex_list
-            .iter()
-            .any(|regex| regex.is_match(alias))
-        {
-            return true;
-        }
-
-        false
+        is_warpified_remote
     }
 
     // Abort any pending prompt or code suggestions, which may now be irrelevant.
@@ -9871,7 +9799,6 @@ impl TerminalView {
                         block: block_completed.serialized_block.clone(),
                         is_local: !self.is_block_considered_remote(
                             block_completed.serialized_block.session_id,
-                            Some(&block_completed.command),
                             ctx,
                         ),
                     });
@@ -9880,22 +9807,16 @@ impl TerminalView {
                     // via a BlockCompleted event but don't affect focus or input.
                     ctx.emit(Event::BlockCompleted {
                         block: serialized_block.clone(),
-                        is_local: !self.is_block_considered_remote(
-                            serialized_block.session_id,
-                            None,
-                            ctx,
-                        ),
+                        is_local: !self
+                            .is_block_considered_remote(serialized_block.session_id, ctx),
                     });
                 } else if let BlockType::BootstrapVisible(serialized_block) = block_type {
                     // Re-compute the focus after the visible bootstrap block has completed.
                     self.redetermine_terminal_focus(ctx);
                     ctx.emit(Event::BlockCompleted {
                         block: serialized_block.clone(),
-                        is_local: !self.is_block_considered_remote(
-                            serialized_block.session_id,
-                            None,
-                            ctx,
-                        ),
+                        is_local: !self
+                            .is_block_considered_remote(serialized_block.session_id, ctx),
                     });
                 }
 
@@ -11852,7 +11773,6 @@ impl TerminalView {
             let rule = correction.rule_applied;
 
             if AISettings::as_ref(ctx).is_intelligent_autosuggestions_enabled(ctx)
-                && UserWorkspaces::as_ref(ctx).is_next_command_enabled()
                 && COMMAND_CORRECTIONS_PREFERRED_DENYLIST.contains(rule.to_str())
             {
                 // Defer to Next Command if the rule is in the denylist.
@@ -22649,8 +22569,7 @@ impl TypedActionView for TerminalView {
             InitProject => self.init_project(false, ctx),
             SummarizeConversation => self.summarize_conversation(ctx),
             IndexProjectSpeedbump => {
-                let codebase_context_enabled =
-                    UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx);
+                let codebase_context_enabled = CodeSettings::is_codebase_context_enabled(ctx);
 
                 if FeatureFlag::FullSourceCodeEmbedding.is_enabled() && codebase_context_enabled {
                     #[cfg(feature = "local_fs")]

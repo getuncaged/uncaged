@@ -15,10 +15,10 @@ use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::auth::AuthStateProvider;
+use crate::billing;
 use crate::settings_view::SettingsSection;
 use crate::ui_components::blended_colors;
 use crate::workspace::WorkspaceAction;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const MODAL_WIDTH: f32 = 480.;
 const CORNER_RADIUS: f32 = 12.;
@@ -118,15 +118,11 @@ impl FreeAiRemovalModal {
     }
 
     fn upgrade_url(ctx: &ViewContext<Self>) -> String {
-        if let Some(team) = UserWorkspaces::as_ref(ctx).current_team() {
-            UserWorkspaces::upgrade_link_for_team(team.uid)
-        } else {
-            let user_id = AuthStateProvider::as_ref(ctx)
-                .get()
-                .user_id()
-                .unwrap_or_default();
-            UserWorkspaces::upgrade_link(user_id)
-        }
+        let user_id = AuthStateProvider::as_ref(ctx)
+            .get()
+            .user_id()
+            .unwrap_or_default();
+        billing::upgrade_link(user_id)
     }
 
     fn render_buttons(&self, appearance: &Appearance) -> Box<dyn Element> {

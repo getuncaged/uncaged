@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use anyhow::Context;
 use url::Url;
 use warpui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 
@@ -10,13 +9,13 @@ use super::{
     ShareableLinkError,
 };
 use crate::app_state::{LeafContents, WorkflowPaneSnapshot};
+use crate::cloud_object::Owner;
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::OpenWarpDriveObjectSettings;
 use crate::server::ids::SyncId;
 use crate::workflows::manager::{WorkflowManager, WorkflowOpenSource};
 use crate::workflows::workflow_view::{WorkflowView, WorkflowViewEvent};
 use crate::workflows::{WorkflowSelectionSource, WorkflowSource, WorkflowType, WorkflowViewMode};
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 pub struct WorkflowPane {
     view: ViewHandle<PaneView<WorkflowView>>,
@@ -48,9 +47,7 @@ impl WorkflowPane {
             None => WorkflowOpenSource::New {
                 title: None,
                 content: None,
-                owner: UserWorkspaces::as_ref(ctx)
-                    .personal_drive(ctx)
-                    .context("personal drive unavailable")?,
+                owner: Owner::local_user(),
                 initial_folder_id: None,
                 is_for_agent_mode: false,
             },

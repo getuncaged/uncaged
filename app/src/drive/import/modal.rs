@@ -17,11 +17,10 @@ use warpui::{
 use super::modal_body::{ImportModalBody, ImportModalBodyAction, ImportModalBodyEvent};
 use crate::appearance::Appearance;
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::cloud_object::{CloudObject, Owner};
+use crate::cloud_object::{CloudObject, Owner, Space};
 use crate::server::ids::SyncId;
 use crate::server::sync_queue::SyncQueue;
 use crate::themes::theme::WarpTheme;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 const CLOSE_BUTTON_SIZE: f32 = 24.;
 const HEADER_FONT_SIZE: f32 = 16.;
@@ -164,11 +163,7 @@ impl ImportModal {
             None => (
                 // Convert to a Space for display, in case we're importing into a shared folder.
                 self.owner
-                    .map(|owner| {
-                        UserWorkspaces::as_ref(app)
-                            .owner_to_space(owner, app)
-                            .name(app)
-                    })
+                    .map(|owner| Space::from_owner(owner).name())
                     .unwrap_or_default(),
                 0,
             ),
