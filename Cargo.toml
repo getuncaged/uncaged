@@ -5,9 +5,7 @@ members = [
 ]
 resolver = "2"
 
-# Include all members except serve-wasm (since it's a helper helper for serving
-# wasm binaries and not something we want to regularly compile or run
-# tests against) and integration (since it is only used for testing).
+# Include all members except integration (since it is only used for testing).
 default-members = [
   "app",
   "crates/channel_versions",

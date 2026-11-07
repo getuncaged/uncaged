@@ -89,7 +89,7 @@ jobs:
       - name: cargo clippy (default features)
         timeout-minutes: 40
         run: >-
-          cargo clippy -p warp -p warp_tui -p uncaged_engine
+          cargo clippy -p warp -p uncaged_engine
           --all-targets --tests -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
@@ -101,7 +101,7 @@ jobs:
       - name: cargo clippy (all features)
         timeout-minutes: 40
         run: >-
-          cargo clippy -p warp -p warp_tui -p uncaged_engine
+          cargo clippy -p warp -p uncaged_engine
           --all-targets --all-features --tests -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
