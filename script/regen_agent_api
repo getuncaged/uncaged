@@ -8,9 +8,10 @@
 # itself builds from the checked-in output and needs neither protoc nor a build
 # script. Run this after editing a `.proto` file and commit the result.
 #
-# The generator is the same prost-build configuration the upstream
-# `warp_multi_agent_api` crate ran from its build.rs, pinned to the versions in
-# our Cargo.lock so the output stays identical.
+# The generator is the prost-build configuration the upstream
+# `warp_multi_agent_api` crate ran from its build.rs, minus the prost-reflect
+# derives (nothing uses reflection), pinned to the prost version in our
+# Cargo.lock.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -37,7 +38,6 @@ publish = false
 
 [dependencies]
 prost-build = "=0.14.3"
-prost-reflect-build = "=0.16.0"
 regex = "1.11.1"
 EOF
 
@@ -84,12 +84,9 @@ fn main() -> std::io::Result<()> {
         proto_files.push(staged);
     }
 
-    let mut config = prost_build::Config::new();
-    config.out_dir(&out_dir);
-    prost_reflect_build::Builder::new()
-        .file_descriptor_set_path(out_dir.join("file_descriptor_set.bin"))
-        .descriptor_pool("crate::DESCRIPTOR_POOL")
-        .compile_protos_with_config(config, &proto_files, &[staging_dir])
+    prost_build::Config::new()
+        .out_dir(&out_dir)
+        .compile_protos(&proto_files, &[staging_dir])
 }
 EOF
 

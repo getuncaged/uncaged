@@ -18,5 +18,4 @@ path = "src/lib.rs"
 
 [dependencies]
 prost.workspace = true
-prost-reflect = { workspace = true, features = ["derive"] }
 prost-types.workspace = true

@@ -6,12 +6,12 @@ use std::fmt::Display;
 use std::ops::Deref;
 
 use ai::skills::SkillPathOrigin;
-use field_mask::{FieldMaskError, FieldMaskOperation};
 use helper::{MessageExt, SubagentExt, ToolCallExt};
 use itertools::Itertools;
 use prost_types::FieldMask;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use warp_multi_agent_api::field_mask::{self, FieldMaskError};
 use warp_multi_agent_api::message::tool_call::subagent::Metadata;
 use warp_multi_agent_api::message::Message;
 use warp_multi_agent_api::{self as api};
@@ -701,10 +701,7 @@ impl Task {
                 .last()
                 .ok_or(UpdateTaskError::MessageNotFound);
         };
-        let updated_message =
-            FieldMaskOperation::update(&api::MESSAGE_DESCRIPTOR, existing_message, &message, mask)
-                .apply()
-                .map_err(UpdateTaskError::from)?;
+        let updated_message = field_mask::update(existing_message, &message, &mask)?;
 
         let id = self.id.clone();
         let exchange_to_update = self
@@ -775,10 +772,7 @@ impl Task {
             log::error!("Message not found for append client action.");
             return Err(UpdateTaskError::MessageNotFound);
         };
-        let updated_message =
-            FieldMaskOperation::append(&api::MESSAGE_DESCRIPTOR, existing_message, &message, mask)
-                .apply()
-                .map_err(UpdateTaskError::from)?;
+        let updated_message = field_mask::append(existing_message, &message, &mask)?;
 
         let id = self.id.clone();
         let exchange_to_update = self

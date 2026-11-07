@@ -38,7 +38,6 @@ command-signatures-v2 = { path = "crates/command-signatures-v2" }
 cloud_objects = { path = "crates/cloud_objects" }
 cloud_object_persistence = { path = "crates/cloud_object_persistence" }
 cloud_object_models = { path = "crates/cloud_object_models" }
-field_mask = { path = "crates/field_mask" }
 fuzzy_match = { path = "crates/fuzzy_match" }
 handlebars = { path = "crates/handlebars" }
 http_client = { path = "crates/http_client" }
@@ -206,7 +205,6 @@ pathfinder_geometry = "0.5.1"
 pin-project = "1.0.10"
 pprof = "0.15.0"
 prost = "0.14.3"
-prost-reflect = "0.16.3"
 prost-types = "0.14.3"
 qrcode = { version = "0.14.1", default-features = false }
 rand = "0.8.6"

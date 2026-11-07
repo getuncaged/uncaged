@@ -631,9 +631,9 @@ fn coalesce_messages_from_client_actions(
 ) -> Vec<warp_multi_agent_api::Message> {
     use std::collections::HashMap;
 
-    use field_mask::FieldMaskOperation;
     use warp_multi_agent_api as api;
     use warp_multi_agent_api::client_action::Action;
+    use warp_multi_agent_api::field_mask;
 
     let mut messages_by_id: HashMap<String, api::Message> = HashMap::new();
     let mut message_order: Vec<String> = Vec::new();
@@ -665,14 +665,7 @@ fn coalesce_messages_from_client_actions(
                     let id = new_message.id.clone();
                     let mask = update.mask.clone().unwrap_or_default();
                     if let Some(existing) = messages_by_id.get_mut(&id) {
-                        if let Ok(merged) = FieldMaskOperation::update(
-                            &api::MESSAGE_DESCRIPTOR,
-                            existing,
-                            new_message,
-                            mask,
-                        )
-                        .apply()
-                        {
+                        if let Ok(merged) = field_mask::update(existing, new_message, &mask) {
                             *existing = merged;
                         }
                     } else {
@@ -686,14 +679,7 @@ fn coalesce_messages_from_client_actions(
                     let id = new_message.id.clone();
                     let mask = append.mask.clone().unwrap_or_default();
                     if let Some(existing) = messages_by_id.get_mut(&id) {
-                        if let Ok(merged) = FieldMaskOperation::append(
-                            &api::MESSAGE_DESCRIPTOR,
-                            existing,
-                            new_message,
-                            mask,
-                        )
-                        .apply()
-                        {
+                        if let Ok(merged) = field_mask::append(existing, new_message, &mask) {
                             *existing = merged;
                         }
                     } else {

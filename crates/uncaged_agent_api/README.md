@@ -23,6 +23,9 @@ mark removed ones `reserved`.
 - `src/generated/` — prost output, checked in. Regenerate it with
   `./script/regen_agent_api` after editing `proto/` (needs `protoc` on PATH; the
   crate itself builds without protoc and without a build script).
+- `src/field_mask.rs` — applies the `FieldMask` of `UpdateTaskMessage` /
+  `AppendToMessageContent` actions, by hand, for the paths the engine produces
+  (no protobuf reflection).
 
 ## License
 
