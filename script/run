@@ -6,10 +6,10 @@
 # as a real `.app` bundle (with code signing, plist updates, etc.). On Linux
 # and Windows it invokes `cargo run` directly for the appropriate binary.
 #
-# This script owns all cross-platform setup (running install_channel_config,
-# detecting internal vs OSS builds, and mapping legacy `--features` entries
-# to environment variables), so platform-specific scripts can assume those
-# values are already provided via environment variables.
+# This script owns all cross-platform setup (choosing the binary and mapping
+# legacy `--features` entries to environment variables), so platform-specific
+# scripts can assume those values are already provided via environment
+# variables.
 
 set -e
 
@@ -23,17 +23,8 @@ INSTALL_COMMON_SKILLS=1
 FORCE_COMMON_SKILLS=0
 COMMON_SKILLS_TARGET="${WARP_COMMON_SKILLS_INSTALL_TARGET:-}"
 
-./script/install_channel_config || echo "Skipping internal channel config installation (no repo access)."
-
-
-# If warp_channel_config is on PATH, build the Local channel binary; otherwise build the OSS channel.
-if command -v warp-channel-config &>/dev/null; then
-    WARP_BIN_NAME="warp"
-    WARP_CHANNEL="local"
-else
-    WARP_BIN_NAME="warp-oss"
-    WARP_CHANNEL="oss"
-fi
+WARP_BIN_NAME="warp-oss"
+WARP_CHANNEL="oss"
 
 # Shared argument parsing. macOS-specific flags (--dont-open,
 # --open_with_launchd, --generate-schema) are forwarded through MAC_ARGS and

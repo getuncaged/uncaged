@@ -9,8 +9,8 @@ Param (
     [Alias('check-only')]
     [Switch]$CHECK_ONLY,
 
-    [ValidateSet('local', 'dev', 'preview', 'stable', 'oss')]
-    [String]$CHANNEL = 'dev',
+    [ValidateSet('oss')]
+    [String]$CHANNEL = 'oss',
 
     [Alias('release-tag')]
     [String]$RELEASE_TAG = '',
@@ -92,25 +92,7 @@ $BUNDLE_ID = "dev.warp.$app_name"
 #
 # WARP_BIN is the name of the binary produced by cargo;
 # BINARY_NAME is the desired name of the binary in the final package.
-if ("$CHANNEL" -eq 'local') {
-    $WARP_BIN = 'warp'
-    $BINARY_NAME = 'warp.exe'
-    $APP_NAME = 'WarpLocal'
-} elseif ("$CHANNEL" -eq 'dev') {
-    $WARP_BIN = 'dev'
-    $BINARY_NAME = 'dev.exe'
-    $APP_NAME = 'WarpDev'
-    $FEATURES = "$FEATURES,agent_mode_debug"
-} elseif ("$CHANNEL" -eq 'preview') {
-    $WARP_BIN = 'preview'
-    $BINARY_NAME = 'preview.exe'
-    $APP_NAME = 'WarpPreview'
-    $FEATURES = "$FEATURES,preview_channel"
-} elseif ("$CHANNEL" -eq 'stable') {
-    $WARP_BIN = 'stable'
-    $BINARY_NAME = 'warp.exe'
-    $APP_NAME = 'Warp'
-} elseif ("$CHANNEL" -eq 'oss') {
+if ("$CHANNEL" -eq 'oss') {
     $WARP_BIN = 'warp-oss'
     $BINARY_NAME = 'warp-oss.exe'
     $APP_NAME = 'Uncaged'

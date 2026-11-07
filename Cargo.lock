@@ -14036,7 +14036,6 @@ dependencies = [
  "warp-command-signatures",
  "warp-workflows",
  "warp_assets",
- "warp_channel_config",
  "warp_cli",
  "warp_completer",
  "warp_core",
@@ -14133,15 +14132,6 @@ dependencies = [
  "anyhow",
  "rust-embed 8.7.2",
  "warpui_core",
-]
-
-[[package]]
-name = "warp_channel_config"
-version = "0.0.0"
-dependencies = [
- "command",
- "serde_json",
- "warp_core",
 ]
 
 [[package]]
@@ -14648,7 +14638,6 @@ dependencies = [
  "string-offset",
  "vec1",
  "warp",
- "warp_channel_config",
  "warp_core",
  "warp_editor",
  "warpui_core",

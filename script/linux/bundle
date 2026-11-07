@@ -19,8 +19,8 @@ cleanup() {
 # Run cleanup() when the script terminates (whether it succeeded or failed).
 trap cleanup EXIT
 
-# By default we build dev bundles.
-RELEASE_CHANNEL="dev"
+# Uncaged ships a single channel, oss.
+RELEASE_CHANNEL="oss"
 FEATURES="release_bundle"
 EXTRA_FEATURES=""
 PACKAGES=( appimage )
@@ -162,28 +162,7 @@ mkdir -p "$OUT_DIR"
 #
 # WARP_BIN is the name of the binary produced by cargo;
 # BINARY_NAME is the desired name of the binary in the final package.
-if [[ $RELEASE_CHANNEL = "local" ]]; then
-  WARP_BIN="warp"
-  BINARY_NAME="warp-local"
-  APP_NAME="WarpLocal"
-  FEATURES="$FEATURES,agent_mode_debug"
-  export HANDLE_MARKDOWN=1
-elif [[ $RELEASE_CHANNEL = "dev" ]]; then
-  WARP_BIN="dev"
-  BINARY_NAME="warp-dev"
-  APP_NAME="WarpDev"
-  FEATURES="$FEATURES,agent_mode_debug"
-  export HANDLE_MARKDOWN=1
-elif [[ $RELEASE_CHANNEL = "preview" ]]; then
-  WARP_BIN="preview"
-  BINARY_NAME="warp-preview"
-  APP_NAME="WarpPreview"
-  FEATURES="$FEATURES,preview_channel"
-elif [[ $RELEASE_CHANNEL = "stable" ]]; then
-  WARP_BIN="stable"
-  BINARY_NAME="warp"
-  APP_NAME="Warp"
-elif [[ $RELEASE_CHANNEL = "oss" ]]; then
+if [[ $RELEASE_CHANNEL = "oss" ]]; then
   WARP_BIN="warp-oss"
   BINARY_NAME="warp-oss"
   # Uncaged: the oss channel ships as the app "Uncaged". APP_NAME here only
@@ -195,6 +174,9 @@ elif [[ $RELEASE_CHANNEL = "oss" ]]; then
   # desktop file app/channels/oss/dev.uncaged.WarpOss.desktop.
   APP_NAME="Uncaged"
   FEATURES="release_bundle"
+else
+  echo "Unsupported channel '$RELEASE_CHANNEL': Uncaged only builds the oss channel." >&2
+  exit 1
 fi
 
 # Artifact-specific binary naming

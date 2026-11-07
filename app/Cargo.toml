@@ -23,29 +23,8 @@ path = "src/bin/oss.rs"
 test = false
 
 [[bin]]
-name = "warp"
-path = "src/bin/local.rs"
-test = false
-
-[[bin]]
 name = "integration"
 path = "src/bin/integration.rs"
-test = false
-
-[[bin]]
-name = "stable"
-path = "src/bin/stable.rs"
-test = false
-
-[[bin]]
-name = "dev"
-path = "src/bin/dev.rs"
-test = false
-
-[[bin]]
-name = "preview"
-path = "src/bin/preview.rs"
-required-features = ["preview_channel"]
 test = false
 
 [[bin]]
@@ -230,7 +209,6 @@ vte.workspace = true
 walkdir.workspace = true
 warp-workflows.workspace = true
 warp_assets.workspace = true
-warp_channel_config.workspace = true
 warp_completer.workspace = true
 warp_core.workspace = true
 warp_editor.workspace = true
@@ -881,7 +859,6 @@ code_find_replace = []
 command_palette_file_search = []
 conversation_filter = []
 ai_context_menu_commands = []
-preview_channel = []
 ai_context_menu_code = []
 expand_edit_to_pane = []
 fallback_model_load_output_messaging = []
