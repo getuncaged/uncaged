@@ -247,39 +247,8 @@ unsafe fn init_logging() {
         // valid C string pointer.
         let msg = unsafe { CStr::from_ptr(msg) };
         let err_message = String::from_utf8_lossy(msg.to_bytes());
-        // Sentry shouldn't panic, but to be safe, make sure we don't unwind across the FFI
-        // boundary.
+        // Make sure we don't unwind across the FFI boundary.
         let _ = panic::catch_unwind(|| {
-            // We report SQLite errors to Sentry in a more-structured format so that they have
-            // better grouping (all are under the same Sentry issue, with details for the specific
-            // error kind). Warning and debug SQLite messages are logged - with the default
-            // sentry_log configuration, warnings are added as breadcrumbs to other events and
-            // debug messages are ignored.
-            // In local builds without crash reporting, all SQLite messages get logged locally.
-
-            #[cfg(feature = "crash_reporting")]
-            if level == log::Level::Error {
-                sentry::with_scope(
-                    |scope| {
-                        let mut context = std::collections::BTreeMap::new();
-                        context.insert("message".to_string(), err_message.into());
-                        context.insert("code".to_string(), err_code.into());
-                        context.insert(
-                            "code_description".to_string(),
-                            sqlite3::code_to_str(err_code).into(),
-                        );
-                        scope.set_context("sqlite", sentry::protocol::Context::Other(context));
-                    },
-                    || {
-                        sentry::capture_message(
-                            "Sqlite Error",
-                            sentry_log::convert_log_level(level),
-                        )
-                    },
-                );
-                return;
-            }
-
             log::log!(
                 level,
                 "SQLite error {} ({}): {}",

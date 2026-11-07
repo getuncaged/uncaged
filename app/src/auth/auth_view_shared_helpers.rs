@@ -317,7 +317,6 @@ pub fn render_overlay(overlay_body: Box<dyn Element>, appearance: &Appearance) -
 #[derive(Default)]
 pub struct PrivacySettingsHandles {
     pub telemetry_switch: SwitchStateHandle,
-    pub crash_reporting_switch: SwitchStateHandle,
     pub cloud_conversation_storage_switch: SwitchStateHandle,
     pub close_button_mouse: MouseStateHandle,
     pub telemetry_docs_mouse: MouseStateHandle,
@@ -326,7 +325,6 @@ pub struct PrivacySettingsHandles {
 /// Actions dispatched by the privacy settings overlay toggles.
 pub struct PrivacySettingsActions<A: Action + Clone> {
     pub toggle_telemetry: A,
-    pub toggle_crash_reporting: A,
     pub toggle_cloud_conversation_storage: A,
     pub hide_overlay: A,
 }
@@ -491,35 +489,6 @@ pub fn render_privacy_settings_toggles<A: Action + Clone + 'static>(
         )
         .finish();
 
-    let toggle_crash = actions.toggle_crash_reporting.clone();
-    let crash_reporting_toggle = Flex::row()
-        .with_main_axis_size(MainAxisSize::Max)
-        .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-        .with_child(
-            Shrinkable::new(
-                1.,
-                render_privacy_settings_section_header("Send crash reports", appearance).finish(),
-            )
-            .finish(),
-        )
-        .with_child(
-            appearance
-                .ui_builder()
-                .switch(handles.crash_reporting_switch.clone())
-                .check(PrivacySettings::as_ref(app).is_crash_reporting_enabled)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(toggle_crash.clone());
-                })
-                .finish(),
-        )
-        .finish();
-
-    let crash_reporting_description = render_description(
-        appearance,
-        "Crash reporting helps Warp's engineering team understand stability and improve performance.".into(),
-    );
-
     let toggle_cloud = actions.toggle_cloud_conversation_storage.clone();
     let cloud_conversation_storage_toggle = Flex::row()
         .with_main_axis_size(MainAxisSize::Max)
@@ -573,17 +542,6 @@ pub fn render_privacy_settings_toggles<A: Action + Clone + 'static>(
                 .with_margin_bottom(AUTH_MODAL_GAP)
                 .finish(),
             Container::new(telemetry_link)
-                .with_margin_bottom(AUTH_MODAL_GAP)
-                .finish(),
-        ]);
-    }
-
-    if ChannelState::is_crash_reporting_available() {
-        col.add_children(vec![
-            Container::new(crash_reporting_toggle)
-                .with_margin_bottom(AUTH_MODAL_GAP)
-                .finish(),
-            Container::new(crash_reporting_description)
                 .with_margin_bottom(AUTH_MODAL_GAP)
                 .finish(),
         ]);

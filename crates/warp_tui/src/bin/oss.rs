@@ -19,7 +19,6 @@ fn main() -> Result<()> {
             server_config: WarpServerConfig::production(),
             oz_config: OzConfig::production(),
             telemetry_config: None,
-            crash_reporting_config: None,
             autoupdate_config: None,
             mcp_static_config: None,
         },

@@ -27,12 +27,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::Autoupdate,
         #[cfg(feature = "changelog")]
         FeatureFlag::Changelog,
-        #[cfg(feature = "cocoa_sentry")]
-        FeatureFlag::CocoaSentry,
-        #[cfg(feature = "crash_reporting")]
-        FeatureFlag::CrashReporting,
-        #[cfg(feature = "log_expensive_frames_in_sentry")]
-        FeatureFlag::LogExpensiveFramesInSentry,
         #[cfg(feature = "record_app_active_events")]
         FeatureFlag::RecordAppActiveEvents,
         #[cfg(feature = "runtime_feature_flags")]

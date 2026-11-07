@@ -189,17 +189,6 @@ impl SystemInfo {
         // Collect a detailed memory breakdown for diagnostics.
         let memory_breakdown = memory_footprint::memory_breakdown();
 
-        // If we're tracking heap usage and detect excessive memory usage,
-        // dump and upload the current heap profiling data.
-        #[cfg(feature = "heap_usage_tracking")]
-        {
-            let breakdown_for_sentry = memory_breakdown.clone();
-            ctx.spawn(
-                crate::profiling::dump_jemalloc_heap_profile(breakdown_for_sentry),
-                |_, _, _| {},
-            );
-        }
-
         // Send a telemetry event indicating that memory usage is extreme.
         // Report RSS here to keep Rudderstack dashboards consistent.
         let total_application_usage_bytes = rss.as_u64();

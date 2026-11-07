@@ -364,14 +364,6 @@ impl AuthManager {
 
                 self.set_needs_reauth(false, ctx);
 
-                // Must be called on the main thread.
-                #[cfg(feature = "crash_reporting")]
-                crate::crash_reporting::set_user_id(
-                    user.local_id,
-                    Some(user.metadata.email.clone()),
-                    ctx,
-                );
-
                 ServerApiProvider::handle(ctx).update(ctx, |provider, ctx| {
                     provider.handle_experiments_fetched(server_experiments, ctx);
                 });

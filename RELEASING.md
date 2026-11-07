@@ -38,9 +38,8 @@ Current version: **0.3.4**.
 ## 2. Build the app + DMG
 
 The channel that produces Uncaged is **`oss`**. It builds the `warp-oss` binary
-as the app named **Uncaged** (bundle id `dev.uncaged.WarpOss`), and — unlike the
-upstream Warp channels — drops the `cocoa_sentry` feature, so **no crash
-reporting / Sentry** is compiled in.
+as the app named **Uncaged** (bundle id `dev.uncaged.WarpOss`). There is **no
+crash reporting / Sentry** in the codebase.
 
 Single-architecture (Apple Silicon), ad-hoc signed — the common local release:
 

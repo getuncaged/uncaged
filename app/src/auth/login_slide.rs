@@ -108,7 +108,6 @@ pub enum LoginSlideAction {
     ShowPrivacySettings,
     HideOverlay,
     ToggleTelemetry,
-    ToggleCrashReporting,
     ToggleCloudConversationStorage,
     DismissNotification,
     PasteAuthUrl,
@@ -898,7 +897,6 @@ impl LoginSlideView {
 
         let actions = PrivacySettingsActions {
             toggle_telemetry: LoginSlideAction::ToggleTelemetry,
-            toggle_crash_reporting: LoginSlideAction::ToggleCrashReporting,
             toggle_cloud_conversation_storage: LoginSlideAction::ToggleCloudConversationStorage,
             hide_overlay: LoginSlideAction::HideOverlay,
         };
@@ -1272,14 +1270,6 @@ impl TypedActionView for LoginSlideView {
                 let handle = PrivacySettings::handle(ctx);
                 ctx.update_model(&handle, |settings, ctx| {
                     settings.set_is_telemetry_enabled(!settings.is_telemetry_enabled, ctx);
-                });
-                ctx.notify();
-            }
-            LoginSlideAction::ToggleCrashReporting => {
-                let handle = PrivacySettings::handle(ctx);
-                ctx.update_model(&handle, |settings, ctx| {
-                    settings
-                        .set_is_crash_reporting_enabled(!settings.is_crash_reporting_enabled, ctx);
                 });
                 ctx.notify();
             }

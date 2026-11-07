@@ -22,7 +22,6 @@ fn main() -> Result<()> {
             server_config: WarpServerConfig::uncaged_sentinel(),
             oz_config: OzConfig::uncaged_sentinel(),
             telemetry_config: None,
-            crash_reporting_config: None,
             autoupdate_config: None,
             mcp_static_config: None,
         },

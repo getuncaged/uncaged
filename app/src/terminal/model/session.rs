@@ -1438,26 +1438,6 @@ impl Session {
                 log::warn!(
                     "Failed to read history using PowerShell commands: {powershell_error:?}"
                 );
-                #[cfg(feature = "crash_reporting")]
-                sentry::with_scope(
-                    |scope| {
-                        let mut context = std::collections::BTreeMap::new();
-                        context.insert(
-                            "powershell_error".to_string(),
-                            format!("{powershell_error:?}").into(),
-                        );
-                        scope.set_context(
-                            "powershell_history",
-                            sentry::protocol::Context::Other(context),
-                        );
-                    },
-                    || {
-                        sentry::capture_message(
-                            "Failed to read history using PowerShell commands",
-                            sentry::Level::Error,
-                        )
-                    },
-                );
                 Ok(contents)
             }
             Err(e) => Err(ReadHistoryContentsError::PowerShellAndAsyncFsError {

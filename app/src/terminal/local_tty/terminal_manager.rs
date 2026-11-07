@@ -33,7 +33,7 @@ use crate::features::FeatureFlag;
 use crate::persistence::ModelEvent;
 use crate::send_telemetry_on_executor;
 use crate::server::telemetry::TelemetryEvent;
-use crate::settings::{DebugSettings, PrivacySettings, SshSettings};
+use crate::settings::{DebugSettings, SshSettings};
 use crate::terminal::available_shells::{AvailableShell, AvailableShells};
 use crate::terminal::color::List as ColorList;
 use crate::terminal::event_listener::ChannelEventListener;
@@ -619,7 +619,6 @@ impl<S> TerminalManager<S> {
             .is_shell_debug_mode_enabled
             .value();
         let is_honor_ps1_enabled = *SessionSettings::as_ref(ctx).honor_ps1;
-        let is_crash_reporting_enabled = PrivacySettings::as_ref(ctx).is_crash_reporting_enabled;
 
         // Determine whether the Node.js Version chip is enabled anywhere it could be
         // shown (the Warp prompt, the agent footer, or the CLI agent footer). When it
@@ -674,7 +673,6 @@ impl<S> TerminalManager<S> {
 
         Pty::new(
             options,
-            is_crash_reporting_enabled,
             #[cfg(windows)]
             event_loop_tx,
             ctx,

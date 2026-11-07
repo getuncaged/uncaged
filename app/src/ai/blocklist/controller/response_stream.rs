@@ -297,7 +297,7 @@ impl ResponseStream {
                 // in-stream error events.)
                 let error = Arc::new(AIApiError::Other(anyhow!(e)));
                 self.error_event_emitted = true;
-                self.report_request_failure(&error, NetworkStatus::as_ref(ctx).is_online());
+                self.report_request_failure(&error);
                 ctx.emit(ResponseStreamEvent::ReceivedEvent(Consumable::new(Err(
                     error,
                 ))));
@@ -410,7 +410,7 @@ impl ResponseStream {
                 }
                 self.error_event_emitted = true;
 
-                self.report_request_failure(e, is_online);
+                self.report_request_failure(e);
 
                 ctx.emit(ResponseStreamEvent::ReceivedEvent(Consumable::new(event)));
             }
@@ -479,14 +479,14 @@ impl ResponseStream {
                     );
                     self.should_resume_conversation_after_stream_finished = true;
                     self.error_event_emitted = true;
-                    self.report_request_failure(&unexpected_eof, is_online);
+                    self.report_request_failure(&unexpected_eof);
                     ctx.emit(ResponseStreamEvent::ReceivedEvent(Consumable::new(Err(
                         unexpected_eof,
                     ))));
                 }
                 RecoveryAction::Fail => {
                     self.error_event_emitted = true;
-                    self.report_request_failure(&unexpected_eof, is_online);
+                    self.report_request_failure(&unexpected_eof);
                     ctx.emit(ResponseStreamEvent::ReceivedEvent(Consumable::new(Err(
                         unexpected_eof,
                     ))));
@@ -498,40 +498,12 @@ impl ResponseStream {
         self.cancellation_tx = None;
     }
 
-    /// Reports a non-retried request failure to crash reporting with classification
-    /// tags.
-    #[cfg_attr(not(feature = "crash_reporting"), expect(unused_variables))]
-    fn report_request_failure(&self, error: &Arc<AIApiError>, is_online: bool) {
-        #[cfg(feature = "crash_reporting")]
-        sentry::with_scope(
-            |scope| {
-                scope.set_tag(
-                    "has_received_client_actions",
-                    self.has_received_client_actions,
-                );
-                scope.set_tag("error", format!("{error:?}"));
-                scope.set_tag("is_recoverable", error.is_recoverable());
-                scope.set_tag(
-                    "will_attempt_resume",
-                    self.should_resume_conversation_after_stream_finished,
-                );
-                scope.set_tag("is_online", is_online);
-                scope.set_tag("retry_count", self.retry_count);
-            },
-            || {
-                report_error!(anyhow!(error.clone()).context(format!(
-                    "MultiAgent request failed after {} retries",
-                    self.retry_count
-                )));
-            },
-        );
-        #[cfg(not(feature = "crash_reporting"))]
-        {
-            report_error!(anyhow!(error.clone()).context(format!(
-                "MultiAgent request failed after {} retries",
-                self.retry_count
-            )));
-        }
+    /// Reports a non-retried request failure.
+    fn report_request_failure(&self, error: &Arc<AIApiError>) {
+        report_error!(anyhow!(error.clone()).context(format!(
+            "MultiAgent request failed after {} retries",
+            self.retry_count
+        )));
     }
 
     /// Parks a retry until connectivity returns; cancellation invalidates the parked

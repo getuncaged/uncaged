@@ -99,7 +99,7 @@ TARGET_ARCH=""
 DMG_NAME_SUFFIX=""
 # By default we build dev bundles.
 RELEASE_CHANNEL="dev"
-FEATURES="release_bundle,cocoa_sentry,extern_plist"
+FEATURES="release_bundle,extern_plist"
 REGISTER_SERVICES=true
 DEBUG=false
 ARTIFACT="app"
@@ -284,8 +284,6 @@ elif [[ $RELEASE_CHANNEL = "dev" ]]; then
     WARP_APP_NAME="WarpDev"
     WARP_SCHEME_NAME="warpdev"
     FEATURES="$FEATURES,agent_mode_debug"
-    # Enable heap usage tracking & profiling using jemalloc through pprof.
-    FEATURES="$FEATURES,jemalloc_pprof,heap_usage_tracking"
     # Enable the Warp Control CLI wrapper for local scripting/automation.
     FEATURES="$FEATURES,warp_control_cli"
     # For dev builds, use different versions of our bundled frameworks (e.g.:
@@ -299,22 +297,16 @@ elif [[ $RELEASE_CHANNEL = "preview" ]]; then
     WARP_APP_NAME="WarpPreview"
     WARP_SCHEME_NAME="warppreview"
     FEATURES="$FEATURES,preview_channel"
-    # Enable heap usage tracking & profiling using jemalloc through pprof.
-    FEATURES="$FEATURES,jemalloc_pprof,heap_usage_tracking"
 elif [[ $RELEASE_CHANNEL = "stable" ]]; then
     WARP_BIN="stable"
     BUNDLE_ID="dev.warp.Warp-Stable"
     WARP_APP_NAME="Warp"
     WARP_SCHEME_NAME="warp"
-    # Enable heap usage tracking & profiling using jemalloc through pprof.
-    FEATURES="$FEATURES,jemalloc_pprof,heap_usage_tracking"
 elif [[ $RELEASE_CHANNEL = "oss" ]]; then
     WARP_BIN="warp-oss"
     BUNDLE_ID="dev.uncaged.WarpOss"
     WARP_APP_NAME="Uncaged"
     WARP_SCHEME_NAME="uncagedoss"
-    # The OSS channel does not ship Sentry, so drop the cocoa_sentry feature
-    # (which would otherwise pull in the Sentry framework dependency).
     FEATURES="release_bundle,extern_plist"
 fi
 
@@ -524,12 +516,6 @@ if [[ "$ARTIFACT" == "app" ]]; then
   "$WORKSPACE_ROOT_DIR/script/prepare_bundled_resources" "$BUNDLED_RESOURCES_DIR" "$RELEASE_CHANNEL" "$CARGO_PROFILE"
 
   "$WORKSPACE_ROOT_DIR/script/compile_icon" "$RELEASE_CHANNEL" "$BUNDLE_DIR/$WARP_APP_NAME.app"
-
-  HELPERS_DIR="$BUNDLE_DIR/$WARP_APP_NAME.app/Contents/Helpers"
-  if [[ ",$FEATURES," =~ ",heap_usage_tracking," ]]; then
-    echo "Bundling pprof..."
-    "$WORKSPACE_ROOT_DIR/script/prepare_bundled_pprof" "$HELPERS_DIR"
-  fi
 
   # Determine CLI wrapper script path based on release channel.  Each channel's
   # value here must match `Channel::cli_command_name` in the Rust source.

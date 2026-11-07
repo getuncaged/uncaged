@@ -193,7 +193,7 @@ configure."** That's enforced in code, not by trust. Each gate and where it live
 | Autoupdate poll / version check | `app/src/autoupdate/mod.rs` + `channel_versions.rs` — gated off for Oss |
 | Login / accounts | `app/src/auth/auth_manager.rs` — refuses auth on Oss (so every account-gated call is unreachable) |
 | Telemetry (Rudderstack) | default off (`app/src/settings/privacy.rs`), and `telemetry_config: None` for Oss |
-| Crash reporting (Sentry) | `cocoa_sentry` feature dropped for oss in `script/macos/bundle`; `crash_reporting_config: None` |
+| Crash reporting (Sentry) | removed: no Sentry code, deps or build steps |
 | AI analytics | removed from default features in `app/Cargo.toml` |
 | Fallback-font download | `app/src/font_fallback.rs` — returns `None` on Oss, uses OS system fonts |
 

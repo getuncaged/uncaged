@@ -1619,10 +1619,8 @@ impl ServerModel {
 
     /// Handles `Initialize` by returning the server version and host id.
     ///
-    /// Also configures Sentry crash reporting based on the user's identity and
-    /// preferences supplied by the connecting client, and sends the latest
-    /// remote Agent Mode context snapshot to the initializing connection.
-    #[cfg_attr(not(feature = "crash_reporting"), allow(unused_variables))]
+    /// Also sends the latest remote Agent Mode context snapshot to the
+    /// initializing connection.
     fn handle_initialize(
         &mut self,
         msg: Initialize,
@@ -1636,16 +1634,6 @@ impl ServerModel {
         CodebaseIndexManager::handle(ctx).update(ctx, |manager, ctx| {
             manager.start_persisted_index_restore(ctx);
         });
-
-        // Update crash reporting based on client-supplied preferences.
-        #[cfg(feature = "crash_reporting")]
-        {
-            if msg.crash_reporting_enabled {
-                self.apply_sentry_user_id(ctx);
-            } else {
-                crate::crash_reporting::uninit_sentry();
-            }
-        }
 
         // Enqueued on the same channel as the response below, so the client
         // buffers it as a push event during the handshake.
@@ -1695,39 +1683,18 @@ impl ServerModel {
         });
     }
 
-    /// Sets the Sentry user identity from the stored `AuthState`.
-    /// Called both during `Initialize` and when re-enabling crash reporting
-    /// via `UpdatePreferences`.
-    #[cfg(feature = "crash_reporting")]
-    fn apply_sentry_user_id(&self, ctx: &mut warpui::AppContext) {
-        if let Some(user_id) = self.auth_state.user_id() {
-            crate::crash_reporting::set_user_id(user_id, self.auth_state.user_email(), ctx);
-        }
-    }
-
-    /// Handles `UpdatePreferences` by dynamically enabling or disabling
-    /// Sentry crash reporting. This is a notification — no response is sent.
+    /// Handles `UpdatePreferences` by applying the client-supplied codebase
+    /// index limits. This is a notification — no response is sent.
     fn handle_update_preferences(
         &mut self,
         msg: super::proto::UpdatePreferences,
-        #[allow(unused_variables)] ctx: &mut ModelContext<Self>,
+        ctx: &mut ModelContext<Self>,
     ) {
         log::info!(
             "Handling UpdatePreferences: crash_reporting_enabled={}",
             msg.crash_reporting_enabled
         );
         Self::apply_codebase_index_limits(msg.codebase_index_limits.as_ref(), ctx);
-        #[cfg(feature = "crash_reporting")]
-        {
-            if msg.crash_reporting_enabled {
-                if !crate::crash_reporting::is_initialized() {
-                    crate::crash_reporting::init(ctx);
-                    self.apply_sentry_user_id(ctx);
-                }
-            } else {
-                crate::crash_reporting::uninit_sentry();
-            }
-        }
     }
 
     /// Handles `Authenticate` by replacing the daemon-wide credential.

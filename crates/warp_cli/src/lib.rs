@@ -455,13 +455,6 @@ pub enum WorkerCommand {
         parent: ParentOpts,
     },
 
-    /// Run the minidump server.
-    #[clap(hide = true)]
-    MinidumpServer {
-        /// Socket name for the minidump server.
-        socket_name: std::path::PathBuf,
-    },
-
     /// Run the remote development server proxy over SSH stdio.
     /// Ensures the daemon is running, then bridges its stdin/stdout
     /// to the daemon via a Unix domain socket.
