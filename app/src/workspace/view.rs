@@ -15143,7 +15143,6 @@ impl Workspace {
                     self.toast_stack
                         .update(ctx, |view, ctx| match result.success_type {
                             OperationSuccessType::Success => {
-                                let object_id_clone = object_id.clone();
                                 let mut new_toast =
                                     DismissibleToast::success(message).with_object_id(object_id);
                                 if let Some(notebook) = cloned_notebook {
@@ -15151,35 +15150,10 @@ impl Workspace {
                                         || result.operation == ObjectOperation::Update)
                                         && notebook.model().ai_document_id.is_some()
                                     {
-                                        // This is a plan. Only show the "Plan synced" toast if the plan is open in
-                                        // the currently active pane group, to avoid confusing users
-                                        // who are working in a different tab.
-                                        if notebook.model().ai_document_id.is_some_and(
-                                            |ai_doc_id| {
-                                                self.active_tab_pane_group()
-                                                    .as_ref(ctx)
-                                                    .contains_ai_document(&ai_doc_id, ctx)
-                                            },
-                                        ) {
-                                            new_toast = DismissibleToast::success(
-                                                "Plan synced to your Warp Drive".to_string(),
-                                            )
-                                            .with_object_id(object_id_clone)
-                                            .with_link(
-                                                ToastLink::new("View".to_string())
-                                                    .with_onclick_action(
-                                                        WorkspaceAction::ViewObjectInWarpDrive(
-                                                            WarpDriveItemId::Object(
-                                                                CloudObjectTypeAndId::Notebook(
-                                                                    notebook.id,
-                                                                ),
-                                                            ),
-                                                        ),
-                                                    ),
-                                            );
-                                        } else {
-                                            return;
-                                        }
+                                        // This is a plan. Plans are saved to the local Drive
+                                        // automatically (often many times while an agent writes
+                                        // one), so their saves never show a toast.
+                                        return;
                                     }
                                 }
 
