@@ -10,7 +10,7 @@ use diesel::sqlite::SqliteConnection;
 use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
 use diesel_migrations::MigrationHarness;
 
-use super::upsert_ai_query_with_limit;
+use super::{read_ai_queries, upsert_ai_query, upsert_ai_query_with_limit};
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{AIAgentExchangeId, AIAgentInput, UserQueryMode};
 use crate::ai::blocklist::{AIQueryHistoryOutputStatus, PersistedAIInput, PersistedAIInputType};
@@ -464,4 +464,28 @@ fn restored_blocks_v2_honors_clear_watermark() {
         3,
         "kill-switch path ignores the watermark"
     );
+}
+
+#[test]
+fn read_ai_queries_decodes_oldest_first_when_read() {
+    let mut conn = test_connection();
+    let queries: Vec<Arc<PersistedAIInput>> =
+        (0..3).map(|i| make_query(&format!("q{i}"))).collect();
+    for query in &queries {
+        upsert_ai_query(&mut conn, query.clone()).expect("upsert should succeed");
+    }
+
+    let persisted = read_ai_queries(&mut conn).expect("read should succeed");
+    // Nothing is decoded until the queries are first read.
+    assert!(!persisted.is_decoded());
+    let texts: Vec<_> = persisted
+        .get()
+        .iter()
+        .map(|query| match &query.inputs[..] {
+            [PersistedAIInputType::Query { text, .. }] => text.clone(),
+            other => panic!("unexpected inputs {other:?}"),
+        })
+        .collect();
+    assert_eq!(texts, ["q0", "q1", "q2"]);
+    assert_eq!(persisted.get().len(), 3);
 }

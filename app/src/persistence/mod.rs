@@ -37,7 +37,7 @@ use warp_multi_agent_api as api;
 use warpui::{Entity, SingletonEntity};
 
 use self::model::{AgentConversation, AgentConversationData, Project};
-use crate::ai::blocklist::PersistedAIInput;
+use crate::ai::blocklist::{PersistedAIInput, PersistedAIQueries};
 use crate::ai::mcp::TemplatableMCPServerInstallation;
 use crate::ai::persisted_workspace::EnablementState;
 use crate::app_state::AppState;
@@ -151,7 +151,7 @@ pub struct PersistedData {
     pub command_history: Vec<PersistedCommand>,
     pub user_profiles: Vec<UserProfileWithUID>,
     pub object_actions: Vec<ObjectAction>,
-    pub ai_queries: Vec<PersistedAIInput>,
+    pub ai_queries: PersistedAIQueries,
     pub codebase_indices: Vec<CodeWorkspaceMetadata>,
     pub workspace_language_servers: HashMap<PathBuf, HashMap<LSPServerType, EnablementState>>,
     pub multi_agent_conversations: Vec<AgentConversation>,

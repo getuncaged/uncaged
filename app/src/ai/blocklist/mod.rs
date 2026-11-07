@@ -65,7 +65,7 @@ pub(crate) use passive_suggestions::{
 pub use permissions::BlocklistAIPermissions;
 #[cfg_attr(target_family = "wasm", allow(unused))]
 pub(crate) use persistence::PersistedAIInputType;
-pub(crate) use persistence::{PersistedAIInput, SerializedBlockListItem};
+pub(crate) use persistence::{PersistedAIInput, PersistedAIQueries, SerializedBlockListItem};
 pub(crate) use queued_query::{
     is_lrc_auto_queue_active, AutofireAction, QueuedQuery, QueuedQueryEvent, QueuedQueryId,
     QueuedQueryModel, QueuedQueryOrigin,

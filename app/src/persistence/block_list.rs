@@ -11,7 +11,7 @@ use itertools::Itertools;
 
 use super::model::Block;
 use super::{model, schema};
-use crate::ai::blocklist::{PersistedAIInput, SerializedBlockListItem};
+use crate::ai::blocklist::{PersistedAIInput, PersistedAIQueries, SerializedBlockListItem};
 use crate::app_state::PaneUuid;
 use crate::persistence::schema::ai_queries;
 use crate::terminal::model::block::{SerializedAgentViewVisibility, SerializedBlock};
@@ -89,21 +89,24 @@ impl TryFrom<&PersistedAIInput> for NewAIQuery {
 
 pub(super) fn read_ai_queries(
     conn: &mut SqliteConnection,
-) -> Result<Vec<PersistedAIInput>, diesel::result::Error> {
+) -> Result<PersistedAIQueries, diesel::result::Error> {
     // Only load at most 100 AI queries; there's a very low chance that the user
     // will ever try rerunning AI queries older than this duration and loading
     // all AI queries in perpetuity has performance implications on app startup.
     // TOOD(alokedesai): Consider loading all AI queries by paginating the SQL query.
     const MAX_AI_QUERIES_TO_READ: i64 = 100;
-    Ok(schema::ai_queries::table
+    let ai_queries = schema::ai_queries::table
         .select(AIQuery::as_select())
         .order_by(schema::ai_queries::columns::start_ts.desc())
         .limit(MAX_AI_QUERIES_TO_READ)
-        .load::<AIQuery>(conn)?
-        .into_iter()
-        .filter_map(|ai_query| PersistedAIInput::try_from(ai_query).ok())
-        .rev()
-        .collect_vec())
+        .load::<AIQuery>(conn)?;
+    Ok(PersistedAIQueries::decode_when_read(move || {
+        ai_queries
+            .into_iter()
+            .filter_map(|ai_query| PersistedAIInput::try_from(ai_query).ok())
+            .rev()
+            .collect_vec()
+    }))
 }
 
 const AI_QUERIES_COUNT_LIMIT: i64 = 10_000;

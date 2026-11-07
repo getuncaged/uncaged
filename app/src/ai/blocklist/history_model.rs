@@ -19,7 +19,7 @@ use warp_multi_agent_api::response_event::stream_finished::{
 use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::controller::response_stream::ResponseStreamId;
-use super::persistence::{PersistedAIInput, PersistedAIInputType};
+use super::persistence::{PersistedAIInput, PersistedAIInputType, PersistedAIQueries};
 use super::RequestInput;
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{
@@ -233,7 +233,7 @@ pub struct BlocklistAIHistoryModel {
     /// AI queries that were read from the SQLite DB. These exchanges do not contain as much
     /// information as the other exchanges we store because they are only used for display in
     /// history.
-    persisted_queries: Vec<PersistedAIInput>,
+    persisted_queries: PersistedAIQueries,
 
     /// Metadata for both local and ambient agent conversations.
     /// Does not include the actual content of the conversations.
@@ -265,7 +265,7 @@ pub struct BlocklistAIHistoryModel {
 
 impl BlocklistAIHistoryModel {
     pub(crate) fn new(
-        persisted_queries: Vec<PersistedAIInput>,
+        persisted_queries: impl Into<PersistedAIQueries>,
         multi_agent_conversations: &[AgentConversation],
     ) -> Self {
         #[cfg(feature = "local_fs")]
@@ -278,7 +278,7 @@ impl BlocklistAIHistoryModel {
             });
 
         let mut model = Self {
-            persisted_queries,
+            persisted_queries: persisted_queries.into(),
             #[cfg(feature = "local_fs")]
             db_connection,
             ..Self::default()
@@ -2049,6 +2049,7 @@ impl BlocklistAIHistoryModel {
         // Add persisted queries from conversations not loaded in memory
         let persisted_queries_vec: Vec<_> = self
             .persisted_queries
+            .get()
             .iter()
             .filter(|persisted| !loaded_conversation_ids.contains(&persisted.conversation_id))
             .filter_map(|persisted| {
@@ -2459,7 +2460,7 @@ impl BlocklistAIHistoryModel {
         self.ambient_agent_terminal_view_ids.clear();
         self.conversation_transcript_viewer_terminal_view_ids
             .clear();
-        self.persisted_queries.clear();
+        self.persisted_queries = PersistedAIQueries::default();
         self.all_conversations_metadata.clear();
         self.agent_id_to_conversation_id.clear();
         self.server_token_to_conversation_id.clear();

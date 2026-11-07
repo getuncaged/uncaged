@@ -1,6 +1,7 @@
 //! Manages how we serialize blocklist AI data for persistence.
 #![cfg_attr(not(feature = "local_fs"), allow(dead_code))]
 
+use std::cell::{Cell, OnceCell};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -31,6 +32,53 @@ pub struct PersistedAIInput {
     pub(crate) model_id: LLMId,
     #[allow(unused)]
     pub(crate) coding_model_id: LLMId,
+}
+
+type DecodeAIQueries = Box<dyn FnOnce() -> Vec<PersistedAIInput>>;
+
+/// The AI queries read from SQLite for the query history, decoded the first time they are read.
+///
+/// Each query's inputs carry its full context, so decoding them is a noticeable part of startup,
+/// while the history is only needed once the user browses it.
+#[derive(Default)]
+pub struct PersistedAIQueries {
+    decode: Cell<Option<DecodeAIQueries>>,
+    decoded: OnceCell<Vec<PersistedAIInput>>,
+}
+
+impl PersistedAIQueries {
+    pub(crate) fn decode_when_read(
+        decode: impl FnOnce() -> Vec<PersistedAIInput> + 'static,
+    ) -> Self {
+        Self {
+            decode: Cell::new(Some(Box::new(decode))),
+            decoded: OnceCell::new(),
+        }
+    }
+
+    /// The queries, oldest first.
+    pub(crate) fn get(&self) -> &[PersistedAIInput] {
+        self.decoded.get_or_init(|| {
+            self.decode
+                .take()
+                .map(|decode| decode())
+                .unwrap_or_default()
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_decoded(&self) -> bool {
+        self.decoded.get().is_some()
+    }
+}
+
+impl From<Vec<PersistedAIInput>> for PersistedAIQueries {
+    fn from(queries: Vec<PersistedAIInput>) -> Self {
+        Self {
+            decode: Cell::new(None),
+            decoded: OnceCell::from(queries),
+        }
+    }
 }
 
 /// Pieces of data we need to persist for each [`AIAgentExchange`]'s input for session restoration.
