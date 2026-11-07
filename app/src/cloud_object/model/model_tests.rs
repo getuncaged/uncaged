@@ -20,7 +20,6 @@ use crate::drive::DriveIndexVariant;
 use crate::features::FeatureFlag;
 use crate::notebooks::CloudNotebookModel;
 use crate::server::ids::{ClientId, ServerId};
-use crate::server::server_api::ServerApiProvider;
 use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::init_and_register_user_preferences;
 use crate::system::SystemStats;
@@ -42,7 +41,6 @@ fn initialize_app(app: &mut App, cached_objects: Vec<Box<dyn CloudObject>>) {
     // Add the necessary singleton models to the App
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
-    app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     app.add_singleton_model(|_ctx| CloudModel::new(None, cached_objects));
     app.add_singleton_model(|_| UpdateManager::new(None));

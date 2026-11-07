@@ -19,7 +19,6 @@ use crate::code_review::code_review_view::CodeReviewView;
 use crate::code_review::diff_state::DiffStateModel;
 use crate::code_review::GlobalCodeReviewModel;
 use crate::pane_group::WorkingDirectoriesModel;
-use crate::server::server_api::ServerApiProvider;
 use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::test_util::settings::initialize_settings_for_tests;
@@ -161,7 +160,6 @@ fn initialize_test_app(app: &mut App) {
     // CodeReviewView reads AI usage/availability when comments are populated
     // (e.g. to compute the comment tray's "Send to Agent" button state), so
     // register the same AI singletons the other code_review tests use.
-    app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     app.add_singleton_model(|_| AIRequestUsageModel::new());
 }

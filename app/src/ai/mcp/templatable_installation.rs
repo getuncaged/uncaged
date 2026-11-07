@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 use std::hash::{Hash, Hasher};
 
 use handlebars::{get_arguments, render_template};
@@ -6,12 +7,32 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use siphasher::sip::SipHasher;
 use uuid::Uuid;
-use warp_managed_secrets::ManagedSecretValue;
 
 use crate::ai::mcp::{TemplatableMCPServer, TemplateVariable};
 
 lazy_static! {
     static ref HASHER: SipHasher = SipHasher::new_with_keys(0, 0);
+}
+
+/// The value of a secret to inject into an MCP server template. Its `Debug` output never shows
+/// the value.
+#[derive(Clone)]
+pub struct SecretValue(String);
+
+impl SecretValue {
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for SecretValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("SecretValue(<redacted>)")
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -109,15 +130,10 @@ impl TemplatableMCPServerInstallation {
     ///
     /// Variables with no matching explicit refs and no matching secret are left
     /// unchanged.
-    pub fn apply_secrets(&mut self, secrets: &HashMap<String, ManagedSecretValue>) {
+    pub fn apply_secrets(&mut self, secrets: &HashMap<String, SecretValue>) {
         let secret_strings: HashMap<String, String> = secrets
             .iter()
-            .filter_map(|(k, v)| {
-                let ManagedSecretValue::RawValue { value } = v else {
-                    return None;
-                };
-                Some((k.clone(), value.clone()))
-            })
+            .map(|(k, v)| (k.clone(), v.expose().to_owned()))
             .collect();
 
         // Access templatable_mcp_server directly instead of using template_variables() to allow mutating
@@ -139,15 +155,11 @@ impl TemplatableMCPServerInstallation {
                     },
                 );
             } else if let Some(secret) = secrets.get(&variable.key) {
-                let ManagedSecretValue::RawValue { value } = secret else {
-                    // We don't support injecting other secret types.
-                    continue;
-                };
                 self.variable_values.insert(
                     variable.key.clone(),
                     VariableValue {
                         variable_type: VariableType::Text,
-                        value: value.clone(),
+                        value: secret.expose().to_owned(),
                     },
                 );
             }

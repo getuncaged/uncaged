@@ -18,7 +18,6 @@ use crate::search::mixer::{
 };
 use crate::search::result_renderer::ItemHighlightState;
 use crate::search::{QueryFilter, SyncDataSource};
-use crate::server::server_api::ServerApiProvider;
 use crate::server::shared_http_client::SharedHttpClient;
 use crate::terminal::HistoryEntry;
 
@@ -107,7 +106,6 @@ impl SyncDataSource for SlowDataSource {
 }
 
 fn initialize_app(app: &mut App) {
-    app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| SharedHttpClient::new_for_test());
 }
 

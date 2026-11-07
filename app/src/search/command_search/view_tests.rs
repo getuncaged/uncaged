@@ -5,7 +5,6 @@ use super::*;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
-use crate::server::server_api::ServerApiProvider;
 use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::system::SystemStats;
@@ -13,8 +12,6 @@ use crate::test_util::settings::initialize_settings_for_tests;
 
 fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);
-
-    app.add_singleton_model(|_| ServerApiProvider::new_for_test());
 
     app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     app.add_singleton_model(|_| NetworkStatus::new());

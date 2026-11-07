@@ -10,7 +10,6 @@ use crate::ai::agent::{
     StartAgentExecutionMode, StartAgentResult,
 };
 use crate::ai::blocklist::BlocklistAIHistoryModel;
-use crate::server::server_api::ServerApiProvider;
 use crate::server::shared_http_client::SharedHttpClient;
 use crate::test_util::settings::initialize_history_persistence_for_tests;
 
@@ -288,7 +287,6 @@ fn execute_resolves_success_when_request_linkage_happens_after_child_already_sta
     App::test((), |mut app| async move {
         initialize_history_persistence_for_tests(&mut app);
         let terminal_view_id = EntityId::new();
-        app.add_singleton_model(|_| ServerApiProvider::new_for_test());
         app.add_singleton_model(|_| SharedHttpClient::new_for_test());
         let history_model = app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
         let executor = app.add_model(StartAgentExecutor::new);
@@ -984,7 +982,6 @@ fn blocked_child_launch_does_not_emit_cleanup_event() {
 fn successfully_started_child_does_not_emit_cleanup_event() {
     App::test((), |mut app| async move {
         let (state, _executor) = dispatch_pending_child_launch(&mut app);
-        app.add_singleton_model(|_| ServerApiProvider::new_for_test());
         app.add_singleton_model(|_| SharedHttpClient::new_for_test());
         // Assigning a run id before linkage marks the child as started, so the
         // executor resolves the pending as a success, not a launch failure.

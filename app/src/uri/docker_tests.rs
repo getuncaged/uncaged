@@ -1,14 +1,12 @@
 use warpui::App;
 
 use super::*;
-use crate::server::server_api::ServerApiProvider;
 use crate::server::shared_http_client::SharedHttpClient;
 
 #[test]
 // Tests behavior based on which query parameters are required.
 fn test_open_docker_container() {
     App::test((), |mut app| async move {
-        app.add_singleton_model(|_| ServerApiProvider::new_for_test());
         app.add_singleton_model(|_| SharedHttpClient::new_for_test());
 
         let base_url = Url::parse("warplocal://action/docker/open_subshell")

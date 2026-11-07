@@ -14,7 +14,6 @@ use crate::search::data_source::Query;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::ServerId;
 use crate::server::ids::SyncId::{self};
-use crate::server::server_api::ServerApiProvider;
 use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::AISettings;
 use crate::system::SystemStats;
@@ -78,7 +77,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
     app.add_singleton_model(CloudViewModel::new);
     app.add_singleton_model(NotebookManager::mock);
-    app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     app.add_singleton_model(|_| SettingsManager::default());
     app.update(crate::settings::init_and_register_user_preferences);

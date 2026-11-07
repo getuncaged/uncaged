@@ -11,7 +11,7 @@ use crate::ai::agent::{
     AnyFileContent, FileContext, FormattedTextWrapper, MessageId, ProgrammingLanguage,
     RenderableAIError, TransientNetworkErrorKind,
 };
-use crate::server::server_api::AIApiError;
+use crate::ai::api_error::AIApiError;
 use crate::terminal::shell::ShellType;
 
 fn to_range(range: Range<u32>) -> Option<FileContentLineRange> {

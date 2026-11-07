@@ -8,7 +8,7 @@ use warp_multi_agent_api as api;
 use super::convert_to::convert_input;
 use super::{ConvertToAPITypeError, RequestParams, ResponseStream};
 use crate::ai::agent::redaction;
-use crate::server::server_api::AIApiError;
+use crate::ai::api_error::AIApiError;
 use crate::terminal::model::session::SessionType;
 
 // The local engine is not built for wasm, which leaves the request unused there.

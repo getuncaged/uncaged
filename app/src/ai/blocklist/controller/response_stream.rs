@@ -12,9 +12,9 @@ use warpui::{Entity, ModelContext, SingletonEntity};
 use crate::ai::agent::api::{self, generate_multi_agent_output, ConvertToAPITypeError};
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::CancellationReason;
+use crate::ai::api_error::AIApiError;
 use crate::network::NetworkStatus;
 use crate::report_error;
-use crate::server::server_api::AIApiError;
 
 /// Maximum number of times a single MAA request is re-sent before the failure is
 /// surfaced.

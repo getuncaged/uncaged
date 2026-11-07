@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use serde_json;
-use warp_managed_secrets::ManagedSecretValue;
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::mcp::parsing::normalize_codex_toml_to_json;
 use crate::ai::mcp::parsing::resolve_json;
+use crate::ai::mcp::templatable_installation::SecretValue;
 use crate::ai::mcp::{
     mcp_provider_from_file_path, CLIServer, JsonTemplate, MCPProvider, MCPServer, MCPServerExt,
     ParsedTemplatableMCPServerResult, ServerSentEvents, StaticEnvVar, StaticHeader,
@@ -847,18 +847,17 @@ fn test_parse_templatable_sse_headers_and_resolve_json() {
 
 // --- Runtime handlebars secret resolution tests ---
 
-fn make_secrets(pairs: Vec<(&str, &str)>) -> HashMap<String, ManagedSecretValue> {
+fn make_secrets(pairs: Vec<(&str, &str)>) -> HashMap<String, SecretValue> {
     pairs
         .into_iter()
-        .map(|(k, v)| {
-            (
-                k.to_string(),
-                ManagedSecretValue::RawValue {
-                    value: v.to_string(),
-                },
-            )
-        })
+        .map(|(k, v)| (k.to_string(), SecretValue::new(v)))
         .collect()
+}
+
+#[test]
+fn test_secret_value_debug_hides_the_value() {
+    let secret = SecretValue::new("sk-top-secret");
+    assert_eq!(format!("{secret:?}"), "SecretValue(<redacted>)");
 }
 
 #[test]

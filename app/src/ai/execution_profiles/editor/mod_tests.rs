@@ -17,7 +17,6 @@ use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
-use crate::server::server_api::ServerApiProvider;
 use crate::server::shared_http_client::SharedHttpClient;
 use crate::test_util::settings::initialize_settings_for_tests;
 fn configurable_model(provider: LLMProvider) -> LLMInfo {
@@ -58,7 +57,6 @@ fn assert_context_window_limit_for_request(
             .override_enabled(gpt_configurable_context_window_enabled);
 
         initialize_settings_for_tests(&mut app);
-        app.add_singleton_model(|_| ServerApiProvider::new_for_test());
         app.add_singleton_model(|_| SharedHttpClient::new_for_test());
         app.add_singleton_model(|_| NetworkStatus::new());
         app.add_singleton_model(CloudModel::mock);
