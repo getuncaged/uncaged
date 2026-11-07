@@ -13,8 +13,6 @@ use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::custom_model_routers::{self, CustomModelRouter, ModelConfigError};
 use super::execution_profiles::profiles::AIExecutionProfilesModel;
-use crate::report_error;
-use crate::server::server_api::ServerApiProvider;
 use crate::user_config::{WarpConfig, WarpConfigUpdateEvent};
 
 /// Key for cached LLM metadata in user preferences.
@@ -602,13 +600,6 @@ impl LLMPreferences {
             me.rebuild_custom_model_routers(ctx);
         }
 
-        // In agent mode eval builds, eagerly kick off a fetch of the model list from the server
-        // so that it's available by the time test steps like `set_preferred_agent_mode_llm` run.
-        // In production, this is handled reactively (on auth complete, network online, etc.)
-        // to avoid duplicate requests at startup.
-        #[cfg(feature = "agent_mode_evals")]
-        me.refresh_available_models(ctx);
-
         me
     }
 
@@ -1149,28 +1140,6 @@ impl LLMPreferences {
             return;
         };
         *last_update.popup_visibility_state.lock() = UpdatePopupVisibilityState::Hidden;
-    }
-
-    /// No auth required (i.e. to populate the pre-login onboarding picker).
-    fn refresh_public_models(&self, ctx: &mut ModelContext<Self>) {
-        let ai_api_client = ServerApiProvider::as_ref(ctx).get_ai_client();
-        ctx.spawn(
-            async move { ai_api_client.get_free_available_models(None).await },
-            |me, result, ctx| match result {
-                Ok(update) => {
-                    if update != me.models_by_feature {
-                        me.on_server_update(update, ctx);
-                    }
-                }
-                Err(e) => {
-                    report_error!(e.context("Failed to fetch free-tier LLMs from server"));
-                }
-            },
-        );
-    }
-
-    pub fn refresh_available_models(&self, ctx: &mut ModelContext<Self>) {
-        self.refresh_public_models(ctx);
     }
 
     pub fn update_feature_model_choices(

@@ -9,7 +9,6 @@ use crate::ai::agent::{
     AIAgentAction, AIAgentActionId, AIAgentActionResultType, AIAgentActionType,
     StartAgentExecutionMode, StartAgentResult,
 };
-use crate::ai::blocklist::orchestration_event_streamer::OrchestrationEventStreamer;
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::server::server_api::ServerApiProvider;
 use crate::test_util::settings::initialize_history_persistence_for_tests;
@@ -290,7 +289,6 @@ fn execute_resolves_success_when_request_linkage_happens_after_child_already_sta
         let terminal_view_id = EntityId::new();
         app.add_singleton_model(|_| ServerApiProvider::new_for_test());
         let history_model = app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
-        app.add_singleton_model(OrchestrationEventStreamer::new);
         let executor = app.add_model(StartAgentExecutor::new);
         let parent_conversation_id = history_model.update(&mut app, |history_model, ctx| {
             history_model.start_new_conversation(terminal_view_id, false, false, false, ctx)
@@ -984,10 +982,7 @@ fn blocked_child_launch_does_not_emit_cleanup_event() {
 fn successfully_started_child_does_not_emit_cleanup_event() {
     App::test((), |mut app| async move {
         let (state, _executor) = dispatch_pending_child_launch(&mut app);
-        // `OrchestrationEventStreamer::new` reads the history singleton, so it
-        // must be registered after the helper registers it.
         app.add_singleton_model(|_| ServerApiProvider::new_for_test());
-        app.add_singleton_model(OrchestrationEventStreamer::new);
         // Assigning a run id before linkage marks the child as started, so the
         // executor resolves the pending as a success, not a launch failure.
         state.history_model.update(&mut app, |model, ctx| {

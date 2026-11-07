@@ -9,15 +9,11 @@ use url::Url;
 use warp_core::report_error;
 use warp_core::ui::theme::WarpTheme;
 use warpui::color::ColorU;
-use warpui::{SingletonEntity, View, ViewContext};
 
 pub use super::agent_config::AgentConfigSnapshot;
 use super::AmbientAgentTaskId;
 use crate::ai::artifacts::{deserialize_artifacts, Artifact};
-use crate::server::server_api::ServerApiProvider;
 use crate::ui_components::icons::Icon;
-use crate::view_components::DismissibleToast;
-use crate::workspace::ToastStack;
 
 fn parse_session_id_from_link(session_link: &str) -> Option<SessionId> {
     Url::parse(session_link).ok().and_then(|url| {
@@ -520,41 +516,6 @@ pub struct RequestUsage {
     pub inference_cost: Option<f64>,
     pub compute_cost: Option<f64>,
     pub platform_cost: Option<f64>,
-}
-
-/// Cancel an ambient agent task and show a toast with the result.
-pub fn cancel_task_with_toast<V: View>(task_id: AmbientAgentTaskId, ctx: &mut ViewContext<V>) {
-    let ai_client = ServerApiProvider::handle(ctx).as_ref(ctx).get_ai_client();
-    let window_id = ctx.window_id();
-    ctx.spawn(
-        async move { ai_client.cancel_ambient_agent_task(&task_id).await },
-        move |_view, result, ctx| {
-            let message = match result {
-                Ok(()) => "Task cancelled".to_string(),
-                Err(e) => {
-                    log::error!("Failed to cancel task: {e}");
-                    format!("Failed to cancel task: {e}")
-                }
-            };
-            ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                let toast = DismissibleToast::default(message);
-                toast_stack.add_ephemeral_toast(toast, window_id, ctx);
-            });
-        },
-    );
-}
-
-/// Cancel an ambient agent task without surfacing a toast to the user.
-pub fn cancel_task_silently<V: View>(task_id: AmbientAgentTaskId, ctx: &mut ViewContext<V>) {
-    let ai_client = ServerApiProvider::handle(ctx).as_ref(ctx).get_ai_client();
-    ctx.spawn(
-        async move { ai_client.cancel_ambient_agent_task(&task_id).await },
-        move |_view, result, _| {
-            if let Err(e) = result {
-                log::error!("Failed to cancel task: {e}");
-            }
-        },
-    );
 }
 
 #[cfg(test)]

@@ -164,7 +164,6 @@ impl OnboardingMainView {
                 ctx.notify();
             }
             AgentOnboardingEvent::SyncWithOsToggled { .. }
-            | AgentOnboardingEvent::AppBecameActive
             | AgentOnboardingEvent::ConnectPresetRequested(_)
             | AgentOnboardingEvent::ActivateConnectionRequested(_) => {
                 // No-op in the standalone demo binary

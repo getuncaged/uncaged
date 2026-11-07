@@ -131,13 +131,10 @@ pub(crate) fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| CLIAgentSessionsModel::new());
     app.add_singleton_model(|_| CLIAgentInstallModel::new_for_test());
     // The blocklist controller created during terminal bootstrap subscribes to
-    // OrchestrationEventService and OrchestrationEventStreamer unconditionally,
-    // so both singletons must be registered before bootstrap.
+    // OrchestrationEventService unconditionally, so it must be registered
+    // before bootstrap.
     app.add_singleton_model(
         crate::ai::blocklist::orchestration_events::OrchestrationEventService::new,
-    );
-    app.add_singleton_model(
-        crate::ai::blocklist::orchestration_event_streamer::OrchestrationEventStreamer::new,
     );
     app.add_singleton_model(|_| ActiveAgentViewsModel::new());
     app.add_singleton_model(AgentNotificationsModel::new);
@@ -174,9 +171,7 @@ pub(crate) fn initialize_app(app: &mut App) {
         )
     });
     app.add_singleton_model(|_| RestoredAgentConversations::new(vec![]));
-    app.add_singleton_model(|ctx| {
-        AIRequestUsageModel::new_for_test(ServerApiProvider::as_ref(ctx).get_ai_client(), ctx)
-    });
+    app.add_singleton_model(|_| AIRequestUsageModel::new());
     app.add_singleton_model(|_| OneTimeModalModel::new());
     let global_resource_handles = GlobalResourceHandles::mock(app);
     app.add_singleton_model(|_| GlobalResourceHandlesProvider::new(global_resource_handles));
@@ -200,9 +195,6 @@ pub(crate) fn initialize_app(app: &mut App) {
     #[cfg(enable_crash_recovery)]
     crate::crash_recovery::CrashRecovery::register_for_test(app);
 
-    app.add_singleton_model(
-        crate::workspace::bonus_grant_notification_model::BonusGrantNotificationModel::new,
-    );
     app.add_singleton_model(|ctx| {
         CodebaseIndexManager::new_for_test(std::sync::Arc::new(LocalStoreClient::new()), ctx)
     });

@@ -1,11 +1,9 @@
-pub mod ai;
 pub mod managed_secrets;
 
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
-use ai::AIClient;
 use anyhow::{anyhow, Context, Result};
 use channel_versions::ChannelVersions;
 use chrono::{DateTime, FixedOffset};
@@ -285,7 +283,7 @@ pub struct ServerApi {
 impl ServerApi {
     fn new(
         event_sender: async_channel::Sender<AuthEvent>,
-        agent_source: Option<ai::AgentSource>,
+        agent_source: Option<crate::ai::ambient_agents::AgentSource>,
         iap_state: Option<Arc<IapState>>,
         ctx: &mut ModelContext<ServerApiProvider>,
     ) -> Self {
@@ -310,7 +308,7 @@ impl ServerApi {
     fn new_with_parts(
         client: Arc<http_client::Client>,
         event_sender: async_channel::Sender<AuthEvent>,
-        agent_source: Option<ai::AgentSource>,
+        agent_source: Option<crate::ai::ambient_agents::AgentSource>,
         iap_token_provider: Option<Arc<dyn http_client::iap::IapTokenProvider>>,
     ) -> Self {
         let graphql_routing = GraphqlRoutingConfig {
@@ -823,7 +821,7 @@ impl ServerApiProvider {
     /// Constructs a new ServerApiProvider.
     #[cfg_attr(target_family = "wasm", allow(unused_variables))]
     pub fn new(
-        agent_source: Option<ai::AgentSource>,
+        agent_source: Option<crate::ai::ambient_agents::AgentSource>,
         iap_state: Option<Arc<IapState>>,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
@@ -863,10 +861,6 @@ impl ServerApiProvider {
     /// Returns a handle to the underlying [`ServerApi`] object.
     /// Prefer retrieving a specific trait object related to the methods you're calling.
     pub fn get(&self) -> Arc<ServerApi> {
-        self.server_api.clone()
-    }
-
-    pub fn get_ai_client(&self) -> Arc<dyn AIClient> {
         self.server_api.clone()
     }
 

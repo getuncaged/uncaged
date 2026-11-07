@@ -1892,8 +1892,8 @@ impl BlocklistAIController {
         ctx: &mut ModelContext<Self>,
     ) {
         self.ambient_agent_task_id = id;
-        self.action_model.update(ctx, |action_model, ctx| {
-            action_model.set_ambient_agent_task_id(id, ctx);
+        self.action_model.update(ctx, |action_model, _| {
+            action_model.set_ambient_agent_task_id(id);
         });
     }
 

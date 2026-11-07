@@ -29,7 +29,6 @@ use warpui::{
     ViewContext, ViewHandle, WindowId,
 };
 
-use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::blocklist::SerializedBlockListItem;
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
 use crate::ai::onboarding::build_onboarding_models;
@@ -230,15 +229,6 @@ pub fn init(app: &mut AppContext) {
         RootView::toggle_maximize_window,
     );
     app.add_action("root_view:toggle_fullscreen", RootView::toggle_fullscreen);
-
-    app.add_global_action(
-        "root_view:open_conversation_viewer",
-        open_conversation_viewer,
-    );
-    app.add_action(
-        "root_view:open_cloud_conversation_in_existing_window",
-        RootView::open_cloud_conversation_in_existing_window,
-    );
 
     app.add_global_action(
         "root_view:open_drive_object_new_window",
@@ -705,19 +695,6 @@ pub(crate) fn open_new_from_path(
         },
         ctx,
     )
-}
-
-/// Opens a new window to view a persisted view-only cloud conversation.
-/// The conversation data is loaded via GraphQL API.
-fn open_conversation_viewer(conversation_id: &ServerConversationToken, ctx: &mut AppContext) {
-    // Trigger the workspace loading mechanism by dispatching the LoadConversationData event
-    // This will open a new window with a loading state, fetch data via GraphQL, and display it
-    open_new_with_workspace_source(
-        NewWorkspaceSource::FromCloudConversationId {
-            conversation_id: conversation_id.clone(),
-        },
-        ctx,
-    );
 }
 
 fn open_settings_page_in_new_window(section: &SettingsSection, ctx: &mut AppContext) {
@@ -1216,9 +1193,6 @@ pub enum NewWorkspaceSource {
     Session {
         options: Box<NewTerminalOptions>,
     },
-    FromCloudConversationId {
-        conversation_id: ServerConversationToken,
-    },
     NotebookFromFilePath {
         file_path: Option<PathBuf>,
     },
@@ -1542,10 +1516,6 @@ impl RootView {
     fn create_agent_onboarding_view(
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<AgentOnboardingView> {
-        LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
-            prefs.refresh_available_models(ctx);
-        });
-
         let themes = onboarding_theme_picker_themes();
         let onboarding_view = ctx.add_typed_action_view(move |ctx| {
             let (models, default_model_id) = build_onboarding_models(LLMPreferences::as_ref(ctx));
@@ -1790,13 +1760,6 @@ impl RootView {
                 let _ = crate::uncaged::activate(id);
                 self.refresh_onboarding_connect_gallery(ctx);
             }
-            AgentOnboardingEvent::AppBecameActive => {
-                // fetch the models when the user tabs/intents back into the app during
-                // onboarding after potentially upgrading
-                LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
-                    prefs.refresh_available_models(ctx);
-                });
-            }
         }
     }
 
@@ -1969,28 +1932,6 @@ impl RootView {
             log::warn!("Auth not complete before trying to open warp drive object");
         }
         true
-    }
-
-    /// Opens a cloud conversation in an existing window.
-    /// If the user owns the conversation, restores or navigates to it directly.
-    /// Otherwise, opens a read-only transcript viewer.
-    pub fn open_cloud_conversation_in_existing_window(
-        &mut self,
-        conversation_id: &ServerConversationToken,
-        ctx: &mut ViewContext<Self>,
-    ) -> bool {
-        if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
-            handle.update(ctx, |workspace, ctx| {
-                workspace.open_cloud_conversation_from_server_token(conversation_id.clone(), ctx);
-            });
-            let window_id = ctx.window_id();
-            ctx.windows().show_window_and_focus_app(window_id);
-            ctx.notify();
-            true
-        } else {
-            log::warn!("Auth not complete before trying to open conversation viewer");
-            false
-        }
     }
 
     pub fn add_file_pane(&mut self, path: &PathBuf, ctx: &mut ViewContext<Self>) -> bool {

@@ -1,6 +1,5 @@
 mod action;
 mod active_session;
-pub mod bonus_grant_notification_model;
 pub(crate) mod cross_window_tab_drag;
 pub mod delete_conversation_confirmation_dialog;
 mod global_actions;

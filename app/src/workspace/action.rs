@@ -16,10 +16,8 @@ use super::tab_settings::{
     VerticalTabsTabItemMode, VerticalTabsViewMode,
 };
 use super::view::{OnboardingTutorial, WorkspaceBanner};
-use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::AIAgentExchangeId;
-use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::PendingAttachment;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentVersion};
 use crate::drive::items::WarpDriveItemId;
@@ -670,12 +668,6 @@ pub enum WorkspaceAction {
         conversation_id: AIConversationId,
         terminal_view_id: Option<EntityId>,
     },
-    /// Load cloud conversation data into a transcript viewer.
-    /// Used when CloudConversations is enabled and the sandbox is not running.
-    OpenConversationTranscriptViewer {
-        conversation_id: ServerConversationToken,
-        ambient_agent_task_id: Option<AmbientAgentTaskId>,
-    },
     /// Toggle the conversation transcript details panel (WASM-only).
     #[cfg(target_family = "wasm")]
     ToggleConversationTranscriptDetailsPanel,
@@ -1010,7 +1002,6 @@ impl WorkspaceAction {
             | ShowRewindConfirmationDialog { .. }
             | ExecuteRewindAIConversation { .. }
             | ExecuteDeleteConversation { .. }
-            | OpenConversationTranscriptViewer { .. }
             | OpenLightbox { .. }
             | UpdateLightboxImage { .. }
             | StartAgentOnboardingTutorial(_)

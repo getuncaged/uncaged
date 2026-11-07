@@ -25,7 +25,6 @@ use crate::ai::blocklist::{
 use crate::ai::document::ai_document_model::{AIDocumentModel, AIDocumentModelEvent};
 use crate::ai::mcp::templatable_manager::{FigmaMcpStatus, TemplatableMCPServerManagerEvent};
 use crate::ai::mcp::TemplatableMCPServerManager;
-use crate::ai::request_usage_model::{AIRequestUsageModel, AIRequestUsageModelEvent};
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::terminal::input::buffer_model::{InputBufferModel, InputBufferUpdateEvent};
 use crate::terminal::input::message_bar::attached_context::{
@@ -207,16 +206,6 @@ impl AgentMessageBar {
                 },
             );
         }
-
-        ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |_, _, event, ctx| {
-            if matches!(
-                event,
-                AIRequestUsageModelEvent::RequestUsageUpdated
-                    | AIRequestUsageModelEvent::AmbientCreditsBannerDismissed
-            ) {
-                ctx.notify();
-            }
-        });
 
         Self {
             agent_view_controller,

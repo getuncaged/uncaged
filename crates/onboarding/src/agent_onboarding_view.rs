@@ -1,12 +1,24 @@
-use std::time::Duration;
-
 use ai::LLMId;
-use instant::Instant;
+use pathfinder_color::ColorU;
+use pathfinder_geometry::vector::vec2f;
+use ui_components::{button, Component as _, Options as _};
 use warp_core::features::FeatureFlag;
+use warp_core::ui::appearance::Appearance;
+use warp_core::ui::theme::{Fill, WarpTheme};
+use warp_core::ui::Icon;
 use warpui_core::assets::asset_cache::AssetSource;
+use warpui_core::elements::{
+    Align, CacheOption, ChildAnchor, Container, Dismiss, Empty, Image, OffsetPositioning,
+    ParentAnchor, ParentElement, ParentOffsetBounds, Rect, Shrinkable, Stack,
+};
 use warpui_core::image_cache::ImageType;
-use warpui_core::windowing::state::{ApplicationStage, StateEvent};
-use warpui_core::windowing::WindowManager;
+use warpui_core::keymap::macros::*;
+use warpui_core::keymap::{FixedBinding, Keystroke};
+use warpui_core::presenter::ChildView;
+use warpui_core::{
+    AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
+    ViewContext, ViewHandle,
+};
 
 use crate::components::feature_optout_dialog::{render_feature_optout_dialog, FeatureOptOutDialog};
 use crate::model::{
@@ -16,26 +28,6 @@ use crate::slides::{
     AgentSlide, AiAccessSlide, AiAccessSlideEvent, AiSetupSlide, ConnectGalleryData,
     CustomizeUISlide, IntentionSlide, IntroSlide, OnboardingModelInfo, OnboardingSlide,
     ProjectSlide, ThemePickerSlide, ThemePickerSlideEvent, ThirdPartySlide,
-};
-
-const APP_BECAME_ACTIVE_DEBOUNCE: Duration = Duration::from_secs(15);
-
-use pathfinder_color::ColorU;
-use pathfinder_geometry::vector::vec2f;
-use ui_components::{button, Component as _, Options as _};
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::{Fill, WarpTheme};
-use warp_core::ui::Icon;
-use warpui_core::elements::{
-    Align, CacheOption, ChildAnchor, Container, Dismiss, Empty, Image, OffsetPositioning,
-    ParentAnchor, ParentElement, ParentOffsetBounds, Rect, Shrinkable, Stack,
-};
-use warpui_core::keymap::macros::*;
-use warpui_core::keymap::{FixedBinding, Keystroke};
-use warpui_core::presenter::ChildView;
-use warpui_core::{
-    AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
-    ViewContext, ViewHandle,
 };
 
 #[derive(Clone, Debug)]
@@ -57,9 +49,6 @@ pub enum AgentOnboardingEvent {
     ConnectPresetRequested(String),
     /// The user clicked "Use" on an already-saved connection, to make it active.
     ActivateConnectionRequested(String),
-    /// Emitted when the app regains focus (e.g. user returns from the browser).
-    /// The parent should refresh any stale data: available models, workspace/billing metadata, etc.
-    AppBecameActive,
 }
 
 pub struct AgentOnboardingView {
@@ -78,7 +67,6 @@ pub struct AgentOnboardingView {
     no_ai_confirm_button: button::Button,
     no_ai_cancel_button: button::Button,
     no_ai_close_button: button::Button,
-    last_model_refresh: Option<Instant>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -213,25 +201,6 @@ impl AgentOnboardingView {
             ctx.add_typed_action_view(move |_| ProjectSlide::new(onboarding_state))
         };
 
-        // When the app regains focus (e.g. user returning from the upgrade page in the
-        // browser), notify the parent to refresh models and workspace/billing metadata.
-        // Debounced to avoid excessive API calls from rapid alt-tabbing.
-        ctx.subscribe_to_model(&WindowManager::handle(ctx), |me, _wm, event, ctx| {
-            let StateEvent::ValueChanged { current, previous } = event;
-            if previous.stage != ApplicationStage::Active
-                && current.stage == ApplicationStage::Active
-            {
-                let now = Instant::now();
-                let should_refresh = me
-                    .last_model_refresh
-                    .is_none_or(|last| now.duration_since(last) >= APP_BECAME_ACTIVE_DEBOUNCE);
-                if should_refresh {
-                    me.last_model_refresh = Some(now);
-                    ctx.emit(AgentOnboardingEvent::AppBecameActive);
-                }
-            }
-        });
-
         Self {
             onboarding_state,
             intro_slide,
@@ -248,7 +217,6 @@ impl AgentOnboardingView {
             no_ai_confirm_button: button::Button::default(),
             no_ai_cancel_button: button::Button::default(),
             no_ai_close_button: button::Button::default(),
-            last_model_refresh: None,
         }
     }
 

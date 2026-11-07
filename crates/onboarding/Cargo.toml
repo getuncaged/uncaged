@@ -18,7 +18,6 @@ bin = []
 ai.workspace = true
 anyhow.workspace = true
 cfg-if.workspace = true
-instant.workspace = true
 log.workspace = true
 pathfinder_color.workspace = true
 pathfinder_geometry.workspace = true

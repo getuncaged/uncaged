@@ -6,8 +6,6 @@ pub mod code_block;
 mod context_model;
 mod controller;
 
-pub(crate) mod local_agent_task_sync_model;
-pub(crate) mod orchestration_event_streamer;
 pub(crate) mod orchestration_events;
 pub(crate) mod orchestration_topology;
 mod passive_suggestions;
@@ -53,9 +51,8 @@ pub(crate) use controller::{
     SlashCommandRequest,
 };
 pub(crate) use history_model::{
-    AIQueryHistory, AIQueryHistoryOutputStatus, BeginConversationRenameError,
-    BlocklistAIHistoryEvent, BlocklistAIHistoryModel, ConversationStatusUpdate, FORK_PREFIX,
-    PRE_REWIND_PREFIX,
+    AIQueryHistory, AIQueryHistoryOutputStatus, BlocklistAIHistoryEvent, BlocklistAIHistoryModel,
+    ConversationStatusUpdate, RenameConversationError, FORK_PREFIX, PRE_REWIND_PREFIX,
 };
 pub(crate) use input_model::{
     BlocklistAIInputEvent, BlocklistAIInputModel, InputConfig, InputType,
@@ -82,4 +79,4 @@ pub(crate) use view_util::{
     CLAUDE_ORANGE, NEW_AGENT_PANE_LABEL,
 };
 
-pub use crate::ai::blocklist::block::{secret_redaction, AIBlockResponseRating, TextLocation};
+pub use crate::ai::blocklist::block::{secret_redaction, TextLocation};

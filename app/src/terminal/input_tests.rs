@@ -228,9 +228,7 @@ pub fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| KeybindingChangedNotifier::new());
     app.add_singleton_model(TerminalKeybindings::new);
     app.add_singleton_model(|_| ActiveSession::default());
-    app.add_singleton_model(|ctx| {
-        AIRequestUsageModel::new_for_test(ServerApiProvider::as_ref(ctx).get_ai_client(), ctx)
-    });
+    app.add_singleton_model(|_| AIRequestUsageModel::new());
     app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
     // QueuedQueryModel subscribes to history events; register after the
     // history model is in place.
@@ -245,13 +243,10 @@ pub fn initialize_app(app: &mut App) {
     });
     app.add_singleton_model(|_| CLIAgentSessionsModel::new());
     // The blocklist controller created during terminal bootstrap subscribes to
-    // OrchestrationEventService and OrchestrationEventStreamer unconditionally,
-    // so both singletons must be registered before bootstrap.
+    // OrchestrationEventService unconditionally, so it must be registered
+    // before bootstrap.
     app.add_singleton_model(
         crate::ai::blocklist::orchestration_events::OrchestrationEventService::new,
-    );
-    app.add_singleton_model(
-        crate::ai::blocklist::orchestration_event_streamer::OrchestrationEventStreamer::new,
     );
     app.add_singleton_model(|_| ActiveAgentViewsModel::new());
     app.add_singleton_model(AgentNotificationsModel::new);

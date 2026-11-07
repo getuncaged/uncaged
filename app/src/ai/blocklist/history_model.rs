@@ -12,7 +12,6 @@ use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use warp_cli::agent::Harness;
-use warp_core::features::FeatureFlag;
 use warp_multi_agent_api::client_action::{Action, StartNewConversation};
 use warp_multi_agent_api::response_event::stream_finished::{
     ConversationUsageMetadata, TokenUsage,
@@ -41,7 +40,6 @@ use crate::persistence::model::{AgentConversation, AgentConversationData};
 use crate::persistence::ModelEvent;
 #[cfg(feature = "local_fs")]
 use crate::persistence::{database_file_path_for_scope, establish_ro_connection, PersistenceScope};
-use crate::server::server_api::ServerApiProvider;
 use crate::terminal::model::block::BlockId;
 use crate::terminal::view::blocklist_filter;
 use crate::ui_components::icons::Icon;
@@ -49,8 +47,8 @@ use crate::GlobalResourceHandlesProvider;
 
 mod conversation_loader;
 pub use conversation_loader::{
-    convert_persisted_conversation_to_ai_conversation_with_metadata, load_conversation_from_server,
-    CLIAgentConversation, CloudConversationData,
+    convert_persisted_conversation_to_ai_conversation_with_metadata, CLIAgentConversation,
+    CloudConversationData,
 };
 
 /// Mirrors [`crate::persistence::agent::MAX_PERSISTED_CONVERSATION_COUNT`].
@@ -184,23 +182,11 @@ pub enum UpdateHistoryError {
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
-pub(crate) enum BeginConversationRenameError {
+pub(crate) enum RenameConversationError {
     #[error("conversation not found")]
     ConversationNotFound,
-    #[error("conversation has no server token")]
-    MissingServerConversationToken,
     #[error("conversation is not ready to rename")]
     ConversationNotReady,
-    #[error("conversation rename already in progress")]
-    RenameInProgress,
-}
-
-#[derive(Debug, Clone)]
-struct InFlightConversationRename {
-    attempted_title: String,
-    previous_root_task_description: String,
-    previous_server_metadata_title: Option<String>,
-    previous_cached_metadata_title: Option<String>,
 }
 
 /// Responsible for managing the history of user and AI exchanges.
@@ -272,9 +258,6 @@ pub struct BlocklistAIHistoryModel {
     /// Populated at startup from the local DB and kept in sync at runtime
     /// via `set_parent_for_conversation` and `restore_conversations`.
     children_by_parent: HashMap<AIConversationId, Vec<AIConversationId>>,
-
-    /// In-flight optimistic conversation rename state keyed by conversation.
-    in_flight_conversation_renames: HashMap<AIConversationId, InFlightConversationRename>,
 
     #[cfg(feature = "local_fs")]
     db_connection: Option<Arc<Mutex<SqliteConnection>>>,
@@ -557,130 +540,25 @@ impl BlocklistAIHistoryModel {
         }
     }
 
-    /// Starts an optimistic local rename and records rollback state.
-    pub(crate) fn begin_conversation_rename(
+    /// Renames a conversation locally and persists the new title.
+    pub(crate) fn rename_conversation(
         &mut self,
         conversation_id: AIConversationId,
         title: String,
         ctx: &mut ModelContext<Self>,
-    ) -> Result<String, BeginConversationRenameError> {
-        if self
-            .in_flight_conversation_renames
-            .contains_key(&conversation_id)
-        {
-            return Err(BeginConversationRenameError::RenameInProgress);
-        }
-
+    ) -> Result<(), RenameConversationError> {
         let conversation = self
             .conversations_by_id
             .get(&conversation_id)
-            .ok_or(BeginConversationRenameError::ConversationNotFound)?;
-        let server_conversation_token = conversation
-            .server_conversation_token()
-            .ok_or(BeginConversationRenameError::MissingServerConversationToken)?
-            .as_str()
-            .to_owned();
+            .ok_or(RenameConversationError::ConversationNotFound)?;
         let root_task = conversation
             .get_root_task()
-            .ok_or(BeginConversationRenameError::ConversationNotReady)?;
+            .ok_or(RenameConversationError::ConversationNotReady)?;
         if root_task.source().is_none() {
-            return Err(BeginConversationRenameError::ConversationNotReady);
+            return Err(RenameConversationError::ConversationNotReady);
         }
-        let previous_root_task_description = root_task.description().to_owned();
-        let previous_server_metadata_title = conversation
-            .server_metadata()
-            .map(|metadata| metadata.title.clone());
-        let previous_cached_metadata_title = self
-            .all_conversations_metadata
-            .get(&conversation_id)
-            .map(|metadata| metadata.title.clone());
-
-        self.in_flight_conversation_renames.insert(
-            conversation_id,
-            InFlightConversationRename {
-                attempted_title: title.clone(),
-                previous_root_task_description,
-                previous_server_metadata_title,
-                previous_cached_metadata_title,
-            },
-        );
         self.apply_conversation_title(conversation_id, title, ctx);
-        Ok(server_conversation_token)
-    }
-
-    /// Completes an in-flight rename and applies any server-normalized title.
-    pub(crate) fn complete_conversation_rename(
-        &mut self,
-        conversation_id: AIConversationId,
-        title: String,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let Some(rename) = self.in_flight_conversation_renames.remove(&conversation_id) else {
-            log::warn!(
-                "complete_conversation_rename called for conversation {conversation_id:?} with no in-flight rename"
-            );
-            return;
-        };
-
-        if rename.attempted_title != title {
-            self.apply_conversation_title(conversation_id, title, ctx);
-        }
-    }
-
-    /// Reverts an in-flight rename to the captured previous title snapshot.
-    pub(crate) fn fail_conversation_rename(
-        &mut self,
-        conversation_id: AIConversationId,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let Some(rename) = self.in_flight_conversation_renames.remove(&conversation_id) else {
-            log::warn!(
-                "fail_conversation_rename called for conversation {conversation_id:?} with no in-flight rename"
-            );
-            return;
-        };
-
-        let terminal_view_id = self.terminal_view_id_for_conversation(&conversation_id);
-
-        let mut updated = false;
-        if let Some(conversation) = self.conversations_by_id.get_mut(&conversation_id) {
-            conversation.restore_conversation_title(
-                rename.previous_root_task_description,
-                rename.previous_server_metadata_title,
-                ctx,
-            );
-            updated = true;
-        } else {
-            log::warn!(
-                "fail_conversation_rename called for missing conversation {conversation_id:?}"
-            );
-        }
-
-        let title = if let Some(previous_title) = rename.previous_cached_metadata_title {
-            if let Some(metadata) = self.all_conversations_metadata.get_mut(&conversation_id) {
-                metadata.title = previous_title.clone();
-                if let Some(server_metadata) = metadata.server_conversation_metadata.as_mut() {
-                    server_metadata.title = previous_title.clone();
-                }
-                updated = true;
-            }
-            previous_title
-        } else {
-            self.conversations_by_id
-                .get(&conversation_id)
-                .and_then(AIConversation::title)
-                .unwrap_or_default()
-        };
-
-        if !updated {
-            return;
-        }
-
-        ctx.emit(BlocklistAIHistoryEvent::UpdatedConversationTitle {
-            terminal_view_id,
-            conversation_id,
-            title,
-        });
+        Ok(())
     }
 
     /// Applies a conversation title locally and notifies title observers.
@@ -1829,49 +1707,6 @@ impl BlocklistAIHistoryModel {
         };
         if let Err(e) = conversation.mark_request_completed(stream_id, terminal_view_id, ctx) {
             log::warn!("Failed to mark exchange as completed: {e}");
-        }
-
-        // If this conversation doesn't have server metadata yet, and it has a server conversation token,
-        // fetch the metadata from the server.
-        let should_fetch_metadata = FeatureFlag::CloudConversations.is_enabled()
-            && conversation.server_metadata().is_none()
-            && conversation.server_conversation_token().is_some();
-
-        if should_fetch_metadata {
-            let server_token = conversation
-                .server_conversation_token()
-                .unwrap()
-                .as_str()
-                .to_string();
-
-            let server_api = ServerApiProvider::as_ref(ctx).get_ai_client();
-            ctx.spawn(
-                async move {
-                    server_api
-                        .list_ai_conversation_metadata(Some(vec![server_token]))
-                        .await
-                },
-                move |model, result, ctx| match result {
-                    Ok(mut metadata_list) if !metadata_list.is_empty() => {
-                        if let Some(metadata) = metadata_list.pop() {
-                            model.set_server_metadata_for_conversation(
-                                conversation_id,
-                                metadata,
-                                ctx,
-                            );
-                        }
-                    }
-                    Ok(_) => {
-                        log::warn!("No metadata returned for conversation {}", conversation_id);
-                    }
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to fetch metadata for conversation {}: {e:#}",
-                            conversation_id
-                        );
-                    }
-                },
-            );
         }
     }
 

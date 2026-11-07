@@ -18,9 +18,7 @@ use warpui::{View, ViewContext, ViewHandle};
 use crate::ai::agent::conversation::ConversationStatus;
 use crate::ai::agent_management::notifications::item::NotificationSourceAgent;
 use crate::ai::agent_management::notifications::{NotificationCategory, NotificationItem};
-use crate::ai::artifacts::{
-    open_screenshot_lightbox, Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent,
-};
+use crate::ai::artifacts::{Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent};
 use crate::appearance::Appearance;
 use crate::ui_components::icon_with_status::{render_icon_with_status, IconWithStatusVariant};
 use crate::util::time_format::format_elapsed_since;
@@ -465,12 +463,6 @@ pub(crate) fn handle_notification_artifact_buttons_event(
         }
         ArtifactButtonsRowEvent::OpenPullRequest { url } => {
             ctx.open_url(url);
-        }
-        ArtifactButtonsRowEvent::ViewScreenshots { artifact_uids } => {
-            open_screenshot_lightbox(artifact_uids, ctx);
-        }
-        ArtifactButtonsRowEvent::DownloadFile { artifact_uid } => {
-            crate::ai::artifacts::download_file_artifact(artifact_uid, ctx);
         }
     }
 }

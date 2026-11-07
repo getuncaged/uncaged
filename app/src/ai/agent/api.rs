@@ -8,7 +8,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 pub use ai::agent::convert::ConvertToAPITypeError;
-use ai::api_keys::ApiKeyManager;
 pub use convert_from::{
     user_inputs_from_messages, ConversionParams, ConvertAPIMessageToClientOutputMessage,
     MaybeAIAgentOutputMessage, MessageToAIAgentOutputMessageError,
@@ -256,10 +255,9 @@ impl RequestParams {
 
         let should_redact_secrets = get_secret_obfuscation_mode(app).should_redact_secret();
 
-        let api_key_manager = ApiKeyManager::as_ref(app);
         // Uncaged has no BYO key, custom inference or Gemini Enterprise entitlement on
-        // Warp's server.
-        let api_keys = api_key_manager.api_keys_for_request(false, None);
+        // Warp's server, so no keys or custom providers go on the request.
+        let api_keys = None;
         let custom_model_providers = None;
         let custom_model_routers = FeatureFlag::CustomModelRouters.is_enabled().then(|| {
             LLMPreferences::as_ref(app).custom_model_routers_for_request(

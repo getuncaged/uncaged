@@ -79,7 +79,6 @@ use crate::ai::agent::{
     AIAgentActionType, AIAgentActionTypeDiscriminants, CancellationReason, FileContext,
     FileLocations,
 };
-use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::get_relevant_files::controller::GetRelevantFilesController;
 #[cfg(feature = "local_fs")]
 use crate::ai::{agent::AnyFileContent, paths::host_native_absolute_path};
@@ -430,16 +429,6 @@ impl BlocklistAIActionExecutor {
 
     pub fn ask_user_question_executor(&self) -> &ModelHandle<AskUserQuestionExecutor> {
         &self.ask_user_question_executor
-    }
-
-    pub fn set_ambient_agent_task_id(
-        &self,
-        id: Option<AmbientAgentTaskId>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.send_message_executor.update(ctx, |executor, _| {
-            executor.set_ambient_agent_task_id(id);
-        });
     }
 
     pub fn preprocess_action(

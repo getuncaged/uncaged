@@ -33,8 +33,6 @@ use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::history_model::CloudConversationData;
-use crate::ai::blocklist::local_agent_task_sync_model::LocalAgentTaskSyncModel;
-use crate::ai::blocklist::orchestration_event_streamer::OrchestrationEventStreamer;
 use crate::ai::blocklist::orchestration_events::OrchestrationEventService;
 use crate::ai::blocklist::orchestration_topology::descendant_conversation_ids_in_spawn_order;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, QueuedQueryModel};
@@ -139,15 +137,11 @@ fn initialize_app(app: &mut App) {
     });
     app.add_singleton_model(|_| CLIAgentSessionsModel::new());
     app.add_singleton_model(OrchestrationEventService::new);
-    app.add_singleton_model(LocalAgentTaskSyncModel::new);
-    app.add_singleton_model(OrchestrationEventStreamer::new);
     app.add_singleton_model(|_| ActiveAgentViewsModel::new());
     app.add_singleton_model(crate::ai::blocklist::BlocklistAIPermissions::new);
     app.add_singleton_model(AgentNotificationsModel::new);
     app.add_singleton_model(AIExecutionProfilesModel::new);
-    app.add_singleton_model(|ctx| {
-        AIRequestUsageModel::new_for_test(ServerApiProvider::as_ref(ctx).get_ai_client(), ctx)
-    });
+    app.add_singleton_model(|_| AIRequestUsageModel::new());
     app.add_singleton_model(LLMPreferences::new);
     app.add_singleton_model(HarnessAvailabilityModel::new);
     #[cfg(feature = "local_fs")]

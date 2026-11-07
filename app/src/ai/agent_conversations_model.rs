@@ -2,31 +2,21 @@
 pub mod entry;
 
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
 
-use chrono::{DateTime, Utc};
 use clap::ValueEnum;
 pub use entry::{
     AgentConversationEntry, AgentConversationEntryId, AgentConversationNavigationSubject,
     AgentConversationProvenance,
 };
-use futures::stream::AbortHandle;
-use instant::Instant;
 use itertools::Itertools;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use warp_cli::agent::Harness;
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
-use warp_core::report_error;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::theme::WarpTheme;
 use warpui::color::ColorU;
-use warpui::r#async::Timer;
-use warpui::windowing::{StateEvent, WindowManager};
-use warpui::{
-    duration_with_jitter, AppContext, Entity, EntityId, ModelContext, ModelHandle, RequestState,
-    SingletonEntity, WindowId,
-};
+use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::api::ServerConversationToken;
@@ -40,107 +30,8 @@ use crate::ai::blocklist::{
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, ConversationStatusUpdate,
 };
 use crate::ai::conversation_navigation::ConversationNavigationData;
-use crate::network::{NetworkStatus, NetworkStatusEvent, NetworkStatusKind};
-use crate::server::retry_strategies::{
-    is_transient_http_error, OUT_OF_BAND_REQUEST_RETRY_STRATEGY, PERIODIC_POLL_RETRY_STRATEGY,
-};
-use crate::server::server_api::ai::TaskListFilter;
-use crate::server::server_api::{HttpStatusError, ServerApiProvider};
 use crate::ui_components::icons::Icon;
 use crate::workspace::{RestoreConversationLayout, WorkspaceAction};
-
-const POLLING_INTERVAL: Duration = Duration::from_secs(30);
-const RTC_TASK_REFRESH_THROTTLE: Duration = Duration::from_secs(5);
-const INITIAL_TASK_AMOUNT: i32 = 100;
-
-/// How long to skip refetching a task that just failed with a transient error
-/// (5xx / 408 / 429 / network). Short cooldown — `spawn_with_retry_on_error_when` already
-/// runs fast exponential retries before bubbling up the failure, so this is just enough to
-/// absorb streaming-driven re-entries from `update_transcript_details_panel_data`.
-const TRANSIENT_FETCH_FAILURE_COOLDOWN: Duration = Duration::from_secs(2);
-
-/// How long to skip refetching a task that just failed with a permanent (non-transient) HTTP
-/// error such as 401/403/404. We don't refuse forever — permissions can change mid-session
-/// (e.g. an ACL grant) — but we wait long enough that streaming bursts and rapid re-entries
-/// can't cause a flood.
-const PERMANENT_FETCH_FAILURE_COOLDOWN: Duration = Duration::from_secs(60);
-
-/// Error details for a failed ambient-agent task metadata fetch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TaskFetchError {
-    message: String,
-    status: Option<u16>,
-}
-
-impl TaskFetchError {
-    fn from_error(e: &anyhow::Error) -> Self {
-        let status = e.chain().find_map(|cause| {
-            cause
-                .downcast_ref::<HttpStatusError>()
-                .map(|http_err| http_err.status)
-        });
-        Self {
-            message: format!("{e}"),
-            status,
-        }
-    }
-
-    pub(crate) fn message(&self) -> &str {
-        &self.message
-    }
-
-    pub(crate) fn is_access_denied(&self) -> bool {
-        matches!(self.status, Some(401 | 403))
-    }
-}
-
-/// Per-task fetch state for `get_or_async_fetch_task_data`. The three variants are mutually
-/// exclusive: a task id is either being fetched right now, in a short cooldown after a
-/// transient failure, or in a longer cooldown after a permanent (non-transient) failure.
-#[derive(Debug)]
-enum TaskFetchState {
-    /// A retry chain is currently outstanding for this task id. Used to dedupe re-entries
-    /// (e.g. from streaming-driven panel refreshes) so we don't spawn overlapping retry
-    /// chains for the same task id.
-    InFlight,
-    /// The fetch returned a permanent (non-transient) HTTP error such as 401/403/404; remember
-    /// when it failed so we can back off for [`PERMANENT_FETCH_FAILURE_COOLDOWN`] before
-    /// retrying. We don't refuse forever in case permissions change mid-session.
-    /// The `TaskFetchError` carries structured failure details for display in the UI.
-    PermanentlyFailed { at: Instant, error: TaskFetchError },
-    /// The retry chain just exhausted on a transient error; remember when it failed so we
-    /// can back off for [`TRANSIENT_FETCH_FAILURE_COOLDOWN`] before retrying.
-    /// The `TaskFetchError` carries structured failure details for display in the UI.
-    TransientlyFailed { at: Instant, error: TaskFetchError },
-}
-
-/// Tracks the cooldown window for RTC-triggered task-list refreshes. Pending events keep
-/// the earliest timestamp in the burst because `updated_after` is a lower bound; using the
-/// latest timestamp could skip tasks that changed earlier in the same window.
-#[derive(Default)]
-enum RtcTaskRefreshThrottleState {
-    #[default]
-    Idle,
-    CoolingDown {
-        pending_timestamp: Option<DateTime<Utc>>,
-        timer_abort_handle: AbortHandle,
-    },
-}
-
-fn record_earliest_rtc_task_refresh_timestamp(
-    pending_timestamp: &mut Option<DateTime<Utc>>,
-    timestamp: DateTime<Utc>,
-) {
-    match pending_timestamp {
-        Some(existing_timestamp) if timestamp < *existing_timestamp => {
-            *existing_timestamp = timestamp;
-        }
-        None => {
-            *pending_timestamp = Some(timestamp);
-        }
-        Some(_) => {}
-    }
-}
 
 /// Protected eviction: we'll always keep at least 200 personal tasks in the model.
 /// This is so that whenever we evict stale tasks, we do not evict relevant, recent personal tasks
@@ -533,8 +424,8 @@ pub(crate) fn artifacts_match_filter(
 }
 
 /// This model serves as a unified interface for reading both local and ambient agent conversations
-/// (i.e. conversations & tasks). The model is responsible for polling for new tasks and updating
-/// its local state accordingly.
+/// (i.e. conversations & tasks). Ambient tasks were only ever fetched from Warp's server, so
+/// Uncaged has no source for them and the task map stays empty outside tests.
 ///
 /// This model backs both the agent management view and the conversation list view.
 pub struct AgentConversationsModel {
@@ -542,30 +433,13 @@ pub struct AgentConversationsModel {
     tasks: HashMap<AmbientAgentTaskId, AmbientAgentTask>,
     /// A map of conversation IDs to local conversations.
     conversations: HashMap<AIConversationId, ConversationMetadata>,
-    /// Handle to abort the in-flight polling request.
-    in_flight_poll_abort_handle: Option<AbortHandle>,
-    /// Handle to abort the timer for initiating the next poll.
-    next_poll_abort_handle: Option<AbortHandle>,
-    /// Set of view IDs actively consuming this model's data per window.
-    /// When a window has at least one consumer, we poll for new tasks while that window is active.
-    active_data_consumers_per_window: HashMap<WindowId, HashSet<EntityId>>,
     /// Whether we have finished the initial task load
     has_finished_initial_load: bool,
-    /// Per-task fetch state for `get_or_async_fetch_task_data`. See [`TaskFetchState`] for
-    /// the meaning of each variant. Tasks that have been successfully fetched live in `tasks`
-    /// and are absent from this map.
-    task_fetch_state: HashMap<AmbientAgentTaskId, TaskFetchState>,
-    rtc_task_refresh_throttle_state: RtcTaskRefreshThrottleState,
-    /// Earliest RTC timestamp received while no list surface was open.
-    /// On next `register_view_open`, triggers a single `fetch_tasks_updated_after`.
-    dirty_since: Option<DateTime<Utc>>,
 }
 
 pub enum AgentConversationsModelEvent {
     /// Initial load of tasks completed.
     ConversationsLoaded,
-    /// New tasks were received during polling (view should diff against its local state).
-    NewTasksReceived,
     /// Existing task data may have been updated (e.g., state changes).
     TasksUpdated,
     /// Conversation status data was updated
@@ -602,21 +476,9 @@ impl AgentConversationsModel {
             return Self {
                 tasks: HashMap::new(),
                 conversations: HashMap::new(),
-                in_flight_poll_abort_handle: None,
-                next_poll_abort_handle: None,
-                active_data_consumers_per_window: HashMap::new(),
                 has_finished_initial_load: true,
-                task_fetch_state: HashMap::new(),
-                rtc_task_refresh_throttle_state: RtcTaskRefreshThrottleState::default(),
-                dirty_since: None,
             };
         }
-
-        // Subscribe to network status and window manager to inform whether we should poll for new task data
-        let network_status = NetworkStatus::handle(ctx);
-        ctx.subscribe_to_model(&network_status, Self::handle_network_status_changed);
-        let window_manager = WindowManager::handle(ctx);
-        ctx.subscribe_to_model(&window_manager, Self::handle_window_state_changed);
 
         let history_model = BlocklistAIHistoryModel::handle(ctx);
         ctx.subscribe_to_model(&history_model, move |me, _, event, ctx| {
@@ -631,13 +493,7 @@ impl AgentConversationsModel {
         let mut model = Self {
             tasks: HashMap::new(),
             conversations: HashMap::new(),
-            in_flight_poll_abort_handle: None,
-            next_poll_abort_handle: None,
-            active_data_consumers_per_window: HashMap::new(),
             has_finished_initial_load: false,
-            task_fetch_state: HashMap::new(),
-            rtc_task_refresh_throttle_state: RtcTaskRefreshThrottleState::default(),
-            dirty_since: None,
         };
 
         // Only sync local conversations if we're not in CLI mode. Server-side data
@@ -653,88 +509,6 @@ impl AgentConversationsModel {
 
     pub fn is_loading(&self) -> bool {
         !self.has_finished_initial_load
-    }
-
-    fn handle_network_status_changed(
-        &mut self,
-        _: ModelHandle<NetworkStatus>,
-        event: &NetworkStatusEvent,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        match event {
-            NetworkStatusEvent::NetworkStatusChanged { new_status } => match new_status {
-                NetworkStatusKind::Online => {
-                    self.update_polling_state(ctx);
-                }
-                NetworkStatusKind::Offline => {
-                    self.abort_existing_poll();
-                }
-            },
-        }
-    }
-
-    fn handle_window_state_changed(
-        &mut self,
-        _: ModelHandle<WindowManager>,
-        event: &StateEvent,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        match event {
-            StateEvent::ValueChanged { current, previous } => {
-                // If the active window changed, check if we need to start/stop polling
-                if current.active_window != previous.active_window {
-                    self.update_polling_state(ctx);
-                }
-            }
-        }
-    }
-
-    fn abort_rtc_task_refresh_throttle(&mut self) {
-        if let RtcTaskRefreshThrottleState::CoolingDown {
-            timer_abort_handle, ..
-        } = std::mem::take(&mut self.rtc_task_refresh_throttle_state)
-        {
-            timer_abort_handle.abort();
-        }
-    }
-
-    /// Fetch tasks updated after the given timestamp (minus 1 second buffer since server uses `>` not `>=`).
-    fn fetch_tasks_updated_after(
-        &mut self,
-        timestamp: DateTime<Utc>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client();
-
-        // Subtract 1 second to give buffer for clock differences with server
-        let updated_after = timestamp - chrono::Duration::seconds(1);
-        // Reset `dirty_since` now that we are doing a fetch.
-        self.dirty_since = None;
-
-        ctx.spawn_with_retry_on_error(
-            move || {
-                let ai_client = ai_client.clone();
-                async move {
-                    ai_client
-                        .list_ambient_agent_tasks(
-                            INITIAL_TASK_AMOUNT,
-                            TaskListFilter {
-                                updated_after: Some(updated_after),
-                                ..Default::default()
-                            },
-                        )
-                        .await
-                }
-            },
-            OUT_OF_BAND_REQUEST_RETRY_STRATEGY,
-            |model, result, ctx| {
-                if let RequestState::RequestSucceeded(tasks) = result {
-                    model.update_model_with_new_tasks(tasks, ctx);
-                } else if let RequestState::RequestFailed(e) = result {
-                    report_error!(e);
-                }
-            },
-        );
     }
 
     /// Sync all conversations to the AgentConversationsModel.
@@ -756,167 +530,6 @@ impl AgentConversationsModel {
         }
 
         ctx.emit(AgentConversationsModelEvent::ConversationsLoaded);
-    }
-
-    /// Called when a view that consumes this model's data becomes visible.
-    /// Uses view_id to make registration idempotent.
-    pub fn register_view_open(
-        &mut self,
-        window_id: WindowId,
-        view_id: EntityId,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.active_data_consumers_per_window
-            .entry(window_id)
-            .or_default()
-            .insert(view_id);
-        self.update_polling_state(ctx);
-
-        // Flush dirty tasks accumulated while no list surface was open.
-        if let Some(dirty_since) = self.dirty_since.take() {
-            self.fetch_tasks_updated_after(dirty_since, ctx);
-        }
-    }
-
-    /// Called when a view that consumes this model's data becomes hidden.
-    /// Uses view_id to make unregistration idempotent.
-    pub fn register_view_closed(
-        &mut self,
-        window_id: WindowId,
-        view_id: EntityId,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if let Some(views) = self.active_data_consumers_per_window.get_mut(&window_id) {
-            views.remove(&view_id);
-            if views.is_empty() {
-                self.active_data_consumers_per_window.remove(&window_id);
-            }
-        }
-        self.update_polling_state(ctx);
-    }
-
-    /// Updates the polling state based on whether the active window has the view open.
-    fn update_polling_state(&mut self, ctx: &mut ModelContext<Self>) {
-        let should_poll = self.should_be_polling(ctx);
-
-        if should_poll && self.next_poll_abort_handle.is_none() {
-            self.poll_for_tasks(ctx);
-        } else if !should_poll {
-            self.abort_existing_poll();
-        }
-    }
-
-    /// Returns true if we should be polling: online, not loading, and active window has the view open.
-    fn should_be_polling(&self, ctx: &ModelContext<Self>) -> bool {
-        if !self.has_finished_initial_load {
-            return false;
-        }
-
-        // Don't poll if we're using RTC
-        if FeatureFlag::AmbientAgentsRTC.is_enabled() {
-            return false;
-        }
-
-        let is_online = NetworkStatus::as_ref(ctx).is_online();
-
-        if !is_online {
-            return false;
-        }
-
-        let active_window = WindowManager::as_ref(ctx).active_window();
-
-        match active_window {
-            Some(window_id) => self
-                .active_data_consumers_per_window
-                .get(&window_id)
-                .is_some_and(|views| !views.is_empty()),
-            None => false,
-        }
-    }
-
-    /// Abort the current in-flight poll (does NOT abort initial sync)
-    fn abort_existing_poll(&mut self) {
-        if let Some(handle) = self.next_poll_abort_handle.take() {
-            handle.abort();
-        }
-        if let Some(handle) = self.in_flight_poll_abort_handle.take() {
-            handle.abort();
-        }
-    }
-
-    fn schedule_next_poll(&mut self, ctx: &mut ModelContext<Self>) {
-        let future_handle = ctx.spawn(
-            async move {
-                Timer::after(duration_with_jitter(POLLING_INTERVAL, 0.2)).await;
-            },
-            |model, _, ctx| {
-                model.poll_for_tasks(ctx);
-            },
-        );
-        self.next_poll_abort_handle = Some(future_handle.abort_handle());
-    }
-
-    fn poll_for_tasks(&mut self, ctx: &mut ModelContext<Self>) {
-        self.abort_existing_poll();
-        if !self.should_be_polling(ctx) {
-            return;
-        }
-
-        let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client();
-
-        let future = ctx.spawn_with_retry_on_error(
-            move || {
-                let ai_client = ai_client.clone();
-                async move {
-                    ai_client
-                        .list_ambient_agent_tasks(100, TaskListFilter::default())
-                        .await
-                }
-            },
-            PERIODIC_POLL_RETRY_STRATEGY,
-            |model, result, ctx| {
-                let should_poll_again = !result.has_pending_retries();
-
-                if let RequestState::RequestSucceeded(tasks) = result {
-                    model.update_model_with_new_tasks(tasks, ctx);
-                }
-
-                if should_poll_again {
-                    model.schedule_next_poll(ctx);
-                }
-            },
-        );
-
-        self.in_flight_poll_abort_handle = Some(future.abort_handle());
-    }
-
-    // Update the model with new tasks retrieved from the server.
-    fn update_model_with_new_tasks(
-        &mut self,
-        tasks: Vec<AmbientAgentTask>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let mut has_new_tasks = false;
-        let mut has_updated_tasks = false;
-
-        for task in tasks {
-            let task_id = task.task_id;
-            match self.tasks.get(&task_id) {
-                Some(existing_task) => {
-                    if existing_task != &task {
-                        has_updated_tasks = true
-                    }
-                }
-                None => has_new_tasks = true,
-            };
-            self.tasks.insert(task_id, task);
-        }
-
-        if has_new_tasks {
-            ctx.emit(AgentConversationsModelEvent::NewTasksReceived);
-        } else if has_updated_tasks {
-            ctx.emit(AgentConversationsModelEvent::TasksUpdated);
-        }
     }
 
     /// Returns true if we have tasks or local conversations in this view
@@ -1030,15 +643,10 @@ impl AgentConversationsModel {
             AgentConversationNavigationSubject::Entry(id) => model
                 .get_entry_by_id(&id, app)
                 .and_then(|entry| model.resolve_entry_open_action(&entry, restore_layout, app)),
+            // A token without a local conversation lived only on Warp's server.
             AgentConversationNavigationSubject::ServerToken(server_token) => model
                 .entry_for_server_token(&server_token, app)
-                .and_then(|entry| model.resolve_entry_open_action(&entry, restore_layout, app))
-                .or_else(|| {
-                    Some(WorkspaceAction::OpenConversationTranscriptViewer {
-                        ambient_agent_task_id: model.task_id_for_server_token(&server_token),
-                        conversation_id: server_token,
-                    })
-                }),
+                .and_then(|entry| model.resolve_entry_open_action(&entry, restore_layout, app)),
         }
     }
 
@@ -1119,34 +727,23 @@ impl AgentConversationsModel {
             }
         }
 
-        if let Some(conversation_id) = entry.identity.local_conversation_id {
-            let nav_data = self
-                .conversations
-                .get(&conversation_id)
-                .map(|metadata| &metadata.nav_data);
-            if !entry.backing.has_cloud_data
-                || entry.backing.has_local_persisted_data
-                || entry.backing.has_loaded_conversation
-                || nav_data.is_some()
-            {
-                return Some(WorkspaceAction::RestoreOrNavigateToConversation {
-                    conversation_id,
-                    window_id: nav_data.and_then(|nav_data| nav_data.window_id),
-                    pane_view_locator: None,
-                    terminal_view_id: nav_data.and_then(|nav_data| nav_data.terminal_view_id),
-                    restore_layout,
-                });
-            }
-        }
-
-        entry
-            .identity
-            .server_conversation_token
-            .as_ref()
-            .map(|token| WorkspaceAction::OpenConversationTranscriptViewer {
-                conversation_id: token.clone(),
-                ambient_agent_task_id: entry.identity.ambient_agent_task_id,
-            })
+        // Conversations with only cloud data lived on Warp's server and cannot be opened.
+        let conversation_id = entry.identity.local_conversation_id?;
+        let nav_data = self
+            .conversations
+            .get(&conversation_id)
+            .map(|metadata| &metadata.nav_data);
+        (!entry.backing.has_cloud_data
+            || entry.backing.has_local_persisted_data
+            || entry.backing.has_loaded_conversation
+            || nav_data.is_some())
+        .then(|| WorkspaceAction::RestoreOrNavigateToConversation {
+            conversation_id,
+            window_id: nav_data.and_then(|nav_data| nav_data.window_id),
+            pane_view_locator: None,
+            terminal_view_id: nav_data.and_then(|nav_data| nav_data.terminal_view_id),
+            restore_layout,
+        })
     }
 
     fn resolve_entry_copy_link(&self, entry: &AgentConversationEntry) -> Option<String> {
@@ -1195,17 +792,6 @@ impl AgentConversationsModel {
             &AgentConversationEntryId::Conversation(conversation_id),
             app,
         )
-    }
-
-    fn task_id_for_server_token(
-        &self,
-        server_token: &ServerConversationToken,
-    ) -> Option<AmbientAgentTaskId> {
-        self.tasks.values().find_map(|task| {
-            task.conversation_id()
-                .is_some_and(|conversation_id| conversation_id == server_token.as_str())
-                .then_some(task.task_id)
-        })
     }
 
     fn handle_history_event(
@@ -1322,122 +908,6 @@ impl AgentConversationsModel {
         self.tasks.get(task_id).cloned()
     }
 
-    /// Returns the error details when the most recent fetch for `task_id` ended in a
-    /// permanent or transient failure and the cooldown has not yet elapsed. The caller
-    /// can use this to display an error state in the details panel.
-    pub(crate) fn task_fetch_error(&self, task_id: &AmbientAgentTaskId) -> Option<&TaskFetchError> {
-        match self.task_fetch_state.get(task_id) {
-            Some(
-                TaskFetchState::PermanentlyFailed { error, .. }
-                | TaskFetchState::TransientlyFailed { error, .. },
-            ) => Some(error),
-            _ => None,
-        }
-    }
-
-    /// Get raw task data by task ID, fetching from server if not in memory.
-    /// If the task is already in memory, returns it immediately.
-    /// If not, spawns an async task to fetch it from the server, stores it in memory,
-    /// and emits a TasksUpdated event when ready.
-    ///
-    /// Multiple unrelated callers (the WASM transcript details panel, the cloud-mode details
-    /// panel, and pane-group restoration) can all hit this method, sometimes many times per
-    /// second while an agent is streaming. To avoid spamming `GET /api/v1/agent/runs/{id}` we:
-    /// * dedupe in-flight fetches per task id,
-    /// * back off for [`TRANSIENT_FETCH_FAILURE_COOLDOWN`] after a transient retry chain
-    ///   exhausts (5xx/408/429/network), and
-    /// * back off for [`PERMANENT_FETCH_FAILURE_COOLDOWN`] after a non-transient failure
-    ///   (e.g. 401/403/404). Permanent failures still get retried periodically so we recover
-    ///   if permissions change mid-session.
-    pub fn get_or_async_fetch_task_data(
-        &mut self,
-        task_id: &AmbientAgentTaskId,
-        ctx: &mut ModelContext<Self>,
-    ) -> Option<AmbientAgentTask> {
-        // If we already have it, return it
-        if let Some(task) = self.tasks.get(task_id) {
-            return Some(task.clone());
-        }
-
-        self.async_fetch_task(task_id, ctx);
-        None
-    }
-
-    /// Consult fetch-state guards and spawn a fetch if allowed.
-    fn async_fetch_task(&mut self, task_id: &AmbientAgentTaskId, ctx: &mut ModelContext<Self>) {
-        match self.task_fetch_state.get(task_id) {
-            Some(TaskFetchState::InFlight) => return,
-            Some(TaskFetchState::PermanentlyFailed { at, .. }) => {
-                if at.elapsed() < PERMANENT_FETCH_FAILURE_COOLDOWN {
-                    return;
-                }
-                // Cooldown has elapsed; clear the entry and fall through to fetch again.
-                self.task_fetch_state.remove(task_id);
-            }
-            Some(TaskFetchState::TransientlyFailed { at, .. }) => {
-                if at.elapsed() < TRANSIENT_FETCH_FAILURE_COOLDOWN {
-                    return;
-                }
-                self.task_fetch_state.remove(task_id);
-            }
-            None => {}
-        }
-
-        // Opportunistically purge other expired entries so the map doesn't grow unbounded.
-        self.task_fetch_state.retain(|_, state| match state {
-            TaskFetchState::TransientlyFailed { at, .. } => {
-                at.elapsed() < TRANSIENT_FETCH_FAILURE_COOLDOWN
-            }
-            TaskFetchState::PermanentlyFailed { at, .. } => {
-                at.elapsed() < PERMANENT_FETCH_FAILURE_COOLDOWN
-            }
-            TaskFetchState::InFlight => true,
-        });
-
-        // Otherwise, spawn a task to fetch it. Use the `_when` variant so non-transient errors
-        // (e.g. 401/403/404) bail after the first attempt instead of issuing all 4 requests in
-        // the retry chain before being cached.
-        let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client();
-        let task_id_clone = *task_id;
-
-        self.task_fetch_state
-            .insert(task_id_clone, TaskFetchState::InFlight);
-
-        ctx.spawn_with_retry_on_error_when(
-            move || {
-                let ai_client = ai_client.clone();
-                async move { ai_client.get_ambient_agent_task(&task_id_clone).await }
-            },
-            OUT_OF_BAND_REQUEST_RETRY_STRATEGY,
-            is_transient_http_error,
-            move |model, result, ctx| match result {
-                RequestState::RequestSucceeded(task) => {
-                    let fetched_id = task.task_id;
-                    model.tasks.insert(fetched_id, task);
-                    model.task_fetch_state.remove(&fetched_id);
-                    ctx.emit(AgentConversationsModelEvent::TasksUpdated);
-                }
-                RequestState::RequestFailed(e) => {
-                    let now = Instant::now();
-                    let error = TaskFetchError::from_error(&e);
-                    let new_state = if is_transient_http_error(&e) {
-                        TaskFetchState::TransientlyFailed { at: now, error }
-                    } else {
-                        TaskFetchState::PermanentlyFailed { at: now, error }
-                    };
-                    model.task_fetch_state.insert(task_id_clone, new_state);
-                    report_error!(e);
-
-                    // On failure, this still emits an update event so that the details panel can re-render with the error message.
-                    ctx.emit(AgentConversationsModelEvent::TasksUpdated);
-                }
-                RequestState::RequestFailedRetryPending(_) => {
-                    // Wait for a terminal outcome before updating dedup/backoff state.
-                }
-            },
-        );
-    }
-
     /// Returns all (name, uid) pairs for creators of tasks in the model.
     ///
     /// We use this function to populate the available creator filter list
@@ -1482,20 +952,6 @@ impl AgentConversationsModel {
         team.truncate(MAX_TEAM_TASKS);
 
         self.tasks = personal.into_iter().chain(team).collect();
-    }
-
-    /// Clears all stored conversation and task data in memory.
-    /// This is used when logging out to ensure no conversation history persists across users.
-    pub(crate) fn reset(&mut self) {
-        self.tasks.clear();
-        self.conversations.clear();
-        self.abort_existing_poll();
-        self.abort_rtc_task_refresh_throttle();
-        self.active_data_consumers_per_window.clear();
-        self.task_fetch_state.clear();
-        self.dirty_since = None;
-        // Reset the initial load flag so that we can retry the initial sync with the new logged in user
-        self.has_finished_initial_load = false;
     }
 }
 

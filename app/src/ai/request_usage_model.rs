@@ -1,45 +1,7 @@
-use std::sync::Arc;
-
 use chrono::{DateTime, Local, Utc};
-use instant::Instant;
 use serde::{Deserialize, Serialize};
-use warp_core::user_preferences::GetUserPreferences as _;
-pub use warp_graphql::billing::BonusGrantType;
 use warp_graphql::scalars::time::ServerTimestamp;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
-
-use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::agent::AIAgentExchangeId;
-use crate::server::server_api::ai::AIClient;
-use crate::settings::AISettings;
-use crate::workspaces::workspace::WorkspaceUid;
-use crate::BlocklistAIHistoryModel;
-
-/// Threshold of ambient-only credits at which we surface upgrade/CTA UI.
-pub const AMBIENT_AGENT_TRIAL_CREDIT_THRESHOLD: i32 = 20;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum BonusGrantScope {
-    User,
-    Workspace(WorkspaceUid),
-}
-
-#[derive(Clone, Debug)]
-pub struct BonusGrant {
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub cost_cents: i32,
-    pub expiration: Option<chrono::DateTime<chrono::Utc>>,
-    pub grant_type: BonusGrantType,
-    pub reason: String,
-    pub user_facing_message: Option<String>,
-    pub request_credits_granted: i32,
-    pub request_credits_remaining: i32,
-    pub scope: BonusGrantScope,
-}
-
-/// The key for the corresponding entry in UserDefaults.
-const REQUEST_LIMIT_INFO_CACHE_KEY: &str = "AIRequestLimitInfo";
-const AMBIENT_CREDITS_BANNER_DISMISSED_KEY: &str = "AmbientCreditsBannerDismissed";
+use warpui::{Entity, SingletonEntity};
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum RequestLimitRefreshDuration {
@@ -117,223 +79,21 @@ pub struct CodebaseContextUsageLimit {
     pub embedding_generation_batch_size: usize,
 }
 
-/// Contains all usage-related information fetched from the server.
-pub struct RequestUsageInfo {
-    pub request_limit_info: RequestLimitInfo,
-    pub bonus_grants: Vec<BonusGrant>,
-}
-
-#[cfg(feature = "agent_mode_evals")]
-impl RequestLimitInfo {
-    pub fn new_for_evals() -> Self {
-        Self {
-            limit: 999999,
-            num_requests_used_since_refresh: 0,
-            next_refresh_time: ServerTimestamp::new(Utc::now() + chrono::Duration::days(30)),
-            is_unlimited: true,
-            request_limit_refresh_duration: RequestLimitRefreshDuration::Monthly,
-            is_unlimited_voice: true,
-            voice_request_limit: 999999,
-            voice_requests_used_since_last_refresh: 0,
-            is_unlimited_codebase_indices: false,
-            max_codebase_indices: 40,
-            max_files_per_repo: 10000,
-            embedding_generation_batch_size: 100,
-        }
-    }
-}
-
-fn cache_request_limit_info(request_limit_info: RequestLimitInfo, app_mut: &mut AppContext) {
-    if let Ok(serialized) = serde_json::to_string(&request_limit_info) {
-        let _ = app_mut
-            .private_user_preferences()
-            .write_value(REQUEST_LIMIT_INFO_CACHE_KEY, serialized);
-    }
-}
-
-fn get_cached_request_limit_info(app_mut: &mut AppContext) -> Option<RequestLimitInfo> {
-    app_mut
-        .private_user_preferences()
-        .read_value(REQUEST_LIMIT_INFO_CACHE_KEY)
-        .unwrap_or_default()
-        .and_then(|serialized| serde_json::from_str(serialized.as_str()).ok())
-}
-
-fn cache_ambient_credits_banner_dismissed(dismissed: bool, app_mut: &mut AppContext) {
-    let _ = app_mut
-        .private_user_preferences()
-        .write_value(AMBIENT_CREDITS_BANNER_DISMISSED_KEY, dismissed.to_string());
-}
-
-fn get_cached_ambient_credits_banner_dismissed(app_mut: &mut AppContext) -> bool {
-    app_mut
-        .private_user_preferences()
-        .read_value(AMBIENT_CREDITS_BANNER_DISMISSED_KEY)
-        .unwrap_or_default()
-        .and_then(|value| value.parse::<bool>().ok())
-        .unwrap_or_default()
-}
-
+/// Uncaged has no Warp plan: the request limit is Warp's free-tier default and
+/// is never refreshed from a server.
 pub struct AIRequestUsageModel {
-    ai_client: Arc<dyn AIClient>,
-
-    /// The last time at which `request_limit_info` was updated.
-    last_update_time: Option<Instant>,
-
     request_limit_info: RequestLimitInfo,
-
-    bonus_grants: Vec<BonusGrant>,
-
-    /// Whether the ambient trial credits banner has been dismissed by the user.
-    ambient_credits_banner_dismissed: bool,
 }
 
 impl Entity for AIRequestUsageModel {
-    type Event = AIRequestUsageModelEvent;
-}
-
-pub enum AIRequestUsageModelEvent {
-    RequestUsageUpdated,
-    AmbientCreditsBannerDismissed,
-    RequestBonusRefunded {
-        requests_refunded: i32,
-        server_conversation_id: String,
-        request_id: String,
-    },
+    type Event = ();
 }
 
 impl AIRequestUsageModel {
-    pub fn new(ai_client: Arc<dyn AIClient>, ctx: &mut ModelContext<Self>) -> Self {
-        // Check if the user has cached request limit info from before.
-        // This is only used to show the latest known value before we finish refreshing from the server below.
-        let cached_request_limit_info = get_cached_request_limit_info(ctx);
-        let request_limit_info = cached_request_limit_info.unwrap_or_default();
-        let ambient_credits_banner_dismissed = get_cached_ambient_credits_banner_dismissed(ctx);
-
+    pub fn new() -> Self {
         Self {
-            ai_client,
-            request_limit_info,
-            last_update_time: None,
-            bonus_grants: vec![],
-            ambient_credits_banner_dismissed,
-        }
-    }
-
-    #[cfg(test)]
-    pub fn new_for_test(ai_client: Arc<dyn AIClient>, ctx: &mut ModelContext<Self>) -> Self {
-        Self {
-            ai_client,
-            last_update_time: None,
             request_limit_info: RequestLimitInfo::default(),
-            bonus_grants: vec![],
-            ambient_credits_banner_dismissed: get_cached_ambient_credits_banner_dismissed(ctx),
         }
-    }
-
-    pub fn update_request_limit_info(
-        &mut self,
-        request_limit_info: RequestLimitInfo,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.last_update_time = Some(Instant::now());
-        self.request_limit_info = request_limit_info;
-        cache_request_limit_info(request_limit_info, ctx);
-
-        AISettings::handle(ctx).update(ctx, |ai_settings, ctx| {
-            ai_settings.update_quota_info(&request_limit_info, ctx);
-        });
-
-        ctx.emit(AIRequestUsageModelEvent::RequestUsageUpdated);
-    }
-
-    pub fn provide_negative_feedback_response_for_ai_conversation(
-        &mut self,
-        client_conversation_id: AIConversationId,
-        request_id: String,
-        client_exchange_id: AIAgentExchangeId,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let server_conversation_id = BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(&client_conversation_id)
-            .and_then(|conversation| conversation.server_conversation_token());
-
-        let Some(server_conversation_id) = server_conversation_id else {
-            return;
-        };
-        let server_conversation_id_string = server_conversation_id.as_str().to_string();
-        let server_conversation_id_string_clone = server_conversation_id_string.clone();
-
-        let request_ids = BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(&client_conversation_id)
-            .map(|conversation| {
-                let mut request_ids = vec![];
-
-                let target_exchange = conversation
-                    .root_task_exchanges()
-                    .find(|exchange| exchange.id == client_exchange_id);
-
-                let mut found_target = false;
-
-                for exchange in conversation.exchanges_reversed() {
-                    if let Some(target_exchange) = target_exchange {
-                        if exchange.id == target_exchange.id {
-                            found_target = true;
-                        }
-                    } else {
-                        break;
-                    }
-
-                    if found_target {
-                        if let Some(server_output_id) = exchange.output_status.server_output_id() {
-                            request_ids.push(server_output_id.to_string());
-                        }
-
-                        if exchange
-                            .input
-                            .iter()
-                            .any(|input| input.display_query().is_some())
-                        {
-                            break;
-                        }
-                    }
-                }
-
-                request_ids
-            })
-            .unwrap_or_default();
-
-        // No reason to refund if there are no request ids.
-        if request_ids.is_empty() {
-            return;
-        }
-
-        let ai_client = self.ai_client.clone();
-        ctx.spawn(
-            async move {
-                ai_client
-                    .provide_negative_feedback_response_for_ai_conversation(
-                        server_conversation_id_string_clone,
-                        request_ids,
-                    )
-                    .await
-            },
-            |_, result, ctx| match result {
-                Ok(requests_refunded) => {
-                    if requests_refunded > 0 {
-                        ctx.emit(AIRequestUsageModelEvent::RequestBonusRefunded {
-                            requests_refunded,
-                            server_conversation_id: server_conversation_id_string,
-                            request_id,
-                        });
-                    }
-                }
-                Err(e) => {
-                    log::error!(
-                        "Failed to provide negative feedback response for ai conversation: {e:?}"
-                    );
-                }
-            },
-        );
     }
 
     /// Returns the number of remaining requests the user has based on their latest rate limit info.
@@ -357,18 +117,10 @@ impl AIRequestUsageModel {
         self.requests_remaining() > 0
     }
 
-    /// Returns `true` if the user meets one of the following conditions:
-    /// 1. user has ai credits from the plan base limit
-    /// 2. user has user bonus grants
-    /// 3. a local engine powers AI
-    /// Use this method as the starting point for AI availability checking.
+    /// Returns `true` if the user has plan requests remaining or a local engine
+    /// powers AI. Use this method as the starting point for AI availability checking.
     pub fn has_any_ai_remaining(&self) -> bool {
-        let has_base_plan_ai_requests = self.has_requests_remaining();
-
-        let user_bonus_credits = self.total_user_interactive_bonus_credits_remaining() > 0;
-
-        has_base_plan_ai_requests
-            || user_bonus_credits
+        self.has_requests_remaining()
             // Uncaged: a local engine means unlimited local AI, no Warp credits.
             || crate::uncaged::engine_active()
     }
@@ -419,54 +171,6 @@ impl AIRequestUsageModel {
             RequestLimitRefreshDuration::Monthly => "monthly".to_string(),
             RequestLimitRefreshDuration::EveryTwoWeeks => "biweekly".to_string(),
         }
-    }
-
-    pub fn bonus_grants(&self) -> &[BonusGrant] {
-        &self.bonus_grants
-    }
-
-    /// Returns the total remaining ambient-only credits for the user.
-    /// Returns None if the user has never received any ambient-only grants.
-    pub fn ambient_only_credits_remaining(&self) -> Option<i32> {
-        let ambient_grants: Vec<_> = self
-            .bonus_grants
-            .iter()
-            .filter(|g| g.grant_type == BonusGrantType::AmbientOnly)
-            .collect();
-        if ambient_grants.is_empty() {
-            None
-        } else {
-            Some(
-                ambient_grants
-                    .iter()
-                    .map(|g| g.request_credits_remaining)
-                    .sum(),
-            )
-        }
-    }
-
-    pub fn is_ambient_credits_banner_dismissed(&self) -> bool {
-        self.ambient_credits_banner_dismissed
-    }
-
-    pub fn dismiss_ambient_credits_banner(&mut self, ctx: &mut ModelContext<Self>) {
-        if self.ambient_credits_banner_dismissed {
-            return;
-        }
-        self.ambient_credits_banner_dismissed = true;
-        cache_ambient_credits_banner_dismissed(true, ctx);
-        ctx.emit(AIRequestUsageModelEvent::AmbientCreditsBannerDismissed);
-    }
-
-    pub fn total_user_interactive_bonus_credits_remaining(&self) -> i32 {
-        let now = Utc::now();
-        self.bonus_grants
-            .iter()
-            .filter(|grant| grant.scope == BonusGrantScope::User)
-            .filter(|grant| grant.grant_type != BonusGrantType::AmbientOnly)
-            .filter(|grant| grant.expiration.is_none_or(|exp| now < exp))
-            .map(|grant| grant.request_credits_remaining)
-            .sum()
     }
 }
 

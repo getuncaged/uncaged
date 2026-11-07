@@ -400,12 +400,8 @@ impl BlocklistAIActionModel {
     pub fn set_ambient_agent_task_id(
         &mut self,
         id: Option<crate::ai::ambient_agents::AmbientAgentTaskId>,
-        ctx: &mut ModelContext<Self>,
     ) {
         self.ambient_agent_task_id = id;
-        self.executor.update(ctx, |executor, ctx| {
-            executor.set_ambient_agent_task_id(id, ctx);
-        });
     }
 
     fn blocked_action_for_conversation(

@@ -47,7 +47,7 @@ use crate::ai::agent_management::cloud_setup_guide_view::{
 use crate::ai::agent_management::details_action_buttons::{
     ActionButtonsConfig, AgentDetailsButtonEvent, ConversationActionButtonsRow,
 };
-use crate::ai::ambient_agents::{cancel_task_with_toast, AgentSource};
+use crate::ai::ambient_agents::AgentSource;
 use crate::ai::artifacts::{Artifact, ArtifactButtonsRow, ArtifactButtonsRowEvent};
 use crate::ai::blocklist::format_credits;
 use crate::ai::conversation_details_panel::{
@@ -856,13 +856,8 @@ impl AgentManagementView {
         open_action: Option<WorkspaceAction>,
         copy_link_url: Option<String>,
     ) -> ActionButtonsConfig {
-        if let Some(task_id) = entry.identity.ambient_agent_task_id {
-            ActionButtonsConfig::for_task(
-                task_id,
-                &entry.display.status,
-                open_action,
-                copy_link_url,
-            )
+        if entry.identity.ambient_agent_task_id.is_some() {
+            ActionButtonsConfig::for_task(open_action, copy_link_url)
         } else if let Some(conversation_id) = entry.identity.local_conversation_id {
             ActionButtonsConfig::for_conversation(conversation_id, open_action, copy_link_url)
         } else {
@@ -883,9 +878,6 @@ impl AgentManagementView {
             AgentDetailsButtonEvent::Open => {
                 // Open button only shown in details panel, not in management view cards.
                 // We open the cards directly via clicking on them.
-            }
-            AgentDetailsButtonEvent::CancelTask { task_id } => {
-                cancel_task_with_toast(*task_id, ctx);
             }
             AgentDetailsButtonEvent::ForkConversation { conversation_id } => {
                 ctx.dispatch_typed_action(&WorkspaceAction::ForkAIConversation {
@@ -945,12 +937,6 @@ impl AgentManagementView {
             ArtifactButtonsRowEvent::OpenPullRequest { url } => {
                 ctx.open_url(url);
             }
-            ArtifactButtonsRowEvent::ViewScreenshots { artifact_uids } => {
-                crate::ai::artifacts::open_screenshot_lightbox(artifact_uids, ctx);
-            }
-            ArtifactButtonsRowEvent::DownloadFile { artifact_uid } => {
-                crate::ai::artifacts::download_file_artifact(artifact_uid, ctx);
-            }
         }
     }
 
@@ -962,7 +948,6 @@ impl AgentManagementView {
     ) {
         match event {
             AgentConversationsModelEvent::ConversationsLoaded
-            | AgentConversationsModelEvent::NewTasksReceived
             | AgentConversationsModelEvent::TasksUpdated => {
                 self.update_creator_dropdown(ctx);
                 self.update_source_dropdown(ctx);

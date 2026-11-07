@@ -327,8 +327,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::ConfigurableToolbar,
         #[cfg(feature = "agent_view_prompt_chip")]
         FeatureFlag::AgentViewPromptChip,
-        #[cfg(feature = "ambient_agents_rtc")]
-        FeatureFlag::AmbientAgentsRTC,
         #[cfg(feature = "classic_completions")]
         FeatureFlag::ClassicCompletions,
         #[cfg(feature = "force_classic_completions")]
@@ -385,10 +383,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::IncrementalAutoReload,
         #[cfg(feature = "run_agents_tool")]
         FeatureFlag::RunAgentsTool,
-        #[cfg(feature = "orchestration_viewer_streamer")]
-        FeatureFlag::OrchestrationViewerStreamer,
-        #[cfg(feature = "owner_orchestration_ancestor_streamer")]
-        FeatureFlag::OwnerOrchestrationAncestorStreamer,
         #[cfg(feature = "pending_user_query_indicator")]
         FeatureFlag::PendingUserQueryIndicator,
         #[cfg(feature = "queue_slash_command")]
@@ -433,8 +427,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::TransferControlTool,
         #[cfg(feature = "warpify_footer")]
         FeatureFlag::WarpifyFooter,
-        #[cfg(feature = "solo_user_byok")]
-        FeatureFlag::SoloUserByok,
         #[cfg(feature = "billing_and_usage_page_v2")]
         FeatureFlag::BillingAndUsagePageV2,
         #[cfg(feature = "gpt_configurable_context_window")]
@@ -455,14 +447,10 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::HandoffCloudCloud,
         #[cfg(feature = "git_credential_refresh")]
         FeatureFlag::GitCredentialRefresh,
-        #[cfg(feature = "custom_inference_endpoints")]
-        FeatureFlag::CustomInferenceEndpoints,
         #[cfg(feature = "custom_model_routers")]
         FeatureFlag::CustomModelRouters,
         #[cfg(feature = "supergrok")]
         FeatureFlag::SuperGrok,
-        #[cfg(feature = "gemini_enterprise")]
-        FeatureFlag::GeminiEnterprise,
         #[cfg(feature = "prompt_cache_expiry_warning")]
         FeatureFlag::PromptCacheExpiryWarning,
     ]);

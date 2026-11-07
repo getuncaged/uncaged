@@ -488,7 +488,6 @@ pub mod flags {
     pub const CODE_SUGGESTIONS_FLAG: &str = "Code_Suggestions";
     pub const NATURAL_LANGUAGE_AUTOSUGGESTIONS_FLAG: &str = "Natural_Language_Autosuggestions";
     pub const SHARED_BLOCK_TITLE_GENERATION_FLAG: &str = "Shared_Block_Title_Generation";
-    pub const GIT_OPERATIONS_AUTOGEN_FLAG: &str = "Git_Operations_Autogen";
     pub const INCLUDE_AGENT_COMMANDS_IN_HISTORY_FLAG: &str = "Include_Agent_Commands_In_History";
     pub const AI_RULES_FLAG: &str = "AI_Rules";
     pub const SUGGESTED_RULES_FLAG: &str = "Suggested_Rules";

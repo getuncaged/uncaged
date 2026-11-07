@@ -1,11 +1,8 @@
 //! Implementation of terminal panes.
-#[cfg(not(target_family = "wasm"))]
-use std::collections::HashMap;
 use std::sync::mpsc::SyncSender;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
-use warp_cli::agent::Harness;
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
 use warp_multi_agent_api as multi_agent_api;
@@ -19,11 +16,7 @@ use super::{
 };
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
-use crate::ai::agent::StartAgentExecutionMode;
-use crate::ai::ambient_agents::task::normalize_orchestrator_agent_name;
-use crate::ai::ambient_agents::{AgentConfigSnapshot, AmbientAgentTaskId};
-use crate::ai::blocklist::agent_view::{AgentViewControllerEvent, AgentViewEntryOrigin};
-use crate::ai::blocklist::orchestration_event_streamer::OrchestrationEventStreamer;
+use crate::ai::blocklist::agent_view::AgentViewControllerEvent;
 #[cfg(feature = "local_fs")]
 use crate::ai::blocklist::BlocklistAIHistoryEvent;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, StartAgentRequest};
@@ -35,20 +28,11 @@ use crate::code::buffer_location::LocalOrRemotePath;
 use crate::pane_group::child_agent::{
     create_error_child_agent_conversation, ErrorChildAgentConversationRequest,
 };
-// Imports below are only consumed by the non-wasm `launch_local_*_child`
-// dispatch helpers; gating them keeps the wasm build warning-clean.
-#[cfg(not(target_family = "wasm"))]
-use crate::pane_group::child_agent::{
-    create_hidden_child_agent_conversation, HiddenChildAgentConversation,
-    HiddenChildAgentConversationRequest, HiddenChildAgentTaskContext,
-};
 #[cfg(feature = "local_fs")]
 use crate::pane_group::CodeSource;
 use crate::pane_group::Event::OpenConversationHistory;
 use crate::pane_group::{self, Direction, PaneGroup};
 use crate::persistence::{BlockCompleted, ModelEvent};
-#[cfg(not(target_family = "wasm"))]
-use crate::server::server_api::ServerApiProvider;
 use crate::session_management::SessionNavigationData;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::general_settings::GeneralSettings;
@@ -545,7 +529,6 @@ impl PaneContent for TerminalPane {
 #[derive(Clone, Copy)]
 struct AgentConversationActionState {
     owner_terminal_view_id: EntityId,
-    task_id: Option<AmbientAgentTaskId>,
     is_in_progress: bool,
     is_cloud_cancel_candidate: bool,
 }
@@ -560,7 +543,6 @@ fn agent_conversation_action_state(
         history_model.terminal_view_id_for_conversation(&conversation_id)?;
     Some(AgentConversationActionState {
         owner_terminal_view_id,
-        task_id: conversation.task_id(),
         is_in_progress: conversation.status().is_in_progress(),
         is_cloud_cancel_candidate: conversation.is_remote_child()
             || conversation.is_viewing_shared_session(),
@@ -619,26 +601,6 @@ fn stop_local_agent_conversation(
     true
 }
 
-fn cancel_cloud_agent_task(
-    task_id: Option<AmbientAgentTaskId>,
-    conversation_id: AIConversationId,
-    show_toast: bool,
-    ctx: &mut ViewContext<PaneGroup>,
-) -> bool {
-    let Some(task_id) = task_id else {
-        log::warn!(
-            "cancel_cloud_agent_task: cloud conversation {conversation_id:?} has no task id"
-        );
-        return false;
-    };
-    if show_toast {
-        crate::ai::ambient_agents::cancel_task_with_toast(task_id, ctx);
-    } else {
-        crate::ai::ambient_agents::cancel_task_silently(task_id, ctx);
-    }
-    true
-}
-
 fn stop_agent_conversation(
     group: &PaneGroup,
     conversation_id: AIConversationId,
@@ -651,14 +613,11 @@ fn stop_agent_conversation(
     if !state.is_in_progress {
         return;
     }
+    // Remote runs lived on Warp's server; there is nothing local to stop.
     if state.is_cloud_cancel_candidate {
-        cancel_cloud_agent_task(state.task_id, conversation_id, true, ctx);
-    } else if !stop_local_agent_conversation(
-        group,
-        state.owner_terminal_view_id,
-        conversation_id,
-        ctx,
-    ) {
+        return;
+    }
+    if !stop_local_agent_conversation(group, state.owner_terminal_view_id, conversation_id, ctx) {
         // If the owner view is gone, still make Stop visible in history.
         BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
             history_model.update_conversation_status(
@@ -732,23 +691,15 @@ fn kill_agent_conversation(
     ctx: &mut ViewContext<PaneGroup>,
 ) {
     let state = agent_conversation_action_state(conversation_id, ctx);
-    // Tombstone every Kill so late events cannot restore a removed child.
-    OrchestrationEventStreamer::handle(ctx).update(ctx, |streamer, ctx| {
-        streamer.mark_conversation_killed(conversation_id, ctx);
-    });
-
     if let Some(state) = state {
-        if state.is_in_progress {
-            if state.is_cloud_cancel_candidate {
-                cancel_cloud_agent_task(state.task_id, conversation_id, false, ctx);
-            } else {
-                stop_local_agent_conversation(
-                    group,
-                    state.owner_terminal_view_id,
-                    conversation_id,
-                    ctx,
-                );
-            }
+        // Remote runs lived on Warp's server; there is nothing local to stop.
+        if state.is_in_progress && !state.is_cloud_cancel_candidate {
+            stop_local_agent_conversation(
+                group,
+                state.owner_terminal_view_id,
+                conversation_id,
+                ctx,
+            );
         }
     }
 
@@ -1297,172 +1248,27 @@ fn handle_terminal_view_event(
     }
 }
 
-/// Dispatches a StartAgent request to the appropriate per-mode helper.
-/// Each helper echoes the child conversation id back via
+/// Answers a StartAgent request. Uncaged runs no child agents (the local
+/// no-harness path needed a Warp server task), so every request surfaces as an
+/// error child conversation, which echoes the request id back via
 /// [`BlocklistAIHistoryModel::record_new_conversation_request_complete`].
-#[cfg_attr(target_family = "wasm", allow(unused_variables))]
 fn dispatch_start_agent_conversation(
     group: &mut PaneGroup,
     parent_pane_id: PaneId,
     request: StartAgentRequest,
     ctx: &mut ViewContext<PaneGroup>,
 ) {
-    match request.execution_mode.clone() {
-        #[cfg(not(target_family = "wasm"))]
-        StartAgentExecutionMode::Local {
-            harness_type: None,
-            model_id,
-        } => {
-            launch_local_no_harness_child(parent_pane_id, request, model_id, ctx);
-        }
-        StartAgentExecutionMode::Local { .. } | StartAgentExecutionMode::Remote { .. } => {
-            // Uncaged runs neither third-party-harness children nor cloud children.
-            let _ = create_error_child_agent_conversation(
-                group,
-                ErrorChildAgentConversationRequest {
-                    parent_pane_id,
-                    name: request.name,
-                    parent_conversation_id: request.parent_conversation_id,
-                    request_id: Some(request.id),
-                    orchestration_harness: None,
-                    error_message: "This kind of child agent is not supported in Uncaged."
-                        .to_string(),
-                },
-                ctx,
-            );
-        }
-    }
-}
-
-/// Sets up a hidden child pane for a Local-no-harness (Oz) agent and
-/// dispatches the prompt. Asynchronously creates the server-side `ai_tasks`
-/// row via `AIClient::create_agent_task` at dispatch time, mirroring the
-/// third-party-harness path (see [`launch_local_harness_child`]). The
-/// resulting `task_id` is stamped onto the child's `AIConversation` and
-/// onto the child's `BlocklistAIController` via the
-/// `HiddenChildAgentTaskContext` (so the agent UI reflects it). On failure
-/// the child surfaces as an error conversation instead.
-///
-/// Gated to non-wasm because `ServerApiProvider` is `cfg(not(wasm))`-only.
-/// `dispatch_start_agent_conversation`'s wasm wildcard arm routes the Oz
-/// path through `create_error_child_agent_conversation` instead.
-#[cfg(not(target_family = "wasm"))]
-fn launch_local_no_harness_child(
-    parent_pane_id: PaneId,
-    request: StartAgentRequest,
-    model_id: Option<String>,
-    ctx: &mut ViewContext<PaneGroup>,
-) {
-    let ai_client = ServerApiProvider::handle(ctx).as_ref(ctx).get_ai_client();
-    let request_id = request.id;
-    let agent_name = normalize_orchestrator_agent_name(&request.name);
-    let request_name = agent_name.clone().unwrap_or_default();
-    let parent_conversation_id = request.parent_conversation_id;
-    let parent_run_id = request.parent_run_id.clone();
-    let prompt = request.prompt.clone();
-
-    let prompt_for_create = prompt.clone();
-    let agent_name_for_create = agent_name.clone();
-    let _ = ctx.spawn(
-        async move {
-            ai_client
-                .create_agent_task(
-                    prompt_for_create,
-                    None,
-                    parent_run_id,
-                    Some(AgentConfigSnapshot {
-                        name: agent_name_for_create,
-                        ..Default::default()
-                    }),
-                )
-                .await
+    let _ = create_error_child_agent_conversation(
+        group,
+        ErrorChildAgentConversationRequest {
+            parent_pane_id,
+            name: request.name,
+            parent_conversation_id: request.parent_conversation_id,
+            request_id: Some(request.id),
+            orchestration_harness: None,
+            error_message: "This kind of child agent is not supported in Uncaged.".to_string(),
         },
-        move |group, result, ctx| match result {
-            Ok(child_task_id) => {
-                if let Some(HiddenChildAgentConversation {
-                    terminal_view: new_terminal_view,
-                    terminal_view_id,
-                    conversation_id,
-                    ..
-                }) = create_hidden_child_agent_conversation(
-                    group,
-                    HiddenChildAgentConversationRequest {
-                        parent_pane_id,
-                        name: request_name.clone(),
-                        parent_conversation_id,
-                        orchestration_harness: Some(Harness::Oz),
-                        env_vars: HashMap::new(),
-                        task_context: Some(HiddenChildAgentTaskContext {
-                            task_id: child_task_id,
-                            working_dir: None,
-                        }),
-                    },
-                    ctx,
-                ) {
-                    apply_child_model_id_override(terminal_view_id, model_id.as_deref(), ctx);
-
-                    // Stamp the task id on the child conversation directly.
-                    BlocklistAIHistoryModel::handle(ctx).update(ctx, |model, ctx| {
-                        if let Some(conversation) = model.conversation_mut(&conversation_id) {
-                            conversation.set_task_id(child_task_id);
-                        }
-                        model.record_new_conversation_request_complete(
-                            request_id,
-                            conversation_id,
-                            ctx,
-                        );
-                    });
-
-                    new_terminal_view.update(ctx, |terminal_view, ctx| {
-                        terminal_view
-                            .ai_controller()
-                            .update(ctx, |controller, ctx| {
-                                controller.send_agent_query_in_conversation(
-                                    prompt.clone(),
-                                    conversation_id,
-                                    ctx,
-                                );
-                            });
-
-                        terminal_view.enter_agent_view(
-                            None,
-                            Some(conversation_id),
-                            AgentViewEntryOrigin::ChildAgent,
-                            ctx,
-                        );
-                    });
-                } else {
-                    let _ = create_error_child_agent_conversation(
-                        group,
-                        ErrorChildAgentConversationRequest {
-                            parent_pane_id,
-                            name: request_name,
-                            parent_conversation_id,
-                            request_id: Some(request_id),
-                            orchestration_harness: Some(Harness::Oz),
-                            error_message:
-                                "Failed to create a hidden pane for the local child agent."
-                                    .to_string(),
-                        },
-                        ctx,
-                    );
-                }
-            }
-            Err(error) => {
-                let _ = create_error_child_agent_conversation(
-                    group,
-                    ErrorChildAgentConversationRequest {
-                        parent_pane_id,
-                        name: request_name,
-                        parent_conversation_id,
-                        request_id: Some(request_id),
-                        orchestration_harness: Some(Harness::Oz),
-                        error_message: format!("Failed to create local child task: {error}"),
-                    },
-                    ctx,
-                );
-            }
-        },
+        ctx,
     );
 }
 

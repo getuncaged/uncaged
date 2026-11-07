@@ -18,7 +18,6 @@ use warpui::{
 
 use super::{config_panel, skills_panel, ssh_panel};
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::appearance::Appearance;
 use crate::code::buffer_location::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]
@@ -136,18 +135,9 @@ mod active_view_state {
         new_view: ToolPanelView,
         ctx: &mut ViewContext<super::LeftPanelView>,
     ) {
-        let previous = left_panel.active_view.0;
         left_panel.active_view.0 = new_view;
         left_panel.update_button_active_states();
         ctx.notify();
-
-        let was_conversation_list_open = previous == ToolPanelView::ConversationListView;
-        let is_conversation_list_open = new_view == ToolPanelView::ConversationListView;
-        if was_conversation_list_open && !is_conversation_list_open {
-            left_panel.on_conversation_list_view_visibility_changed(false, ctx);
-        } else if !was_conversation_list_open && is_conversation_list_open {
-            left_panel.on_conversation_list_view_visibility_changed(true, ctx);
-        }
 
         left_panel.update_active_file_tree_subscription_state(ctx);
     }
@@ -742,7 +732,7 @@ impl LeftPanelView {
             }
         });
 
-        self.on_left_panel_visibility_changed(left_panel_open, ctx);
+        self.on_left_panel_visibility_changed(ctx);
 
         ctx.notify();
     }
@@ -1112,11 +1102,7 @@ impl LeftPanelView {
         }
     }
 
-    pub fn on_left_panel_visibility_changed(&self, is_now_open: bool, ctx: &mut ViewContext<Self>) {
-        if ToolPanelView::ConversationListView == self.active_view.get() {
-            self.on_conversation_list_view_visibility_changed(is_now_open, ctx);
-        }
-
+    pub fn on_left_panel_visibility_changed(&self, ctx: &mut ViewContext<Self>) {
         self.update_active_file_tree_subscription_state(ctx);
     }
 
@@ -1157,25 +1143,6 @@ impl LeftPanelView {
                 view.set_is_active(is_visible, ctx);
             });
         }
-    }
-
-    /// When the conversation list view's visibility changes,
-    /// we need to update the conversation and tasks model to reflect the new state
-    /// (this information is used to decide whether or not we should poll for new tasks).
-    fn on_conversation_list_view_visibility_changed(
-        &self,
-        is_now_open: bool,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let window_id = ctx.window_id();
-        let view_id = self.conversation_list_view.id();
-        AgentConversationsModel::handle(ctx).update(ctx, |model, ctx| {
-            if is_now_open {
-                model.register_view_open(window_id, view_id, ctx);
-            } else {
-                model.register_view_closed(window_id, view_id, ctx);
-            }
-        });
     }
 }
 

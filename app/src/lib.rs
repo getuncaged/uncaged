@@ -823,7 +823,6 @@ pub(crate) fn initialize_app(
     });
 
     let server_api = server_api_provider.as_ref(ctx).get();
-    let ai_client = server_api_provider.as_ref(ctx).get_ai_client();
 
     ctx.add_singleton_model(|_ctx| GPUState::new());
 
@@ -912,7 +911,7 @@ pub(crate) fn initialize_app(
             )
         });
 
-    ctx.add_singleton_model(|ctx| AIRequestUsageModel::new(ai_client, ctx));
+    ctx.add_singleton_model(|_| AIRequestUsageModel::new());
 
     ctx.add_singleton_model(|ctx| {
         #[cfg_attr(target_family = "wasm", allow(unused_mut))]
@@ -1125,9 +1124,6 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(|_| ToastStack);
     ctx.add_singleton_model(|_| GlobalCodeReviewModel);
     ctx.add_singleton_model(|_| workspace::OneTimeModalModel::new());
-    ctx.add_singleton_model(
-        workspace::bonus_grant_notification_model::BonusGrantNotificationModel::new,
-    );
     #[cfg(feature = "local_fs")]
     ctx.add_singleton_model(FileModel::new);
     ctx.add_singleton_model(GlobalBufferModel::new);
@@ -1185,12 +1181,6 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(AgentNotificationsModel::new);
     ctx.add_singleton_model(BlocklistAIPermissions::new);
     ctx.add_singleton_model(ai::blocklist::orchestration_events::OrchestrationEventService::new);
-    ctx.add_singleton_model(
-        ai::blocklist::local_agent_task_sync_model::LocalAgentTaskSyncModel::new,
-    );
-    ctx.add_singleton_model(
-        ai::blocklist::orchestration_event_streamer::OrchestrationEventStreamer::new,
-    );
 
     ctx.add_singleton_model(RepoOutlines::new);
     ctx.add_singleton_model(|ctx| {

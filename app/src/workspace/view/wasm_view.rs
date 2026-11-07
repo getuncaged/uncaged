@@ -168,25 +168,8 @@ impl Workspace {
         self.transcript_details_panel.update(ctx, |panel, ctx| {
             // If we have an ambient agent task ID, try to populate from task data
             if let Some(task_id) = task_id {
-                let conversations_model_handle = AgentConversationsModel::handle(ctx);
-                let task = conversations_model_handle.update(ctx, |conversations_model, ctx| {
-                    conversations_model.get_or_async_fetch_task_data(&task_id, ctx)
-                });
-                if let Some(task) = task {
+                if let Some(task) = AgentConversationsModel::as_ref(ctx).get_task_data(&task_id) {
                     let details = ConversationDetailsData::from_task(&task, None, None, ctx);
-                    panel.set_conversation_details(details, ctx);
-                    ctx.notify();
-                    return;
-                }
-
-                // Task not yet available - check if the fetch failed and show error state
-                if let Some(error_message) = conversations_model_handle
-                    .as_ref(ctx)
-                    .task_fetch_error(&task_id)
-                    .cloned()
-                {
-                    let details =
-                        ConversationDetailsData::from_task_id(task_id, Some(error_message));
                     panel.set_conversation_details(details, ctx);
                     ctx.notify();
                     return;

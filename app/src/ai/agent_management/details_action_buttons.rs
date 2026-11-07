@@ -1,12 +1,10 @@
 //! Action buttons row for conversation details panel.
 
-use warp_core::ui::theme::AnsiColorIdentifier;
 use warpui::elements::{ChildView, CrossAxisAlignment, Empty, Flex, ParentElement};
 use warpui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::agent_conversations_model::{AgentConversationEntryId, AgentRunDisplayStatus};
-use crate::ai::ambient_agents::AmbientAgentTaskId;
+use crate::ai::agent_conversations_model::AgentConversationEntryId;
 use crate::ui_components::icons::Icon;
 use crate::view_components::action_button::{ActionButton, ButtonSize, SecondaryTheme};
 use crate::view_components::copyable_text_field::COPY_FEEDBACK_DURATION;
@@ -19,7 +17,6 @@ const BUTTON_SPACING: f32 = 4.;
 #[derive(Debug, Clone, Default)]
 pub struct ActionButtonsConfig {
     pub open_action: Option<WorkspaceAction>,
-    pub cancel_task_id: Option<AmbientAgentTaskId>,
     pub fork_conversation_id: Option<AIConversationId>,
     /// Shows an info button for viewing more details.
     /// Only used in management view hover toolbelt.
@@ -32,29 +29,17 @@ impl ActionButtonsConfig {
     /// Returns true if no buttons will be rendered.
     pub fn is_empty(&self) -> bool {
         self.open_action.is_none()
-            && self.cancel_task_id.is_none()
             && self.fork_conversation_id.is_none()
             && self.view_details_item_id.is_none()
             && self.copy_link_url.is_none()
     }
 
     /// Create config for a task.
-    /// - `display_status`: used to determine if cancel button should show.
     /// - `open_action`: pass `Some(action)` to show open button, `None` to hide
     /// - `copy_link_url`: conversation link URL, or `None` to hide
-    pub fn for_task(
-        task_id: AmbientAgentTaskId,
-        display_status: &AgentRunDisplayStatus,
-        open_action: Option<WorkspaceAction>,
-        copy_link_url: Option<String>,
-    ) -> Self {
+    pub fn for_task(open_action: Option<WorkspaceAction>, copy_link_url: Option<String>) -> Self {
         Self {
             open_action,
-            cancel_task_id: if display_status.is_cancellable() {
-                Some(task_id)
-            } else {
-                None
-            },
             fork_conversation_id: None,
             view_details_item_id: None,
             copy_link_url,
@@ -71,7 +56,6 @@ impl ActionButtonsConfig {
     ) -> Self {
         Self {
             open_action,
-            cancel_task_id: None,
             fork_conversation_id: Some(conversation_id),
             view_details_item_id: None,
             copy_link_url,
@@ -83,7 +67,6 @@ impl ActionButtonsConfig {
 #[derive(Debug, Clone)]
 pub enum AgentDetailsButtonEvent {
     Open,
-    CancelTask { task_id: AmbientAgentTaskId },
     ForkConversation { conversation_id: AIConversationId },
     ViewDetails { item_id: AgentConversationEntryId },
     CopyLink { link: String },
@@ -93,7 +76,6 @@ pub enum AgentDetailsButtonEvent {
 #[derive(Debug, Clone)]
 pub enum AgentDetailsAction {
     Open,
-    CancelTask,
     ForkConversation,
     ViewDetails,
     CopyLink,
@@ -103,7 +85,6 @@ pub enum AgentDetailsAction {
 pub struct ConversationActionButtonsRow {
     config: ActionButtonsConfig,
     open_button: ViewHandle<ActionButton>,
-    cancel_task_button: ViewHandle<ActionButton>,
     fork_conversation_button: ViewHandle<ActionButton>,
     view_details_button: ViewHandle<ActionButton>,
     copy_link_button: ViewHandle<ActionButton>,
@@ -115,17 +96,7 @@ impl ConversationActionButtonsRow {
             Self::make_action_button(
                 Icon::LinkExternal,
                 "Open conversation",
-                None,
                 AgentDetailsAction::Open,
-            )
-        });
-
-        let cancel_task_button = ctx.add_typed_action_view(|_| {
-            Self::make_action_button(
-                Icon::StopFilled,
-                "Cancel task",
-                Some(AnsiColorIdentifier::Red),
-                AgentDetailsAction::CancelTask,
             )
         });
 
@@ -133,33 +104,21 @@ impl ConversationActionButtonsRow {
             Self::make_action_button(
                 Icon::ArrowSplit,
                 "Fork conversation",
-                None,
                 AgentDetailsAction::ForkConversation,
             )
         });
 
         let view_details_button = ctx.add_typed_action_view(|_| {
-            Self::make_action_button(
-                Icon::Info,
-                "View details",
-                None,
-                AgentDetailsAction::ViewDetails,
-            )
+            Self::make_action_button(Icon::Info, "View details", AgentDetailsAction::ViewDetails)
         });
 
         let copy_link_button = ctx.add_typed_action_view(|_| {
-            Self::make_action_button(
-                Icon::Link,
-                "Copy link to run",
-                None,
-                AgentDetailsAction::CopyLink,
-            )
+            Self::make_action_button(Icon::Link, "Copy link to run", AgentDetailsAction::CopyLink)
         });
 
         Self {
             config: ActionButtonsConfig::default(),
             open_button,
-            cancel_task_button,
             fork_conversation_button,
             view_details_button,
             copy_link_button,
@@ -177,23 +136,14 @@ impl ConversationActionButtonsRow {
         self.config.is_empty()
     }
 
-    fn make_action_button(
-        icon: Icon,
-        tooltip: &str,
-        icon_color: Option<AnsiColorIdentifier>,
-        action: AgentDetailsAction,
-    ) -> ActionButton {
-        let mut button = ActionButton::new("", SecondaryTheme)
+    fn make_action_button(icon: Icon, tooltip: &str, action: AgentDetailsAction) -> ActionButton {
+        ActionButton::new("", SecondaryTheme)
             .with_icon(icon)
             .with_size(ButtonSize::Small)
             .with_tooltip(tooltip)
             .on_click(move |ctx| {
                 ctx.dispatch_typed_action(action.clone());
-            });
-        if let Some(color) = icon_color {
-            button = button.with_icon_ansi_color(color);
-        }
-        button
+            })
     }
 }
 
@@ -222,9 +172,6 @@ impl View for ConversationActionButtonsRow {
         if self.config.open_action.is_some() {
             row.add_child(ChildView::new(&self.open_button).finish());
         }
-        if self.config.cancel_task_id.is_some() {
-            row.add_child(ChildView::new(&self.cancel_task_button).finish());
-        }
         if self.config.fork_conversation_id.is_some() && !cfg!(target_family = "wasm") {
             row.add_child(ChildView::new(&self.fork_conversation_button).finish());
         }
@@ -244,11 +191,6 @@ impl TypedActionView for ConversationActionButtonsRow {
             AgentDetailsAction::Open => {
                 if self.config.open_action.is_some() {
                     ctx.emit(AgentDetailsButtonEvent::Open);
-                }
-            }
-            AgentDetailsAction::CancelTask => {
-                if let Some(task_id) = self.config.cancel_task_id {
-                    ctx.emit(AgentDetailsButtonEvent::CancelTask { task_id });
                 }
             }
             AgentDetailsAction::ForkConversation => {

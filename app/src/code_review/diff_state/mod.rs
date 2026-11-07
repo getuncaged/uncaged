@@ -354,11 +354,6 @@ pub enum DiffStateModelEvent {
     /// A remote git operation completed. The model has already applied any
     /// successful metadata delta to the cached metadata.
     GitOpCompleted(GitOpResult),
-    /// An AI-generated commit message arrived from the remote daemon (issued
-    /// at commit-dialog open). `Ok` carries the message, `Err` the error
-    /// string. The `GitDialog` populates its message editor from this; the
-    /// local path fills the editor directly without going through an event.
-    CommitMessageGenerated(Result<String, String>),
     /// Committed branch files (`merge_base(HEAD, main)..HEAD`) arrived for the
     /// Create PR dialog's Changes box. Fetched on dialog open and delivered the
     /// same way for both backends: the local model computes them off-thread and
@@ -436,9 +431,6 @@ impl DiffStateModel {
             }
             DiffStateModelEvent::GitOpCompleted(result) => {
                 ctx.emit(DiffStateModelEvent::GitOpCompleted(result.clone()));
-            }
-            DiffStateModelEvent::CommitMessageGenerated(result) => {
-                ctx.emit(DiffStateModelEvent::CommitMessageGenerated(result.clone()));
             }
             DiffStateModelEvent::BranchCommittedFilesReceived(files) => {
                 ctx.emit(DiffStateModelEvent::BranchCommittedFilesReceived(
@@ -632,33 +624,11 @@ impl DiffStateModel {
         message: String,
         include_unstaged: bool,
         branch: String,
-        autogenerate_pr_content: bool,
         ctx: &mut ModelContext<Self>,
     ) {
         match self {
             Self::Local(local) => local.update(ctx, |local, ctx| {
-                local.git_commit_chain(
-                    mode,
-                    message,
-                    include_unstaged,
-                    branch,
-                    autogenerate_pr_content,
-                    ctx,
-                );
-            }),
-        }
-    }
-
-    /// Issues an AI commit-message generation request.
-    pub(crate) fn generate_commit_message(
-        &self,
-        include_unstaged: bool,
-        branch_name: String,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        match self {
-            Self::Local(local) => local.update(ctx, |local, ctx| {
-                local.generate_commit_message(include_unstaged, branch_name, ctx);
+                local.git_commit_chain(mode, message, include_unstaged, branch, ctx);
             }),
         }
     }
@@ -672,19 +642,11 @@ impl DiffStateModel {
         }
     }
 
-    /// Creates a PR for the current branch.
-    ///
-    /// When `autogenerate_content` is set, the PR title/body are AI-generated,
-    /// otherwise fallback to `gh pr create --fill`.
-    pub(crate) fn create_pr(
-        &self,
-        branch: String,
-        autogenerate_content: bool,
-        ctx: &mut ModelContext<Self>,
-    ) {
+    /// Creates a PR for the current branch with `gh pr create --fill`.
+    pub(crate) fn create_pr(&self, ctx: &mut ModelContext<Self>) {
         match self {
             Self::Local(local) => local.update(ctx, |local, ctx| {
-                local.create_pr(branch, autogenerate_content, ctx);
+                local.create_pr(ctx);
             }),
         }
     }

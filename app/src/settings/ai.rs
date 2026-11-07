@@ -23,7 +23,6 @@ use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 
-use crate::ai::request_usage_model::RequestLimitInfo;
 use crate::report_if_error;
 use crate::settings::PrivacySettings;
 use crate::terminal::CLIAgent;
@@ -762,17 +761,6 @@ define_settings_group!(AISettings, settings: [
         toml_path: "agents.warp_agent.active_ai.shared_block_title_generation_enabled",
         description: "Controls whether titles are auto-generated when sharing blocks.",
     }
-    // This field should not be referenced directly to lookup git operations AI autogen
-    // enablement -- use the `is_git_operations_autogen_enabled()` getter.
-    git_operations_autogen_enabled_internal: GitOperationsAutogenEnabled {
-        type: bool,
-        default: true,
-        supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
-        private: false,
-        toml_path: "agents.warp_agent.active_ai.git_operations_autogen_enabled",
-        description: "Controls whether AI auto-generates commit messages and PR title/body in the code review dialogs.",
-    }
     // This field should not be referenced directly to lookup Rule Suggestions
     // enablement -- use the `is_rule_suggestions_enabled()` getter.
     rule_suggestions_enabled_internal: RuleSuggestionsEnabled {
@@ -913,19 +901,6 @@ define_settings_group!(AISettings, settings: [
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Never,
         private: true,
-    }
-    // Whether to mint and attach Gemini Enterprise (GEAP) credentials to eligible agent
-    // requests, routing them through the workspace's Google Cloud project. Only consulted
-    // when the admin sets the GEAP host to RESPECT_USER_SETTING; ENFORCE bypasses it.
-    // Uncaged has no workspace, so credentials are never minted.
-    gemini_enterprise_credentials_enabled: GeminiEnterpriseCredentialsEnabled {
-        type: bool,
-        default: false,
-        supported_platforms: SupportedPlatforms::DESKTOP,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
-        private: false,
-        toml_path: "cloud_platform.third_party_api_keys.gemini_enterprise_credentials_enabled",
-        description: "Whether Uncaged should route eligible requests through your workspace's Gemini Enterprise Google Cloud project.",
     }
     // Whether or not the user wants agent mode requests to use their saved rules.
     memory_enabled: MemoryEnabled {
@@ -1512,10 +1487,6 @@ impl AISettings {
         self.is_active_ai_enabled(app) && *self.shared_block_title_generation_enabled_internal
     }
 
-    pub fn is_git_operations_autogen_enabled(&self, app: &warpui::AppContext) -> bool {
-        self.is_active_ai_enabled(app) && *self.git_operations_autogen_enabled_internal
-    }
-
     pub fn is_intelligent_autosuggestions_enabled(&self, app: &warpui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.intelligent_autosuggestions_enabled_internal
     }
@@ -1621,54 +1592,6 @@ impl AISettings {
             if cycle.end_date < Utc::now() {
                 cycle.banner_state.dismissed = true;
             }
-        }
-
-        report_if_error!(self
-            .ai_request_quota_info
-            .set_value(AIRequestQuotaInfo { cycle_history }, ctx));
-    }
-
-    /// Updates the quota info based on the latest RequestLimitInfo.
-    ///
-    /// This method finds or creates the appropriate CycleInfo based on the
-    /// request_limit_info's next refresh time and updates its fields accordingly.
-    pub fn update_quota_info(
-        &mut self,
-        request_limit_info: &RequestLimitInfo,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        // Convert ServerTimestamp to DateTime<Utc>
-        let next_refresh_time = request_limit_info.next_refresh_time.utc();
-        let now = Utc::now();
-
-        // Check if request_limit_info has unlimited requests
-        let is_quota_exceeded = !request_limit_info.is_unlimited
-            && request_limit_info.num_requests_used_since_refresh >= request_limit_info.limit;
-
-        let mut cycle_history = self.ai_request_quota_info.cycle_history.clone();
-
-        // Track if we updated an existing cycle
-        let mut updated_existing_cycle = false;
-
-        // Find or create a cycle that matches the current period
-        if let Some(current_cycle) = cycle_history.last_mut() {
-            if now <= current_cycle.end_date {
-                // Update existing cycle
-                current_cycle.was_quota_exceeded = is_quota_exceeded;
-                updated_existing_cycle = true;
-            }
-        }
-
-        // Only create a new cycle if we didn't update an existing one
-        if !updated_existing_cycle {
-            // Create a new cycle
-            let new_cycle = CycleInfo {
-                end_date: next_refresh_time,
-                was_quota_exceeded: is_quota_exceeded,
-                banner_state: BannerState::default(),
-            };
-
-            cycle_history.push(new_cycle);
         }
 
         report_if_error!(self

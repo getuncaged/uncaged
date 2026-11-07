@@ -8107,7 +8107,6 @@ dependencies = [
  "ai",
  "anyhow",
  "cfg-if",
- "instant",
  "log",
  "pathfinder_color",
  "pathfinder_geometry",

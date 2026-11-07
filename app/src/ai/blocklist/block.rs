@@ -39,7 +39,6 @@ pub use pending_user_query_block::{PendingUserQueryBlock, PendingUserQueryBlockE
 #[cfg(not(target_family = "wasm"))]
 use repo_metadata::repositories::DetectedRepositories;
 use secret_redaction::*;
-use serde::Serialize;
 use settings::Setting as _;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::theme::color::internal_colors;
@@ -138,7 +137,6 @@ use crate::ai::facts::{AIFact, AIMemory, CloudAIFactModel};
 use crate::ai::get_relevant_files::controller::{
     GetRelevantFilesController, GetRelevantFilesControllerEvent,
 };
-use crate::ai::{AIRequestUsageModel, AIRequestUsageModelEvent};
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::code::editor::comment_editor::create_readonly_comment_markdown_editor;
@@ -331,13 +329,6 @@ pub enum TextLocation {
     },
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AIBlockResponseRating {
-    Positive,
-    Negative,
-}
-
 #[derive(Clone)]
 struct ActionButtons {
     run_button: CompactibleActionButton,
@@ -425,10 +416,6 @@ pub(super) struct AIBlockStateHandles {
     manage_autonomy_settings_link_handle: MouseStateHandle,
 
     ask_user_question_speedbump_settings_link_handle: MouseStateHandle,
-
-    /// Mouse state handles for rating the AI block.
-    thumbs_up_handle: MouseStateHandle,
-    thumbs_down_handle: MouseStateHandle,
 
     /// Mouse state handle for the overflow menu button
     overflow_menu_handle: MouseStateHandle,
@@ -980,13 +967,6 @@ pub struct AIBlock {
     /// This UI is used for the new conversation suggestion multi-select.
     keyboard_navigable_buttons: Option<ViewHandle<KeyboardNavigableButtons>>,
 
-    /// The thumbs up/down rating of the AI block response.
-    response_rating: OnceCell<AIBlockResponseRating>,
-
-    /// The number of requests that have been refunded.
-    /// Right now, this happens when a user thumbs down a response.
-    request_refunded_count: Option<i32>,
-
     /// Requested commands that were auto-expanded,
     /// and should thus be auto-collapsed when the block is finished.
     requested_commands_to_auto_collapse: HashSet<AIAgentActionId>,
@@ -1201,33 +1181,6 @@ impl AIBlock {
                 .on_click(|ctx| ctx.dispatch_typed_action(AIBlockAction::OpenAIFactCollection))
         });
 
-        ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |me, _, event, ctx| {
-            if let AIRequestUsageModelEvent::RequestBonusRefunded {
-                requests_refunded,
-                server_conversation_id,
-                request_id,
-            } = event
-            {
-                let server_conversation_token = BlocklistAIHistoryModel::as_ref(ctx)
-                    .conversation(&me.client_ids.conversation_id)
-                    .and_then(|conversation| conversation.server_conversation_token())
-                    .cloned();
-
-                let server_output_id = me.model.server_output_id(ctx);
-
-                if let (Some(server_conversation_token), Some(server_output_id)) =
-                    (server_conversation_token, server_output_id)
-                {
-                    if request_id.eq(server_output_id.to_string().as_str())
-                        && server_conversation_id.eq(server_conversation_token.as_str())
-                    {
-                        me.request_refunded_count = Some(*requests_refunded);
-                        ctx.notify();
-                    }
-                }
-            }
-        });
-
         // Note: UpdatedStreamingExchange is handled by the dedicated on_updated_output()
         // callback in model_impl.rs, so we don't need to respond to it here.
         ctx.subscribe_to_model(
@@ -1430,9 +1383,7 @@ impl AIBlock {
             suggested_agent_mode_workflow: Default::default(),
             manage_rules_button,
             keyboard_navigable_buttons: None,
-            response_rating: OnceCell::new(),
             terminal_view_id,
-            request_refunded_count: None,
             action_buttons: Default::default(),
             search_codebase_view: Default::default(),
             web_search_views: Default::default(),
@@ -1829,8 +1780,6 @@ impl AIBlock {
             self.handle_web_fetch_messages(&output.messages, ctx);
         }
 
-        self.fetch_conversation_search_agent_run_titles(output, ctx);
-
         for action in output.actions() {
             let new_action_ids: HashSet<AIAgentActionId> =
                 output.actions().map(|action| action.id.clone()).collect();
@@ -2114,18 +2063,6 @@ impl AIBlock {
                     output,
                     get_secret_obfuscation_mode(ctx).is_visually_obfuscated(),
                 );
-        }
-    }
-
-    fn fetch_conversation_search_agent_run_titles(
-        &self,
-        output: &AIAgentOutput,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        for task_id in Self::conversation_search_agent_run_ids(output) {
-            AgentConversationsModel::handle(ctx).update(ctx, |model, ctx| {
-                model.get_or_async_fetch_task_data(&task_id, ctx);
-            });
         }
     }
 
@@ -5805,9 +5742,6 @@ pub enum AIBlockAction {
         action_id: AIAgentActionId,
         server_output_id: Option<ServerOutputId>,
     },
-    Rated {
-        is_positive: bool,
-    },
     /// Clear the selections of all other views **except** for the source view that dispatched the event.
     /// The `source_view_id` will be `None` if the event is dispatched by the [`warpui::elements::SelectableArea`]
     /// instead of a nested view (i.e. code block, requested command, etc.), which means all nested views
@@ -6187,40 +6121,6 @@ impl TypedActionView for AIBlock {
                         },
                     );
                     action_model.execute_action(action_id, self.client_ids.conversation_id, ctx);
-                });
-            }
-            AIBlockAction::Rated { is_positive } => {
-                let output_id = self.model.server_output_id(ctx);
-                let rating = if *is_positive {
-                    AIBlockResponseRating::Positive
-                } else {
-                    AIBlockResponseRating::Negative
-                };
-                if self.response_rating.set(rating).is_err() {
-                    // A rating was already set for this block. This should be unreachable.
-                    return;
-                }
-
-                if matches!(rating, AIBlockResponseRating::Negative) {
-                    if let Some(output_id) = output_id.clone() {
-                        let request_usage_model = AIRequestUsageModel::handle(ctx);
-                        request_usage_model.update(ctx, |request_usage_model, ctx| {
-                            request_usage_model
-                                .provide_negative_feedback_response_for_ai_conversation(
-                                    self.client_ids.conversation_id,
-                                    output_id.to_string(),
-                                    self.client_ids.client_exchange_id,
-                                    ctx,
-                                );
-                        });
-                    }
-                }
-
-                let window_id = ctx.window_id();
-                ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    let toast =
-                        DismissibleToast::default(String::from("Thank you for the feedback!"));
-                    toast_stack.add_ephemeral_toast(toast, window_id, ctx);
                 });
             }
             AIBlockAction::ClearOtherSelections {

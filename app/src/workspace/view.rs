@@ -135,10 +135,8 @@ use super::util::{
 };
 use super::{util, ActiveSession, TabBarDropTargetData, TabBarLocation, WorkspaceRegistry};
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
-use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
 use crate::ai::agent::{AIAgentInput, EntrypointType};
-use crate::ai::agent_conversations_model::AgentConversationsModel;
 #[cfg(target_family = "wasm")]
 use crate::ai::agent_conversations_model::AgentConversationsModelEvent;
 use crate::ai::agent_management::notifications::toast_stack::AgentNotificationToastStack;
@@ -152,7 +150,7 @@ use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::agent_view::agent_input_footer::editor::AgentToolbarEditorMode;
 use crate::ai::blocklist::agent_view::editor::{AgentToolbarEditorEvent, AgentToolbarEditorModal};
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
-use crate::ai::blocklist::history_model::{load_conversation_from_server, CloudConversationData};
+use crate::ai::blocklist::history_model::CloudConversationData;
 use crate::ai::blocklist::inline_action::code_diff_view::CodeDiffView;
 use crate::ai::blocklist::suggested_agent_mode_workflow_modal::{
     SuggestedAgentModeWorkflowAndId, SuggestedAgentModeWorkflowModal,
@@ -263,7 +261,6 @@ use crate::server::cloud_objects::update_manager::{
 };
 use crate::server::ids::{ObjectUid, SyncId};
 use crate::server::network_log_pane_manager::NetworkLogPaneManager;
-use crate::server::server_api::ai::AIClient;
 use crate::server::server_api::{ServerApi, ServerApiProvider, ServerTime};
 use crate::session_management::{SessionNavigationData, SessionSource, TabNavigationData};
 use crate::settings::cloud_preferences::CloudPreferencesSettings;
@@ -389,7 +386,6 @@ use crate::workflows::{
     WorkflowViewMode,
 };
 use crate::workspace::action::CommandSearchOptions;
-use crate::workspace::bonus_grant_notification_model::BonusGrantNotificationEvent;
 use crate::workspace::cross_window_tab_drag::{
     AttachTarget, CrossWindowTabDrag, DragResult, DropResult, GhostState,
 };
@@ -1558,12 +1554,8 @@ impl Workspace {
         settings_pane
     }
 
-    fn build_workflow_modal(
-        ai_client: Arc<dyn AIClient>,
-        ctx: &mut ViewContext<Self>,
-    ) -> ViewHandle<WorkflowModal> {
-        let workflow_modal =
-            ctx.add_typed_action_view(|ctx| WorkflowModal::new(ai_client.clone(), ctx));
+    fn build_workflow_modal(ctx: &mut ViewContext<Self>) -> ViewHandle<WorkflowModal> {
+        let workflow_modal = ctx.add_typed_action_view(WorkflowModal::new);
 
         ctx.subscribe_to_view(&workflow_modal, |me, _, event, ctx| {
             me.handle_workflow_modal_event(event, ctx);
@@ -2485,7 +2477,6 @@ impl Workspace {
 
         let server_api_provider = ServerApiProvider::as_ref(ctx);
         let server_api = server_api_provider.get();
-        let ai_client = server_api_provider.get_ai_client();
 
         // Inserting a (window, ModalSizes) pair to the ResizableData singleton. A restored window
         // reads the sizes from the window snapshot. A new window initializes with all default sizes.
@@ -2581,7 +2572,7 @@ impl Workspace {
             },
         );
 
-        let workflow_modal = Self::build_workflow_modal(ai_client.clone(), ctx);
+        let workflow_modal = Self::build_workflow_modal(ctx);
 
         let suggested_agent_mode_workflow_modal =
             Self::build_suggested_agent_mode_workflow_modal(ctx);
@@ -2788,8 +2779,7 @@ impl Workspace {
             &AgentConversationsModel::handle(ctx),
             |me, _, event, ctx| match event {
                 // Update transcript details if task or conversation data is updated
-                AgentConversationsModelEvent::NewTasksReceived
-                | AgentConversationsModelEvent::TasksUpdated
+                AgentConversationsModelEvent::TasksUpdated
                 | AgentConversationsModelEvent::ConversationUpdated { .. }
                 | AgentConversationsModelEvent::ConversationArtifactsUpdated { .. } => {
                     me.update_transcript_details_panel_data(ctx);
@@ -2881,19 +2871,6 @@ impl Workspace {
             }
             ctx.notify();
         });
-
-        ctx.subscribe_to_model(
-            &crate::workspace::bonus_grant_notification_model::BonusGrantNotificationModel::handle(
-                ctx,
-            ),
-            |me, _, event, ctx| {
-                let BonusGrantNotificationEvent::ShowNotification { message, .. } = event;
-                me.toast_stack.update(ctx, |toast_stack, ctx| {
-                    toast_stack
-                        .add_persistent_toast(DismissibleToast::success(message.clone()), ctx);
-                });
-            },
-        );
 
         let mut ws = Self {
             tabs: Vec::new(),
@@ -3504,9 +3481,6 @@ impl Workspace {
                     ctx,
                 );
             }
-            NewWorkspaceSource::FromCloudConversationId { conversation_id } => {
-                self.open_cloud_conversation_from_server_token(conversation_id, ctx);
-            }
             NewWorkspaceSource::AgentSession {
                 options,
                 initial_query,
@@ -3633,13 +3607,11 @@ impl Workspace {
             | NewWorkspaceSource::AgentSession { .. }
             | NewWorkspaceSource::NotebookFromFilePath { .. } => should_default_open,
             #[cfg(not(target_family = "wasm"))]
-            NewWorkspaceSource::FromCloudConversationId { .. }
-            | NewWorkspaceSource::NotebookById { .. }
-            | NewWorkspaceSource::WorkflowById { .. } => should_default_open,
+            NewWorkspaceSource::NotebookById { .. } | NewWorkspaceSource::WorkflowById { .. } => {
+                should_default_open
+            }
             #[cfg(target_family = "wasm")]
-            NewWorkspaceSource::FromCloudConversationId { .. }
-            | NewWorkspaceSource::NotebookById { .. }
-            | NewWorkspaceSource::WorkflowById { .. } => {
+            NewWorkspaceSource::NotebookById { .. } | NewWorkspaceSource::WorkflowById { .. } => {
                 // Web opens these as single-purpose views without exposed multi-tab UI, so keep
                 // the tabs panel closed even though native windows still expose workspace chrome.
                 false
@@ -3788,108 +3760,6 @@ impl Workspace {
                 }
             });
         }
-    }
-
-    /// Opens a cloud conversation by server token in the read-only transcript viewer. Only
-    /// conversations owned by a signed-in user reopened their pane, and Uncaged has no accounts.
-    pub fn open_cloud_conversation_from_server_token(
-        &mut self,
-        server_token: ServerConversationToken,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.load_cloud_conversation_into_new_transcript_viewer(server_token, None, ctx);
-    }
-
-    /// Load the conversation into a transcript viewer in a new tab (with no input/backing shell)
-    pub fn load_cloud_conversation_into_new_transcript_viewer(
-        &mut self,
-        conversation_id: ServerConversationToken,
-        ambient_agent_task_id: Option<AmbientAgentTaskId>,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        // Create the tab immediately with a loading state
-        let new_pane_group = ctx.add_typed_action_view(|ctx| {
-            PaneGroup::new_for_conversation_transcript_viewer_loading(
-                self.tips_completed.clone(),
-                self.user_default_shell_unsupported_banner_model_handle
-                    .clone(),
-                self.server_api.clone(),
-                self.model_event_sender.clone(),
-                ctx,
-            )
-        });
-
-        ctx.subscribe_to_view(&new_pane_group, move |me, pane_group, event, ctx| {
-            me.handle_file_tree_event(pane_group, event, ctx)
-        });
-
-        self.tabs.push(TabData::new(new_pane_group.clone()));
-        let new_tab_index = self.tab_count() - 1;
-        self.tab_mru_order
-            .push(self.tabs[new_tab_index].pane_group.id());
-        self.activate_tab_internal(new_tab_index, ctx);
-
-        let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client();
-        let server_token = conversation_id;
-        let local_conversation_id =
-            BlocklistAIHistoryModel::handle(ctx).update(ctx, |history, _| {
-                history.get_or_set_canonical_conversation_id_for_server_token(&server_token)
-            });
-
-        ctx.spawn(
-            async move {
-                load_conversation_from_server(local_conversation_id, server_token, ai_client).await
-            },
-            move |me, cloud_conversation, ctx| {
-                let Some(cloud_conversation) = cloud_conversation else {
-                    log::error!("Failed to load conversation from server");
-                    me.toast_stack.update(ctx, |view, ctx| {
-                        let new_toast = DismissibleToast::error(
-                            "Failed to load conversation data.".to_string(),
-                        );
-                        view.add_ephemeral_toast(new_toast, ctx);
-                    });
-                    return;
-                };
-
-                // Update the pane group with the loaded conversation
-                new_pane_group.update(ctx, |pane_group, ctx| {
-                    pane_group.load_data_into_conversation_transcript_viewer(
-                        cloud_conversation,
-                        ambient_agent_task_id,
-                        ctx,
-                    );
-                });
-
-                // Open the transcript details panel by default on WASM (unless on mobile)
-                #[cfg(target_family = "wasm")]
-                {
-                    if !warpui::platform::wasm::is_mobile_device() {
-                        me.current_workspace_state.is_transcript_details_panel_open = true;
-                        me.transcript_info_button.update(ctx, |button, ctx| {
-                            button.set_active(true, ctx);
-                        });
-                    }
-                    me.update_transcript_details_panel_data(ctx);
-                }
-
-                // Refresh the focused conversation state.
-                if me.active_tab_pane_group().id() == new_pane_group.id() {
-                    let focused_terminal_view_id = me
-                        .active_tab_pane_group()
-                        .as_ref(ctx)
-                        .active_session_view(ctx)
-                        .map(|view| view.id());
-                    let ambient_agent_task_id =
-                        me.ambient_agent_task_id_for_focused_terminal_view(ctx);
-                    me.notify_terminal_focus_change(
-                        focused_terminal_view_id,
-                        ambient_agent_task_id,
-                        ctx,
-                    );
-                }
-            },
-        );
     }
 
     pub fn is_conversation_transcript_viewer_focused(&self, app: &AppContext) -> bool {
@@ -7939,23 +7809,13 @@ impl Workspace {
         self.vertical_tabs_panel.show_settings_popup = false;
     }
 
-    /// Sets the visibility state of the agent management view
-    /// and updates the AgentConversationsModel to reflect the new state.
+    /// Sets the visibility state of the agent management view.
     fn set_is_agent_management_view_open(&mut self, is_open: bool, ctx: &mut ViewContext<Self>) {
         let was_open = self.current_workspace_state.is_agent_management_view_open;
         if was_open == is_open {
             return;
         }
         self.current_workspace_state.is_agent_management_view_open = is_open;
-        let window_id = self.window_id;
-        let view_id = self.agent_management_view.id();
-        AgentConversationsModel::handle(ctx).update(ctx, |model, ctx| {
-            if is_open {
-                model.register_view_open(window_id, view_id, ctx);
-            } else {
-                model.register_view_closed(window_id, view_id, ctx);
-            }
-        });
 
         // Notify panels about the agent management view state change so they can
         // update their top border visibility accordingly.
@@ -9720,12 +9580,6 @@ impl Workspace {
                 self.current_workspace_state.is_workflow_modal_open = false;
                 ctx.notify();
             }
-            WorkflowModalEvent::AiAssistError(message) => {
-                self.toast_stack.update(ctx, |view, ctx| {
-                    let new_toast = DismissibleToast::error(message.clone());
-                    view.add_ephemeral_toast(new_toast, ctx);
-                });
-            }
             WorkflowModalEvent::UpdatedWorkflow(workflow_id) => {
                 // If saved workflow id matches the one that is currently displayed, then refresh workflow info box + input
                 self.maybe_refresh_workflow_info_box_and_input(workflow_id, ctx);
@@ -11489,7 +11343,7 @@ impl Workspace {
             .is_some_and(|m| m.has_local_data);
         let future = history_model
             .as_ref(ctx)
-            .load_conversation_data(conversation_id, ctx);
+            .load_conversation_data(conversation_id);
         let terminal_view_for_closure = terminal_view.clone();
         let window_id = ctx.window_id();
         ctx.spawn(future, move |_workspace, conversation, ctx| {
@@ -11560,7 +11414,7 @@ impl Workspace {
         let history_model = BlocklistAIHistoryModel::handle(ctx);
         let future = history_model
             .as_ref(ctx)
-            .load_conversation_data(conversation_id, ctx);
+            .load_conversation_data(conversation_id);
         ctx.spawn(future, move |_workspace, conversation, ctx| {
             let Some(conversation) = conversation else {
                 log::warn!("Failed to load conversation {conversation_id}");
@@ -11628,7 +11482,7 @@ impl Workspace {
         let history_model = BlocklistAIHistoryModel::handle(ctx);
         let future = history_model
             .as_ref(ctx)
-            .load_conversation_data(conversation_id, ctx);
+            .load_conversation_data(conversation_id);
 
         ctx.spawn(future, move |workspace, conversation, ctx| {
             let Some(conversation) = conversation else {
@@ -11740,13 +11594,10 @@ impl Workspace {
         // `ephemeral_message_model.current_message().is_none()` gate.
         let has_initial_query = summarize_after_fork || initial_prompt.is_some();
 
-        let cloud_storage_enabled =
-            PrivacySettings::as_ref(ctx).is_cloud_conversation_storage_enabled;
-
         // Load the conversation data asynchronously
         let future = history_model
             .as_ref(ctx)
-            .load_conversation_data(conversation_id, ctx);
+            .load_conversation_data(conversation_id);
 
         ctx.spawn(future, move |workspace, source_conversation, ctx| {
             let Some(CloudConversationData::Oz(source_conversation)) = source_conversation else {
@@ -11760,74 +11611,24 @@ impl Workspace {
                 return;
             };
 
-            let source_server_token = source_conversation
-                .server_conversation_token()
-                .map(|t| t.as_str().to_string());
-            let title_for_fork = source_conversation.title();
-
-            // Skip the server-side fork when forking from a specific exchange.
-            // The server's ForkConversation copies the entire GCS conversation
-            // data, which includes exchanges after the fork point. This creates
-            // a mismatch with the locally-truncated fork and causes TaskNotFound
-            // errors during cloud-to-cloud handoff replay.
-            let should_server_fork =
-                cloud_storage_enabled && fork_from_exchange.is_none();
-            if let Some(source_token) = source_server_token.filter(|_| should_server_fork) {
-                let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client();
-                ctx.spawn(
-                    async move {
-                        ai_client
-                            .fork_conversation(source_token, title_for_fork)
-                            .await
-                    },
-                    move |workspace, result, ctx| {
-                        let server_forked_id = match result {
-                            Ok(response) => Some(response.forked_conversation_id),
-                            Err(err) => {
-                                log::warn!("Server-side fork failed, proceeding with local-only fork: {err:#}");
-                                None
-                            }
-                        };
-                        workspace.create_local_fork(
-                            source_conversation,
-                            conversation_id,
-                            fork_from_exchange,
-                            summarize_after_fork,
-                            summarization_prompt,
-                            initial_prompt,
-                            initial_attachments,
-                            destination,
-                            has_initial_query,
-                            source_terminal_view_id,
-                            server_forked_id,
-                            window_id,
-                            ctx,
-                        );
-                    },
-                );
-            } else {
-                workspace.create_local_fork(
-                    source_conversation,
-                    conversation_id,
-                    fork_from_exchange,
-                    summarize_after_fork,
-                    summarization_prompt,
-                    initial_prompt,
-                    initial_attachments,
-                    destination,
-                    has_initial_query,
-                    source_terminal_view_id,
-                    None,
-                    window_id,
-                    ctx,
-                );
-            }
+            workspace.create_local_fork(
+                source_conversation,
+                conversation_id,
+                fork_from_exchange,
+                summarize_after_fork,
+                summarization_prompt,
+                initial_prompt,
+                initial_attachments,
+                destination,
+                has_initial_query,
+                source_terminal_view_id,
+                window_id,
+                ctx,
+            );
         });
     }
 
     /// Completes the fork by creating the local conversation and restoring it into a pane.
-    /// If `server_forked_conversation_id` is provided, the local fork is bound to the
-    /// server-side fork so it immediately has cloud storage and a server identity.
     #[allow(clippy::too_many_arguments)]
     fn create_local_fork(
         &mut self,
@@ -11841,7 +11642,6 @@ impl Workspace {
         destination: ForkedConversationDestination,
         has_initial_query: bool,
         source_terminal_view_id: Option<EntityId>,
-        server_forked_conversation_id: Option<String>,
         window_id: WindowId,
         ctx: &mut ViewContext<Self>,
     ) {
@@ -11867,7 +11667,7 @@ impl Workspace {
             }
         });
 
-        let mut forked_conversation = match fork_result {
+        let forked_conversation = match fork_result {
             Ok(forked_conversation) => forked_conversation,
             Err(e) => {
                 log::error!("Conversation forking failed. {e}.");
@@ -11878,16 +11678,6 @@ impl Workspace {
                 return;
             }
         };
-
-        if let Some(server_id) = server_forked_conversation_id {
-            let forked_id = forked_conversation.id();
-            forked_conversation.set_server_conversation_token(server_id.clone());
-            history_model.update(ctx, |history_model, ctx| {
-                history_model.set_server_conversation_token_for_conversation_and_persist(
-                    forked_id, server_id, ctx,
-                );
-            });
-        }
 
         // Handle forking into the current pane
         if destination.is_current_pane() {
@@ -14400,7 +14190,7 @@ impl Workspace {
                 if pane_group.id() == self.active_tab_pane_group().id() {
                     self.left_panel_open = *is_open;
                     self.left_panel_view.update(ctx, |left_panel, ctx| {
-                        left_panel.on_left_panel_visibility_changed(*is_open, ctx);
+                        left_panel.on_left_panel_visibility_changed(ctx);
                     });
                 }
             }
@@ -19645,9 +19435,6 @@ impl Workspace {
                 .insert(flags::SHARED_BLOCK_TITLE_GENERATION_FLAG);
         }
 
-        if *ai_settings.git_operations_autogen_enabled_internal.value() {
-            context.set.insert(flags::GIT_OPERATIONS_AUTOGEN_FLAG);
-        }
         if *ai_settings.include_agent_commands_in_history.value() {
             context
                 .set
@@ -21350,25 +21137,6 @@ impl TypedActionView for Workspace {
                     *pane_view_locator,
                     *terminal_view_id,
                     *restore_layout,
-                    ctx,
-                );
-            }
-            OpenConversationTranscriptViewer {
-                conversation_id,
-                ambient_agent_task_id,
-            } => {
-                // Check if there's already a terminal viewing this conversation's task.
-                if let Some(task_id) = ambient_agent_task_id {
-                    if let Some((_, locator)) =
-                        self.find_pane_with_ambient_agent_conversation(*task_id, ctx)
-                    {
-                        self.focus_pane(locator, ctx);
-                        return;
-                    }
-                }
-                self.load_cloud_conversation_into_new_transcript_viewer(
-                    conversation_id.clone(),
-                    *ambient_agent_task_id,
                     ctx,
                 );
             }

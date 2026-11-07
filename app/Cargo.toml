@@ -416,7 +416,6 @@ autoupdate = []
 figma_detection = []
 bundled_skills = []
 supergrok = []
-gemini_enterprise = []
 agent_mode = []
 agent_mode_debug = []
 agent_mode_primary_xml = []
@@ -540,7 +539,6 @@ default = [
     "list_skills",
     "ask_user_question",
     "bundled_skills",
-    # "ambient_agents_rtc",  # Uncaged: needs Warp servers
     # Uncaged: cloud-agent modes disabled (no account, no Warp cloud).
     # "cloud_mode",
     # "cloud_mode_from_local_session",
@@ -606,16 +604,12 @@ default = [
     # "oz_handoff",
     # "handoff_local_cloud",
     "run_agents_tool",
-    # "orchestration_viewer_streamer",  # Uncaged: needs Warp servers
-    # "owner_orchestration_ancestor_streamer",  # Uncaged: needs Warp servers
     "pending_user_query_indicator",
     "queue_slash_command",
     "queued_prompts_v2",
     # Uncaged: cloud-mode input/setup + cloud handoff disabled.
     # "cloud_mode_setup_v2",
     # "handoff_cloud_cloud",
-    "solo_user_byok",
-    "custom_inference_endpoints",
     "custom_model_routers",
     "supergrok",
     # "billing_and_usage_page_v2",  # Uncaged: needs Warp servers
@@ -864,7 +858,6 @@ agent_tips = []
 agent_toolbar_editor = ["agent_view"]
 cloud_conversations = []
 agent_view_prompt_chip = ["agent_view"]
-ambient_agents_rtc = []
 team_api_keys = []
 named_agents = []
 classic_completions = []
@@ -891,8 +884,6 @@ skill_arguments = []
 active_conversation_requires_interaction = []
 incremental_auto_reload = []
 run_agents_tool = []
-orchestration_viewer_streamer = []
-owner_orchestration_ancestor_streamer = []
 pending_user_query_indicator = []
 queue_slash_command = []
 queued_prompts_v2 = ["queue_slash_command"]
@@ -911,9 +902,7 @@ handoff_local_cloud = []
 hoa_notifications = []
 open_code_notifications = []
 transfer_control_tool = []
-custom_inference_endpoints = []
 custom_model_routers = []
-solo_user_byok = []
 billing_and_usage_page_v2 = []
 gpt_configurable_context_window = []
 configurable_toolbar = []

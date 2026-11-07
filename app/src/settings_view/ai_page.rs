@@ -65,12 +65,11 @@ use crate::settings::{
     AIAutoDetectionEnabled, AICommandDenylist, AISettingsChangedEvent,
     AgentModeCodingPermissionsType, AgentModeCommandExecutionDenylist,
     AgentModeCommandExecutionPredicate, AgentModeQuerySuggestionsEnabled, AgentTrigger,
-    CodeSettings, CodebaseContextEnabled, FileBasedMcpEnabled, GitOperationsAutogenEnabled,
-    IncludeAgentCommandsInHistory, InputSettings, IntelligentAutosuggestionsEnabled,
-    LongRunningCommandSubmissionMode, MemoryEnabled, NLDInTerminalEnabled,
-    NaturalLanguageAutosuggestionsEnabled, OrchestrationMessageDisplayMode,
-    PreferShellForKnownCommands, PromptSubmissionMode, RuleSuggestionsEnabled,
-    SharedBlockTitleGenerationEnabled, ShouldRenderCLIAgentToolbar,
+    CodeSettings, CodebaseContextEnabled, FileBasedMcpEnabled, IncludeAgentCommandsInHistory,
+    InputSettings, IntelligentAutosuggestionsEnabled, LongRunningCommandSubmissionMode,
+    MemoryEnabled, NLDInTerminalEnabled, NaturalLanguageAutosuggestionsEnabled,
+    OrchestrationMessageDisplayMode, PreferShellForKnownCommands, PromptSubmissionMode,
+    RuleSuggestionsEnabled, SharedBlockTitleGenerationEnabled, ShouldRenderCLIAgentToolbar,
     ShouldRenderUseAgentToolbarForUserCommands, ShowAgentTips, ShowHintText, ThinkingDisplayMode,
     WarpDriveContextEnabled,
 };
@@ -116,7 +115,7 @@ use std::sync::LazyLock;
 
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 
-use crate::ai::{AIRequestUsageModel, AIRequestUsageModelEvent};
+use crate::ai::AIRequestUsageModel;
 use crate::appearance::{Appearance, AppearanceEvent};
 use crate::editor::{EditorView, Event as EditorEvent, TextOptions};
 use crate::menu::{MenuItem, MenuItemFields};
@@ -150,8 +149,6 @@ const NATURAL_LANGUAGE_AUTOSUGGESTIONS: &str =
     "Let AI suggest natural language autosuggestions, based on recent commands and their outputs.";
 const SHARED_BLOCK_TITLE_GENERATION_DESCRIPTION: &str =
     "Let AI generate a title for your shared block based on the command and output.";
-const GIT_OPERATIONS_AUTOGEN_DESCRIPTION: &str =
-    "Let AI generate commit messages and pull request titles and descriptions.";
 const WISPR_FLOW_URL: &str = "https://wisprflow.ai/";
 
 pub fn init_actions_from_parent_view<T: Action + Clone>(
@@ -393,23 +390,6 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         )
         .with_group(bindings::BindingGroup::WarpAi)
         .with_enabled(|| FeatureFlag::SharedBlockTitleGeneration.is_enabled())],
-        app,
-    );
-    ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
-        vec![ToggleSettingActionPair::new(
-            "commit and pull request generation",
-            builder(SettingsAction::AI(
-                AISettingsPageAction::ToggleGitOperationsAutogen,
-            )),
-            &(context.clone() & id!(flags::IS_ACTIVE_AI_ENABLED)),
-            flags::GIT_OPERATIONS_AUTOGEN_FLAG,
-        )
-        .with_enabled(|| FeatureFlag::GitOperationsInCodeReview.is_enabled())
-        .is_supported_on_current_platform(
-            AISettings::as_ref(app)
-                .git_operations_autogen_enabled_internal
-                .is_supported_on_current_platform(),
-        )],
         app,
     );
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
@@ -1519,17 +1499,6 @@ impl AISettingsPageView {
             }
         });
 
-        let ai_request_model = AIRequestUsageModel::handle(ctx);
-        ctx.subscribe_to_model(&ai_request_model, |me, _, event, ctx| {
-            match event {
-                AIRequestUsageModelEvent::RequestUsageUpdated => ctx.notify(),
-                AIRequestUsageModelEvent::RequestBonusRefunded { .. } => ctx.notify(),
-                AIRequestUsageModelEvent::AmbientCreditsBannerDismissed => {}
-            }
-            Self::refresh_base_model_menu(&me.base_model_dropdown, ctx);
-            Self::refresh_coding_model_menu(&me.coding_model_dropdown, ctx);
-        });
-
         let profile_views = Self::create_profile_views(ctx);
 
         // Custom model router views
@@ -2257,10 +2226,6 @@ impl AISettingsPageView {
                         && ai_settings
                             .shared_block_title_generation_enabled_internal
                             .is_supported_on_current_platform())
-                    || (FeatureFlag::GitOperationsInCodeReview.is_enabled()
-                        && ai_settings
-                            .git_operations_autogen_enabled_internal
-                            .is_supported_on_current_platform())
                 {
                     widgets.push(Box::new(ActiveAIWidget::default()));
                 }
@@ -2306,10 +2271,6 @@ impl AISettingsPageView {
                     || (FeatureFlag::SharedBlockTitleGeneration.is_enabled()
                         && ai_settings
                             .shared_block_title_generation_enabled_internal
-                            .is_supported_on_current_platform())
-                    || (FeatureFlag::GitOperationsInCodeReview.is_enabled()
-                        && ai_settings
-                            .git_operations_autogen_enabled_internal
                             .is_supported_on_current_platform())
                 {
                     widgets.push(Box::new(ActiveAIWidget::default()));
@@ -3060,7 +3021,6 @@ pub enum AISettingsPageAction {
     ToggleCodeSuggestions,
     ToggleNaturalLanguageAutosuggestions,
     ToggleSharedTitleGeneration,
-    ToggleGitOperationsAutogen,
     ToggleAIInputAutoDetection,
     TogglePreferShellForKnownCommands,
     ToggleNLDInTerminal,
@@ -3222,16 +3182,6 @@ impl TypedActionView for AISettingsPageView {
                     log::warn!(
                         "Failed to set value for Shared Block Title Generation setting: {e:?}"
                     );
-                }
-                ctx.notify();
-            }
-            AISettingsPageAction::ToggleGitOperationsAutogen => {
-                if let Err(e) = AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    settings
-                        .git_operations_autogen_enabled_internal
-                        .toggle_and_save_value(ctx)
-                }) {
-                    log::warn!("Failed to set value for Git Operations Autogen setting: {e:?}");
                 }
                 ctx.notify();
             }
@@ -4015,7 +3965,6 @@ struct ActiveAIWidget {
     code_suggestions_toggle: SwitchStateHandle,
     natural_language_autosuggestions_toggle: SwitchStateHandle,
     shared_block_title_generation_toggle: SwitchStateHandle,
-    git_operations_autogen_toggle: SwitchStateHandle,
 }
 
 impl ActiveAIWidget {
@@ -4049,13 +3998,6 @@ impl ActiveAIWidget {
         FeatureFlag::SharedBlockTitleGeneration.is_enabled()
             && AISettings::as_ref(app)
                 .shared_block_title_generation_enabled_internal
-                .is_supported_on_current_platform()
-    }
-
-    fn is_git_operations_autogen_toggleable(&self, app: &AppContext) -> bool {
-        FeatureFlag::GitOperationsInCodeReview.is_enabled()
-            && AISettings::as_ref(app)
-                .git_operations_autogen_enabled_internal
                 .is_supported_on_current_platform()
     }
 
@@ -4194,38 +4136,13 @@ impl ActiveAIWidget {
             ))
             .finish()
     }
-
-    fn render_git_operations_autogen_section(
-        &self,
-        view: &AISettingsPageView,
-        app: &warpui::AppContext,
-    ) -> Box<dyn warpui::Element> {
-        let ai_settings = AISettings::as_ref(app);
-        let is_toggleable = ai_settings.is_active_ai_enabled(app);
-        Flex::column()
-            .with_child(render_ai_setting_toggle::<GitOperationsAutogenEnabled>(
-                "Commit & Pull Request Generation",
-                AISettingsPageAction::ToggleGitOperationsAutogen,
-                *ai_settings.git_operations_autogen_enabled_internal,
-                is_toggleable,
-                self.git_operations_autogen_toggle.clone(),
-                &view.local_only_icon_tooltip_states,
-                app,
-            ))
-            .with_child(render_ai_setting_description(
-                GIT_OPERATIONS_AUTOGEN_DESCRIPTION,
-                is_toggleable,
-                app,
-            ))
-            .finish()
-    }
 }
 
 impl SettingsWidget for ActiveAIWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "active ai a.i. next command prompt suggestions code diffs suggested banners passive unit tests commit pull request pr git code review autogen generate"
+        "active ai a.i. next command prompt suggestions code diffs suggested banners passive unit tests"
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
@@ -4234,7 +4151,6 @@ impl SettingsWidget for ActiveAIWidget {
             || self.is_suggested_code_banners_toggleable(app)
             || self.is_natural_language_autosuggestions_toggleable(app)
             || self.is_shared_block_title_generation_toggleable(app)
-            || self.is_git_operations_autogen_toggleable(app)
     }
 
     fn render(
@@ -4295,10 +4211,6 @@ impl SettingsWidget for ActiveAIWidget {
 
         if self.is_shared_block_title_generation_toggleable(app) {
             column.add_child(self.render_shared_block_title_generation_section(view, app));
-        }
-
-        if self.is_git_operations_autogen_toggleable(app) {
-            column.add_child(self.render_git_operations_autogen_section(view, app));
         }
 
         column.finish()

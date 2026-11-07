@@ -12,7 +12,6 @@ use crate::ai::agent::{
     AIAgentAction, AIAgentActionResultType, AIAgentActionType, LifecycleEventType,
     StartAgentExecutionMode, StartAgentResult,
 };
-use crate::ai::blocklist::orchestration_event_streamer::OrchestrationEventStreamer;
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::ai::local_harness_setup::local_harness_product_disabled_message;
 
@@ -178,9 +177,6 @@ impl StartAgentExecutor {
             Some(id) => {
                 let _ = pending.sender.try_send(StartAgentOutcome::Started {
                     agent_id: id.clone(),
-                });
-                OrchestrationEventStreamer::handle(ctx).update(ctx, |streamer, ctx| {
-                    streamer.register_watched_run_id(pending.parent_conversation_id, id, ctx);
                 });
             }
             None => {

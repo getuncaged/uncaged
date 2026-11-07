@@ -2820,12 +2820,7 @@ impl TerminalView {
                     // Delete the conversation if it's unmodified, new, has no init steps,
                     // and isn't a child agent in an orchestration tree.
                     if !was_modified && was_new && !has_init_steps && !is_child_agent {
-                        conversation_utils::remove_conversation(
-                            *conversation_id,
-                            me.view_id,
-                            false, // Empty new conversations were never synced to the cloud.
-                            ctx,
-                        );
+                        conversation_utils::remove_conversation(*conversation_id, me.view_id, ctx);
                     }
 
                     // Uncaged: no "you had a conversation here" entry card. The
@@ -8767,7 +8762,7 @@ impl TerminalView {
             ai_block.cleanup_block(ctx);
         });
         let conversation_id = passive_block.as_ref(ctx).conversation_id();
-        conversation_utils::remove_conversation(conversation_id, self.view_id, true, ctx);
+        conversation_utils::remove_conversation(conversation_id, self.view_id, ctx);
         self.rich_content_views.remove(rich_content_idx);
         self.model
             .lock()

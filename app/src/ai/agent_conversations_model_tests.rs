@@ -3,7 +3,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
-use instant::Instant;
 use parking_lot::Mutex;
 use persistence::model::{AgentConversationData, ConversationUsageMetadata};
 use warp_cli::agent::Harness;
@@ -14,10 +13,9 @@ use super::entry::{
     AgentConversationEntryId, AgentConversationNavigationSubject, AgentConversationProvenance,
 };
 use super::{
-    record_earliest_rtc_task_refresh_timestamp, AgentConversationsModel,
-    AgentConversationsModelEvent, AgentManagementFilters, AgentRunDisplayStatus, ArtifactFilter,
-    ConversationMetadata, ConversationUpdateKind, EnvironmentFilter, HarnessFilter, OwnerFilter,
-    RtcTaskRefreshThrottleState, StatusFilter, TaskFetchError, TaskFetchState, MAX_PERSONAL_TASKS,
+    AgentConversationsModel, AgentConversationsModelEvent, AgentManagementFilters,
+    AgentRunDisplayStatus, ArtifactFilter, ConversationMetadata, ConversationUpdateKind,
+    EnvironmentFilter, HarnessFilter, OwnerFilter, StatusFilter, MAX_PERSONAL_TASKS,
     MAX_TEAM_TASKS,
 };
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
@@ -27,10 +25,8 @@ use crate::ai::agent::conversation::{
     ServerAIConversationMetadata,
 };
 use crate::ai::ambient_agents::agent_config::HarnessConfig;
-use crate::ai::ambient_agents::task::{TaskPrincipalInfo, TaskStatusMessage};
-use crate::ai::ambient_agents::{
-    AgentConfigSnapshot, AmbientAgentTask, AmbientAgentTaskId, AmbientAgentTaskState,
-};
+use crate::ai::ambient_agents::task::{AgentConfigSnapshot, TaskPrincipalInfo, TaskStatusMessage};
+use crate::ai::ambient_agents::{AmbientAgentTask, AmbientAgentTaskId, AmbientAgentTaskState};
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::history_model::{
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, ConversationStatusUpdate,
@@ -38,7 +34,6 @@ use crate::ai::blocklist::history_model::{
 use crate::ai::conversation_navigation::ConversationNavigationData;
 use crate::cloud_object::{Owner, Revision, ServerMetadata, ServerPermissions};
 use crate::server::ids::ServerId;
-use crate::server::server_api::HttpStatusError;
 use crate::test_util::ai_agent_tasks::{create_api_task, create_message};
 use crate::test_util::settings::initialize_history_persistence_for_tests;
 use crate::workspace::WorkspaceAction;
@@ -654,46 +649,8 @@ fn create_test_model() -> AgentConversationsModel {
     AgentConversationsModel {
         tasks: HashMap::new(),
         conversations: HashMap::new(),
-        in_flight_poll_abort_handle: None,
-        next_poll_abort_handle: None,
-        active_data_consumers_per_window: HashMap::new(),
         has_finished_initial_load: false,
-        task_fetch_state: Default::default(),
-        rtc_task_refresh_throttle_state: RtcTaskRefreshThrottleState::default(),
-        dirty_since: None,
     }
-}
-
-#[test]
-fn rtc_task_refresh_pending_timestamp_records_first_timestamp() {
-    let timestamp = Utc::now();
-    let mut pending_timestamp = None;
-
-    record_earliest_rtc_task_refresh_timestamp(&mut pending_timestamp, timestamp);
-
-    assert_eq!(pending_timestamp, Some(timestamp));
-}
-
-#[test]
-fn rtc_task_refresh_pending_timestamp_keeps_earliest_timestamp() {
-    let earliest_timestamp = Utc::now();
-    let later_timestamp = earliest_timestamp + Duration::seconds(3);
-    let mut pending_timestamp = Some(earliest_timestamp);
-
-    record_earliest_rtc_task_refresh_timestamp(&mut pending_timestamp, later_timestamp);
-
-    assert_eq!(pending_timestamp, Some(earliest_timestamp));
-}
-
-#[test]
-fn rtc_task_refresh_pending_timestamp_replaces_later_timestamp() {
-    let earliest_timestamp = Utc::now();
-    let later_timestamp = earliest_timestamp + Duration::seconds(3);
-    let mut pending_timestamp = Some(later_timestamp);
-
-    record_earliest_rtc_task_refresh_timestamp(&mut pending_timestamp, earliest_timestamp);
-
-    assert_eq!(pending_timestamp, Some(earliest_timestamp));
 }
 
 fn create_test_conversation_metadata(
@@ -1148,7 +1105,7 @@ fn test_resolve_open_action_returns_none_for_active_unattachable_session() {
 }
 
 #[test]
-fn test_resolve_open_action_handles_server_token_subject_without_entry() {
+fn test_resolve_open_action_does_not_open_server_token_without_entry() {
     App::test((), |mut app| async move {
         add_entry_projection_test_models(&mut app);
         app.add_singleton_model(|_| create_test_model());
@@ -1161,19 +1118,13 @@ fn test_resolve_open_action_handles_server_token_subject_without_entry() {
                 ctx,
             );
 
-            assert!(matches!(
-                action,
-                Some(WorkspaceAction::OpenConversationTranscriptViewer {
-                    conversation_id,
-                    ambient_agent_task_id: None,
-                }) if conversation_id == server_token
-            ));
+            assert!(action.is_none());
         });
     });
 }
 
 #[test]
-fn test_resolve_open_action_opens_completed_cloud_task_by_server_token() {
+fn test_resolve_open_action_does_not_open_completed_cloud_task() {
     App::test((), |mut app| async move {
         add_entry_projection_test_models(&mut app);
 
@@ -1200,19 +1151,13 @@ fn test_resolve_open_action_opens_completed_cloud_task_by_server_token() {
                 ctx,
             );
 
-            assert!(matches!(
-                action,
-                Some(WorkspaceAction::OpenConversationTranscriptViewer {
-                    conversation_id,
-                    ambient_agent_task_id: Some(resolved_task_id),
-                }) if conversation_id.as_str() == token && resolved_task_id == task_id
-            ));
+            assert!(action.is_none());
         });
     });
 }
 
 #[test]
-fn test_resolve_open_action_opens_metadata_only_cloud_conversation_by_server_token() {
+fn test_resolve_open_action_does_not_open_metadata_only_cloud_conversation() {
     App::test((), |mut app| async move {
         let token = "metadata-only-token";
         add_entry_projection_test_models(&mut app);
@@ -1249,13 +1194,7 @@ fn test_resolve_open_action_opens_metadata_only_cloud_conversation_by_server_tok
                 ctx,
             );
 
-            assert!(matches!(
-                action,
-                Some(WorkspaceAction::OpenConversationTranscriptViewer {
-                    conversation_id,
-                    ambient_agent_task_id: None,
-                }) if conversation_id.as_str() == token
-            ));
+            assert!(action.is_none());
         });
     });
 }
@@ -2041,181 +1980,6 @@ fn test_harness_filter_is_filtering_and_reset() {
     filters.reset_all_but_owner();
     assert_eq!(filters.harness, HarnessFilter::default());
     assert!(!filters.is_filtering());
-}
-
-#[test]
-fn test_task_fetch_error_extracts_access_denied_http_status() {
-    for status in [401, 403] {
-        let error = anyhow::Error::new(HttpStatusError {
-            status,
-            body: String::new(),
-        })
-        .context("run metadata unavailable");
-        let fetch_error = TaskFetchError::from_error(&error);
-
-        assert_eq!(fetch_error.message(), "run metadata unavailable");
-        assert!(
-            fetch_error.is_access_denied(),
-            "expected status {status} to be access denied"
-        );
-    }
-
-    for error in [
-        anyhow::Error::new(HttpStatusError {
-            status: 404,
-            body: String::new(),
-        })
-        .context("permission denied text alone should not decide the UI"),
-        anyhow::anyhow!("API error 403: forbidden"),
-    ] {
-        assert!(!TaskFetchError::from_error(&error).is_access_denied());
-    }
-}
-
-#[test]
-fn test_get_or_async_fetch_task_data_returns_cached_task_without_fetching() {
-    // If the task is already in `tasks`, return it directly and don't touch the fetch-state
-    // map — even if a stale `PermanentlyFailedAt` entry exists (which shouldn't normally happen,
-    // but proves the success path takes precedence).
-    App::test((), |mut app| async move {
-        let now = Utc::now();
-        let task = create_test_task(&make_uuid(7000), "user-a", now);
-        let task_id = task.task_id;
-
-        let model_handle = app.add_singleton_model(|_| {
-            let mut model = create_test_model();
-            model.tasks.insert(task_id, task.clone());
-            // Sentinel: even if a permanent-failure entry is present, the cached task wins.
-            model.task_fetch_state.insert(
-                task_id,
-                TaskFetchState::PermanentlyFailed {
-                    at: Instant::now(),
-                    error: TaskFetchError {
-                        message: "test".to_string(),
-                        status: None,
-                    },
-                },
-            );
-            model
-        });
-
-        let result = model_handle.update(&mut app, |model, ctx| {
-            model.get_or_async_fetch_task_data(&task_id, ctx)
-        });
-
-        assert!(result.is_some(), "cached task should be returned");
-        model_handle.update(&mut app, |model, _| {
-            // The cached-hit fast path doesn't touch `task_fetch_state`, so the sentinel
-            // entry is left as-is and (importantly) no `InFlight` entry was added.
-            assert!(matches!(
-                model.task_fetch_state.get(&task_id),
-                Some(TaskFetchState::PermanentlyFailed { .. })
-            ));
-        });
-    });
-}
-
-#[test]
-fn test_get_or_async_fetch_task_data_skips_when_permanently_failed() {
-    // A task id marked as `PermanentlyFailed` within its cooldown (e.g. very recent 403) must
-    // not spawn a new fetch.
-    App::test((), |mut app| async move {
-        let task_id: AmbientAgentTaskId = make_uuid(7001).parse().unwrap();
-
-        let model_handle = app.add_singleton_model(|_| {
-            let mut model = create_test_model();
-            model.task_fetch_state.insert(
-                task_id,
-                TaskFetchState::PermanentlyFailed {
-                    at: Instant::now(),
-                    error: TaskFetchError {
-                        message: "403 Forbidden".to_string(),
-                        status: Some(403),
-                    },
-                },
-            );
-            model
-        });
-
-        let result = model_handle.update(&mut app, |model, ctx| {
-            model.get_or_async_fetch_task_data(&task_id, ctx)
-        });
-
-        assert!(result.is_none());
-        model_handle.update(&mut app, |model, _| {
-            // The state is unchanged -- still permanently failed, no in-flight upgrade.
-            assert!(matches!(
-                model.task_fetch_state.get(&task_id),
-                Some(TaskFetchState::PermanentlyFailed { .. })
-            ));
-        });
-    });
-}
-
-#[test]
-fn test_get_or_async_fetch_task_data_skips_when_in_flight() {
-    // A task id already marked as `InFlight` must not spawn a duplicate fetch.
-    App::test((), |mut app| async move {
-        let task_id: AmbientAgentTaskId = make_uuid(7002).parse().unwrap();
-
-        let model_handle = app.add_singleton_model(|_| {
-            let mut model = create_test_model();
-            model
-                .task_fetch_state
-                .insert(task_id, TaskFetchState::InFlight);
-            model
-        });
-
-        let result = model_handle.update(&mut app, |model, ctx| {
-            model.get_or_async_fetch_task_data(&task_id, ctx)
-        });
-
-        assert!(result.is_none());
-        model_handle.update(&mut app, |model, _| {
-            // Still exactly the one in-flight entry we pre-seeded.
-            assert_eq!(model.task_fetch_state.len(), 1);
-            assert!(matches!(
-                model.task_fetch_state.get(&task_id),
-                Some(TaskFetchState::InFlight)
-            ));
-        });
-    });
-}
-
-#[test]
-fn test_get_or_async_fetch_task_data_skips_within_transient_cooldown() {
-    // A recent transient failure (timestamp younger than the cooldown) must short-circuit.
-    App::test((), |mut app| async move {
-        let task_id: AmbientAgentTaskId = make_uuid(7003).parse().unwrap();
-
-        let model_handle = app.add_singleton_model(|_| {
-            let mut model = create_test_model();
-            model.task_fetch_state.insert(
-                task_id,
-                TaskFetchState::TransientlyFailed {
-                    at: Instant::now(),
-                    error: TaskFetchError {
-                        message: "500 Internal Server Error".to_string(),
-                        status: Some(500),
-                    },
-                },
-            );
-            model
-        });
-
-        let result = model_handle.update(&mut app, |model, ctx| {
-            model.get_or_async_fetch_task_data(&task_id, ctx)
-        });
-
-        assert!(result.is_none());
-        model_handle.update(&mut app, |model, _| {
-            // The transient entry is preserved (no upgrade to in-flight).
-            assert!(matches!(
-                model.task_fetch_state.get(&task_id),
-                Some(TaskFetchState::TransientlyFailed { .. })
-            ));
-        });
-    });
 }
 
 #[test]

@@ -543,9 +543,6 @@ pub enum FeatureFlag {
     /// Enables configuring header toolbar item order, side placement, and visibility.
     ConfigurableToolbar,
 
-    /// Enables real-time communication updates for ambient agent tasks.
-    AmbientAgentsRTC,
-
     // Enables a side panel conversation list view for AgentView mode.
     AgentViewConversationListView,
 
@@ -649,16 +646,6 @@ pub enum FeatureFlag {
     /// `OrchestrationV2`; has no effect when v2 is off.
     RunAgentsTool,
 
-    /// Replaces `OrchestrationViewerModel`'s REST polling loop with an SSE-driven
-    /// `ancestor_run_id` stream consumed via `OrchestrationEventStreamer`'s new
-    /// viewer-mode entry. Off by default; flipping it on activates the
-    /// per-orchestrator viewer-mode consumer and the broadcast `ChildSpawned`
-    /// / `ChildStatusChanged` events. See `specs/orch-viewer-polling/TECH.md`.
-    OrchestrationViewerStreamer,
-
-    /// Uses a parent-family ancestor stream for owner-side orchestrator event delivery.
-    OwnerOrchestrationAncestorStreamer,
-
     /// Shows a pending user query indicator during summarization when a follow-up
     /// prompt is queued via `/fork-and-compact` or `/compact-and`.
     PendingUserQueryIndicator,
@@ -743,11 +730,6 @@ pub enum FeatureFlag {
     /// Enables the ask_user_question tool allowing the agent to ask clarifying questions.
     AskUserQuestion,
 
-    /// When enabled, solo users (not on a team) can use BYO API keys.
-    SoloUserByok,
-
-    /// Enables the Custom Inference settings UI for adding user-provided third-party / OpenAI-compatible inference endpoints.
-    CustomInferenceEndpoints,
     /// Enables Custom Inference endpoints for enterprise users.
     CustomInferenceEndpointsEnterprise,
 
@@ -813,10 +795,6 @@ pub enum FeatureFlag {
     /// Gates the SuperGrok feature, which lets users
     /// connect a Grok subscription instead of pasting an API key.
     SuperGrok,
-
-    /// Gates Gemini Enterprise (GEAP) BYOLLM, which lets users
-    /// route eliglible models to GEAP instead of Warp-managed inference.
-    GeminiEnterprise,
 
     /// Gates the custom model router feature, which allows users to define
     /// their own model routers.

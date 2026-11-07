@@ -155,11 +155,7 @@ impl SlashCommandDataSource {
         ctx.subscribe_to_model(
             &AgentConversationsModel::handle(ctx),
             |me, _, event, ctx| {
-                if matches!(
-                    event,
-                    AgentConversationsModelEvent::TasksUpdated
-                        | AgentConversationsModelEvent::NewTasksReceived
-                ) {
+                if matches!(event, AgentConversationsModelEvent::TasksUpdated) {
                     me.recompute_active_commands(ctx);
                 }
             },

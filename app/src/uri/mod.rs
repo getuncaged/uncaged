@@ -17,7 +17,6 @@ use warpui::platform::TerminationMode;
 use warpui::{AppContext, SingletonEntity as _, TypedActionView, WindowId};
 
 use self::docker::open_docker_container;
-use crate::ai::agent::api::ServerConversationToken;
 use crate::cloud_object::ObjectType;
 use crate::drive::{OpenWarpDriveObjectArgs, OpenWarpDriveObjectSettings};
 use crate::features::FeatureFlag;
@@ -54,8 +53,6 @@ pub enum UriHost {
     Action,
     /// A host prefix for all actions that involve launch configurations
     Launch,
-    /// Supports viewing AI conversations via a warp:// URI.
-    Conversation,
     /// Supports WD object actions
     Drive,
     /// Supports opening warp's settings panel via URI
@@ -83,7 +80,6 @@ impl FromStr for UriHost {
             "team" => Ok(Self::Team),
             "action" => Ok(Self::Action),
             "launch" => Ok(Self::Launch),
-            "conversation" => Ok(Self::Conversation),
             "drive" => Ok(Self::Drive),
             "settings" => Ok(Self::Settings),
             "home" => Ok(Self::Home),
@@ -143,40 +139,6 @@ impl UriHost {
             }
             UriHost::TabConfig => {
                 handle_tab_config_uri(primary_window_id, url, ctx);
-            }
-            UriHost::Conversation => {
-                // We expect the uri to have the conversation ID as the last segment.
-                // e.g. warp://conversation/{conversation_id}
-                let conversation_id: Option<ServerConversationToken> = url
-                    .path_segments()
-                    .into_iter()
-                    .flatten()
-                    .last()
-                    .map(|s| ServerConversationToken::new(s.to_owned()));
-
-                if let Some(conversation_id) = conversation_id {
-                    // If there's an existing window, open the conversation in a new tab. Otherwise, open a new window.
-                    match primary_window_id.and_then(|window_id| {
-                        ctx.root_view_id(window_id)
-                            .map(|view_id| (window_id, view_id))
-                    }) {
-                        Some((primary_window_id, root_view_id)) => {
-                            ctx.dispatch_action(
-                                primary_window_id,
-                                &[root_view_id],
-                                "root_view:open_cloud_conversation_in_existing_window",
-                                &conversation_id,
-                                log::Level::Info,
-                            );
-                        }
-                        None => ctx.dispatch_global_action(
-                            "root_view:open_conversation_viewer",
-                            &conversation_id,
-                        ),
-                    }
-                } else {
-                    log::warn!("Failed to open conversation with uri={url}");
-                }
             }
             UriHost::Drive => {
                 // We expect the uri to have the ID of the object we are trying to open and the object_type.
@@ -388,7 +350,7 @@ impl UriHost {
         match self {
             Self::Team | Self::Drive | Self::Settings => W::default(),
             // These URLs always open new windows.
-            Self::Launch | Self::Conversation | Self::Home => W::Nothing,
+            Self::Launch | Self::Home => W::Nothing,
             // This will actually be handled by [`Action::window_behavior_hint`].
             Self::Action => W::Nothing,
             // TODO(vorporeal): probably want to focus the window with the MCP pane open
@@ -1184,7 +1146,6 @@ fn validate_custom_uri(url: &Url) -> Result<UriHost> {
     let host_allows_arbitrary_path = match host {
         UriHost::Action
         | UriHost::Launch
-        | UriHost::Conversation
         | UriHost::Drive
         | UriHost::Team
         | UriHost::Settings

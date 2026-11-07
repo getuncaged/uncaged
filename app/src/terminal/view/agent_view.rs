@@ -170,7 +170,7 @@ impl TerminalView {
             let conversation_id_copy = conversation_id;
             let future = history_model
                 .as_ref(ctx)
-                .load_conversation_data(conversation_id_copy, ctx);
+                .load_conversation_data(conversation_id_copy);
             ctx.spawn(future, move |me, conversation, ctx| {
                 let Some(conversation) = conversation else {
                     me.show_error_toast(
