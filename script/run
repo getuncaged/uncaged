@@ -117,7 +117,6 @@ fi
 # by warp-channel-config. Intercept them here so that existing --features
 # invocations keep working.
 for mapping in \
-    "with_local_server:WITH_LOCAL_SERVER" \
     "with_sandbox_telemetry:WITH_SANDBOX_TELEMETRY"; do
     feature="${mapping%%:*}"
     env_var="${mapping##*:}"

@@ -15,9 +15,6 @@ pub mod completions;
 pub mod mcp;
 pub mod skill;
 
-pub const SERVER_ROOT_URL_OVERRIDE_ENV: &str = "WARP_SERVER_ROOT_URL";
-pub const WS_SERVER_URL_OVERRIDE_ENV: &str = "WARP_WS_SERVER_URL";
-
 /// Options related to the parent process that spawned this Warp instance.
 #[derive(Debug, Default, Clone, clap::Args)]
 pub struct ParentOpts {
@@ -44,24 +41,6 @@ pub struct ParentOpts {
 #[command(name = "uncaged", display_name = "Uncaged")]
 #[clap(args_conflicts_with_subcommands = true)]
 pub struct Args {
-    /// Override the server root URL.
-    #[arg(
-        long = "server-root-url",
-        global = true,
-        hide = true,
-        env = "WARP_SERVER_ROOT_URL"
-    )]
-    server_root_url: Option<String>,
-
-    /// Override the websocket server URL.
-    #[arg(
-        long = "ws-server-url",
-        global = true,
-        hide = true,
-        env = "WARP_WS_SERVER_URL"
-    )]
-    ws_server_url: Option<String>,
-
     #[command(subcommand)]
     command: Option<Command>,
 
@@ -139,14 +118,6 @@ impl Args {
     /// Extract the main Warp application args.
     pub fn into_app_args(self) -> AppArgs {
         self.args
-    }
-
-    pub fn server_root_url(&self) -> Option<&str> {
-        self.server_root_url.as_deref()
-    }
-
-    pub fn ws_server_url(&self) -> Option<&str> {
-        self.ws_server_url.as_deref()
     }
 }
 

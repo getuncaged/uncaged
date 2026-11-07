@@ -18,6 +18,8 @@ pub type Error = WsErr;
 
 pub struct WebSocket {
     stream: ws_stream_wasm::WsStream,
+    /// Held for as long as the stream: it owns the browser `WebSocket`'s event callbacks.
+    #[allow(dead_code)]
     meta: WsMeta,
 }
 
@@ -30,12 +32,6 @@ impl WebSocket {
     ) {
         let (sink, stream) = self.stream.split();
         (sink, stream.map(Ok::<_, ws_stream_wasm::WsErr>))
-    }
-
-    pub async fn into_graphql_client_builder(self) -> graphql_ws_client::ClientBuilder {
-        graphql_ws_client::Client::build(
-            graphql_ws_client::ws_stream_wasm::Connection::new((self.meta, self.stream)).await,
-        )
     }
 }
 

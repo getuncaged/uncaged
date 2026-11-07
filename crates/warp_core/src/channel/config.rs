@@ -20,39 +20,13 @@ pub struct ChannelConfig {
     pub mcp_static_config: Option<McpStaticConfig>,
 }
 
-/// Configuration for GCP Identity-Aware Proxy authentication, present only on staging builds.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct IapConfig {
-    /// The IAP OAuth2 client ID used as the audience for identity tokens.
-    pub audiences: Cow<'static, str>,
-    /// The service account email to impersonate when acquiring IAP credentials.
-    pub service_account_email: Cow<'static, str>,
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WarpServerConfig {
     /// The root URL for the standard server pool.
     pub server_root_url: Cow<'static, str>,
-    /// The URL for the RTC server, which serves real-time updates for Warp Drive objects.
-    pub rtc_server_url: Cow<'static, str>,
-    /// The API key to use when making requests to Firebase Authentication endpoints.
-    pub firebase_auth_api_key: Cow<'static, str>,
-    /// Configuration for GCP Identity-Aware Proxy authentication, present only on
-    /// staging builds. [`None`] on production builds.
-    #[serde(default)]
-    pub iap_config: Option<IapConfig>,
 }
 
 impl WarpServerConfig {
-    pub fn production() -> Self {
-        Self {
-            server_root_url: "https://app.warp.dev".into(),
-            rtc_server_url: "wss://rtc.app.warp.dev/graphql/v2".into(),
-            firebase_auth_api_key: "AIzaSyBdy3O3S9hrdayLJxJ7mriBR4qgUaUygAs".into(),
-            iap_config: None,
-        }
-    }
-
     /// Uncaged: a fail-closed server config for the account-free Oss channel.
     ///
     /// Every Warp endpoint is pointed at an unroutable sentinel — `192.0.2.0`
@@ -61,14 +35,10 @@ impl WarpServerConfig {
     /// the local `uncaged_engine`, and all known egress paths are already gated
     /// off for `Channel::Oss`; this is defense-in-depth so that ANY code path we
     /// missed — now or after an upstream merge — fails to *connect* instead of
-    /// silently phoning home to `app.warp.dev`. The Firebase key is blanked
-    /// because login is disabled on this channel.
+    /// silently phoning home to `app.warp.dev`.
     pub fn uncaged_sentinel() -> Self {
         Self {
             server_root_url: "http://192.0.2.0:9".into(),
-            rtc_server_url: "ws://192.0.2.0:9".into(),
-            firebase_auth_api_key: "".into(),
-            iap_config: None,
         }
     }
 }

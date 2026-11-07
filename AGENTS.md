@@ -8,21 +8,6 @@ This file provides guidance when working with code in this repository.
 - `cargo run` - Build and run Uncaged locally (the `warp-oss` binary)
 - `./script/bundle app --channel oss --selfsign --debug --arch aarch64` - Bundle a local macOS debug app
 
-### Running with local warp-server
-To connect Warp client to a local warp-server instance:
-
-```bash
-# Connect to server on default port 8080
-cargo run --features with_local_server
-
-# Connect to server on custom port (e.g., 8082)
-SERVER_ROOT_URL=http://localhost:8082 WS_SERVER_URL=ws://localhost:8082/graphql/v2 cargo run --features with_local_server
-```
-
-Environment variables:
-- `SERVER_ROOT_URL` - HTTP endpoint (default: `http://localhost:8080`)
-- `WS_SERVER_URL` - WebSocket endpoint (default: `ws://localhost:8080/graphql/v2`)
-
 ### Testing
 - `cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2` - Run tests with nextest
 - `cargo nextest run -p warp_completer --features v2` - Run completer tests with v2 features
@@ -80,7 +65,6 @@ This is a Rust-based terminal emulator with a custom UI framework called **WarpU
 - `crates/editor/` - Text editing functionality
 - `crates/warpui/` and `crates/warpui_core/` - Custom UI framework
 - `crates/ipc/` - Inter-process communication
-- `crates/graphql/` - GraphQL client and schema
 
 ### Key Architectural Patterns
 
@@ -150,10 +134,6 @@ This is a Rust-based terminal emulator with a custom UI framework called **WarpU
 - Uses Diesel ORM with SQLite
 - Migrations in `crates/persistence/migrations/`
 - Schema defined in `crates/persistence/src/schema.rs`
-
-**GraphQL**:
-- Schema and client code generation from `crates/warp_graphql_schema/api/schema.graphql`
-- TypeScript types generated for frontend integration
 
 ### Feature Flags
 
