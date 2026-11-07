@@ -45,8 +45,6 @@ cfg_if::cfg_if! {
     }
 }
 
-pub mod gallery;
-pub use gallery::MCPGalleryManager;
 pub mod templatable;
 #[cfg(not(target_family = "wasm"))]
 pub use cloud_object_models::{
@@ -455,11 +453,6 @@ pub enum MCPServerUpdate {
     CloudTemplate {
         publisher: Author,
         new_version_ts: i64,
-        json_template: JsonTemplate,
-    },
-    Gallery {
-        name: String,
-        new_version: i32,
         json_template: JsonTemplate,
     },
 }

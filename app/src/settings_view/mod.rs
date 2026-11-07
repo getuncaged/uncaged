@@ -1799,23 +1799,16 @@ impl SettingsView {
     }
 
     /// Open the MCP servers page, optionally to list page or edit page.
-    /// If `autoinstall_gallery_title` is provided, triggers auto-install of the specified gallery MCP.
     pub fn open_mcp_servers_page(
         &mut self,
         page: MCPServersSettingsPage,
-        autoinstall_gallery_title: Option<&str>,
         ctx: &mut ViewContext<Self>,
     ) {
         // Navigate to the AgentMCPServers subpage (under the Agents umbrella).
         self.set_and_refresh_current_page(SettingsSection::AgentMCPServers, ctx);
         if let Some(mcp_page) = self.settings_page(SettingsSection::MCPServers) {
             if let SettingsPageViewHandle::MCPServers(view) = &mcp_page.view_handle {
-                view.update(ctx, |view, ctx| {
-                    view.update_page(page, ctx);
-                    if let Some(title) = autoinstall_gallery_title {
-                        view.autoinstall_from_gallery(title, ctx);
-                    }
-                })
+                view.update(ctx, |view, ctx| view.update_page(page, ctx))
             }
         }
     }

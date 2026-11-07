@@ -61,7 +61,6 @@ use crate::terminal::shell::ShellType;
 use crate::terminal::view::cell_size_and_padding;
 use crate::themes::onboarding_theme_picker_themes;
 use crate::themes::theme::{AnsiColorIdentifier, ThemeKind, WarpThemeConfig};
-use crate::uri::OpenMCPSettingsArgs;
 use crate::util::bindings::{self, is_binding_pty_compliant};
 use crate::util::traffic_lights::{traffic_light_data, TrafficLightData, TrafficLightMouseStates};
 use crate::view_components::DismissibleToast;
@@ -715,8 +714,7 @@ fn open_settings_page_in_new_window(section: &SettingsSection, ctx: &mut AppCont
 
 /// MCP servers need to wait for initial load to complete, so we have this action in addition
 /// to the general-purpose [`open_settings_page_in_new_window`].
-fn open_mcp_settings_in_new_window(args: &OpenMCPSettingsArgs, ctx: &mut AppContext) {
-    let autoinstall = args.autoinstall.clone();
+fn open_mcp_settings_in_new_window(_: &(), ctx: &mut AppContext) {
     let root_handle = open_new_window_get_handles(None, ctx).1;
     root_handle.update(ctx, |root_view, ctx| {
         if let AuthOnboardingState::Terminal(workspace_view_handle) =
@@ -725,11 +723,7 @@ fn open_mcp_settings_in_new_window(args: &OpenMCPSettingsArgs, ctx: &mut AppCont
             let initial_load_complete = UpdateManager::as_ref(ctx).initial_load_complete();
             workspace_view_handle.update(ctx, |_, ctx| {
                 let _ = ctx.spawn(initial_load_complete, move |workspace, _, ctx| {
-                    workspace.open_mcp_servers_page(
-                        MCPServersSettingsPage::List,
-                        autoinstall.as_deref(),
-                        ctx,
-                    )
+                    workspace.open_mcp_servers_page(MCPServersSettingsPage::List, ctx)
                 });
             });
         }
@@ -2009,23 +2003,17 @@ impl RootView {
         true
     }
 
-    /// Opens the MCP servers settings page in an existing window, optionally triggering auto-install.
-    /// Waits for `initial_load_complete` before opening so gallery data is available for autoinstall.
+    /// Opens the MCP servers settings page in an existing window once the initial load completes.
     pub fn open_mcp_settings_in_existing_window(
         &mut self,
-        args: &OpenMCPSettingsArgs,
+        _: &(),
         ctx: &mut ViewContext<Self>,
     ) -> bool {
         if let AuthOnboardingState::Terminal(handle) = &self.auth_onboarding_state {
-            let autoinstall = args.autoinstall.clone();
             let initial_load_complete = UpdateManager::as_ref(ctx).initial_load_complete();
             handle.update(ctx, |_, ctx| {
                 let _ = ctx.spawn(initial_load_complete, move |workspace, _, ctx| {
-                    workspace.open_mcp_servers_page(
-                        MCPServersSettingsPage::List,
-                        autoinstall.as_deref(),
-                        ctx,
-                    )
+                    workspace.open_mcp_servers_page(MCPServersSettingsPage::List, ctx)
                 });
             });
             let window_id = ctx.window_id();

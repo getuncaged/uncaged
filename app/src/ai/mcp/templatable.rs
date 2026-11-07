@@ -1,6 +1,6 @@
 pub use cloud_object_models::{
-    CloudTemplatableMCPServer, CloudTemplatableMCPServerModel, GalleryData, JsonTemplate,
-    TemplatableMCPServer, TemplateVariable,
+    CloudTemplatableMCPServer, CloudTemplatableMCPServerModel, JsonTemplate, TemplatableMCPServer,
+    TemplateVariable,
 };
 use warp_core::ui::appearance::Appearance;
 

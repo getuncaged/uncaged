@@ -628,7 +628,6 @@ impl ServerCardView {
                     lines.push(template_sync_id_text);
                 }
             }
-            ServerCardItemId::GalleryMCP(_) => {}
             ServerCardItemId::FileBasedMCP(_) => {}
         }
 

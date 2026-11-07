@@ -146,13 +146,6 @@ impl TemplatableMCPServerManager {
         log::warn!("Enabling Figma MCP server is not supported in WASM");
     }
 
-    /// Installs the Figma MCP server from the MCP gallery.
-    ///
-    /// This is a no-op in WASM, as MCP servers are not supported in WASM.
-    pub fn install_figma_from_gallery(&mut self, _ctx: &mut ModelContext<Self>) {
-        log::warn!("Installing Figma from gallery is not supported in WASM");
-    }
-
     /// Delete oauth credentials from secure storage
     ///
     /// No-op in WASM, as MCP servers are not supported in WASM
