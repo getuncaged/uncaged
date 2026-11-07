@@ -13,12 +13,11 @@ use diesel::result::Error;
 use crate::{
     CloudAIExecutionProfile, CloudAIExecutionProfileModel, CloudAIFact, CloudAIFactModel,
     CloudEnvVarCollection, CloudEnvVarCollectionModel, CloudMCPServer, CloudMCPServerModel,
-    CloudPreference, CloudPreferenceModel, CloudTemplatableMCPServer,
-    CloudTemplatableMCPServerModel, CloudWorkflowEnum, CloudWorkflowEnumModel,
+    CloudTemplatableMCPServer, CloudTemplatableMCPServerModel, CloudWorkflowEnum,
+    CloudWorkflowEnumModel,
 };
 
 pub enum PersistedGenericStringObject {
-    Preference(CloudPreference),
     EnvVarCollection(CloudEnvVarCollection),
     WorkflowEnum(CloudWorkflowEnum),
     AIFact(CloudAIFact),
@@ -30,7 +29,8 @@ pub enum PersistedGenericStringObject {
 /// Parses the JSON object type out of an `object_metadata.object_type` column value.
 ///
 /// Rows written by older builds for object types this build no longer has (for example the
-/// removed cloud environments, scheduled cloud agents and cloud agent configs) yield `None`, so
+/// removed cloud environments, scheduled cloud agents, cloud agent configs and settings-sync
+/// preferences) yield `None`, so
 /// the loader skips them instead of failing to load Warp Drive.
 fn json_object_type_from_metadata(object_type: &str) -> Option<JsonObjectType> {
     let json_object_type = object_type.strip_prefix(&format!(
@@ -57,24 +57,13 @@ pub fn read_generic_string_objects(
             let metadata = read_context.metadata_for_object(
                 object.id,
                 ObjectType::GenericStringObject(GenericStringObjectFormat::Json(
-                    JsonObjectType::Preference,
+                    JsonObjectType::EnvVarCollection,
                 )),
             )?;
             let object_id = id_from_metadata::<GenericStringObjectId>(metadata)?;
             let cloud_object_permissions = read_context.permissions_for_metadata(metadata)?;
             let json_object_type = json_object_type_from_metadata(&metadata.object_type)?;
             match json_object_type {
-                JsonObjectType::Preference => {
-                    let model = CloudPreferenceModel::deserialize_owned(&object.data);
-                    model.ok().map(|model| {
-                        PersistedGenericStringObject::Preference(CloudPreference::new(
-                            object_id,
-                            model,
-                            to_cloud_object_metadata(metadata),
-                            cloud_object_permissions,
-                        ))
-                    })
-                }
                 JsonObjectType::EnvVarCollection => {
                     let model = CloudEnvVarCollectionModel::deserialize_owned(&object.data);
                     model.ok().map(|model| {

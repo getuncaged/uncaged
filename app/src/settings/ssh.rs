@@ -1,5 +1,5 @@
 use settings::macros::define_settings_group;
-use settings::{RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};
+use settings::SupportedPlatforms;
 
 define_settings_group!(SshSettings,
     settings: [
@@ -7,7 +7,6 @@ define_settings_group!(SshSettings,
             type: bool,
             default: false,
             supported_platforms: SupportedPlatforms::ALL,
-            sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
             private: false,
             storage_key: "ReuseExistingSshControlMaster",
             toml_path: "warpify.ssh.reuse_existing_control_master",

@@ -178,7 +178,6 @@ impl ToString for GenericStringObjectFormat {
 /// An object sub-type for objects that implement the JsonModel trait.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 pub enum JsonObjectType {
-    Preference,
     EnvVarCollection,
     WorkflowEnum,
     AIFact,
@@ -190,7 +189,6 @@ pub enum JsonObjectType {
 impl JsonObjectType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            JsonObjectType::Preference => "PREFERENCE",
             JsonObjectType::EnvVarCollection => "ENVVARCOLLECTION",
             JsonObjectType::WorkflowEnum => "WORKFLOWENUM",
             JsonObjectType::AIFact => "AIFACT",
@@ -206,7 +204,6 @@ impl TryFrom<&str> for JsonObjectType {
 
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         match value {
-            "PREFERENCE" => Ok(JsonObjectType::Preference),
             "ENVVARCOLLECTION" => Ok(JsonObjectType::EnvVarCollection),
             "WORKFLOWENUM" => Ok(JsonObjectType::WorkflowEnum),
             "AIFACT" => Ok(JsonObjectType::AIFact),
@@ -810,9 +807,6 @@ impl From<GenericStringObjectFormat>
     fn from(format: GenericStringObjectFormat) -> Self {
         use warp_graphql::generic_string_object::GenericStringObjectFormat as GraphQLFormat;
         match format {
-            GenericStringObjectFormat::Json(JsonObjectType::Preference) => {
-                GraphQLFormat::JsonPreference
-            }
             GenericStringObjectFormat::Json(JsonObjectType::EnvVarCollection) => {
                 GraphQLFormat::JsonEnvVarCollection
             }

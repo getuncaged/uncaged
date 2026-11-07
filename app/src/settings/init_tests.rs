@@ -3,7 +3,7 @@ use settings::{PrivatePreferences, PublicPreferences, Setting, SettingsManager};
 use settings_value::SettingsValue;
 use warp_core::features::FeatureFlag;
 use warp_core::settings::macros::define_settings_group;
-use warp_core::settings::{SupportedPlatforms, SyncToCloud};
+use warp_core::settings::SupportedPlatforms;
 use warp_core::user_preferences::GetUserPreferences as _;
 use warpui::SingletonEntity;
 use warpui_extras::user_preferences;
@@ -21,7 +21,6 @@ define_settings_group!(MigrationTestSettings, settings: [
         type: bool,
         default: false,
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Never,
         private: false,
         toml_path: "migration_test.public_setting",
     },
@@ -29,7 +28,6 @@ define_settings_group!(MigrationTestSettings, settings: [
         type: String,
         default: String::new(),
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Never,
         private: false,
         toml_path: "migration_test.public_string_setting",
     },
@@ -37,7 +35,6 @@ define_settings_group!(MigrationTestSettings, settings: [
         type: bool,
         default: false,
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Never,
         private: true,
     },
 ]);
@@ -374,7 +371,7 @@ fn test_migration_with_multiple_setting_types() {
 mod notifications_migration {
     use settings::{PrivatePreferences, PublicPreferences, SettingsManager};
     use warp_core::settings::macros::define_settings_group;
-    use warp_core::settings::{SupportedPlatforms, SyncToCloud};
+    use warp_core::settings::SupportedPlatforms;
     use warpui_extras::user_preferences;
 
     use crate::terminal::session_settings::NotificationsSettings;
@@ -384,7 +381,6 @@ mod notifications_migration {
             type: NotificationsSettings,
             default: NotificationsSettings::default(),
             supported_platforms: SupportedPlatforms::ALL,
-            sync_to_cloud: SyncToCloud::Never,
             private: false,
             toml_path: "migration_test.notifications",
             max_table_depth: 1,
@@ -611,5 +607,96 @@ fn test_uncaged_autodetection_reset_does_not_override_a_later_choice() {
                 "a one-time reset that keeps re-applying is not a migration, it is a veto"
             );
         });
+    });
+}
+
+/// Registers the production settings registry over the given public preferences, with
+/// in-memory private preferences.
+fn register_all_settings_over(
+    public_prefs: Box<dyn user_preferences::UserPreferences>,
+    ctx: &mut warpui::AppContext,
+) {
+    use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
+
+    ctx.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
+    ctx.add_singleton_model(move |_| PublicPreferences::new(public_prefs));
+    ctx.add_singleton_model(move |_| -> PrivatePreferences {
+        PrivatePreferences::new(Box::<user_preferences::in_memory::InMemoryPreferences>::default())
+    });
+    ctx.add_singleton_model(|_| SettingsManager::default());
+    ctx.add_singleton_model(crate::user_config::WarpConfig::mock);
+    warpui_extras::secure_storage::register_noop("test", ctx);
+    super::register_all_settings(ctx);
+}
+
+/// A settings file holding every public setting (at its default value) loads without errors,
+/// marks every key as present and leaves the file byte-for-byte unchanged.
+#[test]
+fn test_settings_file_with_every_key_round_trips() {
+    use warpui_extras::user_preferences::toml_backed::TomlBackedUserPreferences;
+    use warpui_extras::user_preferences::UserPreferences as _;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("settings.toml");
+
+    // Collect every public setting's TOML location and file-format default.
+    type Entry = (String, String, Option<&'static str>, Option<u32>);
+    let collected: std::sync::Arc<std::sync::Mutex<Vec<Entry>>> = Default::default();
+    let collected_in_app = collected.clone();
+    warpui::App::test((), |mut app| async move {
+        app.update(|ctx| {
+            register_all_settings_over(
+                Box::<user_preferences::in_memory::InMemoryPreferences>::default(),
+                ctx,
+            );
+        });
+        app.read(|ctx| {
+            *collected_in_app.lock().unwrap() = SettingsManager::as_ref(ctx)
+                .default_values_for_settings_file()
+                .map(|(key, value, hierarchy, depth)| {
+                    (key.to_string(), value.to_string(), hierarchy, depth)
+                })
+                .collect();
+        });
+    });
+    let entries = collected.lock().unwrap().clone();
+    assert!(entries.len() > 100, "expected the full settings registry");
+
+    // Write a settings file that sets every key explicitly.
+    {
+        let (prefs, error) = TomlBackedUserPreferences::new(path.clone());
+        assert!(error.is_none(), "fresh settings file should open cleanly");
+        for (key, value, hierarchy, depth) in &entries {
+            prefs
+                .write_value_with_hierarchy(key, value.clone(), *hierarchy, *depth)
+                .unwrap_or_else(|e| panic!("failed to write {key}: {e:?}"));
+        }
+    }
+    let written = std::fs::read_to_string(&path).expect("settings file written");
+
+    warpui::App::test((), |mut app| async move {
+        let path_for_load = path.clone();
+        app.update(|ctx| {
+            let (prefs, error) = TomlBackedUserPreferences::new(path_for_load);
+            assert!(error.is_none(), "written settings file should parse");
+            register_all_settings_over(Box::new(prefs), ctx);
+        });
+        app.update(|ctx| {
+            let manager = SettingsManager::as_ref(ctx);
+            assert!(
+                manager.validate_all_public_settings(ctx).is_empty(),
+                "every key should hold a valid value"
+            );
+        });
+        app.update(|ctx| {
+            let failed = SettingsManager::handle(ctx)
+                .update(ctx, |manager, ctx| manager.reload_all_public_settings(ctx));
+            assert!(failed.is_empty(), "keys failed to load: {failed:?}");
+        });
+        let reread = std::fs::read_to_string(&path).expect("settings file still present");
+        assert_eq!(
+            written, reread,
+            "loading must not rewrite the settings file"
+        );
     });
 }

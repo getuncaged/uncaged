@@ -4,7 +4,7 @@ use anyhow::Error;
 use serde::{Deserialize, Serialize};
 use settings_value::SettingsValue;
 use warp_core::define_settings_group;
-use warp_core::settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
+use warp_core::settings::{Setting, SupportedPlatforms};
 use warpui::{AppContext, ModelContext, SingletonEntity};
 
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
@@ -17,7 +17,6 @@ define_settings_group!(WorkflowAliases, settings: [
         type: Vec<WorkflowAlias>,
         default: vec![],
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: true,
         storage_key: "WorkflowAliases",
     }

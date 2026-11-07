@@ -18,8 +18,7 @@ use warpui::{
 };
 
 use super::settings_page::{
-    render_sub_header, LocalOnlyIconState, MatchData, PageType, SettingsPageMeta,
-    SettingsPageViewHandle, SettingsWidget,
+    MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget,
 };
 use super::SettingsSection;
 use crate::appearance::Appearance;
@@ -29,7 +28,6 @@ use crate::editor::{
 };
 use crate::keyboard::{write_custom_keybinding, UserDefinedKeybinding};
 use crate::search_bar::SearchBar;
-use crate::settings::CloudPreferencesSettings;
 use crate::themes;
 use crate::util::bindings::{
     filter_bindings_including_keystroke, reset_keybinding_to_default, set_custom_keybinding,
@@ -938,9 +936,7 @@ fn trigger_keybinding_notifier(
 }
 
 #[derive(Default)]
-struct KeybindingsWidget {
-    local_only_icon_mouse_state: MouseStateHandle,
-}
+struct KeybindingsWidget {}
 
 impl KeybindingsWidget {
     fn render_description(
@@ -1079,34 +1075,11 @@ impl SettingsWidget for KeybindingsWidget {
         &self,
         view: &Self::View,
         appearance: &Appearance,
-        app: &AppContext,
+        _app: &AppContext,
     ) -> Box<dyn Element> {
-        let local_only_icon_state = if *CloudPreferencesSettings::as_ref(app).settings_sync_enabled
-        {
-            Some(LocalOnlyIconState::Visible {
-                mouse_state: self.local_only_icon_mouse_state.clone(),
-                custom_tooltip: Some("Keyboard shortcuts are not synced to the cloud".to_string()),
-            })
-        } else {
-            None
-        };
-
-        // Uncaged: the settings view titles the page "Keyboard shortcuts", so the sub-header
-        // only shows when it has the not-synced icon to carry.
-        let subheader = local_only_icon_state.map(|local_only_icon_state| {
-            render_sub_header(
-                appearance,
-                "Configure keyboard shortcuts",
-                Some(local_only_icon_state),
-            )
-        });
         let description = self.render_description(view.bindings.as_ref(), appearance);
 
-        let mut column = Flex::column();
-        if let Some(subheader) = subheader {
-            column.add_child(subheader);
-        }
-        column
+        Flex::column()
             .with_child(description)
             .with_child(render_columns(
                 Container::new(render_text(

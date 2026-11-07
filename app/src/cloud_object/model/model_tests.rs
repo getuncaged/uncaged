@@ -3,13 +3,11 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use cloud_object_models::{ServerNotebook, ServerWorkflow};
 use cloud_objects::UserUid;
-use settings::{RespectUserSyncSetting, SyncToCloud};
 use warp_graphql::scalars::time::ServerTimestamp;
 use warpui::{App, ModelHandle};
 
 use super::*;
 use crate::cloud_object::model::actions::ObjectActions;
-use crate::cloud_object::model::generic_string_model::GenericStringModel;
 use crate::cloud_object::model::view::{
     CloudViewModel, EditorState, UpdateTimestamp, EDITOR_TIMEOUT_DURATION_MINUTES,
 };
@@ -23,7 +21,7 @@ use crate::features::FeatureFlag;
 use crate::notebooks::CloudNotebookModel;
 use crate::server::ids::{ClientId, ServerId};
 use crate::server::server_api::ServerApiProvider;
-use crate::settings::{init_and_register_user_preferences, Preference};
+use crate::settings::init_and_register_user_preferences;
 use crate::system::SystemStats;
 use crate::workflows::workflow::Workflow;
 use crate::workflows::CloudWorkflowModel;
@@ -242,54 +240,6 @@ fn move_object(id: ServerId, location: CloudObjectLocation, app: &mut App) {
             ctx,
         )
     });
-}
-
-#[test]
-fn test_create_json_object() {
-    let client_id = ClientId::default();
-    let id = SyncId::ClientId(client_id);
-    let json_object: Box<dyn CloudObject> = Box::new(CloudPreference::new(
-        id,
-        GenericStringModel::new(
-            Preference::new(
-                "test_storage_key".to_owned(),
-                "{\"test_key\": \"test_value\"}",
-                SyncToCloud::Globally(RespectUserSyncSetting::Yes),
-            )
-            .expect("error creating preference"),
-        ),
-        CloudObjectMetadata {
-            pending_changes_statuses: CloudObjectStatuses {
-                content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
-                has_pending_metadata_change: false,
-                has_pending_permissions_change: false,
-                pending_untrash: false,
-                pending_delete: false,
-            },
-            folder_id: Default::default(),
-            revision: Default::default(),
-            metadata_last_updated_ts: Default::default(),
-            current_editor_uid: Default::default(),
-            trashed_ts: Default::default(),
-            is_welcome_object: false,
-            creator_uid: None,
-            last_editor_uid: None,
-            last_task_run_ts: None,
-        },
-        mock_permissions(),
-    ));
-
-    App::test((), |mut app| async move {
-        let cloud_model = create_cloud_model(&mut app, vec![json_object]);
-        cloud_model.read(&app, |model, _| {
-            let json_object: &CloudPreference =
-                model.get_object_of_type(&id).expect("model should exist");
-            assert_eq!(
-                json_object.model().string_model.storage_key,
-                "test_storage_key".to_owned()
-            );
-        });
-    })
 }
 
 #[test]

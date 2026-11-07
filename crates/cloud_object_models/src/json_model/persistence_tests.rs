@@ -11,8 +11,8 @@ fn metadata_object_type(json_object_type: &str) -> String {
 #[test]
 fn known_json_object_types_are_loaded() {
     assert!(matches!(
-        json_object_type_from_metadata(&metadata_object_type("PREFERENCE")),
-        Some(JsonObjectType::Preference)
+        json_object_type_from_metadata(&metadata_object_type("ENVVARCOLLECTION")),
+        Some(JsonObjectType::EnvVarCollection)
     ));
     assert!(matches!(
         json_object_type_from_metadata(&metadata_object_type("AIEXECUTIONPROFILE")),
@@ -22,8 +22,10 @@ fn known_json_object_types_are_loaded() {
 
 #[test]
 fn removed_json_object_types_are_skipped() {
-    // Object types removed with Warp's cloud agents may still be in an existing database.
+    // Object types removed with Warp's cloud agents and settings sync may still be in an
+    // existing database.
     for removed in [
+        "PREFERENCE",
         "CLOUDENVIRONMENT",
         "SCHEDULEDAMBIENTAGENT",
         "CLOUDAGENTCONFIG",

@@ -55,7 +55,7 @@ use crate::settings_view::mcp_servers::update_modal::{UpdateModalBody, UpdateMod
 use crate::settings_view::mcp_servers::{style, ServerCardItemId};
 use crate::settings_view::mcp_servers_page::InstallOrigin;
 use crate::settings_view::settings_page::{
-    build_toggle_element, render_body_item_label, LocalOnlyIconState, ToggleState,
+    build_toggle_element, render_body_item_label, ToggleState,
 };
 use crate::ui_components::blended_colors;
 use crate::util::truncation::truncate_from_end;
@@ -990,7 +990,6 @@ impl MCPServersListPageView {
             "Auto-spawn servers from third-party agents".to_string(),
             None,
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
         );

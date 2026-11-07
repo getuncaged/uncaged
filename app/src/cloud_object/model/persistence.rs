@@ -7,7 +7,6 @@ use warp_core::features::FeatureFlag;
 use warp_util::sync::Condition;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
-use super::generic_string_model::GenericStringObjectId;
 use crate::ai::execution_profiles::CloudAIExecutionProfile;
 use crate::cloud_object::{
     CloudModelType, CloudObject, CloudObjectLocation, GenericCloudObject,
@@ -19,7 +18,6 @@ use crate::env_vars::CloudEnvVarCollection;
 use crate::notebooks::CloudNotebook;
 use crate::persistence::ModelEvent;
 use crate::server::ids::{HashableId, ObjectUid, SyncId, ToServerId};
-use crate::settings::cloud_preferences::{CloudPreference, CloudPreferenceModel};
 use crate::workflows::workflow_enum::CloudWorkflowEnum;
 use crate::workflows::CloudWorkflow;
 
@@ -709,26 +707,6 @@ impl CloudModel {
             .values()
             .filter(move |object| !object.is_trashed(self) && object.permissions().owner == owner)
             .filter_map(|object| object.into())
-    }
-
-    /// Returns a map of CloudPreference models keyed by their storage key.
-    pub fn get_all_cloud_preferences_by_storage_key(&self) -> HashMap<String, &CloudPreference> {
-        let mut keys: HashSet<String> = HashSet::new();
-        self.get_all_objects_of_type::<GenericStringObjectId, CloudPreferenceModel>()
-            .map(|cloud_prefs| {
-                if keys.contains(&cloud_prefs.model().string_model.storage_key) {
-                    log::warn!(
-                        "Duplicate cloud preference storage key: {}",
-                        cloud_prefs.model().string_model.storage_key
-                    );
-                    keys.insert(cloud_prefs.model().string_model.storage_key.clone());
-                }
-                (
-                    cloud_prefs.model().string_model.storage_key.clone(),
-                    cloud_prefs,
-                )
-            })
-            .collect::<HashMap<_, _>>()
     }
 
     pub fn get_object_of_type<K, M>(&self, object_id: &SyncId) -> Option<&GenericCloudObject<K, M>>

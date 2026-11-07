@@ -28,10 +28,9 @@ use warpui::{
 use super::directory_color_add_picker::{DirectoryColorAddPicker, DirectoryColorAddPickerEvent};
 use super::settings_page::{
     build_reset_button, render_body_item, render_body_item_label, render_dropdown_item,
-    render_segmented_control, render_settings_description, render_slider_row, Category,
-    LocalOnlyIconState, MatchData, PageType, Segment, SettingsPageEvent, SettingsPageMeta,
-    SettingsPageViewHandle, SettingsWidget, SliderRow, ToggleState, CONTENT_FONT_SIZE,
-    HEADER_PADDING, ROW_CONTROL_GAP,
+    render_segmented_control, render_settings_description, render_slider_row, Category, MatchData,
+    PageType, Segment, SettingsPageEvent, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget,
+    SliderRow, ToggleState, CONTENT_FONT_SIZE, HEADER_PADDING, ROW_CONTROL_GAP,
 };
 use super::{
     flags, SettingActionPairContexts, SettingActionPairDescriptions, SettingsAction,
@@ -2481,7 +2480,6 @@ fn switch_row(
     render_body_item::<AppearancePageAction>(
         label.to_string(),
         None,
-        LocalOnlyIconState::Hidden,
         ToggleState::Enabled,
         appearance,
         appearance
@@ -2502,15 +2500,7 @@ fn dropdown_row(
     dropdown: &ViewHandle<Dropdown<AppearancePageAction>>,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
-    render_dropdown_item(
-        appearance,
-        label,
-        description,
-        None,
-        LocalOnlyIconState::Hidden,
-        None,
-        dropdown,
-    )
+    render_dropdown_item(appearance, label, description, None, None, dropdown)
 }
 
 /// A row whose control is a dropdown-sized element that isn't a [`Dropdown`] (the searchable font
@@ -2527,7 +2517,6 @@ fn dropdown_like_row(
             label.to_string(),
             None,
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
         ))
@@ -2607,7 +2596,6 @@ fn input_row(
     render_body_item::<AppearancePageAction>(
         label.to_string(),
         None,
-        LocalOnlyIconState::Hidden,
         toggle_state,
         appearance,
         control,
@@ -3249,7 +3237,6 @@ impl SettingsWidget for ZoomLevelWidget {
             "Zoom",
             Some("Scales the whole interface, in every window."),
             Some(reset_button),
-            LocalOnlyIconState::Hidden,
             None,
             &view.zoom_level_dropdown,
         )
@@ -3424,7 +3411,6 @@ impl SettingsWidget for PromptWidget {
                             "Prompt".to_string(),
                             None,
                             None,
-                            LocalOnlyIconState::Hidden,
                             ToggleState::Enabled,
                             appearance,
                         ))
@@ -4315,7 +4301,6 @@ impl SettingsWidget for EditToolbarWidget {
             "Header toolbar layout".to_string(),
             None,
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
         );

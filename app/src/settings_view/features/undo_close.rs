@@ -1,10 +1,8 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::time::Duration;
 
 use settings::{Setting, ToggleableSetting};
 use warpui::elements::{
-    Container, CrossAxisAlignment, Flex, MainAxisAlignment, MouseStateHandle, ParentElement, Text,
+    Container, CrossAxisAlignment, Flex, MainAxisAlignment, ParentElement, Text,
 };
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::switch::SwitchStateHandle;
@@ -16,8 +14,7 @@ use crate::appearance::Appearance;
 use crate::editor::{self, EditorView, SingleLineEditorOptions, TextOptions};
 use crate::report_if_error;
 use crate::settings_view::features_page::render_group;
-use crate::settings_view::settings_page::{render_body_item, LocalOnlyIconState, ToggleState};
-use crate::undo_close::settings::UndoCloseEnabled;
+use crate::settings_view::settings_page::{render_body_item, ToggleState};
 use crate::undo_close::UndoCloseSettings;
 
 #[derive(Debug, Clone, Copy)]
@@ -34,8 +31,6 @@ pub struct UndoCloseView {
     grace_period_editor: ViewHandle<EditorView>,
     /// Whether or not the grace period value is valid.
     is_grace_period_valid: bool,
-    /// State for the local only icon tooltip.
-    local_only_icon_states: RefCell<HashMap<String, MouseStateHandle>>,
 }
 
 impl UndoCloseView {
@@ -77,7 +72,6 @@ impl UndoCloseView {
         });
         Self {
             switch_state: Default::default(),
-            local_only_icon_states: Default::default(),
             grace_period_editor,
             is_grace_period_valid: true,
         }
@@ -176,12 +170,6 @@ impl View for UndoCloseView {
             .with_child(render_body_item::<Action>(
                 "Enable reopening of closed sessions".into(),
                 None,
-                LocalOnlyIconState::for_setting(
-                    UndoCloseEnabled::storage_key(),
-                    UndoCloseEnabled::sync_to_cloud(),
-                    &mut self.local_only_icon_states.borrow_mut(),
-                    app,
-                ),
                 ToggleState::Enabled,
                 appearance,
                 ui_builder

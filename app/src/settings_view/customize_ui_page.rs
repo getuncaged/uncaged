@@ -20,8 +20,8 @@ use warpui::{
 };
 
 use super::settings_page::{
-    render_body_item, Category, LocalOnlyIconState, MatchData, PageType, SettingsPageMeta,
-    SettingsPageViewHandle, SettingsWidget, ToggleState,
+    render_body_item, Category, MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle,
+    SettingsWidget, ToggleState,
 };
 use super::SettingsSection;
 use crate::appearance::Appearance;
@@ -193,7 +193,6 @@ impl SettingsWidget for ProjectExplorerWidget {
         render_body_item::<CustomizeUiSettingsPageAction>(
             "Project explorer".into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             appearance
@@ -233,7 +232,6 @@ impl SettingsWidget for ConversationHistoryWidget {
         render_body_item::<CustomizeUiSettingsPageAction>(
             "Conversation history".into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             appearance
@@ -273,7 +271,6 @@ impl SettingsWidget for GlobalSearchWidget {
         render_body_item::<CustomizeUiSettingsPageAction>(
             "Global file search".into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             appearance
@@ -313,7 +310,6 @@ impl SettingsWidget for DriveWidget {
         render_body_item::<CustomizeUiSettingsPageAction>(
             "Drive".into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             appearance
@@ -356,7 +352,6 @@ impl SettingsWidget for CodeReviewButtonWidget {
         render_body_item::<CustomizeUiSettingsPageAction>(
             "Show code review button".into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             appearance

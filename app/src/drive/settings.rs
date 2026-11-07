@@ -1,5 +1,5 @@
 use settings::macros::define_settings_group;
-use settings::{RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};
+use settings::SupportedPlatforms;
 
 use super::DriveSortOrder;
 
@@ -10,7 +10,6 @@ define_settings_group!(WarpDriveSettings, settings: [
         type: DriveSortOrder,
         default: DriveSortOrder::ByObjectType,
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "warp_drive.sorting_choice",
         description: "The sort order for items in Warp Drive.",
@@ -20,7 +19,6 @@ define_settings_group!(WarpDriveSettings, settings: [
         type: bool,
         default: true,
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "warp_drive.enabled",
         description: "Whether workspace is enabled.",

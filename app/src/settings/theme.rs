@@ -1,5 +1,5 @@
 use settings::macros::define_settings_group;
-use settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
+use settings::{Setting, SupportedPlatforms};
 use warpui::platform::SystemTheme;
 use warpui::AppContext;
 
@@ -17,7 +17,6 @@ define_settings_group!(ThemeSettings, settings: [
         // Uncaged ships its own ember theme as the out-of-the-box default.
         default: ThemeKind::Uncaged,
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         toml_path: "appearance.themes.theme",
         max_table_depth: 0,
@@ -27,7 +26,6 @@ define_settings_group!(ThemeSettings, settings: [
         type: bool,
         default: false,
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         storage_key: "SystemTheme",
         toml_path: "appearance.themes.system_theme",
@@ -37,7 +35,6 @@ define_settings_group!(ThemeSettings, settings: [
         type: SelectedSystemThemes,
         default: SelectedSystemThemes::default(),
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: false,
         storage_key: "SelectedSystemThemes",
         toml_path: "appearance.themes.selected_system_themes",

@@ -11,20 +11,15 @@
 //! Both default to false, so a fresh install is "not asked, not checking" and
 //! stays completely offline until the user chooses. See
 //! `app/src/autoupdate/mod.rs` for the gate that reads them.
-//!
-//! Not synced to the cloud: Uncaged has no cloud. `SyncToCloud::Never` is the
-//! only honest value here, and it keeps the setting from being round-tripped by
-//! any inherited syncing machinery.
 
 use settings::macros::define_settings_group;
-use settings::{SupportedPlatforms, SyncToCloud};
+use settings::SupportedPlatforms;
 
 define_settings_group!(UpdateSettings, settings: [
    auto_update_enabled: AutoUpdateEnabled {
        type: bool,
        default: false,
        supported_platforms: SupportedPlatforms::ALL,
-       sync_to_cloud: SyncToCloud::Never,
        private: false,
        toml_path: "general.auto_update_enabled",
        description: "Check GitHub for new Uncaged releases and install them. Off until you turn it on; nothing is requested before then.",
@@ -33,7 +28,6 @@ define_settings_group!(UpdateSettings, settings: [
        type: bool,
        default: false,
        supported_platforms: SupportedPlatforms::ALL,
-       sync_to_cloud: SyncToCloud::Never,
        private: false,
        toml_path: "general.auto_update_prompt_answered",
        description: "Whether the one-time 'check for updates?' question has been answered. Internal; set by answering the prompt.",

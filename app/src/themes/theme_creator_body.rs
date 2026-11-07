@@ -2583,7 +2583,7 @@ fn section_card(
     let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
     column.add_child(match description {
         Some(description) => render_sub_header_with_description(appearance, title, description),
-        None => render_sub_header(appearance, title, None),
+        None => render_sub_header(appearance, title),
     });
     column.add_children(rows);
     settings_card(column.finish(), appearance)

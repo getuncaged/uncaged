@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use settings::macros::define_settings_group;
-use settings::{SupportedPlatforms, SyncToCloud};
+use settings::SupportedPlatforms;
 
 #[derive(
     Clone,
@@ -31,7 +31,6 @@ define_settings_group!(NativePreferenceSettings, settings: [
         default: UserNativePreference::default(),
         supported_platforms: SupportedPlatforms::WEB,
         // Once setting sync is enabled we should sync this to the cloud
-        sync_to_cloud: SyncToCloud::Never,
         private: false,
         storage_key: "UserNativePreference",
         toml_path: "general.user_native_preference",
@@ -41,7 +40,6 @@ define_settings_group!(NativePreferenceSettings, settings: [
         type: bool,
         default: false,
         supported_platforms: SupportedPlatforms::WEB,
-        sync_to_cloud: SyncToCloud::Never,
         private: true,
     },
 ]);

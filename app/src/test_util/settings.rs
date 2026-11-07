@@ -34,8 +34,8 @@ pub fn initialize_settings_for_tests_with_mode(
     use crate::settings::{
         init_and_register_user_preferences, AISettings, AccessibilitySettings,
         AliasExpansionSettings, AppEditorSettings, BlockVisibilitySettings, ChangelogSettings,
-        CloudPreferencesSettings, CodeSettings, DebugSettings, EmacsBindingsSettings, FontSettings,
-        GPUSettings, InputModeSettings, InputSettings, NativePreferenceSettings, PaneSettings,
+        CodeSettings, DebugSettings, EmacsBindingsSettings, FontSettings, GPUSettings,
+        InputModeSettings, InputSettings, NativePreferenceSettings, PaneSettings,
         SameLinePromptBlockSettings, ScrollSettings, SelectionSettings, SshSettings, ThemeSettings,
         UpdateSettings, VimBannerSettings,
     };
@@ -69,7 +69,6 @@ pub fn initialize_settings_for_tests_with_mode(
     BlockVisibilitySettings::register(app);
     BlockListSettings::register(app);
     ChangelogSettings::register(app);
-    CloudPreferencesSettings::register(app);
     CommandSearchSettings::register(app);
     DebugSettings::register(app);
     AppIconSettings::register(app);

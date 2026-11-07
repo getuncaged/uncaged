@@ -263,7 +263,6 @@ use crate::server::ids::{ObjectUid, SyncId};
 use crate::server::network_log_pane_manager::NetworkLogPaneManager;
 use crate::server::server_api::{ServerApi, ServerApiProvider, ServerTime};
 use crate::session_management::{SessionNavigationData, SessionSource, TabNavigationData};
-use crate::settings::cloud_preferences::CloudPreferencesSettings;
 use crate::settings::{
     respect_system_theme, AISettings, AISettingsChangedEvent, AccessibilitySettings,
     AliasExpansionSettings, AppEditorSettings, BlockVisibilitySettings, ChangelogSettings,
@@ -19191,11 +19190,6 @@ impl Workspace {
 
         if *input_settings.syntax_highlighting.value() {
             context.set.insert(flags::SYNTAX_HIGHLIGHTING_FLAG);
-        }
-
-        let cloud_preferences_settings = CloudPreferencesSettings::as_ref(app);
-        if *cloud_preferences_settings.settings_sync_enabled.value() {
-            context.set.insert(flags::SETTINGS_SYNC_FLAG);
         }
 
         if *block_list_settings

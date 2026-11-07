@@ -9,10 +9,10 @@ use warp_graphql::object::CloudObjectWithDescendants;
 
 use crate::{
     AIExecutionProfile, AIFact, CloudFolderModel, CloudNotebookModel, CloudWorkflowModel,
-    EnvVarCollection, JsonSerializer, MCPServer, Preference, ServerAIExecutionProfile,
-    ServerAIFact, ServerEnvVarCollection, ServerFolder, ServerMCPServer, ServerNotebook,
-    ServerPreference, ServerTemplatableMCPServer, ServerWorkflow, ServerWorkflowEnum,
-    TemplatableMCPServer, WorkflowEnum,
+    EnvVarCollection, JsonSerializer, MCPServer, ServerAIExecutionProfile, ServerAIFact,
+    ServerEnvVarCollection, ServerFolder, ServerMCPServer, ServerNotebook,
+    ServerTemplatableMCPServer, ServerWorkflow, ServerWorkflowEnum, TemplatableMCPServer,
+    WorkflowEnum,
 };
 
 /// A cloud object from the server.
@@ -21,7 +21,6 @@ pub enum ServerCloudObject {
     Notebook(ServerNotebook),
     Workflow(Box<ServerWorkflow>),
     Folder(ServerFolder),
-    Preference(ServerPreference),
     EnvVarCollection(ServerEnvVarCollection),
     WorkflowEnum(ServerWorkflowEnum),
     AIFact(ServerAIFact),
@@ -36,7 +35,6 @@ impl ServerCloudObject {
             ServerCloudObject::Notebook(notebook) => &notebook.metadata,
             ServerCloudObject::Workflow(workflow) => &workflow.metadata,
             ServerCloudObject::Folder(folder) => &folder.metadata,
-            ServerCloudObject::Preference(preferences) => &preferences.metadata,
             ServerCloudObject::EnvVarCollection(env_var_collection) => &env_var_collection.metadata,
             ServerCloudObject::WorkflowEnum(workflow_enum) => &workflow_enum.metadata,
             ServerCloudObject::AIFact(aifact) => &aifact.metadata,
@@ -55,7 +53,6 @@ impl ServerCloudObject {
             ServerCloudObject::Notebook(notebook) => notebook.id.uid(),
             ServerCloudObject::Workflow(workflow) => workflow.id.uid(),
             ServerCloudObject::Folder(folder) => folder.id.uid(),
-            ServerCloudObject::Preference(preferences) => preferences.id.uid(),
             ServerCloudObject::EnvVarCollection(env_var_collection) => env_var_collection.id.uid(),
             ServerCloudObject::WorkflowEnum(workflow_enum) => workflow_enum.id.uid(),
             ServerCloudObject::AIFact(aifact) => aifact.id.uid(),
@@ -83,8 +80,6 @@ where
             ServerCloudObject::Workflow(Box::new(server_workflow.clone()))
         } else if let Some(server_folder) = value.downcast_ref::<ServerFolder>() {
             ServerCloudObject::Folder(server_folder.clone())
-        } else if let Some(server_preferences) = value.downcast_ref::<ServerPreference>() {
-            ServerCloudObject::Preference(server_preferences.clone())
         } else if let Some(server_env_var_collection) =
             value.downcast_ref::<ServerEnvVarCollection>()
         {
@@ -248,11 +243,6 @@ fn server_gso_to_cloud_object(
                 GenericServerObject::<GenericStringObjectId, GenericStringModel<EnvVarCollection, JsonSerializer>>::try_from_gql(gso)?,
             ))
         }
-        warp_graphql::generic_string_object::GenericStringObjectFormat::JsonPreference => Ok(
-            ServerCloudObject::Preference(
-                GenericServerObject::<GenericStringObjectId, GenericStringModel<Preference, JsonSerializer>>::try_from_gql(gso)?,
-            ),
-        ),
         warp_graphql::generic_string_object::GenericStringObjectFormat::JsonWorkflowEnum => Ok(
             ServerCloudObject::WorkflowEnum(
                 GenericServerObject::<GenericStringObjectId, GenericStringModel<WorkflowEnum, JsonSerializer>>::try_from_gql(gso)?,
@@ -281,7 +271,8 @@ fn server_gso_to_cloud_object(
         // Formats unknown to this client build (e.g. the server-only `JsonRunner`) or no longer
         // supported by it (cloud environments, scheduled cloud agents). Returning an error lets
         // callers skip the object rather than failing.
-        warp_graphql::generic_string_object::GenericStringObjectFormat::JsonCloudEnvironment
+        warp_graphql::generic_string_object::GenericStringObjectFormat::JsonPreference
+        | warp_graphql::generic_string_object::GenericStringObjectFormat::JsonCloudEnvironment
         | warp_graphql::generic_string_object::GenericStringObjectFormat::JsonScheduledAmbientAgent
         | warp_graphql::generic_string_object::GenericStringObjectFormat::Unknown => Err(anyhow::anyhow!(
             "unsupported generic string object format (unknown to this client build)"

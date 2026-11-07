@@ -39,10 +39,7 @@ use super::settings_page::{
     render_body_item, render_separator, Category, MatchData, PageType, SettingsPageMeta,
     SettingsPageViewHandle, SettingsWidget, TOGGLE_BUTTON_RIGHT_PADDING,
 };
-use super::{
-    flags, LocalOnlyIconState, SettingsAction, SettingsSection, ToggleSettingActionPair,
-    ToggleState,
-};
+use super::{flags, SettingsAction, SettingsSection, ToggleSettingActionPair, ToggleState};
 use crate::ai::persisted_workspace::{
     EnablementState, LspRepoStatus, PersistedWorkspace, PersistedWorkspaceEvent,
 };
@@ -2112,7 +2109,6 @@ impl SettingsWidget for CodebaseIndexingCategorizedWidget {
         content.add_child(render_body_item::<CodeSettingsPageAction>(
             CODEBASE_INDEXING_LABEL.into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             toggle_element,
@@ -2126,7 +2122,6 @@ impl SettingsWidget for CodebaseIndexingCategorizedWidget {
             content.add_child(render_body_item::<CodeSettingsPageAction>(
                 AUTO_INDEX_FEATURE_NAME.into(),
                 None,
-                LocalOnlyIconState::Hidden,
                 ToggleState::Enabled,
                 appearance,
                 ui_builder
@@ -2220,7 +2215,6 @@ impl SettingsWidget for AutoOpenCodeReviewPaneCodeWidget {
         render_body_item::<CodeSettingsPageAction>(
             "Auto open code review panel".into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             appearance
@@ -2289,7 +2283,6 @@ impl SettingsWidget for CodeReviewDiffStatsToggleWidget {
         render_body_item::<CodeSettingsPageAction>(
             "Show diff stats on code review button".into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             appearance
@@ -2331,7 +2324,6 @@ impl SettingsWidget for ShowHiddenFilesToggleWidget {
         render_body_item::<CodeSettingsPageAction>(
             "Show hidden files in project explorer".into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             appearance
@@ -2373,7 +2365,6 @@ impl SettingsWidget for FormatOnSaveToggleWidget {
         render_body_item::<CodeSettingsPageAction>(
             "Format on save (requires an active language server)".into(),
             None,
-            LocalOnlyIconState::Hidden,
             ToggleState::Enabled,
             appearance,
             appearance

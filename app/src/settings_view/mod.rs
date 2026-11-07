@@ -89,7 +89,7 @@ pub use features_page::FeaturesPageAction;
 pub use setting_toggles::SettingToggleAction;
 pub use settings_page::{
     render_body_item_label, render_info_icon, render_input_list, render_separator, AdditionalInfo,
-    InputListItem, LocalOnlyIconState, ToggleState,
+    InputListItem, ToggleState,
 };
 
 /// Original sidebar width used when the settings-file footer is not
@@ -407,7 +407,6 @@ pub mod flags {
     pub const ERROR_UNDERLINING_FLAG: &str = "error_underlining";
     pub const SYNTAX_HIGHLIGHTING_FLAG: &str = "syntax_highlighting";
     pub const SAME_LINE_PROMPT: &str = "Same_Line_Prompt_Enabled";
-    pub const SETTINGS_SYNC_FLAG: &str = "settings_sync";
     pub const SAFE_MODE_FLAG: &str = "safe_mode";
     pub const CLOUD_CONVERSATION_STORAGE_FLAG: &str = "Cloud_Conversation_Storage_Enabled";
     pub const CLOUD_CONVERSATION_STORAGE_EDITABLE_FLAG: &str =

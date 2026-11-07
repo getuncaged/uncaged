@@ -2,14 +2,13 @@ use anyhow::Result;
 use warpui_core::{AppContext, SingletonEntity};
 
 use crate::manager::SettingsManager;
-use crate::{Setting, SupportedPlatforms, SyncToCloud, *};
+use crate::{Setting, SupportedPlatforms, *};
 
 define_settings_group!(TestSettings, settings: [
     simple_setting: SimpleSetting {
         type: bool,
         default: false,
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Never,
         private: false,
         toml_path: "test.simple_setting",
     },
@@ -17,7 +16,6 @@ define_settings_group!(TestSettings, settings: [
         type: bool,
         default: true,
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Never,
         private: true,
         storage_key: "KeyIsOverridden",
     },
@@ -25,7 +23,6 @@ define_settings_group!(TestSettings, settings: [
         type: bool,
         default: false,
         supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Never,
         private: false,
         toml_path: "test_section.hierarchy_flag",
     },
