@@ -11,7 +11,7 @@ use crate::ai::execution_profiles::{
     AIExecutionProfile, ActionPermission, CloudAIExecutionProfileModel,
 };
 use crate::ai::mcp::TemplatableMCPServerManager;
-use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
+use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{GenericCloudObject, Revision, ServerMetadata, ServerPermissions};
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
@@ -33,23 +33,17 @@ fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
     }
 }
 
-/// Regression test for: "Logging in to an existing user at the end of
-/// onboarding should preserve the user's cloud-stored default execution
-/// profile rather than overwriting it with the onboarding-selected
-/// base_model and autonomy."
+/// Onboarding must preserve a default execution profile already saved in the
+/// Drive rather than overwriting it with the onboarding-selected base_model
+/// and autonomy.
 ///
-/// Simulates the full post-login flow:
-///   1. User starts unauthenticated; `AIExecutionProfilesModel` begins in
-///      `Unsynced`.
-///   2. User logs into an existing account; their cloud default profile
-///      arrives via initial bulk load and `InitialLoadCompleted` fires.
-///   3. The reconciliation handler promotes the local state to `Synced`
-///      with the cloud profile's `sync_id`.
-///   4. `apply_onboarding_settings` runs with onboarding-selected values that
-///      differ from what's on the cloud profile.
-///   5. The cloud profile's stored values must be preserved.
+///   1. The saved default profile is in `CloudModel` (loaded from SQLite)
+///      before `AIExecutionProfilesModel` is created, which adopts it.
+///   2. `apply_onboarding_settings` runs with onboarding-selected values that
+///      differ from what's on the saved profile.
+///   3. The saved profile's stored values must be preserved.
 #[test]
-fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_login() {
+fn apply_onboarding_settings_preserves_saved_default_profile() {
     App::test((), |mut app| async move {
         initialize_settings_for_tests(&mut app);
         app.add_singleton_model(|_| NetworkStatus::new());
@@ -57,7 +51,6 @@ fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_l
         app.add_singleton_model(CloudModel::mock);
         app.add_singleton_model(|_| TemplatableMCPServerManager::default());
         app.add_singleton_model(PrivacySettings::mock);
-        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         // The existing user's stored cloud default profile. Values are
         // deliberately chosen to differ from both `AIExecutionProfile`'s
@@ -83,18 +76,16 @@ fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_l
             ServerPermissions::mock_personal(),
         );
 
-        // Insert the existing user's cloud profile via the initial-load
-        // path (no per-object events) and emit `InitialLoadCompleted` so
-        // `AIExecutionProfilesModel` reconciles to `Synced`.
-        CloudModel::handle(&app).update(&mut app, move |cloud_model, ctx| {
-            let server_objects: Vec<ServerAIExecutionProfile> = vec![server_object];
-            for object in server_objects {
-                cloud_model.add_object(object.id, GenericCloudObject::new_from_server(object));
-            }
-            ctx.emit(CloudModelEvent::InitialLoadCompleted);
+        // The Drive is loaded from SQLite before `AIExecutionProfilesModel` is created.
+        CloudModel::handle(&app).update(&mut app, move |cloud_model, _| {
+            cloud_model.add_object(
+                server_object.id,
+                GenericCloudObject::new_from_server(server_object),
+            );
         });
+        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
-        // Sanity: reconciliation occurred and the model now reads the
+        // Sanity: the model adopted the saved profile and reads the
         // cloud profile.
         profile_model.read(&app, |model, ctx| {
             let info = model.default_profile(ctx);

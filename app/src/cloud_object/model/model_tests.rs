@@ -12,8 +12,8 @@ use crate::cloud_object::model::view::{
     CloudViewModel, EditorState, UpdateTimestamp, EDITOR_TIMEOUT_DURATION_MINUTES,
 };
 use crate::cloud_object::{
-    CloudObjectMetadata, CloudObjectPermissions, CloudObjectStatuses, CloudObjectSyncStatus, Owner,
-    ServerMetadata, ServerPermissions, LOCAL_USER_UID,
+    CloudObjectMetadata, CloudObjectPermissions, Owner, ServerMetadata, ServerPermissions,
+    LOCAL_USER_UID,
 };
 use crate::drive::folders::CloudFolderModel;
 use crate::drive::DriveIndexVariant;
@@ -160,13 +160,6 @@ fn mock_cloud_folder(id: SyncId, name: String, folder_id: Option<SyncId>) -> Clo
             is_warp_pack: false,
         },
         CloudObjectMetadata {
-            pending_changes_statuses: CloudObjectStatuses {
-                content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
-                has_pending_metadata_change: false,
-                has_pending_permissions_change: false,
-                pending_untrash: false,
-                pending_delete: false,
-            },
             folder_id,
             revision: Default::default(),
             metadata_last_updated_ts: Default::default(),
@@ -191,13 +184,6 @@ fn mock_cloud_notebook(id: SyncId, title: String, folder_id: Option<SyncId>) -> 
             conversation_id: None,
         },
         CloudObjectMetadata {
-            pending_changes_statuses: CloudObjectStatuses {
-                content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
-                has_pending_metadata_change: false,
-                has_pending_permissions_change: false,
-                pending_untrash: false,
-                pending_delete: false,
-            },
             folder_id,
             revision: Default::default(),
             metadata_last_updated_ts: Default::default(),

@@ -1,4 +1,3 @@
-use warpui::elements::MouseStateHandle;
 use warpui::Element;
 
 use super::{WarpDriveItem, WarpDriveItemId};
@@ -47,14 +46,6 @@ impl WarpDriveItem for WarpDriveSpace {
 
     fn warp_drive_id(&self) -> WarpDriveItemId {
         WarpDriveItemId::Space(self.space)
-    }
-
-    fn sync_status_icon(
-        &self,
-        _hover_state: MouseStateHandle,
-        _appearance: &Appearance,
-    ) -> Option<Box<dyn Element>> {
-        None
     }
 
     fn clone_box(&self) -> Box<dyn WarpDriveItem> {

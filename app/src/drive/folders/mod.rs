@@ -43,10 +43,6 @@ impl CloudModelType for CloudFolderModel {
         ModelEvent::UpsertFolders(objects.into_iter().map(CloudFolder::from).collect())
     }
 
-    fn should_update_after_server_conflict(&self) -> bool {
-        false
-    }
-
     fn serialized(&self) -> SerializedModel {
         SerializedModel::new(self.name.to_owned())
     }

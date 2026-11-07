@@ -11,9 +11,7 @@ use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentModel};
 use crate::appearance::Appearance;
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::cloud_object::{
-    CloudObjectMetadata, CloudObjectPermissions, CloudObjectStatuses, CloudObjectSyncStatus, Owner,
-};
+use crate::cloud_object::{CloudObjectMetadata, CloudObjectPermissions, Owner};
 use crate::notebooks::{CloudNotebook, CloudNotebookModel};
 use crate::server::ids::SyncId;
 use crate::test_util::settings::initialize_settings_for_tests;
@@ -48,13 +46,6 @@ fn add_saved_plan_notebook(app: &mut App, document_id: AIDocumentId, content: &s
             conversation_id: None,
         },
         CloudObjectMetadata {
-            pending_changes_statuses: CloudObjectStatuses {
-                content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
-                has_pending_metadata_change: false,
-                has_pending_permissions_change: false,
-                pending_untrash: false,
-                pending_delete: false,
-            },
             folder_id: None,
             revision: Default::default(),
             metadata_last_updated_ts: Default::default(),

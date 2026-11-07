@@ -1,27 +1,9 @@
 use std::any::Any;
 use std::fmt::{self, Debug};
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use super::{ObjectType, ServerMetadata, ServerPermissions};
 use crate::ids::SyncId;
-
-#[derive(Clone, Debug, Default)]
-pub enum ConflictStatus<T> {
-    #[default]
-    NoConflicts,
-    ConflictingChanges {
-        object: Arc<T>,
-    },
-}
-
-impl<T> ConflictStatus<T> {
-    /// Utility function that allows for a more ergonomic way of figuring out whether there is a
-    /// conflict (for cases where we don't care about the conflict details).
-    pub fn has_conflicts(&self) -> bool {
-        matches!(self, ConflictStatus::ConflictingChanges { .. })
-    }
-}
 
 /// Common behavior that server-backed models expose to generic server objects.
 pub trait ServerObjectModel: Debug + Clone + Send + Sync + 'static {

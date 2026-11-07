@@ -238,10 +238,6 @@ impl CloudModelType for CloudWorkflowModel {
         ModelEvent::UpsertWorkflows(objects.into_iter().map(CloudWorkflow::from).collect())
     }
 
-    fn should_update_after_server_conflict(&self) -> bool {
-        true
-    }
-
     fn serialized(&self) -> SerializedModel {
         SerializedModel::new(
             serde_json::to_string(&self.data).expect("failed to serialize workflow"),

@@ -63,7 +63,7 @@ use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::server::cloud_objects::update_manager::{
-    ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
+    ObjectOperation, UpdateManager, UpdateManagerEvent,
 };
 use crate::server::ids::{ClientId, SyncId};
 use crate::settings::app_installation_detection::{
@@ -509,9 +509,7 @@ impl WorkflowView {
     ) {
         let UpdateManagerEvent::ObjectOperationComplete { result } = event;
 
-        if result.success_type != OperationSuccessType::Success
-            || result.id != Some(self.workflow_id)
-        {
+        if result.id != Some(self.workflow_id) {
             return;
         }
 

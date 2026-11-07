@@ -302,8 +302,7 @@ impl CloudViewModel {
                     }
                 }
             }
-            CloudModelEvent::ObjectForceExpanded { .. } | CloudModelEvent::InitialLoadCompleted => {
-            }
+            CloudModelEvent::ObjectForceExpanded { .. } => {}
         }
     }
 

@@ -190,10 +190,6 @@ where
         )
     }
 
-    fn should_update_after_server_conflict(&self) -> bool {
-        true
-    }
-
     fn serialized(&self) -> SerializedModel {
         S::serialize(&self.string_model)
     }

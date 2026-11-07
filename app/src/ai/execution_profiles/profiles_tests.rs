@@ -10,7 +10,7 @@ use crate::ai::execution_profiles::{
     AIExecutionProfile, ActionPermission, CloudAIExecutionProfileModel, WriteToPtyPermission,
 };
 use crate::ai::mcp::TemplatableMCPServerManager;
-use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
+use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{
     GenericCloudObject, Owner, Revision, ServerGuestSubject, ServerMetadata, ServerObjectGuest,
     ServerPermissions, LOCAL_USER_UID,
@@ -129,35 +129,16 @@ fn edits_persist_on_unsynced_default_profile_when_logged_out() {
     })
 }
 
-/// Regression test for the "log in to an existing user after onboarding"
-/// bug. Cloud objects arriving via the initial bulk load are inserted into
-/// `CloudModel` *without* firing per-object `ObjectCreated` events, and a
-/// single `CloudModelEvent::InitialLoadCompleted` is emitted afterward instead.
-/// Without the reconciliation handler for `InitialLoadCompleted`, the
-/// existing user's default profile sits in `CloudModel` but
-/// `AIExecutionProfilesModel` stays in `Unsynced`, so a subsequent
-/// onboarding edit creates a duplicate cloud default profile instead of
-/// editing the existing one. This test drives that sequence and asserts
-/// the model adopts the cloud profile's sync id.
+/// The Drive is loaded from SQLite before `AIExecutionProfilesModel` is created, so a default
+/// profile saved there must be adopted at construction, and later edits must target it in place
+/// rather than creating a duplicate.
 #[test]
-fn reconciles_unsynced_default_profile_with_cloud_after_initial_load() {
+fn adopts_default_profile_saved_in_drive_at_startup() {
     App::test((), |mut app| async move {
         install_singletons(&mut app);
-        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
-        // Baseline: CloudModel is empty, so the model starts Unsynced and
-        // `sync_id` is `None`.
-        profile_model.read(&app, |model, ctx| {
-            assert!(
-                model.default_profile(ctx).sync_id().is_none(),
-                "default profile should be Unsynced at startup"
-            );
-        });
-
-        // Simulate the user's existing cloud default profile arriving via
-        // initial bulk load. We construct the existing profile with
-        // `apply_code_diffs = AlwaysAllow` so we can verify the model is
-        // reading that cloud object after reconciliation.
+        // We construct the saved profile with `apply_code_diffs = AlwaysAllow` so we can verify
+        // the model is reading that object.
         let cloud_uid = ServerId::from(42);
         let cloud_sync_id = SyncId::ServerId(cloud_uid);
         let cloud_profile = AIExecutionProfile {
@@ -172,37 +153,33 @@ fn reconciles_unsynced_default_profile_with_cloud_after_initial_load() {
             mock_server_metadata(cloud_uid),
             ServerPermissions::mock_personal(),
         );
-
-        // Insert the object into CloudModel without per-object events and then
-        // emit `InitialLoadCompleted` so the reconciliation handler fires.
-        CloudModel::handle(&app).update(&mut app, move |cloud_model, ctx| {
-            let server_objects: Vec<ServerAIExecutionProfile> = vec![server_object];
-            for object in server_objects {
-                cloud_model.add_object(object.id, GenericCloudObject::new_from_server(object));
-            }
-            ctx.emit(CloudModelEvent::InitialLoadCompleted);
+        CloudModel::handle(&app).update(&mut app, move |cloud_model, _| {
+            cloud_model.add_object(
+                server_object.id,
+                GenericCloudObject::new_from_server(server_object),
+            );
         });
 
-        // The model should now be Synced with the cloud profile's sync_id,
-        // and `default_profile` should read values from the existing cloud
-        // object (proving we're not backed by a fresh client-side default).
+        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
+
+        // `default_profile` should read values from the saved object (proving we're not backed
+        // by a fresh client-side default).
         profile_model.read(&app, |model, ctx| {
             let info = model.default_profile(ctx);
             assert_eq!(
                 info.sync_id(),
                 Some(cloud_sync_id),
-                "model did not adopt the existing cloud default profile's sync_id"
+                "model did not adopt the saved default profile's sync_id"
             );
             assert_eq!(
                 info.data().apply_code_diffs,
                 ActionPermission::AlwaysAllow,
-                "default profile should now surface the existing cloud value"
+                "default profile should surface the saved value"
             );
         });
 
-        // Further edits should now target the existing cloud profile in
-        // place, rather than falling through the `Unsynced` branch and
-        // creating a duplicate.
+        // Further edits should target the saved profile in place, rather than falling through
+        // the `Unsynced` branch and creating a duplicate.
         let default_profile_id = profile_model.read(&app, |model, _ctx| model.default_profile_id());
         profile_model.update(&mut app, |model, ctx| {
             model.set_apply_code_diffs(default_profile_id, &ActionPermission::AlwaysAsk, ctx);
@@ -212,12 +189,12 @@ fn reconciles_unsynced_default_profile_with_cloud_after_initial_load() {
             assert_eq!(
                 info.sync_id(),
                 Some(cloud_sync_id),
-                "edit should target the same cloud sync_id, not create a duplicate"
+                "edit should target the same sync_id, not create a duplicate"
             );
             assert_eq!(
                 info.data().apply_code_diffs,
                 ActionPermission::AlwaysAsk,
-                "edit should be reflected on the existing cloud profile"
+                "edit should be reflected on the saved profile"
             );
         });
     })
@@ -264,29 +241,29 @@ fn ignores_shared_default_profile_created_from_cloud() {
 }
 
 #[test]
-fn ignores_shared_default_profile_after_initial_load() {
+fn ignores_shared_default_profile_saved_in_drive_at_startup() {
     let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
 
     App::test((), |mut app| async move {
         install_singletons(&mut app);
-        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         let attacker_sync_id = SyncId::ServerId(ServerId::from(31338));
         let attacker_profile = attacker_owned_shared_default_profile(ServerId::from(31338));
-        CloudModel::handle(&app).update(&mut app, move |cloud_model, ctx| {
-            let server_objects: Vec<ServerAIExecutionProfile> = vec![attacker_profile];
-            for object in server_objects {
-                cloud_model.add_object(object.id, GenericCloudObject::new_from_server(object));
-            }
-            ctx.emit(CloudModelEvent::InitialLoadCompleted);
+        CloudModel::handle(&app).update(&mut app, move |cloud_model, _| {
+            cloud_model.add_object(
+                attacker_profile.id,
+                GenericCloudObject::new_from_server(attacker_profile),
+            );
         });
+
+        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         profile_model.read(&app, |model, ctx| {
             let default_profile = model.default_profile(ctx);
             assert_eq!(
                 default_profile.sync_id(),
                 None,
-                "shared attacker-owned default profile should not be reconciled as default"
+                "shared attacker-owned default profile should not be adopted as default"
             );
             assert_eq!(
                 default_profile.data().execute_commands,

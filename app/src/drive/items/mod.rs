@@ -1,4 +1,3 @@
-use warpui::elements::MouseStateHandle;
 use warpui::{AppContext, Element};
 
 use super::cloud_object_styling::warp_drive_icon_color;
@@ -30,11 +29,6 @@ pub trait WarpDriveItem {
     fn click_action(&self) -> Option<DriveIndexAction>;
     fn preview(&self, appearance: &Appearance) -> Option<Box<dyn Element>>;
     fn warp_drive_id(&self) -> WarpDriveItemId;
-    fn sync_status_icon(
-        &self,
-        hover_state: MouseStateHandle,
-        appearance: &Appearance,
-    ) -> Option<Box<dyn Element>>;
 
     fn icon(&self, appearance: &Appearance, color: Option<Fill>) -> Option<Box<dyn Element>> {
         let object_type = self.object_type()?;

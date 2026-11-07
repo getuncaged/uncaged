@@ -58,7 +58,6 @@ pub struct ItemStates {
     pub item_hover_state: MouseStateHandle,
     pub menu_button_state: MouseStateHandle,
     pub draggable_state: DraggableState,
-    pub item_sync_icon_hover_state: MouseStateHandle,
 }
 
 struct WarpDriveItemStyles {
@@ -122,7 +121,6 @@ pub struct WarpDriveRow<'a> {
     /// how many levels into a folder hierarchy the row is.
     /// 0 means the object is in the root directory.
     folder_depth: usize,
-    sync_icon: Option<Box<dyn Element>>,
     can_move: bool,
     styles: WarpDriveItemStyles,
     menu_open: bool,
@@ -203,16 +201,12 @@ impl<'a> WarpDriveRow<'a> {
             false => Empty::new().finish(),
         };
 
-        let sync_icon =
-            item.sync_status_icon(item_states.item_sync_icon_hover_state.clone(), appearance);
-
         Some(Self {
             item,
             space,
             item_states,
             overflow_button,
             folder_depth,
-            sync_icon,
             can_move,
             styles: WarpDriveItemStyles::default(appearance),
             menu_open,
@@ -261,12 +255,6 @@ impl<'a> WarpDriveRow<'a> {
             .lock()
             .expect("Should be able to lock")
             .is_hovered()
-            && !self
-                .item_states
-                .item_sync_icon_hover_state
-                .lock()
-                .expect("Should be able to lock")
-                .is_hovered()
     }
 
     /// Wraps an object preview in some uniformly-styled modal. Also conditionally returns an empty
@@ -734,9 +722,6 @@ impl UiComponent for WarpDriveRow<'_> {
                     .with_cross_axis_alignment(CrossAxisAlignment::Center);
 
                 items_row.add_child(Shrinkable::new(1., inner_item).finish());
-                if let Some(sync_icon) = self.sync_icon {
-                    items_row.add_child(Container::new(sync_icon).with_margin_right(4.).finish());
-                }
 
                 let row_element: Box<dyn Element> = if overflow_on_left {
                     let row_container = Container::new(items_row.finish())

@@ -1,15 +1,12 @@
 use chrono::Utc;
 use warpui::{App, SingletonEntity};
 
-use super::{
-    get_duplicate_object_name, InitiatedBy, ObjectOperation, ObjectOperationResult,
-    OperationSuccessType,
-};
+use super::{get_duplicate_object_name, InitiatedBy, ObjectOperation, ObjectOperationResult};
 use crate::cloud_object::model::actions::{ObjectActionType, ObjectActions};
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent, UpdateSource};
 use crate::cloud_object::{
-    CloudObject, CloudObjectLocation, CloudObjectMetadata, CloudObjectPermissions,
-    CloudObjectSyncStatus, ObjectIdType, Owner, Space,
+    CloudObject, CloudObjectLocation, CloudObjectMetadata, CloudObjectPermissions, ObjectIdType,
+    Owner, Space,
 };
 use crate::drive::folders::{CloudFolder, CloudFolderModel};
 use crate::drive::CloudObjectTypeAndId;
@@ -53,32 +50,12 @@ fn upserted_metadata(event: &ModelEvent) -> CloudObjectMetadata {
     }
 }
 
-fn assert_saved(metadata: &CloudObjectMetadata) {
-    assert!(matches!(
-        metadata.pending_changes_statuses.content_sync_status,
-        CloudObjectSyncStatus::NoLocalChanges
-    ));
-    // SQLite skips the trash state and folder while either flag is set.
-    assert!(
-        !metadata
-            .pending_changes_statuses
-            .has_pending_metadata_change
-    );
-    assert!(
-        !metadata
-            .pending_changes_statuses
-            .has_pending_permissions_change
-    );
-    assert!(!metadata.has_pending_online_only_change());
-}
-
 fn assert_success(
     result: &ObjectOperationResult,
     operation: ObjectOperation,
     id: Option<SyncId>,
     num_objects: Option<i32>,
 ) {
-    assert_eq!(result.success_type, OperationSuccessType::Success);
     assert_eq!(result.operation, operation);
     assert_eq!(result.id, id);
     assert_eq!(result.num_objects, num_objects);
@@ -245,7 +222,6 @@ fn test_create_objects_are_saved_locally() {
 
         for id in [workflow_id, folder_id, notebook_id] {
             let metadata = metadata(&app, id);
-            assert_saved(&metadata);
             assert!(metadata.revision.is_some());
         }
         assert_eq!(metadata(&app, notebook_id).folder_id, Some(folder_id));
@@ -255,9 +231,6 @@ fn test_create_objects_are_saved_locally() {
         assert!(matches!(events[0], ModelEvent::UpsertWorkflow { .. }));
         assert!(matches!(events[1], ModelEvent::UpsertFolder { .. }));
         assert!(matches!(events[2], ModelEvent::UpsertNotebook { .. }));
-        for event in &events {
-            assert_saved(&upserted_metadata(event));
-        }
 
         let results = operation_results(&harness);
         assert_eq!(results.len(), 3);
@@ -296,12 +269,10 @@ fn test_update_leaves_object_saved() {
 
         let workflow = workflow(&app, workflow_id);
         assert_eq!(workflow.display_name(), "after");
-        assert_saved(&workflow.metadata);
         assert!(workflow.metadata.revision >= created_revision);
 
         let events = db_events(&harness);
         assert_eq!(events.len(), 1);
-        assert_saved(&upserted_metadata(&events[0]));
 
         let results = operation_results(&harness);
         assert_eq!(results.len(), 1);
@@ -336,7 +307,6 @@ fn test_rename_folder() {
                 .clone()
         });
         assert_eq!(folder.model().name, "new name");
-        assert_saved(&folder.metadata);
 
         let events = db_events(&harness);
         assert_eq!(events.len(), 1);
@@ -367,14 +337,12 @@ fn trash_and_assert_persisted(app: &mut App, harness: &UpdateManagerStruct, work
     let metadata = metadata(app, workflow_id);
     assert!(metadata.trashed_ts.is_some());
     assert_eq!(metadata.metadata_last_updated_ts, metadata.trashed_ts);
-    assert_saved(&metadata);
     assert!(is_trashed(app, workflow_id));
 
     let events = db_events(harness);
     assert_eq!(events.len(), 1);
     let upserted = upserted_metadata(&events[0]);
     assert_eq!(upserted.trashed_ts, metadata.trashed_ts);
-    assert_saved(&upserted);
 
     assert!(
         cloud_events(harness).contains(&CloudModelEvent::ObjectTrashed {
@@ -435,7 +403,6 @@ fn test_untrash_object() {
         let metadata = metadata(&app, workflow_id);
         assert!(metadata.trashed_ts.is_none());
         assert_eq!(metadata.folder_id, Some(folder_id));
-        assert_saved(&metadata);
 
         let events = db_events(&harness);
         assert_eq!(events.len(), 1);
@@ -626,7 +593,7 @@ fn test_empty_trash() {
         assert_eq!(results.len(), 1);
         assert_success(&results[0], ObjectOperation::EmptyTrash, None, Some(3));
 
-        // With nothing left in the trash, emptying it is rejected and deletes nothing.
+        // With nothing left in the trash, emptying it reports zero objects and deletes nothing.
         harness
             .update_manager
             .update(&mut app, |update_manager, ctx| {
@@ -635,9 +602,7 @@ fn test_empty_trash() {
         assert!(db_events(&harness).is_empty());
         let results = operation_results(&harness);
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].success_type, OperationSuccessType::Rejection);
-        assert_eq!(results[0].operation, ObjectOperation::EmptyTrash);
-        assert_eq!(results[0].num_objects, Some(0));
+        assert_success(&results[0], ObjectOperation::EmptyTrash, None, Some(0));
         assert!(exists(&app, active_id));
     })
 }
@@ -664,7 +629,6 @@ fn test_move_object_into_folder_and_back_to_root() {
             });
         let moved = metadata(&app, workflow_id);
         assert_eq!(moved.folder_id, Some(folder_id));
-        assert_saved(&moved);
         let events = db_events(&harness);
         assert_eq!(events.len(), 1);
         assert_eq!(upserted_metadata(&events[0]).folder_id, Some(folder_id));
@@ -749,7 +713,6 @@ fn test_duplicate_object() {
         let duplicate = workflow(&app, duplicate_id);
         assert_eq!(duplicate.display_name(), "workflow (1)");
         assert_eq!(duplicate.metadata.folder_id, Some(folder_id));
-        assert_saved(&duplicate.metadata);
         assert_eq!(db_events(&harness).len(), 1);
     })
 }
@@ -861,7 +824,6 @@ fn test_new_folder_is_complete_as_created() {
         None,
         ClientId::new(),
     );
-    assert_saved(&folder.metadata);
     assert!(folder
         .metadata
         .revision

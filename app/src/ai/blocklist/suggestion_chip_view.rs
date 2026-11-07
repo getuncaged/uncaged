@@ -14,7 +14,7 @@ use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::drive::CloudObjectTypeAndId;
 use crate::server::cloud_objects::update_manager::{
-    ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
+    ObjectOperation, UpdateManager, UpdateManagerEvent,
 };
 use crate::server::ids::{ClientId, SyncId};
 use crate::ui_components::blended_colors;
@@ -262,9 +262,7 @@ impl SuggestionChipView {
     ) {
         let UpdateManagerEvent::ObjectOperationComplete { result } = event;
 
-        if let (ObjectOperation::Create { .. }, OperationSuccessType::Success) =
-            (&result.operation, &result.success_type)
-        {
+        if let ObjectOperation::Create { .. } = &result.operation {
             if result.id == Some(self.sync_id) {
                 // Reload the rule from the cloud model.
                 match &mut self.suggestion {

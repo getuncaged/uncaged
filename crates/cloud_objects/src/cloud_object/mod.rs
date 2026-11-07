@@ -5,20 +5,10 @@ use std::str::FromStr;
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
-use pathfinder_geometry::vector::vec2f;
 use serde::{Deserialize, Serialize};
 use warp_core::features::FeatureFlag;
-use warp_core::ui::Icon;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::Fill;
 use warp_graphql::object_permissions::AccessLevel;
 use warp_graphql::scalars::time::ServerTimestamp;
-use warpui_core::Element;
-use warpui_core::elements::{
-    Align, ChildAnchor, ConstrainedBox, Hoverable, MouseStateHandle, OffsetPositioning,
-    ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
-};
-use warpui_core::ui_components::components::UiComponent;
 
 use crate::auth::UserUid;
 use crate::drive::sharing::{SharingAccessLevel, Subject, TeamKind, UserKind};
@@ -416,32 +406,6 @@ impl ServerPermissions {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct NumInFlightRequests(pub usize);
-
-#[derive(Clone, Debug)]
-/// An enum representing what state a local cloud object's content changes can be in,
-/// in relation to the server.
-pub enum CloudObjectSyncStatus {
-    /// The object's content hasn't changed from what we believe the server's representation
-    /// to be.
-    NoLocalChanges,
-    /// The object's content has been modified locally, and is currently in the sync queue
-    /// attempting to sync up with the server.
-    InFlight(NumInFlightRequests),
-    /// The object's content has been modified locally but has unresolved conflict with the server
-    /// revision.
-    InConflict,
-    /// The object's content has been modified locally, but persisting the change on the server
-    /// could not complete for some reason.
-    Errored,
-}
-
-const SYNC_ICON_DIMENSIONS: f32 = 16.;
-
-const SYNC_STATUS_TOOLTIP_INFLIGHT: &str = "Saving";
-const SYNC_STATUS_TOOLTIP_ERROR: &str = "Failed to save";
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct CloudObjectPermissions {
     pub owner: Owner,
@@ -561,7 +525,6 @@ pub struct CloudObjectMetadata {
     pub revision: Option<Revision>,
     pub metadata_last_updated_ts: Option<ServerTimestamp>,
     pub current_editor_uid: Option<String>,
-    pub pending_changes_statuses: CloudObjectStatuses,
     pub trashed_ts: Option<ServerTimestamp>,
     pub folder_id: Option<SyncId>,
     /// Welcome objects are created on the server when a user first receives
@@ -583,13 +546,6 @@ impl CloudObjectMetadata {
             revision: Some(server_metadata.revision),
             current_editor_uid: server_metadata.current_editor_uid,
             metadata_last_updated_ts: Some(server_metadata.metadata_last_updated_ts),
-            pending_changes_statuses: CloudObjectStatuses {
-                content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
-                has_pending_metadata_change: false,
-                has_pending_permissions_change: false,
-                pending_untrash: false,
-                pending_delete: false,
-            },
             trashed_ts: server_metadata.trashed_ts,
             folder_id: server_metadata.folder_id.map(|id| id.into()),
             is_welcome_object: server_metadata.is_welcome_object,
@@ -611,7 +567,6 @@ impl CloudObjectMetadata {
             revision: Some(Revision::now()),
             current_editor_uid: None,
             metadata_last_updated_ts: Some(Utc::now().into()),
-            pending_changes_statuses: CloudObjectStatuses::mock(),
             trashed_ts: None,
             folder_id: None,
             is_welcome_object: false,
@@ -621,157 +576,8 @@ impl CloudObjectMetadata {
         }
     }
 
-    pub fn has_pending_content_changes(&self) -> bool {
-        !matches!(
-            self.pending_changes_statuses.content_sync_status,
-            CloudObjectSyncStatus::NoLocalChanges | CloudObjectSyncStatus::InConflict
-        )
-    }
-
-    /// True iff there are unsynced online-only changes for the object.
-    pub fn has_pending_online_only_change(&self) -> bool {
-        self.pending_changes_statuses.has_pending_permissions_change
-            || self.pending_changes_statuses.has_pending_metadata_change
-            || self.pending_changes_statuses.pending_untrash
-            || self.pending_changes_statuses.pending_delete
-    }
-
     pub fn set_current_editor(&mut self, editor_uid: Option<String>) {
         self.current_editor_uid = editor_uid;
-    }
-
-    /// Updates revision and last_editor_uid from server metadata.
-    ///
-    /// This unconditionally updates the revision and last_editor_uid, even if
-    /// there are conflicts, so callers should check for conflicts before calling
-    /// this.
-    pub fn update_revision_from_server(&mut self, server_metadata: &ServerMetadata) {
-        self.revision = Some(server_metadata.revision.clone());
-        self.last_editor_uid = server_metadata.last_editor_uid.clone();
-    }
-
-    /// Updates self from a new metadata received from the server
-    pub fn update_from_new_metadata_ts(&mut self, server_metadata: ServerMetadata) {
-        // Overwriting the metadata from an MetadataUpdated RTC message shouldn't overwrite
-        // the versioning of the object's data: the revision timestamp, has_pending_changes, conflict_status
-        // (if the object data is not being updated, the data versioning should stay the same.
-        self.current_editor_uid = server_metadata.current_editor_uid;
-        self.trashed_ts = server_metadata.trashed_ts;
-        self.folder_id = server_metadata.folder_id.map(|folder_id| folder_id.into());
-        self.creator_uid = server_metadata.creator_uid;
-        self.metadata_last_updated_ts = Some(server_metadata.metadata_last_updated_ts);
-    }
-}
-
-/// A struct holding the different statuses of pending changes that a cloud object might have.
-/// Note that content is handled differently than permissions/metadata:
-///   * Content changes go through the sync queue, and thus can exist in more states
-///   * Metadata/permissions changes are synchronous operations, and thus are only either
-///     in flight or synced
-#[derive(Clone, Debug)]
-pub struct CloudObjectStatuses {
-    pub content_sync_status: CloudObjectSyncStatus,
-    /// True iff there are unsynced permission changes for the object.
-    /// We intentionally don't persist this value in sqlite. And if true,
-    /// we don't upsert any in-memory permission changes to sqlite.
-    pub has_pending_permissions_change: bool,
-    /// True iff there are unsynced metadata changes for the object.
-    /// We intentionally don't persist this value in sqlite. And if true,
-    /// we don't upsert trashed and folder changes to sqlite.
-    pub has_pending_metadata_change: bool,
-
-    /// True iff there is an unsynced untrash operation on the object.
-    pub pending_untrash: bool,
-
-    /// True iff there is an unsynced delete operation on the object.
-    pub pending_delete: bool,
-}
-
-impl CloudObjectStatuses {
-    /// Empty statuses with no in-flight changes, for use in tests.
-    #[cfg(any(test, feature = "test-util"))]
-    pub fn mock() -> Self {
-        Self {
-            content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
-            has_pending_permissions_change: false,
-            has_pending_metadata_change: false,
-            pending_untrash: false,
-            pending_delete: false,
-        }
-    }
-
-    pub fn render_icon(
-        &self,
-        hover_state: MouseStateHandle,
-        appearance: &Appearance,
-    ) -> Option<Box<dyn Element>> {
-        let theme = appearance.theme();
-        let has_in_flight_requests = match &self.content_sync_status {
-            CloudObjectSyncStatus::InFlight(reqs) => reqs.0 > 0,
-            _ => false,
-        };
-
-        let should_show_syncing_indicator = has_in_flight_requests
-            || self.has_pending_metadata_change
-            || self.has_pending_permissions_change
-            || self.pending_untrash;
-        let should_show_error_indicator = matches!(
-            self.content_sync_status,
-            CloudObjectSyncStatus::Errored | CloudObjectSyncStatus::InConflict
-        );
-
-        let icon_and_tooltip_text = if should_show_syncing_indicator {
-            Some((
-                Icon::Refresh.to_warpui_icon(theme.sub_text_color(theme.surface_2())),
-                SYNC_STATUS_TOOLTIP_INFLIGHT,
-            ))
-        } else if should_show_error_indicator {
-            Some((
-                Icon::AlertTriangle.to_warpui_icon(Fill::Solid(theme.ui_error_color())),
-                SYNC_STATUS_TOOLTIP_ERROR,
-            ))
-        } else {
-            None
-        };
-
-        if let Some((icon, tooltip_text)) = icon_and_tooltip_text {
-            return Some(
-                Align::new(
-                    Hoverable::new(hover_state, move |hover_state| {
-                        let mut stack = Stack::new().with_child(
-                            ConstrainedBox::new(icon.finish())
-                                .with_height(SYNC_ICON_DIMENSIONS)
-                                .with_width(SYNC_ICON_DIMENSIONS)
-                                .finish(),
-                        );
-
-                        if hover_state.is_hovered() {
-                            let tooltip = appearance
-                                .ui_builder()
-                                .tool_tip(tooltip_text.to_string())
-                                .build()
-                                .finish();
-
-                            stack.add_positioned_overlay_child(
-                                tooltip,
-                                OffsetPositioning::offset_from_parent(
-                                    vec2f(0., -24.),
-                                    ParentOffsetBounds::Unbounded,
-                                    ParentAnchor::Center,
-                                    ChildAnchor::Center,
-                                ),
-                            );
-                        }
-
-                        stack.finish()
-                    })
-                    .finish(),
-                )
-                .finish(),
-            );
-        }
-
-        None
     }
 }
 

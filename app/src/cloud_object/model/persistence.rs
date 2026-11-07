@@ -29,6 +29,8 @@ pub enum UpdateSource {
     Local,
 }
 
+// Every event is about an object; the shared prefix keeps the names readable at call sites.
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CloudModelEvent {
     ObjectMoved {
@@ -62,8 +64,6 @@ pub enum CloudModelEvent {
     ObjectForceExpanded {
         id: String,
     },
-    /// The initial bulk load of cloud objects from the server has completed.
-    InitialLoadCompleted,
 }
 
 enum FolderOpenState {
@@ -222,8 +222,7 @@ impl CloudModel {
         ctx.notify();
     }
 
-    // Does not emit events or notify — used during initial load where
-    // InitialLoadCompleted is emitted once afterward instead.
+    // Does not emit events or notify.
     fn create_object_internal(&mut self, id: SyncId, object: impl CloudObject + 'static) {
         self.objects_by_id.insert(id.uid(), Box::new(object));
     }

@@ -1059,71 +1059,7 @@ impl AIExecutionProfilesModel {
             } => {
                 self.handle_ai_execution_profile_updated(*id, *source, ctx);
             }
-            CloudModelEvent::InitialLoadCompleted => {
-                self.reconcile_with_cloud_state_after_initial_load(ctx);
-            }
             _ => {}
-        }
-    }
-
-    /// Reconcile model state with `CloudModel` once an initial bulk load
-    /// completes.
-    ///
-    /// The initial load path (`update_objects_from_initial_load`) inserts
-    /// cloud objects into `CloudModel` *without* emitting per-object
-    /// `ObjectCreated` events — it emits a single
-    /// `CloudModelEvent::InitialLoadCompleted` afterward instead. That means
-    /// our normal `handle_ai_execution_profile_created` handler never fires
-    /// for execution profiles that arrived via initial load, and the model
-    /// stays in `Unsynced` even though the user already has a cloud default
-    /// profile.
-    ///
-    /// Without this reconciliation, a subsequent edit from `apply_agent_settings`
-    /// (onboarding) would hit the `Unsynced` branch of `edit_profile_internal`
-    /// and *create a duplicate* cloud default profile rather than editing the
-    /// existing one. That manifests as the default profile showing neither
-    /// the user's prior cloud values nor the onboarding choices — because the
-    /// UI ends up reading a fresh client-side default with only a few fields
-    /// touched.
-    fn reconcile_with_cloud_state_after_initial_load(&mut self, ctx: &mut ModelContext<Self>) {
-        let cloud_model = CloudModel::as_ref(ctx);
-        let all_profiles: Vec<(SyncId, bool)> = cloud_model
-            .get_all_objects_of_type::<GenericStringObjectId, CloudAIExecutionProfileModel>()
-            .filter(|o| Self::is_owned_by_current_user(o))
-            .map(|o| (o.id, o.model().string_model.is_default_profile))
-            .collect();
-
-        // Transition Unsynced -> Synced if cloud has a default profile.
-        if let DefaultProfileState::Unsynced { id, .. } = self.default_profile_state {
-            if let Some((sync_id, _)) = all_profiles.iter().find(|(_, is_default)| *is_default) {
-                self.default_profile_state = DefaultProfileState::Synced { id };
-                self.profile_id_to_sync_id.insert(id, *sync_id);
-                log::info!(
-                    "Reconciled default execution profile with cloud after initial load: \
-                     profile_id={id:?}, sync_id={sync_id:?}"
-                );
-                ctx.emit(AIExecutionProfilesModelEvent::ProfileUpdated(id));
-            }
-        }
-
-        // Register non-default profiles from cloud that we aren't
-        // already tracking so later edits find their backing sync_id.
-        let mut added_non_default = false;
-        for (sync_id, is_default) in all_profiles {
-            if is_default {
-                continue;
-            }
-            if !self.profile_id_to_sync_id.values().any(|s| *s == sync_id) {
-                let profile_id = ClientProfileId::new();
-                self.profile_id_to_sync_id.insert(profile_id, sync_id);
-                log::info!(
-                    "Registered existing cloud execution profile after initial load: {sync_id:?}"
-                );
-                added_non_default = true;
-            }
-        }
-        if added_non_default {
-            ctx.emit(AIExecutionProfilesModelEvent::ProfileCreated);
         }
     }
 

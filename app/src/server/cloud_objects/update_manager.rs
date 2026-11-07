@@ -18,7 +18,7 @@ use crate::cloud_object::model::actions::{ObjectActionType, ObjectActions};
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent, UpdateSource};
 use crate::cloud_object::{
-    CloudModelType, CloudObject, CloudObjectLocation, CloudObjectSyncStatus, GenericCloudObject,
+    CloudModelType, CloudObject, CloudObjectLocation, GenericCloudObject,
     GenericStringObjectFormat, JsonObjectType, ObjectIdType, Owner, Revision, Space,
 };
 use crate::drive::folders::CloudFolderModel;
@@ -37,15 +37,6 @@ lazy_static! {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum OperationSuccessType {
-    Success,
-    Failure,
-    Rejection,
-    Denied(String),
-    FeatureNotAvailable,
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub enum ObjectOperation {
     Create { initiated_by: InitiatedBy },
     Update,
@@ -58,7 +49,6 @@ pub enum ObjectOperation {
 
 #[derive(Clone, Debug)]
 pub struct ObjectOperationResult {
-    pub success_type: OperationSuccessType,
     pub operation: ObjectOperation,
     /// The object the operation applied to. `None` for operations on a whole space, such as
     /// emptying the trash.
@@ -129,7 +119,6 @@ impl UpdateManager {
     ) {
         ctx.emit(UpdateManagerEvent::ObjectOperationComplete {
             result: ObjectOperationResult {
-                success_type: OperationSuccessType::Success,
                 operation,
                 id,
                 num_objects,
@@ -142,32 +131,6 @@ impl UpdateManager {
     pub fn initial_load_complete(&self) -> impl Future<Output = ()> {
         // We're not using `async fn` here so that the returned Future doesn't borrow self.
         self.has_initial_load.wait()
-    }
-
-    /// Replace an object's data with the conflicting version from the server. If the object does
-    /// not have a conflict, this has no effect.
-    pub fn replace_object_with_conflict(&mut self, uid: &ObjectUid, ctx: &mut ModelContext<Self>) {
-        let cloud_model_handle = CloudModel::handle(ctx);
-
-        // Update the in-memory model first, and check for conflicts.
-        let had_conflicts = cloud_model_handle.update(ctx, |cloud_model, ctx| {
-            match cloud_model.get_mut_by_uid(uid) {
-                Some(object) if object.has_conflicting_changes() => {
-                    object.replace_object_with_conflict();
-                    ctx.emit(CloudModelEvent::ObjectUpdated {
-                        type_and_id: object.cloud_object_type_and_id(),
-                        source: UpdateSource::Server,
-                    });
-                    true
-                }
-                _ => false,
-            }
-        });
-
-        // Update SQLite, but only if the in-memory model was updated.
-        if had_conflicts {
-            self.save_in_memory_object_to_sqlite(cloud_model_handle.as_ref(ctx), uid);
-        }
     }
 
     pub fn update_ai_fact(
@@ -660,8 +623,6 @@ impl UpdateManager {
                 return false;
             };
             object.metadata.revision = Some(Revision::now());
-            object.metadata.pending_changes_statuses.content_sync_status =
-                CloudObjectSyncStatus::NoLocalChanges;
             cloud_model.update_object_from_edit(model, object_id, ctx);
             true
         });
@@ -826,20 +787,8 @@ impl UpdateManager {
             .collect();
         let deleted = self.delete_objects_and_descendants(trashed_uids, ctx);
 
-        let success_type = if deleted == 0 {
-            // Shows a toast that there are no objects in the Trash.
-            OperationSuccessType::Rejection
-        } else {
-            OperationSuccessType::Success
-        };
-        ctx.emit(UpdateManagerEvent::ObjectOperationComplete {
-            result: ObjectOperationResult {
-                success_type,
-                operation: ObjectOperation::EmptyTrash,
-                id: None,
-                num_objects: Some(deleted),
-            },
-        });
+        // Reports zero objects when the trash was already empty, which shows a toast saying so.
+        Self::emit_success(ObjectOperation::EmptyTrash, None, Some(deleted), ctx);
     }
 
     /// Removes the objects, the descendants of any folders among them and all of their actions,

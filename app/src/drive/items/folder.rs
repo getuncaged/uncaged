@@ -1,5 +1,4 @@
 use warp_core::features::FeatureFlag;
-use warpui::elements::MouseStateHandle;
 use warpui::{AppContext, Element};
 
 use super::{WarpDriveItem, WarpDriveItemId};
@@ -71,17 +70,6 @@ impl WarpDriveItem for WarpDriveFolder {
 
     fn warp_drive_id(&self) -> WarpDriveItemId {
         WarpDriveItemId::Object(self.id)
-    }
-
-    fn sync_status_icon(
-        &self,
-        hover_state: MouseStateHandle,
-        appearance: &Appearance,
-    ) -> Option<Box<dyn Element>> {
-        self.folder
-            .metadata
-            .pending_changes_statuses
-            .render_icon(hover_state, appearance)
     }
 
     fn action_summary(&self, _app: &AppContext) -> Option<String> {

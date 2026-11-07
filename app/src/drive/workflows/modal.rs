@@ -887,8 +887,7 @@ impl WorkflowModal {
             | CloudModelEvent::ObjectUntrashed { .. }
             | CloudModelEvent::ObjectCreated { .. }
             | CloudModelEvent::ObjectDeleted { .. }
-            | CloudModelEvent::ObjectForceExpanded { .. }
-            | CloudModelEvent::InitialLoadCompleted => {}
+            | CloudModelEvent::ObjectForceExpanded { .. } => {}
         }
     }
 

@@ -1,15 +1,14 @@
 use chrono::Utc;
 use cloud_objects::auth::UserUid;
 use cloud_objects::cloud_object::{
-    CloudObjectGuest, CloudObjectMetadata, CloudObjectPermissions, CloudObjectSyncStatus,
-    GenericStringObjectFormat, JsonObjectType, NumInFlightRequests, ObjectIdType,
-    ServerObjectContainer,
+    CloudObjectGuest, CloudObjectMetadata, CloudObjectPermissions, GenericStringObjectFormat,
+    JsonObjectType, ObjectIdType, ServerObjectContainer,
 };
 use cloud_objects::drive::sharing::{
     LinkSharingSubjectType, SharingAccessLevel, Subject, TeamKind, UserKind,
 };
 use cloud_objects::ids::{ClientId, ServerId, SyncId};
-use diesel::{Connection, RunQueryDsl, SqliteConnection};
+use diesel::{Connection, ExpressionMethods, RunQueryDsl, SqliteConnection};
 use diesel_migrations::MigrationHarness;
 use persistence::model::ObjectMetadata;
 use persistence::schema;
@@ -98,26 +97,40 @@ fn count_generic_string_objects(conn: &mut SqliteConnection) -> usize {
 }
 
 #[test]
-fn test_pending_row_loads_without_pending_changes() {
+fn test_pending_row_loads_and_is_rewritten_as_saved() {
     let mut conn = test_connection();
-    let mut metadata = CloudObjectMetadata::mock();
-    metadata.pending_changes_statuses.content_sync_status =
-        CloudObjectSyncStatus::InFlight(NumInFlightRequests(1));
     let id = SyncId::ClientId(ClientId::new());
-    upsert_generic_string_objects(&mut conn, vec![env_var_collection(id, metadata)])
-        .expect("upsert should succeed");
+    upsert_generic_string_objects(
+        &mut conn,
+        vec![env_var_collection(id, CloudObjectMetadata::mock())],
+    )
+    .expect("insert should succeed");
+    assert!(!metadata_rows(&mut conn)[0].is_pending);
 
-    let rows = metadata_rows(&mut conn);
-    assert_eq!(rows.len(), 1);
     // Rows written while objects waited for Warp's server are marked pending.
+    diesel::update(schema::object_metadata::dsl::object_metadata)
+        .set(schema::object_metadata::dsl::is_pending.eq(true))
+        .execute(&mut conn)
+        .expect("marking the row pending should succeed");
+    let rows = metadata_rows(&mut conn);
     assert!(rows[0].is_pending);
 
-    let loaded = to_cloud_object_metadata(&rows[0]);
-    assert!(matches!(
-        loaded.pending_changes_statuses.content_sync_status,
-        CloudObjectSyncStatus::NoLocalChanges
-    ));
-    assert!(!loaded.has_pending_content_changes());
+    // A pending row loads like any other.
+    let trashed_ts = ServerTimestamp::new(Utc::now());
+    let mut loaded = to_cloud_object_metadata(&rows[0]);
+    assert_eq!(loaded.trashed_ts, None);
+
+    // The next write stores it as saved, with all of its metadata.
+    loaded.trashed_ts = Some(trashed_ts);
+    upsert_generic_string_objects(&mut conn, vec![env_var_collection(id, loaded)])
+        .expect("update should succeed");
+    let rows = metadata_rows(&mut conn);
+    assert_eq!(rows.len(), 1);
+    assert!(!rows[0].is_pending);
+    assert_eq!(
+        to_cloud_object_metadata(&rows[0]).trashed_ts,
+        Some(trashed_ts)
+    );
 }
 
 #[test]

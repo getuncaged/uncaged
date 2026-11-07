@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use warp_core::context_flag::ContextFlag;
-use warpui::elements::{Clipped, Container, Flex, MouseStateHandle, ParentElement};
+use warpui::elements::{Clipped, Container, Flex, ParentElement};
 use warpui::fonts::Weight;
 use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element, SingletonEntity};
@@ -151,17 +151,6 @@ impl WarpDriveItem for WarpDriveEnvVarCollection {
 
     fn warp_drive_id(&self) -> WarpDriveItemId {
         WarpDriveItemId::Object(self.id)
-    }
-
-    fn sync_status_icon(
-        &self,
-        hover_state: MouseStateHandle,
-        appearance: &Appearance,
-    ) -> Option<Box<dyn Element>> {
-        self.env_var_collection
-            .metadata
-            .pending_changes_statuses
-            .render_icon(hover_state, appearance)
     }
 
     fn action_summary(&self, app: &AppContext) -> Option<String> {

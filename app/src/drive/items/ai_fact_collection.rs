@@ -1,4 +1,3 @@
-use warpui::elements::MouseStateHandle;
 use warpui::{AppContext, Element};
 
 use super::{WarpDriveItem, WarpDriveItemId};
@@ -51,14 +50,6 @@ impl WarpDriveItem for WarpDriveAIFactCollection {
 
     fn warp_drive_id(&self) -> WarpDriveItemId {
         WarpDriveItemId::AIFactCollection
-    }
-
-    fn sync_status_icon(
-        &self,
-        _hover_state: MouseStateHandle,
-        _appearance: &Appearance,
-    ) -> Option<Box<dyn Element>> {
-        None
     }
 
     fn action_summary(&self, _app: &AppContext) -> Option<String> {

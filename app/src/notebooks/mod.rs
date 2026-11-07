@@ -59,10 +59,6 @@ impl CloudModelType for CloudNotebookModel {
         ModelEvent::UpsertNotebooks(objects.into_iter().map(CloudNotebook::from).collect())
     }
 
-    fn should_update_after_server_conflict(&self) -> bool {
-        true
-    }
-
     fn serialized(&self) -> SerializedModel {
         let serialized = SerializedNotebook {
             data: self.data.clone(),

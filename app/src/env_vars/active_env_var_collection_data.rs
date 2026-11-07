@@ -7,9 +7,7 @@ use crate::cloud_object::model::view::CloudViewModel;
 use crate::cloud_object::{CloudObject, Owner, Space};
 use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
 use crate::env_vars::CloudEnvVarCollection;
-use crate::server::cloud_objects::update_manager::{
-    ObjectOperation, OperationSuccessType, UpdateManagerEvent,
-};
+use crate::server::cloud_objects::update_manager::{ObjectOperation, UpdateManagerEvent};
 use crate::server::ids::{ClientId, SyncId};
 use crate::{AppContext, CloudModel, UpdateManager};
 
@@ -77,10 +75,7 @@ impl ActiveEnvVarCollectionData {
 
         let UpdateManagerEvent::ObjectOperationComplete { result } = event;
 
-        if result.success_type != OperationSuccessType::Success
-            || result.id.is_none()
-            || self.id() != result.id
-        {
+        if result.id.is_none() || self.id() != result.id {
             return;
         }
 

@@ -972,8 +972,7 @@ impl DriveIndex {
             | CloudModelEvent::ObjectUntrashed { .. }
             | CloudModelEvent::ObjectCreated { .. }
             | CloudModelEvent::ObjectMoved { .. }
-            | CloudModelEvent::ObjectDeleted { .. }
-            | CloudModelEvent::InitialLoadCompleted => {}
+            | CloudModelEvent::ObjectDeleted { .. } => {}
         }
     }
 

@@ -429,7 +429,6 @@ fn test_close_with_pending_changes() {
                 .expect("Notebook should exist");
             assert_eq!(notebook.model().title, "Test");
             assert_eq!(notebook.model().data, "Hello Some text");
-            assert!(!notebook.metadata.has_pending_content_changes());
         })
     });
 }

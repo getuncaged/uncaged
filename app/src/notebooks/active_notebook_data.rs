@@ -9,7 +9,7 @@ use crate::cloud_object::{CloudObject, Owner, Space};
 use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
 use crate::notebooks::CloudNotebook;
 use crate::server::cloud_objects::update_manager::{
-    ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
+    ObjectOperation, UpdateManager, UpdateManagerEvent,
 };
 use crate::server::ids::{ClientId, SyncId};
 
@@ -52,7 +52,6 @@ pub struct ActiveNotebookData {
     pub active_notebook: ActiveNotebook,
 
     pub show_grab_edit_access_modal: bool,
-    pub feature_not_available: bool,
 }
 
 impl ActiveNotebookData {
@@ -96,10 +95,9 @@ impl ActiveNotebookData {
             return;
         }
 
-        match (&result.operation, &result.success_type) {
-            (ObjectOperation::Create { .. }, OperationSuccessType::Success) => {
+        match &result.operation {
+            ObjectOperation::Create { .. } => {
                 if let Some(notebook_id) = result.id {
-                    self.feature_not_available = false;
                     self.saving_status = SavingStatus::Saved;
                     self.active_notebook = ActiveNotebook::CommittedNotebook(notebook_id);
                     ctx.emit(ActiveNotebookDataEvent::BreadcrumbsChanged);
@@ -107,31 +105,18 @@ impl ActiveNotebookData {
                     ctx.notify();
                 }
             }
-            (ObjectOperation::Update, OperationSuccessType::Success) => {
-                self.feature_not_available = false;
+            ObjectOperation::Update => {
                 self.saving_status = SavingStatus::Saved;
                 ctx.notify();
             }
-            (ObjectOperation::Update, OperationSuccessType::Rejection) => {
-                self.feature_not_available = false;
-                ctx.emit(ActiveNotebookDataEvent::EditRejected);
-                ctx.notify();
-            }
-            (ObjectOperation::Update, OperationSuccessType::FeatureNotAvailable) => {
-                self.feature_not_available = true;
-                ctx.emit(ActiveNotebookDataEvent::EditRejected);
-                ctx.notify();
-            }
-            (ObjectOperation::TakeEditAccess, OperationSuccessType::Success) => {
-                self.feature_not_available = false;
+            ObjectOperation::TakeEditAccess => {
                 self.mode = Mode::Editing;
                 ctx.emit(ActiveNotebookDataEvent::SwitchedToEditMode);
             }
-            (ObjectOperation::Trash, OperationSuccessType::Success)
-            | (ObjectOperation::Untrash, OperationSuccessType::Success) => {
+            ObjectOperation::Trash | ObjectOperation::Untrash => {
                 ctx.emit(ActiveNotebookDataEvent::TrashStatusChanged);
             }
-            _ => {}
+            ObjectOperation::Delete { .. } | ObjectOperation::EmptyTrash => {}
         }
     }
 
@@ -140,7 +125,6 @@ impl ActiveNotebookData {
         self.saving_status = SavingStatus::default();
         self.show_grab_edit_access_modal = false;
         self.active_notebook = ActiveNotebook::None;
-        self.feature_not_available = false;
     }
 
     pub fn open_new(
@@ -237,27 +221,6 @@ impl ActiveNotebookData {
         self.id() == Some(notebook_id)
     }
 
-    /// Checks whether or not this notebook has edit conflicts that would
-    /// results in the conflict resolution banner being shown. We check both
-    /// if a conflicting object has been received from the server, and that there
-    /// are no pending content changes on the notebook.
-    ///
-    /// We need to check the pending content changes because of a race condition where
-    /// echo'd back RTC messages can come in before a server response and incorrectly apply
-    /// a conflict to the notebook. To ensure we don't incorrectly show the dialog, we wait until
-    /// all pending requests have returned.
-    pub fn has_conflicts(&self, ctx: &AppContext) -> bool {
-        self.id()
-            .and_then(|id| CloudModel::as_ref(ctx).get_by_uid(&id.uid()))
-            .is_some_and(|object| {
-                object.has_conflicting_changes() && !object.metadata().has_pending_content_changes()
-            })
-    }
-
-    pub fn feature_not_available(&self) -> bool {
-        self.feature_not_available
-    }
-
     /// Returns the current editor of the active object. Returns None
     /// if there is not currently an active notebook
     pub fn current_editor(&self, ctx: &AppContext) -> Option<Editor> {
@@ -309,8 +272,6 @@ impl ActiveNotebookData {
 pub enum ActiveNotebookDataEvent {
     /// The editing baton for the current object was successfully grabbed server-side.
     SwitchedToEditMode,
-    /// An edit to the current object was rejected.
-    EditRejected,
     /// The notebook's breadcrumbs were updated.
     BreadcrumbsChanged,
     /// This notebook was saved to Warp Drive for the first time.

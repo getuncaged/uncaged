@@ -83,8 +83,6 @@ pub enum RuleViewAction {
 #[derive(Default, Debug, Clone)]
 pub struct MouseStateHandles {
     pub hover: MouseStateHandle,
-    pub sync_status_hover: MouseStateHandle,
-    pub sync_status_icon: MouseStateHandle,
 }
 
 #[derive(Debug, Clone)]
@@ -659,33 +657,6 @@ impl RuleView {
             .finish()
     }
 
-    fn render_sync_status_icon(
-        &self,
-        ai_row: CloudRuleRow,
-        appearance: &Appearance,
-    ) -> Option<Box<dyn Element>> {
-        let item = ai_row.fact.to_warp_drive_item(appearance)?;
-        let icon =
-            item.sync_status_icon(ai_row.mouse_states.sync_status_icon.clone(), appearance)?;
-
-        Some(
-            Hoverable::new(ai_row.mouse_states.sync_status_hover.clone(), |state| {
-                let mut container = Container::new(icon)
-                    .with_border(Border::all(1.))
-                    .with_uniform_padding(4.);
-                if state.is_hovered() {
-                    container = container
-                        .with_background(appearance.theme().surface_2())
-                        .with_border(
-                            Border::all(1.).with_border_fill(appearance.theme().surface_3()),
-                        );
-                }
-                container.with_margin_right(style::ROW_ICON_MARGIN).finish()
-            })
-            .finish(),
-        )
-    }
-
     fn render_file_backed_row(
         &self,
         project_row: FileBackedRow,
@@ -791,10 +762,6 @@ impl RuleView {
         let mut row = Flex::row()
             .with_main_axis_size(MainAxisSize::Max)
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween);
-
-        if let Some(sync_status_icon) = self.render_sync_status_icon(ai_row.clone(), appearance) {
-            row.add_child(sync_status_icon);
-        }
 
         row.add_child(Expanded::new(1., fact_text).finish());
 

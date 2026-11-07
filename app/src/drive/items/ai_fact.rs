@@ -1,4 +1,4 @@
-use warpui::elements::{Container, Flex, MouseStateHandle, ParentElement};
+use warpui::elements::{Container, Flex, ParentElement};
 use warpui::fonts::Weight;
 use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element};
@@ -86,17 +86,6 @@ impl WarpDriveItem for WarpDriveAIFact {
 
     fn warp_drive_id(&self) -> WarpDriveItemId {
         WarpDriveItemId::Object(self.id)
-    }
-
-    fn sync_status_icon(
-        &self,
-        hover_state: MouseStateHandle,
-        appearance: &Appearance,
-    ) -> Option<Box<dyn Element>> {
-        self.ai_fact
-            .metadata
-            .pending_changes_statuses
-            .render_icon(hover_state, appearance)
     }
 
     fn action_summary(&self, _app: &AppContext) -> Option<String> {

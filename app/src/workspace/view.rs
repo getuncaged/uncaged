@@ -257,7 +257,7 @@ use crate::search::command_search::view::{CommandSearchEvent, CommandSearchView}
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::search::{self, QueryFilter};
 use crate::server::cloud_objects::update_manager::{
-    ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
+    ObjectOperation, UpdateManager, UpdateManagerEvent,
 };
 use crate::server::ids::{ObjectUid, SyncId};
 use crate::server::network_log_pane_manager::NetworkLogPaneManager;
@@ -15126,177 +15126,80 @@ impl Workspace {
                     // Early exit for objects that don't show toasts.
                     return;
                 }
-                if let Some(message) = CloudObjectToastMessage::toast_message(
-                    object,
-                    &result.operation,
-                    &result.success_type,
-                    ctx,
-                ) {
+                if let Some(message) =
+                    CloudObjectToastMessage::toast_message(object, &result.operation, ctx)
+                {
                     let workflow: Option<&CloudWorkflow> = object.into();
                     let cloned_workflow = workflow.cloned();
-                    let env_var_collection: Option<&CloudEnvVarCollection> = object.into();
-                    let cloned_env_var_collection = env_var_collection.cloned();
 
                     let notebook: Option<&CloudNotebook> = object.into();
                     let cloned_notebook = notebook.cloned();
 
-                    self.toast_stack
-                        .update(ctx, |view, ctx| match result.success_type {
-                            OperationSuccessType::Success => {
-                                let mut new_toast =
-                                    DismissibleToast::success(message).with_object_id(object_id);
-                                if let Some(notebook) = cloned_notebook {
-                                    if (matches!(result.operation, ObjectOperation::Create { .. })
-                                        || result.operation == ObjectOperation::Update)
-                                        && notebook.model().ai_document_id.is_some()
-                                    {
-                                        // This is a plan. Plans are saved to the local Drive
-                                        // automatically (often many times while an agent writes
-                                        // one), so their saves never show a toast.
-                                        return;
-                                    }
-                                }
+                    self.toast_stack.update(ctx, |view, ctx| {
+                        let mut new_toast =
+                            DismissibleToast::success(message).with_object_id(object_id);
+                        if let Some(notebook) = cloned_notebook {
+                            if (matches!(result.operation, ObjectOperation::Create { .. })
+                                || result.operation == ObjectOperation::Update)
+                                && notebook.model().ai_document_id.is_some()
+                            {
+                                // This is a plan. Plans are saved to the local Drive
+                                // automatically (often many times while an agent writes
+                                // one), so their saves never show a toast.
+                                return;
+                            }
+                        }
 
-                                if let Some(workflow) = cloned_workflow {
-                                    if matches!(result.operation, ObjectOperation::Create { .. })
-                                        || result.operation == ObjectOperation::Update
-                                    {
-                                        new_toast = new_toast.with_link(
-                                            ToastLink::new("View".to_string()).with_onclick_action(
-                                                WorkspaceAction::ViewObjectInWarpDrive(
-                                                    WarpDriveItemId::Object(
-                                                        CloudObjectTypeAndId::Workflow(workflow.id),
-                                                    ),
-                                                ),
+                        if let Some(workflow) = cloned_workflow {
+                            if matches!(result.operation, ObjectOperation::Create { .. })
+                                || result.operation == ObjectOperation::Update
+                            {
+                                new_toast = new_toast.with_link(
+                                    ToastLink::new("View".to_string()).with_onclick_action(
+                                        WorkspaceAction::ViewObjectInWarpDrive(
+                                            WarpDriveItemId::Object(
+                                                CloudObjectTypeAndId::Workflow(workflow.id),
                                             ),
-                                        )
-                                    }
-                                }
-
-                                if result.operation == ObjectOperation::Trash {
-                                    new_toast = new_toast.with_link(
-                                        ToastLink::new("Undo".to_string()).with_onclick_action(
-                                            WorkspaceAction::UndoTrash(cloud_object_type_and_id),
                                         ),
-                                    )
-                                }
+                                    ),
+                                )
+                            }
+                        }
 
-                                view.add_ephemeral_toast(new_toast, ctx);
-                            }
-                            OperationSuccessType::Failure => {
-                                // Suppress failure toasts for plan notebook updates
-                                // that are not visible in the active pane group.
-                                // Plan notebooks auto-save in the background, and
-                                // showing persistent error toasts for transient
-                                // failures is confusing when the user didn't
-                                // initiate the action.
-                                if let Some(notebook) = &cloned_notebook {
-                                    if result.operation == ObjectOperation::Update
-                                        && notebook.model().ai_document_id.is_some_and(
-                                            |ai_doc_id| {
-                                                !self
-                                                    .active_tab_pane_group()
-                                                    .as_ref(ctx)
-                                                    .contains_ai_document(&ai_doc_id, ctx)
-                                            },
-                                        )
-                                    {
-                                        return;
-                                    }
-                                }
-                                let new_toast =
-                                    DismissibleToast::error(message).with_object_id(object_id);
-                                view.add_persistent_toast(new_toast, ctx);
-                            }
-                            OperationSuccessType::Rejection => {
-                                let new_toast = if let Some(workflow) = cloned_workflow {
-                                    DismissibleToast::error(message)
-                                        .with_link(
-                                            ToastLink::new(
-                                                "Check out the latest version and try again."
-                                                    .to_string(),
-                                            )
-                                            .with_onclick_action(
-                                                WorkspaceAction::HandleConflictingWorkflow(
-                                                    workflow.id,
-                                                ),
-                                            ),
-                                        )
-                                        .with_object_id(object_id)
-                                } else if let Some(env_var_collection) = cloned_env_var_collection {
-                                    DismissibleToast::error(message)
-                                        .with_link(
-                                            ToastLink::new(
-                                                "Check out the latest version and try again."
-                                                    .to_string(),
-                                            )
-                                            .with_onclick_action(
-                                                WorkspaceAction::HandleConflictingEnvVarCollection(
-                                                    env_var_collection.id,
-                                                ),
-                                            ),
-                                        )
-                                        .with_object_id(object_id)
-                                } else {
-                                    return;
-                                };
-                                view.add_persistent_toast(new_toast, ctx);
-                            }
-                            OperationSuccessType::FeatureNotAvailable => {
-                                if cloned_workflow.is_some() {
-                                    log::error!(
-                                        "Getting feature not available message for workflows"
-                                    );
-                                }
-                            }
-                            OperationSuccessType::Denied(_) => {
-                                let new_toast =
-                                    DismissibleToast::error(message).with_object_id(object_id);
-                                view.add_persistent_toast(new_toast, ctx);
-                            }
-                        });
+                        if result.operation == ObjectOperation::Trash {
+                            new_toast = new_toast.with_link(
+                                ToastLink::new("Undo".to_string()).with_onclick_action(
+                                    WorkspaceAction::UndoTrash(cloud_object_type_and_id),
+                                ),
+                            )
+                        }
+
+                        view.add_ephemeral_toast(new_toast, ctx);
+                    });
                 }
             }
         }
 
         // For confirmation toast of permadeletion
         if let Some(n) = result.num_objects {
-            if let Some(message) = CloudObjectToastMessage::toast_deletion_confirm_message(
-                n,
-                &result.operation,
-                &result.success_type,
-            ) {
-                self.toast_stack
-                    .update(ctx, |view, ctx| match result.success_type {
-                        OperationSuccessType::Success => {
-                            let new_toast = DismissibleToast::success(message);
-                            view.add_ephemeral_toast(new_toast, ctx);
-                        }
-                        OperationSuccessType::Failure => {
-                            let new_toast: DismissibleToast<WorkspaceAction> =
-                                DismissibleToast::error(message);
-                            view.add_ephemeral_toast(new_toast, ctx);
-                        }
-                        OperationSuccessType::Rejection => {
-                            let new_toast = DismissibleToast::error(message);
-                            view.add_ephemeral_toast(new_toast, ctx);
-                        }
-                        OperationSuccessType::FeatureNotAvailable => {
-                            log::error!("Should not get deletion confirmation message when feature is not available. Operation type {:?}", result.operation);
-                        }
-                        OperationSuccessType::Denied(_) => {
-                            let new_toast = DismissibleToast::error(message);
-                            view.add_ephemeral_toast(new_toast, ctx);
-                        },
-                    })
+            if let Some(message) =
+                CloudObjectToastMessage::toast_deletion_confirm_message(n, &result.operation)
+            {
+                self.toast_stack.update(ctx, |view, ctx| {
+                    // Emptying a trash that was already empty reports zero objects.
+                    let new_toast = if result.operation == ObjectOperation::EmptyTrash && n == 0 {
+                        DismissibleToast::error(message)
+                    } else {
+                        DismissibleToast::success(message)
+                    };
+                    view.add_ephemeral_toast(new_toast, ctx);
+                })
             }
         }
 
         // If this was a successful update on a workflow - caused by this client - then we may need
         // to update the contents of the workflow info box to represent the new synced state.
-        if result.success_type == OperationSuccessType::Success
-            && result.operation == ObjectOperation::Update
-        {
+        if result.operation == ObjectOperation::Update {
             let cloud_model = CloudModel::as_ref(ctx);
             let updated_object = result.id.and_then(|id| cloud_model.get_by_uid(&id.uid()));
             if let Some(CloudObjectTypeAndId::Workflow(workflow_id)) =
@@ -20789,26 +20692,6 @@ impl TypedActionView for Workspace {
                         DismissibleToast::success("Disabled all synchronized inputs.".to_string());
                     view.add_ephemeral_toast(new_toast, ctx);
                 });
-            }
-            HandleConflictingWorkflow(workflow_id) => {
-                self.toast_stack.update(ctx, |view, ctx| {
-                    view.dismiss_older_toasts(&workflow_id.uid(), ctx);
-                });
-                self.open_workflow_with_existing(
-                    *workflow_id,
-                    &OpenWarpDriveObjectSettings::default(),
-                    ctx,
-                );
-            }
-            HandleConflictingEnvVarCollection(env_var_collection_id) => {
-                self.toast_stack.update(ctx, |view, ctx| {
-                    view.dismiss_older_toasts(&env_var_collection_id.uid(), ctx);
-                });
-                self.open_env_var_collection(
-                    &EnvVarCollectionSource::Existing(*env_var_collection_id),
-                    true,
-                    ctx,
-                );
             }
             OpenPromptEditor { .. } => {
                 self.open_prompt_editor(ctx);
