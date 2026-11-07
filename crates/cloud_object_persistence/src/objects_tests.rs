@@ -8,11 +8,11 @@ use cloud_objects::drive::sharing::{
     LinkSharingSubjectType, SharingAccessLevel, Subject, TeamKind, UserKind,
 };
 use cloud_objects::ids::{ClientId, ServerId, SyncId};
+use cloud_objects::time::ServerTimestamp;
 use diesel::{Connection, ExpressionMethods, RunQueryDsl, SqliteConnection};
 use diesel_migrations::MigrationHarness;
 use persistence::model::ObjectMetadata;
 use persistence::schema;
-use warp_graphql::scalars::time::ServerTimestamp;
 
 use super::{
     GenericStringObjectPersistenceData, delete_cloud_object, delete_generic_string_object,

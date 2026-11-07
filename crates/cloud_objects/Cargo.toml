@@ -12,7 +12,6 @@ test-util = []
 [dependencies]
 anyhow.workspace = true
 chrono.workspace = true
-cynic.workspace = true
 derivative.workspace = true
 itertools.workspace = true
 lasso.workspace = true
@@ -22,4 +21,6 @@ settings_value.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 warp_core.workspace = true
-warp_graphql.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

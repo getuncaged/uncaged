@@ -7,12 +7,11 @@ use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use warp_core::features::FeatureFlag;
-use warp_graphql::object_permissions::AccessLevel;
-use warp_graphql::scalars::time::ServerTimestamp;
 
 use crate::auth::UserUid;
 use crate::drive::sharing::{SharingAccessLevel, Subject, TeamKind, UserKind};
 use crate::ids::{FolderId, ServerId, SyncId};
+use crate::time::ServerTimestamp;
 
 mod actions;
 mod generic_cloud_object;
@@ -205,42 +204,6 @@ impl TryFrom<&str> for JsonObjectType {
     }
 }
 
-impl TryFrom<warp_graphql::object::ObjectType> for ObjectIdType {
-    type Error = anyhow::Error;
-    fn try_from(object_type: warp_graphql::object::ObjectType) -> Result<Self, Self::Error> {
-        match object_type {
-            warp_graphql::object::ObjectType::AIConversation => Err(anyhow!(
-                "AIConversation is not a supported object type for this operation"
-            )),
-            warp_graphql::object::ObjectType::Notebook => Ok(ObjectIdType::Notebook),
-            warp_graphql::object::ObjectType::Workflow => Ok(ObjectIdType::Workflow),
-            warp_graphql::object::ObjectType::Folder => Ok(ObjectIdType::Folder),
-            warp_graphql::object::ObjectType::GenericStringObject => {
-                Ok(ObjectIdType::GenericStringObject)
-            }
-            warp_graphql::object::ObjectType::Unknown => {
-                Err(anyhow!("could not convert unknown cloud object type"))
-            }
-        }
-    }
-}
-
-impl From<ObjectType> for warp_graphql::object::ObjectType {
-    fn from(value: ObjectType) -> Self {
-        match value {
-            ObjectType::Notebook => warp_graphql::object::ObjectType::Notebook,
-            ObjectType::Workflow => warp_graphql::object::ObjectType::Workflow,
-            ObjectType::Folder => warp_graphql::object::ObjectType::Folder,
-            ObjectType::GenericStringObject(GenericStringObjectFormat::Json(
-                JsonObjectType::EnvVarCollection,
-            )) => warp_graphql::object::ObjectType::GenericStringObject,
-            ObjectType::GenericStringObject(gso) => {
-                todo!("Moving is not implemented for {:?}", gso);
-            }
-        }
-    }
-}
-
 /// The revision timestamp at which an object was edited. This is used by the server
 /// to determine if an edit to an object was at the latest revision. Edits at older
 /// revisions are rejected by the server.
@@ -355,7 +318,7 @@ pub enum ServerGuestSubject {
 /// Server representation of a link-sharing setting.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ServerLinkSharing {
-    pub access_level: AccessLevel,
+    pub access_level: SharingAccessLevel,
     pub source: Option<ServerObjectContainer>,
 }
 
@@ -363,7 +326,7 @@ pub struct ServerLinkSharing {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ServerObjectGuest {
     pub subject: ServerGuestSubject,
-    pub access_level: AccessLevel,
+    pub access_level: SharingAccessLevel,
     /// If this guest is inherited, this is the ancestor that it's inherited from.
     pub source: Option<ServerObjectContainer>,
 }
@@ -488,7 +451,7 @@ pub struct CloudLinkSharing {
 impl CloudLinkSharing {
     pub fn from_server(server_link_sharing: ServerLinkSharing) -> Self {
         Self {
-            access_level: server_link_sharing.access_level.into(),
+            access_level: server_link_sharing.access_level,
             source: server_link_sharing.source,
         }
     }
@@ -514,7 +477,7 @@ impl CloudObjectGuest {
 
         Self {
             subject,
-            access_level: server_guest.access_level.into(),
+            access_level: server_guest.access_level,
             source: server_guest.source,
         }
     }
@@ -602,210 +565,5 @@ impl SerializedModel {
 impl From<String> for SerializedModel {
     fn from(s: String) -> Self {
         Self(s)
-    }
-}
-
-// GraphQL conversion impls.
-
-impl From<GenericStringObjectFormat>
-    for warp_graphql::generic_string_object::GenericStringObjectFormat
-{
-    fn from(format: GenericStringObjectFormat) -> Self {
-        use warp_graphql::generic_string_object::GenericStringObjectFormat as GraphQLFormat;
-        match format {
-            GenericStringObjectFormat::Json(JsonObjectType::EnvVarCollection) => {
-                GraphQLFormat::JsonEnvVarCollection
-            }
-            GenericStringObjectFormat::Json(JsonObjectType::WorkflowEnum) => {
-                GraphQLFormat::JsonWorkflowEnum
-            }
-            GenericStringObjectFormat::Json(JsonObjectType::AIFact) => GraphQLFormat::JsonAIFact,
-            GenericStringObjectFormat::Json(JsonObjectType::MCPServer) => {
-                GraphQLFormat::JsonMCPServer
-            }
-            GenericStringObjectFormat::Json(JsonObjectType::AIExecutionProfile) => {
-                GraphQLFormat::JsonAIExecutionProfile
-            }
-            GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer) => {
-                GraphQLFormat::JsonTemplatableMCPServer
-            }
-        }
-    }
-}
-
-impl From<GenericStringObjectUniqueKey>
-    for warp_graphql::generic_string_object::GenericStringObjectUniqueKey
-{
-    fn from(key: GenericStringObjectUniqueKey) -> Self {
-        use warp_graphql::generic_string_object::GenericStringObjectUniqueKey as GraphQLKey;
-        GraphQLKey {
-            key: key.key,
-            unique_per: key.unique_per.into(),
-        }
-    }
-}
-
-impl From<UniquePer> for warp_graphql::generic_string_object::UniquePer {
-    fn from(unique_per: UniquePer) -> Self {
-        use warp_graphql::generic_string_object::UniquePer as GraphQLUniquePer;
-        match unique_per {
-            UniquePer::User => GraphQLUniquePer::User,
-        }
-    }
-}
-
-impl TryFrom<warp_graphql::object::ObjectMetadata> for ServerMetadata {
-    type Error = anyhow::Error;
-
-    fn try_from(value: warp_graphql::object::ObjectMetadata) -> Result<Self, Self::Error> {
-        let folder_id: Option<FolderId> = match value.parent {
-            warp_graphql::object::Container::FolderContainer(folder_container) => {
-                Some(folder_container.folder_uid.into_inner().into())
-            }
-            _ => None,
-        };
-        let metadata = ServerMetadata {
-            uid: ServerId::from_string_lossy(value.uid.inner()),
-            revision: value.revision_ts.into(),
-            metadata_last_updated_ts: value.metadata_last_updated_ts,
-            trashed_ts: value.trashed_ts,
-            folder_id,
-            is_welcome_object: value.is_welcome_object,
-            creator_uid: value.creator_uid.map(|uid| uid.into_inner()),
-            last_editor_uid: value.last_editor_uid.map(|uid| uid.into_inner()),
-            current_editor_uid: value.current_editor_uid.map(|uid| uid.into_inner()),
-        };
-        Ok(metadata)
-    }
-}
-
-impl TryFrom<warp_graphql::object_permissions::ObjectPermissions> for ServerPermissions {
-    type Error = anyhow::Error;
-
-    fn try_from(
-        value: warp_graphql::object_permissions::ObjectPermissions,
-    ) -> Result<Self, Self::Error> {
-        let server_object_guests: Result<Vec<ServerObjectGuest>, _> = value
-            .guests
-            .into_iter()
-            .map(|guest| guest.try_into())
-            .collect();
-        let object_permissions = ServerPermissions {
-            space: value.space.try_into()?,
-            guests: server_object_guests?,
-            anyone_link_sharing: match value.anyone_link_sharing {
-                Some(sharing) => Some(sharing.try_into()?),
-                None => None,
-            },
-            permissions_last_updated_ts: value.last_updated_ts,
-        };
-        Ok(object_permissions)
-    }
-}
-
-impl TryFrom<warp_graphql::object_permissions::ObjectGuest> for ServerObjectGuest {
-    type Error = anyhow::Error;
-
-    fn try_from(value: warp_graphql::object_permissions::ObjectGuest) -> Result<Self, Self::Error> {
-        let object_guest = ServerObjectGuest {
-            subject: value.subject.try_into()?,
-            access_level: value.access_level,
-            source: match value.source {
-                Some(container) => Some(container.try_into()?),
-                None => None,
-            },
-        };
-        Ok(object_guest)
-    }
-}
-
-impl TryFrom<warp_graphql::object_permissions::GuestSubject> for ServerGuestSubject {
-    type Error = anyhow::Error;
-
-    fn try_from(
-        value: warp_graphql::object_permissions::GuestSubject,
-    ) -> Result<Self, Self::Error> {
-        match value {
-            warp_graphql::object_permissions::GuestSubject::UserGuest(user_guest) => {
-                let guest_subject = ServerGuestSubject::User {
-                    firebase_uid: user_guest.firebase_uid.into_inner(),
-                };
-                Ok(guest_subject)
-            }
-            warp_graphql::object_permissions::GuestSubject::PendingUserGuest(guest) => {
-                Ok(ServerGuestSubject::PendingUser { email: guest.email })
-            }
-            warp_graphql::object_permissions::GuestSubject::TeamGuest(team_guest) => {
-                Ok(ServerGuestSubject::Team {
-                    team_uid: ServerId::from_string_lossy(team_guest.uid.inner()),
-                })
-            }
-            warp_graphql::object_permissions::GuestSubject::Unknown => {
-                anyhow::bail!("Unknown GuestSubject type")
-            }
-        }
-    }
-}
-
-impl TryFrom<warp_graphql::object_permissions::LinkSharing> for ServerLinkSharing {
-    type Error = anyhow::Error;
-
-    fn try_from(value: warp_graphql::object_permissions::LinkSharing) -> Result<Self, Self::Error> {
-        Ok(ServerLinkSharing {
-            access_level: value.access_level,
-            source: value.source.map(TryInto::try_into).transpose()?,
-        })
-    }
-}
-
-impl TryFrom<warp_graphql::object::Container> for ServerObjectContainer {
-    type Error = anyhow::Error;
-
-    fn try_from(value: warp_graphql::object::Container) -> Result<Self, Self::Error> {
-        match value {
-            warp_graphql::object::Container::FolderContainer(folder) => {
-                Ok(ServerObjectContainer::Folder {
-                    folder_uid: ServerId::from_string_lossy(folder.folder_uid.inner()),
-                })
-            }
-            warp_graphql::object::Container::Space(space) => Ok(ServerObjectContainer::Drive {
-                owner: space.try_into()?,
-            }),
-            warp_graphql::object::Container::Unknown => {
-                anyhow::bail!("Unknown Container type")
-            }
-        }
-    }
-}
-
-impl TryFrom<warp_graphql::object::Space> for Owner {
-    type Error = anyhow::Error;
-
-    fn try_from(value: warp_graphql::object::Space) -> Result<Self, Self::Error> {
-        let owner = match value.type_ {
-            warp_graphql::object::SpaceType::Team => Owner::Team {
-                team_uid: ServerId::from_string_lossy(value.uid.inner()),
-            },
-            warp_graphql::object::SpaceType::User => Owner::User {
-                user_uid: UserUid::new(value.uid.inner()),
-            },
-        };
-        Ok(owner)
-    }
-}
-
-impl From<Owner> for warp_graphql::object_permissions::Owner {
-    fn from(owner: Owner) -> Self {
-        use warp_graphql::object_permissions::{Owner as GraphQLOwner, OwnerType};
-        match owner {
-            Owner::User { user_uid } => GraphQLOwner {
-                type_: OwnerType::User,
-                uid: Some(cynic::Id::new(user_uid.to_string())),
-            },
-            Owner::Team { team_uid, .. } => GraphQLOwner {
-                type_: OwnerType::Team,
-                uid: Some(cynic::Id::new(team_uid)),
-            },
-        }
     }
 }

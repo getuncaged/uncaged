@@ -6,7 +6,6 @@ use chrono::Local;
 use lazy_static::lazy_static;
 use regex::Regex;
 use warp_core::features::FeatureFlag;
-use warp_graphql::generic_string_object::GenericStringObjectFormat as GraphQLFormat;
 use warpui::{AppContext, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
@@ -26,6 +25,9 @@ use crate::cloud_object::{
 use crate::terminal::model::block::BlockId;
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::TerminalView;
+
+/// The name Warp's wire protocol gives the AI fact (rule) generic string object format.
+const AI_FACT_OBJECT_TYPE: &str = "JsonAIFact";
 
 lazy_static! {
     // Regex to match <block:[block_id]> patterns
@@ -311,12 +313,11 @@ fn get_object_attachment_payload(
                 .and_then(|object| {
                     if let Some(ai_fact) = object.as_any().downcast_ref::<GenericCloudObject<GenericStringObjectId, CloudAIFactModel>>() {
                         let string_object = ai_fact as &dyn CloudStringObject;
-                        // Convert the format to GraphQL format since that's what the server expects
-                        let graphql_format: GraphQLFormat =
-                            string_object.generic_string_object_format().into();
                         Some(DriveObjectPayload::GenericStringObject {
                             payload: string_object.serialized().model_as_str().to_string(),
-                            object_type: graphql_format.to_string(),
+                            // The format's name in Warp's wire protocol, which the agent
+                            // context still carries.
+                            object_type: AI_FACT_OBJECT_TYPE.to_string(),
                         })
                     } else {
                         None

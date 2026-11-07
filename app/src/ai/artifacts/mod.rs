@@ -4,7 +4,6 @@ use anyhow::anyhow;
 use warp_core::report_error;
 use warp_multi_agent_api as api;
 
-use crate::ai::artifact_download::sanitized_basename;
 use crate::notebooks::NotebookId;
 
 pub mod buttons;
@@ -189,47 +188,6 @@ impl From<api::message::artifact_event::PlanArtifact> for Artifact {
             } else {
                 Some(plan.title)
             },
-        }
-    }
-}
-
-impl TryFrom<warp_graphql::ai::AIConversationArtifact> for Artifact {
-    type Error = ();
-
-    fn try_from(value: warp_graphql::ai::AIConversationArtifact) -> Result<Self, Self::Error> {
-        match value {
-            warp_graphql::ai::AIConversationArtifact::PlanArtifact(plan) => Ok(Artifact::Plan {
-                document_uid: plan.document_uid.into_inner(),
-                notebook_uid: plan
-                    .notebook_uid
-                    .map(|id| NotebookId::from(id.into_inner())),
-                title: plan.title,
-            }),
-            warp_graphql::ai::AIConversationArtifact::PullRequestArtifact(pr) => {
-                let (repo, number) = parse_github_pr_url(&pr.url).unzip();
-                Ok(Artifact::PullRequest {
-                    url: pr.url,
-                    branch: pr.branch,
-                    repo,
-                    number,
-                })
-            }
-            warp_graphql::ai::AIConversationArtifact::ScreenshotArtifact(screenshot) => {
-                Ok(Artifact::Screenshot {
-                    artifact_uid: screenshot.artifact_uid.into_inner(),
-                    mime_type: screenshot.mime_type,
-                    description: screenshot.description,
-                })
-            }
-            warp_graphql::ai::AIConversationArtifact::FileArtifact(file) => Ok(Artifact::File {
-                artifact_uid: file.artifact_uid.into_inner(),
-                filepath: file.filepath.clone(),
-                filename: sanitized_basename(&file.filepath).unwrap_or(file.filepath),
-                mime_type: file.mime_type,
-                description: file.description,
-                size_bytes: file.size_bytes,
-            }),
-            warp_graphql::ai::AIConversationArtifact::Unknown => Err(()),
         }
     }
 }

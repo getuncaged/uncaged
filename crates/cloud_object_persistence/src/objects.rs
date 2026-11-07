@@ -6,6 +6,7 @@ use cloud_objects::cloud_object::{
     GenericStringObjectFormat, ObjectIdType, ObjectType, Owner, Revision,
 };
 use cloud_objects::ids::{ClientId, FolderId, HashableId, SyncId, ToServerId};
+use cloud_objects::time::ServerTimestamp;
 use diesel::result::Error;
 use diesel::{
     Connection, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection,
@@ -16,7 +17,6 @@ use persistence::model::{
 };
 use persistence::schema;
 use warp_core::features::FeatureFlag;
-use warp_graphql::scalars::time::ServerTimestamp;
 
 use crate::{decode_guests, decode_link_sharing, encode_guests, encode_link_sharing};
 

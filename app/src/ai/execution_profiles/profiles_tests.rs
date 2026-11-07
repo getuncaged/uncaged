@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use cloud_object_models::ServerAIExecutionProfile;
+use cloud_objects::drive::sharing::SharingAccessLevel;
 use cloud_objects::UserUid;
 use warp_core::features::FeatureFlag;
-use warp_graphql::object_permissions::AccessLevel;
 use warpui::{App, SingletonEntity};
 
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
@@ -62,7 +62,7 @@ fn attacker_owned_shared_default_profile(cloud_uid: ServerId) -> ServerAIExecuti
                 subject: ServerGuestSubject::User {
                     firebase_uid: LOCAL_USER_UID.to_string(),
                 },
-                access_level: AccessLevel::Editor,
+                access_level: SharingAccessLevel::Edit,
                 source: None,
             }],
             anyone_link_sharing: None,
@@ -302,7 +302,7 @@ fn filters_non_owned_non_default_profile_from_list() {
                     subject: ServerGuestSubject::User {
                         firebase_uid: LOCAL_USER_UID.to_string(),
                     },
-                    access_level: AccessLevel::Editor,
+                    access_level: SharingAccessLevel::Edit,
                     source: None,
                 }],
                 anyone_link_sharing: None,

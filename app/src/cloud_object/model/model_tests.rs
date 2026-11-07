@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use cloud_object_models::{ServerNotebook, ServerWorkflow};
+use cloud_objects::time::ServerTimestamp;
 use cloud_objects::UserUid;
-use warp_graphql::scalars::time::ServerTimestamp;
 use warpui::{App, ModelHandle};
 
 use super::*;

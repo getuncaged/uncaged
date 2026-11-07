@@ -4,9 +4,9 @@ use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 
 use chrono::Utc;
+use cloud_objects::time::ServerTimestamp;
 use lazy_static::lazy_static;
 use regex::Regex;
-use warp_graphql::scalars::time::ServerTimestamp;
 use warp_util::sync::Condition;
 use warpui::{Entity, ModelContext, SingletonEntity};
 

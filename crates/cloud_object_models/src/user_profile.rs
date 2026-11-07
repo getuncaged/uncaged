@@ -10,17 +10,6 @@ pub struct UserProfileWithUID {
     pub photo_url: String,
 }
 
-impl From<warp_graphql::user::PublicUserProfile> for UserProfileWithUID {
-    fn from(value: warp_graphql::user::PublicUserProfile) -> Self {
-        UserProfileWithUID {
-            firebase_uid: UserUid::new(&value.uid),
-            display_name: value.display_name,
-            email: value.email.unwrap_or_default(),
-            photo_url: value.photo_url.unwrap_or_default(),
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UserProfileIdAndName {
     pub user_uid: UserUid,

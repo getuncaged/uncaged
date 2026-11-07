@@ -16,29 +16,3 @@ fn test_parse_github_pr_url() {
     );
     assert_eq!(parse_github_pr_url("not a url"), None);
 }
-
-#[test]
-fn converts_graphql_file_artifact() {
-    let artifact = Artifact::try_from(warp_graphql::ai::AIConversationArtifact::FileArtifact(
-        warp_graphql::ai::FileArtifact {
-            artifact_uid: "artifact-file-1".into(),
-            filepath: "outputs/report.txt".to_string(),
-            mime_type: "text/plain".to_string(),
-            description: Some("Daily summary".to_string()),
-            size_bytes: Some(42),
-        },
-    ))
-    .expect("expected file artifact conversion");
-
-    assert_eq!(
-        artifact,
-        Artifact::File {
-            artifact_uid: "artifact-file-1".to_string(),
-            filepath: "outputs/report.txt".to_string(),
-            filename: "report.txt".to_string(),
-            mime_type: "text/plain".to_string(),
-            description: Some("Daily summary".to_string()),
-            size_bytes: Some(42),
-        }
-    );
-}
