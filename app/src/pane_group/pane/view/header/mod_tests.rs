@@ -12,7 +12,7 @@ use crate::pane_group::{BackingView, PaneConfiguration, PaneId, PaneView};
 use crate::server::server_api::ServerApiProvider;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::test_util::settings::initialize_settings_for_tests;
-use crate::{NetworkStatus, SyncQueue, UpdateManager, UserProfiles};
+use crate::{NetworkStatus, UpdateManager, UserProfiles};
 
 /// A dummy view that is also a backing pane view for testing purposes.
 struct TestView {
@@ -102,7 +102,6 @@ fn initialize_app(app: &mut App) {
 
     app.add_singleton_model(|_| Appearance::mock());
     app.add_singleton_model(|_| NetworkStatus::new());
-    app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
     app.add_singleton_model(CloudModel::mock);

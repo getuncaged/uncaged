@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
+use cloud_object_models::ServerNotebook;
 use cloud_objects::UserUid;
 use futures_util::future::BoxFuture;
 use warp_core::ui::appearance::Appearance;
@@ -17,7 +18,7 @@ use super::{NotebookEvent, NotebookView, SAVE_PERIOD};
 use crate::cloud_object::model::actions::ObjectActions;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::model::view::{CloudViewModel, Editor, EditorState};
-use crate::cloud_object::{Owner, Revision, ServerMetadata, ServerNotebook, ServerPermissions};
+use crate::cloud_object::{Owner, Revision, ServerMetadata, ServerPermissions};
 use crate::drive::OpenWarpDriveObjectSettings;
 use crate::editor::{DisplayPoint, EditorAction, SelectAction};
 use crate::network::NetworkStatus;
@@ -33,7 +34,6 @@ use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::ClientId;
 use crate::server::ids::SyncId::ServerId;
 use crate::server::server_api::ServerApiProvider;
-use crate::server::sync_queue::SyncQueue;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::terminal::keys::TerminalKeybindings;
 use crate::test_util::settings::initialize_settings_for_tests;
@@ -59,7 +59,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(NotebookKeybindings::new);
     app.add_singleton_model(TerminalKeybindings::new);
     app.add_singleton_model(PrivacySettings::mock);
-    app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(CloudViewModel::mock);
     app.add_singleton_model(|_| UserProfiles::new(vec![]));
@@ -469,15 +468,14 @@ fn test_close_unmodified() {
 }
 
 #[test]
-fn test_only_user_title_edits_synced() {
-    // This tests that we only sync user edits, and don't echo back received title changes.
+fn test_user_title_edits_saved() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
 
         let (_, notebook_view, _) = create_notebook(&mut app);
 
-        let mut server_notebook = mock_server_notebook("Initial Title", "Notebook contents");
-        let cloud_notebook: CloudNotebook = CloudNotebook::new_from_server(server_notebook.clone());
+        let server_notebook = mock_server_notebook("Initial Title", "Notebook contents");
+        let cloud_notebook: CloudNotebook = CloudNotebook::new_from_server(server_notebook);
         let notebook_id = cloud_notebook.id;
 
         CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
@@ -485,19 +483,7 @@ fn test_only_user_title_edits_synced() {
         });
         open_notebook(&mut app, &notebook_view, cloud_notebook).await;
 
-        // When a new title comes in, we should update the buffer but not emit a change.
-        server_notebook.model.title = "New Title".to_string();
-        server_notebook.metadata.revision = (Utc::now() + Duration::seconds(2)).into();
-        CloudModel::handle(&app).update(&mut app, |cloud_model, ctx| {
-            cloud_model.upsert_from_server_notebook(server_notebook, ctx);
-        });
-
-        notebook_view.read(&app, |notebook, ctx| {
-            assert_eq!(notebook.title(ctx), "New Title");
-            assert!(!notebook.title_is_dirty);
-        });
-
-        // When the _user_ edits the title, that should be synced.
+        // When the _user_ edits the title, that should be saved.
         notebook_view.update(&mut app, |notebook, ctx| {
             notebook.title.update(ctx, |title, ctx| {
                 title.user_insert("!!!", ctx);
@@ -514,7 +500,7 @@ fn test_only_user_title_edits_synced() {
             let notebook = CloudModel::as_ref(ctx)
                 .get_notebook(&notebook_id)
                 .expect("Notebook should exist");
-            assert_eq!(notebook.model().title, "New Title!!!");
+            assert_eq!(notebook.model().title, "Initial Title!!!");
         });
     });
 }

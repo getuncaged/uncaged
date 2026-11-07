@@ -1,7 +1,3 @@
-use std::sync::Arc;
-
-use anyhow::Result;
-use async_trait::async_trait;
 pub use cloud_object_models::{CloudFolder, CloudFolderModel};
 // Re-exported from warp_server_client.
 pub use warp_server_client::ids::FolderId;
@@ -12,17 +8,11 @@ use super::items::WarpDriveItem;
 use super::CloudObjectTypeAndId;
 use crate::appearance::Appearance;
 use crate::cloud_object::{
-    CloudModelType, CloudObjectEventEntrypoint, CloudObjectUpsertParams, CreateCloudObjectResult,
-    CreateObjectRequest, GenericServerObject, ObjectType, Revision, Space, UpdateCloudObjectResult,
+    CloudModelType, CloudObjectUpsertParams, ObjectType, SerializedModel, Space,
 };
 use crate::persistence::ModelEvent;
-use crate::server::cloud_objects::update_manager::InitiatedBy;
-use crate::server::ids::{ServerId, SyncId};
-use crate::server::server_api::object::ObjectClient;
-use crate::server::sync_queue::{QueueItem, SerializedModel};
+use crate::server::ids::SyncId;
 
-#[cfg_attr(not(target_family = "wasm"), async_trait)]
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
 impl CloudModelType for CloudFolderModel {
     type CloudObjectType = CloudFolder;
     type IdType = FolderId;
@@ -53,38 +43,6 @@ impl CloudModelType for CloudFolderModel {
         ModelEvent::UpsertFolders(objects.into_iter().map(CloudFolder::from).collect())
     }
 
-    fn create_object_queue_item(
-        &self,
-        folder: &CloudFolder,
-        entrypoint: CloudObjectEventEntrypoint,
-        initiated_by: InitiatedBy,
-    ) -> Option<QueueItem> {
-        if let SyncId::ClientId(client_id) = folder.id {
-            return Some(QueueItem::CreateObject {
-                object_type: self.object_type(),
-                serialized_model: Some(Arc::new(folder.model().name.clone().into())),
-                title: None,
-                owner: folder.permissions.owner,
-                id: client_id,
-                initial_folder_id: folder.metadata.folder_id,
-                entrypoint,
-                initiated_by,
-            });
-        }
-        None
-    }
-
-    fn update_object_queue_item(
-        &self,
-        _revision_ts: Option<Revision>,
-        folder: &CloudFolder,
-    ) -> QueueItem {
-        QueueItem::UpdateFolder {
-            id: folder.id,
-            model: folder.model().clone().into(),
-        }
-    }
-
     fn should_update_after_server_conflict(&self) -> bool {
         false
     }
@@ -100,24 +58,6 @@ impl CloudModelType for CloudFolderModel {
 
     fn supports_linking(&self) -> bool {
         true
-    }
-
-    async fn send_create_request(
-        object_client: Arc<dyn ObjectClient>,
-        request: CreateObjectRequest,
-    ) -> Result<CreateCloudObjectResult> {
-        object_client.create_folder(request).await
-    }
-
-    async fn send_update_request(
-        &self,
-        object_client: Arc<dyn ObjectClient>,
-        server_id: ServerId,
-        _revision: Option<Revision>,
-    ) -> Result<UpdateCloudObjectResult<GenericServerObject<FolderId, Self>>> {
-        object_client
-            .update_folder(server_id.into(), self.name.clone().into())
-            .await
     }
 
     fn renders_in_warp_drive(&self) -> bool {

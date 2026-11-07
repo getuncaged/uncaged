@@ -39,7 +39,7 @@ use crate::appearance::Appearance;
 use crate::cloud_object::breadcrumbs::ContainingObject;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::model::view::CloudViewModel;
-use crate::cloud_object::{CloudObject, ObjectType, Owner, Revision, Space};
+use crate::cloud_object::{CloudObject, ObjectType, Owner, Space};
 use crate::drive::cloud_object_styling::warp_drive_icon_color;
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
@@ -291,7 +291,6 @@ pub struct WorkflowView {
     /// etc.).
     default_argument_id: usize,
     pub(super) ai_metadata_assist_state: AiAssistState,
-    revision_ts: Option<Revision>,
     pub(super) ai_client: Arc<dyn AIClient>,
     owner: Option<Owner>,
     initial_folder_id: Option<SyncId>,
@@ -436,7 +435,6 @@ impl WorkflowView {
             ai_metadata_assist_state: AiAssistState::PreRequest,
             owner: None,
             initial_folder_id: None,
-            revision_ts: None,
             command_display_data: WorkflowCommandDisplayData::new_empty(),
             ai_client,
             pending_argument_editor_row: None,
@@ -539,8 +537,7 @@ impl WorkflowView {
             return;
         }
 
-        // Reload the saved workflow. After an update, this makes sure we get the correct updated
-        // revision_ts.
+        // Reload the saved workflow.
         if let ObjectOperation::Create { .. } | ObjectOperation::Update = result.operation {
             if let Some(workflow) = self.get_cloud_workflow(ctx) {
                 self.load(
@@ -626,8 +623,6 @@ impl WorkflowView {
             }
             mode => mode,
         };
-
-        self.revision_ts = workflow.metadata.revision.clone();
 
         let owner = workflow.permissions.owner;
         self.owner = Some(owner);
@@ -1272,8 +1267,7 @@ impl WorkflowView {
         self.workflow_view_mode =
             WorkflowViewMode::supported_view_mode(Some(self.workflow_id), ctx);
         // always reset with the cloudmodel version whether or not we successfully
-        // transition to the view mode. This reset doesn't always set the correct revision_ts
-        // we rely on the load called when we handle the update_manager's change event.
+        // transition to the view mode.
         self.reset(ctx);
         self.update_editors_interactivity(ctx);
         ctx.notify()
@@ -1322,8 +1316,6 @@ impl WorkflowView {
         };
 
         // Always reset the view with cloud model when we transition to the view or edit mode.
-        // This reset is necessary when transitioning to edit mode so that we can reset the `revision_ts`.
-        // Without this, any updates after a first update will get rejected, due to a perceived conflict.
         if matches!(self.workflow_view_mode, WorkflowViewMode::View)
             || matches!(self.workflow_view_mode, WorkflowViewMode::Edit)
         {

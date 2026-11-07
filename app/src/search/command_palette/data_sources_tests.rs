@@ -1,13 +1,12 @@
 use chrono::Utc;
+use cloud_object_models::{ServerNotebook, ServerWorkflow};
 use settings::manager::SettingsManager;
 use warpui::{App, SingletonEntity};
 
 use super::*;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::model::view::CloudViewModel;
-use crate::cloud_object::{
-    Owner, Revision, ServerMetadata, ServerNotebook, ServerPermissions, ServerWorkflow,
-};
+use crate::cloud_object::{Owner, Revision, ServerMetadata, ServerPermissions};
 use crate::network::NetworkStatus;
 use crate::notebooks::manager::NotebookManager;
 use crate::notebooks::{CloudNotebookModel, NotebookId};
@@ -16,9 +15,9 @@ use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::ServerId;
 use crate::server::ids::SyncId::{self};
 use crate::server::server_api::ServerApiProvider;
-use crate::server::sync_queue::SyncQueue;
 use crate::settings::AISettings;
 use crate::system::SystemStats;
+use crate::test_util::cloud_objects::add_server_object;
 use crate::workflows::workflow::Workflow;
 use crate::workflows::{CloudWorkflowModel, WorkflowId};
 use crate::workspaces::user_profiles::UserProfiles;
@@ -73,7 +72,6 @@ fn initialize_app(app: &mut App) {
     // Add the necessary singleton models to the App
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
-    app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
@@ -91,11 +89,13 @@ fn test_drive_data_source_correctly_filters_drive_filter() {
         initialize_app(&mut app);
         // Initialize CloudModel
         CloudModel::handle(&app).update(&mut app, |model, ctx| {
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook(1.into(), Owner::mock_current_user()),
                 ctx,
             );
-            model.upsert_from_server_workflow(
+            add_server_object(
+                model,
                 mock_server_workflow(2.into(), Owner::mock_current_user()),
                 ctx,
             )
@@ -139,11 +139,13 @@ fn test_drive_data_source_correctly_filters_no_filter() {
         initialize_app(&mut app);
         // Initialize CloudModel
         CloudModel::handle(&app).update(&mut app, |model, ctx| {
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook(1.into(), Owner::mock_current_user()),
                 ctx,
             );
-            model.upsert_from_server_workflow(
+            add_server_object(
+                model,
                 mock_server_workflow(2.into(), Owner::mock_current_user()),
                 ctx,
             )
@@ -186,11 +188,13 @@ fn test_drive_data_source_correctly_filters_workflow_filter() {
         initialize_app(&mut app);
         // Initialize CloudModel
         CloudModel::handle(&app).update(&mut app, |model, ctx| {
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook(1.into(), Owner::mock_current_user()),
                 ctx,
             );
-            model.upsert_from_server_workflow(
+            add_server_object(
+                model,
                 mock_server_workflow(2.into(), Owner::mock_current_user()),
                 ctx,
             )
@@ -235,11 +239,13 @@ fn test_drive_data_source_correctly_filters_notebook_filter() {
         initialize_app(&mut app);
         // Initialize CloudModel
         CloudModel::handle(&app).update(&mut app, |model, ctx| {
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook(1.into(), Owner::mock_current_user()),
                 ctx,
             );
-            model.upsert_from_server_workflow(
+            add_server_object(
+                model,
                 mock_server_workflow(2.into(), Owner::mock_current_user()),
                 ctx,
             )

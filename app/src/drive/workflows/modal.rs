@@ -33,7 +33,7 @@ use super::workflow_arg_type_helpers::{self, ArgumentEditorRowIndex};
 use crate::appearance::Appearance;
 use crate::cloud_object::breadcrumbs::{ContainingObject, ContainingObjectKind};
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::cloud_object::{CloudObject, ObjectType, Owner, Revision};
+use crate::cloud_object::{CloudObject, ObjectType, Owner};
 use crate::drive::cloud_object_styling::warp_drive_icon_color;
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::{CloudObjectTypeAndId, DriveObjectType};
@@ -145,7 +145,6 @@ pub struct WorkflowModal {
     pub(super) arguments_state: ArgumentsState,
     pub(super) arguments_rows: Vec<ArgumentEditorRow>,
     show_unsaved_changes_dialog: bool,
-    revision_ts: Option<Revision>,
     pub(super) ai_client: Arc<dyn AIClient>,
     pub(super) ai_metadata_assist_state: AiAssistState,
     breadcrumbs: Option<Vec<BreadcrumbState<ContainingObject>>>,
@@ -284,7 +283,6 @@ impl WorkflowModal {
             arguments_state: Default::default(),
             arguments_rows: Vec::new(),
             show_unsaved_changes_dialog: false,
-            revision_ts: None,
             ai_client,
             ai_metadata_assist_state: AiAssistState::PreRequest,
             breadcrumbs: Default::default(),
@@ -515,7 +513,6 @@ impl WorkflowModal {
         self.owner = None;
         self.initial_folder_id = None;
         self.workflow_id = None;
-        self.revision_ts = None;
 
         self.title_editor.update(ctx, |editor, ctx| {
             editor.clear_buffer_and_reset_undo_stack(ctx);
@@ -894,10 +891,8 @@ impl WorkflowModal {
 
     fn handle_cloud_model_event(&mut self, event: &CloudModelEvent, ctx: &mut ViewContext<Self>) {
         match event {
-            CloudModelEvent::ObjectMoved { type_and_id, .. }
-            | CloudModelEvent::ObjectPermissionsUpdated { type_and_id, .. } => {
-                // Update breadcrumbs if a teammate has moved the workflow elsewhere, or if it's
-                // been shared.
+            CloudModelEvent::ObjectMoved { type_and_id, .. } => {
+                // Update breadcrumbs if the workflow has moved elsewhere.
                 if let Some(workflow_id) = self.workflow_id {
                     // Check that it's the currently active/open workflow
                     if *type_and_id
@@ -907,14 +902,12 @@ impl WorkflowModal {
                     }
                 }
             }
-            CloudModelEvent::NotebookEditorChangedFromServer { .. }
-            | CloudModelEvent::ObjectUpdated { .. }
+            CloudModelEvent::ObjectUpdated { .. }
             | CloudModelEvent::ObjectTrashed { .. }
             | CloudModelEvent::ObjectUntrashed { .. }
             | CloudModelEvent::ObjectCreated { .. }
             | CloudModelEvent::ObjectDeleted { .. }
             | CloudModelEvent::ObjectForceExpanded { .. }
-            | CloudModelEvent::ObjectSynced { .. }
             | CloudModelEvent::InitialLoadCompleted => {}
         }
     }

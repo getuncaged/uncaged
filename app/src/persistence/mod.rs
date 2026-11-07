@@ -24,7 +24,7 @@ use std::thread::JoinHandle;
 
 use ai::project_context::model::ProjectRulePath;
 use ai::workspace::WorkspaceMetadata as CodeWorkspaceMetadata;
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Local};
 use instant::Instant;
 use lsp::supported_servers::LSPServerType;
 #[cfg(any(feature = "local_fs", feature = "integration_tests"))]
@@ -150,7 +150,6 @@ pub struct PersistedData {
     pub cloud_objects: Vec<Box<dyn CloudObject>>,
     pub command_history: Vec<PersistedCommand>,
     pub user_profiles: Vec<UserProfileWithUID>,
-    pub time_of_next_force_object_refresh: Option<DateTime<Utc>>,
     pub object_actions: Vec<ObjectAction>,
     pub ai_queries: Vec<PersistedAIInput>,
     pub codebase_indices: Vec<CodeWorkspaceMetadata>,
@@ -236,9 +235,6 @@ pub enum ModelEvent {
         profiles: Vec<UserProfileWithUID>,
     },
     ClearUserProfiles,
-    RecordTimeOfNextRefresh {
-        timestamp: DateTime<Utc>,
-    },
     InsertObjectAction {
         object_action: ObjectAction,
     },

@@ -618,9 +618,7 @@ impl EnvVarCollectionView {
     pub fn load(&mut self, env_var_collection: CloudEnvVarCollection, ctx: &mut ViewContext<Self>) {
         self.active_env_var_collection_data
             .update(ctx, |data, ctx| {
-                data.open_existing(env_var_collection.id, ctx);
-                data.revision_ts
-                    .clone_from(&env_var_collection.metadata.revision);
+                data.open_existing(env_var_collection.id, ctx)
             });
 
         let collection = &env_var_collection.model().string_model;
@@ -935,13 +933,6 @@ impl EnvVarCollectionView {
             | CloudModelEvent::ObjectDeleted { .. }
             | CloudModelEvent::ObjectUntrashed { .. }
             | CloudModelEvent::ObjectMoved { .. } => ctx.notify(),
-            CloudModelEvent::ObjectPermissionsUpdated { type_and_id, .. }
-                if self
-                    .as_active_env_var_collection_id(type_and_id, ctx)
-                    .is_some() =>
-            {
-                self.update_editor_interactivity(ctx);
-            }
             _ => (),
         }
     }

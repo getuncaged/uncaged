@@ -1,10 +1,7 @@
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-use std::sync::Arc;
 
-use anyhow::Result;
-use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use cloud_objects::UserUid;
 use derivative::Derivative;
@@ -13,12 +10,10 @@ use regex::Regex;
 use url::Url;
 use warp_core::channel::Channel;
 use warp_core::features::FeatureFlag;
-use warp_graphql::queries::get_updated_cloud_objects::UpdatedObjectInput;
 use warp_graphql::scalars::time::ServerTimestamp;
 use warpui::{AppContext, SingletonEntity};
 
 use self::breadcrumbs::ContainingObject;
-use self::model::actions::ObjectActions;
 use self::model::generic_string_model::{
     GenericStringModel, GenericStringObjectId, Serializer, StringModel,
 };
@@ -28,10 +23,7 @@ use crate::channel::ChannelState;
 use crate::drive::items::WarpDriveItem;
 use crate::drive::{CloudObjectTypeAndId, OpenWarpDriveObjectArgs, OpenWarpDriveObjectSettings};
 use crate::persistence::ModelEvent;
-use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::server::ids::{HashableId, HashedSqliteId, ObjectUid, ServerId, SyncId, ToServerId};
-use crate::server::server_api::object::ObjectClient;
-use crate::server::sync_queue::{QueueItem, SerializedModel};
 use crate::util::time_format::format_approx_duration_from_now_utc;
 use crate::workflows::{CloudWorkflow, WorkflowSource};
 use crate::workspaces::user_profiles::UserProfiles;
@@ -107,22 +99,8 @@ pub trait CloudObject: Debug {
     /// Returns the CloudObjectTypeAndId for this object.
     fn cloud_object_type_and_id(&self) -> CloudObjectTypeAndId;
 
-    /// Sets the server id on this object.
-    fn set_server_id(&mut self, server_id: ServerId);
-
     /// Returns whether this object can be moved to the given space.
     fn can_move_to_space(&self, _space: Space) -> bool {
-        true
-    }
-
-    // Whether to clear this object from the local SQLite DB on a unique key conflict.
-    fn should_clear_on_unique_key_conflict(&self) -> bool {
-        false
-    }
-
-    /// Whether to show a warning if this object is unsaved at quit time
-    /// (which typically blocks the user from quitting)
-    fn warn_if_unsaved_at_quit(&self) -> bool {
         true
     }
 
@@ -131,24 +109,6 @@ pub trait CloudObject: Debug {
 
     // Returns the name of the object.
     fn display_name(&self) -> String;
-
-    /// Returns an optional UpdatedObjectInput to use during initial load, where
-    /// the object's timestamps are sent to the server for comparison
-    fn versions(&self, app: &AppContext) -> Option<UpdatedObjectInput>;
-
-    /// Returns an optional sync queue item of this object that would allow it to
-    /// created properly on the server. Returns None if it's already been created
-    /// server-side.
-    fn create_object_queue_item(
-        &self,
-        entrypoint: CloudObjectEventEntrypoint,
-        initiated_by: InitiatedBy,
-    ) -> Option<QueueItem>;
-
-    /// Returns a sync queue item of this object that would allow it to be updated
-    /// properly on the server.  Takes an optional revision_ts to set as the revision
-    /// in the sync queue item.
-    fn update_object_queue_item(&self, revision_ts: Option<Revision>) -> QueueItem;
 
     /// Returns whether this model type should render as a warp drive item.
     fn renders_in_warp_drive(&self) -> bool;
@@ -310,46 +270,6 @@ pub trait CloudObject: Debug {
     /// Updates the object to deal with any conflict status.
     fn replace_object_with_conflict(&mut self);
 
-    /// Sets the content sync status of this object to `InFlight` (if it wasn't already) and
-    /// increments the number of in flight requests tracked in the `InFlight` enum.
-    fn increment_in_flight_request_count(&mut self) {
-        let new_reqs = match &self.metadata().pending_changes_statuses.content_sync_status {
-            CloudObjectSyncStatus::InFlight(reqs) => reqs.0 + 1,
-            _ => 1,
-        };
-
-        self.set_pending_content_changes_status(CloudObjectSyncStatus::InFlight(
-            NumInFlightRequests(new_reqs),
-        ))
-    }
-
-    /// Decrements the number of in flight requests tracked in this object's `InFlight` enum. If
-    /// that number becomes 0, it's no longer in flight, so it will be set to `status_if_no_reqs`.
-    /// Returns true if the object is no longer in flight.
-    fn decrement_in_flight_request_count(
-        &mut self,
-        status_if_no_reqs: CloudObjectSyncStatus,
-    ) -> bool {
-        match &self.metadata().pending_changes_statuses.content_sync_status {
-            CloudObjectSyncStatus::InFlight(reqs) => {
-                if reqs.0 - 1 == 0 {
-                    self.set_pending_content_changes_status(status_if_no_reqs);
-                    return true;
-                } else {
-                    self.set_pending_content_changes_status(CloudObjectSyncStatus::InFlight(
-                        NumInFlightRequests(reqs.0 - 1),
-                    ));
-                    return false;
-                }
-            }
-            _ => log::error!(
-                "called decrement_in_flight_request_count with a non-`InFlight` cloud status"
-            ),
-        }
-
-        true
-    }
-
     /// Sets the content change status on this object's metadata
     fn set_pending_content_changes_status(
         &mut self,
@@ -414,8 +334,6 @@ pub trait CloudObject: Debug {
 ///
 /// When building new model types (e.g. for settings or launch configs) we should just
 /// have to implement this trait, and not the entire CloudObject trait.
-#[cfg_attr(not(target_family = "wasm"), async_trait)]
-#[cfg_attr(target_family = "wasm", async_trait(?Send))]
 pub trait CloudModelType: Debug + Clone + Send + Sync {
     /// The associated CloudObject type for this model (e.g. CloudNotebook, CloudWorkflow, etc)
     type CloudObjectType: CloudObject + 'static;
@@ -436,12 +354,6 @@ pub trait CloudModelType: Debug + Clone + Send + Sync {
 
     /// Returns whether this model type should show update toasts in the UI.
     fn should_show_activity_toasts(&self) -> bool {
-        true
-    }
-
-    /// Whether to show a warning if this model is unsaved at quit time
-    /// (which typically blocks the user from quitting)
-    fn warn_if_unsaved_at_quit(&self) -> bool {
         true
     }
 
@@ -472,47 +384,12 @@ pub trait CloudModelType: Debug + Clone + Send + Sync {
     where
         Self: Sized;
 
-    /// Returns the sync queue item for creating this model on the server.
-    fn create_object_queue_item(
-        &self,
-        object: &Self::CloudObjectType,
-        entrypoint: CloudObjectEventEntrypoint,
-        initiated_by: InitiatedBy,
-    ) -> Option<QueueItem>;
-
-    /// Returns the sync queue item for updating this model on the server.
-    /// Takes an optional revision timestamp to set in the queue item.
-    fn update_object_queue_item(
-        &self,
-        revision_ts: Option<Revision>,
-        object: &Self::CloudObjectType,
-    ) -> QueueItem;
-
     /// Returns a serialized model.
     fn serialized(&self) -> SerializedModel;
-
-    /// Sends a request to the server to create this model.
-    async fn send_create_request(
-        object_client: Arc<dyn ObjectClient>,
-        request: CreateObjectRequest,
-    ) -> Result<CreateCloudObjectResult>;
-
-    /// Sends a request to the server to update this model.
-    async fn send_update_request(
-        &self,
-        object_client: Arc<dyn ObjectClient>,
-        server_id: ServerId,
-        revision: Option<Revision>,
-    ) -> Result<UpdateCloudObjectResult<GenericServerObject<Self::IdType, Self>>>;
 
     /// Returns whether this model type supports being moved to the given space.
     fn can_move_to_space(&self, _current_space: Space, _new_space: Space) -> bool {
         true
-    }
-
-    /// Returns whether this model type should clear on a unique key conflict.
-    fn should_clear_on_unique_key_conflict(&self) -> bool {
-        false
     }
 
     /// Returns whether this model type supports web links
@@ -611,10 +488,6 @@ where
         self.model().should_show_activity_toasts()
     }
 
-    fn warn_if_unsaved_at_quit(&self) -> bool {
-        self.model().warn_if_unsaved_at_quit()
-    }
-
     fn metadata(&self) -> &CloudObjectMetadata {
         &self.metadata
     }
@@ -637,10 +510,6 @@ where
 
     fn cloud_object_type_and_id(&self) -> CloudObjectTypeAndId {
         self.model().cloud_object_type_and_id(self.id)
-    }
-
-    fn should_clear_on_unique_key_conflict(&self) -> bool {
-        self.model().should_clear_on_unique_key_conflict()
     }
 
     fn can_move_to_space(&self, space: Space) -> bool {
@@ -682,10 +551,6 @@ where
                 }
             }
         }
-    }
-
-    fn set_server_id(&mut self, server_id: ServerId) {
-        self.id = SyncId::ServerId(server_id);
     }
 
     fn object_link(&self) -> Option<String> {
@@ -736,37 +601,6 @@ where
 
     fn display_name(&self) -> String {
         self.model().display_name()
-    }
-
-    fn versions(&self, app: &AppContext) -> Option<UpdatedObjectInput> {
-        match (self.id, self.metadata.revision.as_ref()) {
-            (SyncId::ServerId(id), Some(revision)) => {
-                let actions_ts = ObjectActions::as_ref(app)
-                    .get_latest_processed_at_ts(&self.id.uid())
-                    .map(|t| t.into());
-                Some(UpdatedObjectInput {
-                    uid: id.into(),
-                    revision_ts: revision.timestamp(),
-                    metadata_ts: self.metadata.metadata_last_updated_ts,
-                    permissions_ts: self.permissions.permissions_last_updated_ts,
-                    actions_ts,
-                })
-            }
-            _ => None,
-        }
-    }
-
-    fn create_object_queue_item(
-        &self,
-        entrypoint: CloudObjectEventEntrypoint,
-        initiated_by: InitiatedBy,
-    ) -> Option<QueueItem> {
-        self.model()
-            .create_object_queue_item(self, entrypoint, initiated_by)
-    }
-
-    fn update_object_queue_item(&self, revision_ts: Option<Revision>) -> QueueItem {
-        self.model().update_object_queue_item(revision_ts, self)
     }
 
     fn renders_in_warp_drive(&self) -> bool {
@@ -975,12 +809,6 @@ fn get_top_folder_trashed_ts(
     }
     None
 }
-
-pub use cloud_object_models::{
-    ServerAIExecutionProfile, ServerAIFact, ServerCloudObject, ServerEnvVarCollection,
-    ServerFolder, ServerMCPServer, ServerNotebook, ServerPreference, ServerTemplatableMCPServer,
-    ServerWorkflow, ServerWorkflowEnum, TryFromGql,
-};
 
 #[derive(Default, Clone, Copy, Debug, Eq, Derivative)]
 #[derivative(PartialEq, Hash)]

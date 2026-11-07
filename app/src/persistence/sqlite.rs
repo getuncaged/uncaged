@@ -20,8 +20,7 @@ use cloud_object_models::workflow::persistence as workflow_persistence;
 use cloud_object_models::workflow::persistence::upsert_workflows;
 use cloud_object_persistence::{
     delete_cloud_object, delete_generic_string_object, load_cloud_object_read_context,
-    read_time_of_next_force_object_refresh, record_time_of_next_refresh, update_object_metadata,
-    upsert_generic_string_objects as upsert_generic_string_object_rows,
+    update_object_metadata, upsert_generic_string_objects as upsert_generic_string_object_rows,
     GenericStringObjectPersistenceData,
 };
 use diesel::connection::{DefaultLoadingMode, SimpleConnection};
@@ -474,10 +473,6 @@ fn handle_model_event(event: ModelEvent, connection: &mut SqliteConnection) -> a
         }
         ModelEvent::ClearUserProfiles => {
             clear_user_profiles(connection).context("error clearing user profiles")
-        }
-        ModelEvent::RecordTimeOfNextRefresh { timestamp } => {
-            record_time_of_next_refresh(connection, timestamp)
-                .context("error marking object refresh as completed")
         }
         ModelEvent::InsertObjectAction { object_action } => {
             insert_object_action(connection, object_action).context("error inserting object action")
@@ -2224,8 +2219,6 @@ fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error>
         running_mcp_servers,
     };
 
-    let time_of_next_force_object_refresh = read_time_of_next_force_object_refresh(conn)?;
-
     let ai_queries = read_ai_queries(conn)?;
 
     let codebase_indices = get_all_codebase_index_metadata(conn)?;
@@ -2242,7 +2235,6 @@ fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error>
         cloud_objects,
         command_history: commands,
         user_profiles,
-        time_of_next_force_object_refresh,
         object_actions,
         ai_queries,
         codebase_indices,

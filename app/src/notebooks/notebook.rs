@@ -512,10 +512,6 @@ impl NotebookView {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            ActiveNotebookDataEvent::ModeChangedFromServer => {
-                log::info!("Edit mode stolen");
-                self.switch_to_view(ctx);
-            }
             ActiveNotebookDataEvent::SwitchedToEditMode => {
                 log::info!("Edit mode confirmed from server");
                 self.set_editor_interaction_state(InteractionState::Editable, ctx);

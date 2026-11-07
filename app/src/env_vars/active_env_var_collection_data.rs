@@ -4,7 +4,7 @@ use super::CloudEnvVarCollectionModel;
 use crate::cloud_object::breadcrumbs::ContainingObject;
 use crate::cloud_object::model::persistence::CloudModelEvent;
 use crate::cloud_object::model::view::CloudViewModel;
-use crate::cloud_object::{CloudObject, Owner, Revision, Space};
+use crate::cloud_object::{CloudObject, Owner, Space};
 use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
 use crate::env_vars::CloudEnvVarCollection;
 use crate::server::cloud_objects::update_manager::{
@@ -37,7 +37,6 @@ pub enum SavingStatus {
 pub struct ActiveEnvVarCollectionData {
     pub saving_status: SavingStatus,
     pub active_env_var_collection: ActiveEnvVarCollection,
-    pub revision_ts: Option<Revision>,
 }
 
 impl ActiveEnvVarCollectionData {
@@ -90,14 +89,13 @@ impl ActiveEnvVarCollectionData {
                 let Some(env_var_collection_id) = result.id else {
                     return;
                 };
-                if let Some(env_var_collection) =
-                    cloud_model.get_env_var_collection(&env_var_collection_id)
+                if cloud_model
+                    .get_env_var_collection(&env_var_collection_id)
+                    .is_some()
                 {
                     self.saving_status = SavingStatus::Saved;
                     self.active_env_var_collection =
                         ActiveEnvVarCollection::CommittedEnvVarCollection(env_var_collection_id);
-                    self.revision_ts
-                        .clone_from(&env_var_collection.metadata.revision);
                     if matches!(result.operation, ObjectOperation::Create { .. }) {
                         ctx.emit(ActiveEnvVarCollectionDataEvent::Created);
                     }

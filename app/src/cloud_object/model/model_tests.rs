@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+use cloud_object_models::{ServerNotebook, ServerWorkflow};
 use cloud_objects::UserUid;
 use settings::{RespectUserSyncSetting, SyncToCloud};
+use warp_graphql::scalars::time::ServerTimestamp;
 use warpui::{App, ModelHandle};
 
 use super::*;
@@ -12,18 +14,18 @@ use crate::cloud_object::model::view::{
     CloudViewModel, EditorState, UpdateTimestamp, EDITOR_TIMEOUT_DURATION_MINUTES,
 };
 use crate::cloud_object::{
-    CloudObjectMetadata, CloudObjectPermissions, CloudObjectStatuses, CloudObjectSyncStatus,
-    NumInFlightRequests, ObjectIdType, Owner, ServerMetadata, ServerPermissions, LOCAL_USER_UID,
+    CloudObjectMetadata, CloudObjectPermissions, CloudObjectStatuses, CloudObjectSyncStatus, Owner,
+    ServerMetadata, ServerPermissions, LOCAL_USER_UID,
 };
-use crate::drive::folders::{CloudFolderModel, FolderId};
+use crate::drive::folders::CloudFolderModel;
 use crate::drive::DriveIndexVariant;
 use crate::features::FeatureFlag;
-use crate::notebooks::{CloudNotebookModel, NotebookId};
-use crate::server::ids::{ServerId, ServerIdAndType};
+use crate::notebooks::CloudNotebookModel;
+use crate::server::ids::{ClientId, ServerId};
 use crate::server::server_api::ServerApiProvider;
-use crate::server::sync_queue::SyncQueue;
 use crate::settings::{init_and_register_user_preferences, Preference};
 use crate::system::SystemStats;
+use crate::workflows::workflow::Workflow;
 use crate::workflows::CloudWorkflowModel;
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::{NetworkStatus, UpdateManager};
@@ -34,7 +36,7 @@ fn create_cloud_model(
 ) -> ModelHandle<CloudModel> {
     // Make sure to register the CloudModel singleton - some CloudObject methods
     // find it and other dependencies via the AppContext.
-    app.add_singleton_model(|_ctx| CloudModel::new(None, objects, None))
+    app.add_singleton_model(|_ctx| CloudModel::new(None, objects))
 }
 
 fn initialize_app(app: &mut App, cached_objects: Vec<Box<dyn CloudObject>>) {
@@ -42,8 +44,7 @@ fn initialize_app(app: &mut App, cached_objects: Vec<Box<dyn CloudObject>>) {
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
-    app.add_singleton_model(SyncQueue::mock);
-    app.add_singleton_model(|_ctx| CloudModel::new(None, cached_objects, None));
+    app.add_singleton_model(|_ctx| CloudModel::new(None, cached_objects));
     app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
     app.add_singleton_model(CloudViewModel::new);
@@ -244,136 +245,6 @@ fn move_object(id: ServerId, location: CloudObjectLocation, app: &mut App) {
 }
 
 #[test]
-fn test_update_with_deleted_objects() {
-    let workflows = mock_server_workflows(
-        5,
-        Owner::Team {
-            team_uid: ServerId::from(1),
-        },
-        3,
-    );
-    let notebooks = mock_server_notebooks();
-
-    App::test((), |mut app| async move {
-        let cloud_model = create_cloud_model(
-            &mut app,
-            workflows
-                .iter()
-                .map(|workflow| CloudWorkflow::new_from_server(workflow.clone()))
-                .map(|o| Box::new(o) as Box<dyn CloudObject>)
-                .collect(),
-        );
-        cloud_model.update(&mut app, |model, ctx| {
-            for notebook in notebooks.clone() {
-                model.upsert_from_server_notebook(notebook, ctx);
-            }
-        });
-
-        // Validate there's some notebooks and workflows in memory
-        cloud_model.read(&app, |cloud_model, _| {
-            assert_eq!(
-                3,
-                cloud_model.get_all_active_and_inactive_workflows().count()
-            );
-            assert_eq!(
-                4,
-                cloud_model.get_all_active_and_inactive_notebooks().count()
-            );
-            assert_eq!(7, cloud_model.as_cloud_objects().count());
-        });
-
-        // Apply the "update from server"
-        cloud_model.update(&mut app, |cloud_model, ctx| {
-            // Set 3rd notebook to have pending changes. This should keep it in memory,
-            // even though it's not returned from the server.
-            let notebook_id: SyncId = SyncId::ServerId(3.into());
-            if let Some(object) = cloud_model.get_notebook_mut(&notebook_id) {
-                object.set_pending_content_changes_status(CloudObjectSyncStatus::InFlight(
-                    NumInFlightRequests(1),
-                ));
-            }
-            cloud_model.update_objects(notebooks.into_iter().take(2), ctx);
-            cloud_model.update_objects(workflows.into_iter().take(2), ctx);
-        });
-
-        cloud_model.read(&app, |cloud_model, _| {
-            // expected: 3rd workflow was removed on the server, and so we don't want it in
-            // memory
-            assert_eq!(
-                2,
-                cloud_model.get_all_active_and_inactive_workflows().count()
-            );
-            // expected: 3rd notebook has local changes, so we want to keep it, but 4th
-            // doesn't and also wasn't returned from the server, so we want to remove it.
-            assert_eq!(
-                3,
-                cloud_model.get_all_active_and_inactive_notebooks().count()
-            );
-            assert_eq!(5, cloud_model.as_cloud_objects().count());
-        });
-    })
-}
-
-#[test]
-fn test_update_object_server_id_for_notebook() {
-    let client_id = ClientId::new();
-    let server_id: NotebookId = 1.into();
-    let notebooks: Vec<Box<dyn CloudObject>> = vec![Box::new(CloudNotebook::new(
-        SyncId::ClientId(client_id),
-        CloudNotebookModel {
-            title: "t1".to_string(),
-            data: "d1".to_string(),
-            ai_document_id: None,
-            conversation_id: None,
-        },
-        CloudObjectMetadata {
-            pending_changes_statuses: CloudObjectStatuses {
-                content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
-                has_pending_metadata_change: false,
-                has_pending_permissions_change: false,
-                pending_untrash: false,
-                pending_delete: false,
-            },
-            folder_id: Default::default(),
-            revision: Default::default(),
-            metadata_last_updated_ts: Default::default(),
-            current_editor_uid: Default::default(),
-            trashed_ts: Default::default(),
-            is_welcome_object: false,
-            creator_uid: None,
-            last_editor_uid: None,
-            last_task_run_ts: None,
-        },
-        mock_permissions(),
-    ))];
-
-    App::test((), |mut app| async move {
-        let cloud_model = create_cloud_model(&mut app, notebooks);
-        cloud_model.update(&mut app, |model, ctx| {
-            model.update_object_after_server_creation(
-                client_id,
-                ServerCreationInfo {
-                    creator_uid: None,
-                    permissions: ServerPermissions::mock_personal(),
-                    server_id_and_type: ServerIdAndType {
-                        id: server_id.to_server_id(),
-                        id_type: ObjectIdType::Notebook,
-                    },
-                },
-                ctx,
-            )
-        });
-
-        cloud_model.read(&app, |model, _| {
-            let notebook = model
-                .get_notebook(&SyncId::ServerId(server_id.into()))
-                .unwrap();
-            assert_eq!(notebook.id, SyncId::ServerId(server_id.into()));
-        });
-    })
-}
-
-#[test]
 fn test_create_json_object() {
     let client_id = ClientId::default();
     let id = SyncId::ClientId(client_id);
@@ -417,110 +288,6 @@ fn test_create_json_object() {
                 json_object.model().string_model.storage_key,
                 "test_storage_key".to_owned()
             );
-        });
-    })
-}
-
-#[test]
-fn test_update_object_server_id_for_workflow() {
-    let client_id = ClientId::new();
-    let server_id: ServerId = 1.into();
-    let workflows: Vec<Box<dyn CloudObject>> = vec![Box::new(CloudWorkflow::new(
-        SyncId::ServerId(1.into()),
-        CloudWorkflowModel::new(Workflow::new("w1", "c1")),
-        CloudObjectMetadata {
-            pending_changes_statuses: CloudObjectStatuses {
-                content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
-                has_pending_metadata_change: false,
-                has_pending_permissions_change: false,
-                pending_untrash: false,
-                pending_delete: false,
-            },
-            folder_id: Default::default(),
-            revision: Default::default(),
-            metadata_last_updated_ts: Default::default(),
-            current_editor_uid: Default::default(),
-            trashed_ts: Default::default(),
-            is_welcome_object: false,
-            creator_uid: None,
-            last_editor_uid: None,
-            last_task_run_ts: None,
-        },
-        mock_permissions(),
-    ))];
-    App::test((), |mut app| async move {
-        let cloud_model = create_cloud_model(&mut app, workflows);
-        cloud_model.update(&mut app, |model, ctx| {
-            model.update_object_after_server_creation(
-                client_id,
-                ServerCreationInfo {
-                    creator_uid: None,
-                    permissions: ServerPermissions::mock_personal(),
-                    server_id_and_type: ServerIdAndType {
-                        id: server_id,
-                        id_type: ObjectIdType::Workflow,
-                    },
-                },
-                ctx,
-            )
-        });
-
-        cloud_model.read(&app, |model, _| {
-            let workflow = model.get_workflow(&SyncId::ServerId(server_id)).unwrap();
-            assert_eq!(workflow.id, SyncId::ServerId(server_id));
-        });
-    })
-}
-
-#[test]
-fn test_update_object_server_id_for_folder() {
-    let client_id = ClientId::new();
-    let server_id: FolderId = 1.into();
-    let folders: Vec<Box<dyn CloudObject>> = vec![Box::new(CloudFolder::new(
-        SyncId::ServerId(1.into()),
-        CloudFolderModel::new("test", false),
-        CloudObjectMetadata {
-            pending_changes_statuses: CloudObjectStatuses {
-                content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
-                has_pending_metadata_change: false,
-                has_pending_permissions_change: false,
-                pending_untrash: false,
-                pending_delete: false,
-            },
-            folder_id: Default::default(),
-            revision: Default::default(),
-            metadata_last_updated_ts: Default::default(),
-            current_editor_uid: Default::default(),
-            trashed_ts: Default::default(),
-            is_welcome_object: false,
-            creator_uid: None,
-            last_editor_uid: None,
-            last_task_run_ts: None,
-        },
-        mock_permissions(),
-    ))];
-    App::test((), |mut app| async move {
-        let cloud_model = create_cloud_model(&mut app, folders);
-        cloud_model.update(&mut app, |model, ctx| {
-            model.update_object_after_server_creation(
-                client_id,
-                ServerCreationInfo {
-                    creator_uid: None,
-                    permissions: ServerPermissions::mock_personal(),
-                    server_id_and_type: ServerIdAndType {
-                        id: server_id.to_server_id(),
-                        id_type: ObjectIdType::Folder,
-                    },
-                },
-                ctx,
-            )
-        });
-
-        cloud_model.read(&app, |model, _| {
-            let folder = model
-                .get_folder_by_uid(&SyncId::ServerId(server_id.into()).uid())
-                .unwrap();
-            assert_eq!(folder.id, SyncId::ServerId(server_id.into()));
         });
     })
 }

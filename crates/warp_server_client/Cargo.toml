@@ -8,7 +8,7 @@ license.workspace = true
 
 [features]
 agent_mode_evals = ["dep:rand"]
-test-util = ["cloud_object_client/test-util", "cloud_objects/test-util", "dep:mockall"]
+test-util = ["cloud_objects/test-util", "dep:mockall"]
 
 [dependencies]
 anyhow.workspace = true
@@ -20,7 +20,6 @@ blocking.workspace = true
 bounded-vec-deque.workspace = true
 cfg-if.workspace = true
 chrono.workspace = true
-cloud_object_client.workspace = true
 cloud_object_models.workspace = true
 cloud_objects.workspace = true
 command.workspace = true

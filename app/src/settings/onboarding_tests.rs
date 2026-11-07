@@ -1,5 +1,6 @@
 use ai::LLMId;
 use chrono::{DateTime, Utc};
+use cloud_object_models::ServerAIExecutionProfile;
 use onboarding::slides::{AgentAutonomy, AgentDevelopmentSettings, ProjectOnboardingSettings};
 use onboarding::SelectedSettings;
 use warp_core::features::FeatureFlag;
@@ -11,11 +12,10 @@ use crate::ai::execution_profiles::{
 };
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::cloud_object::{Revision, ServerAIExecutionProfile, ServerMetadata, ServerPermissions};
+use crate::cloud_object::{GenericCloudObject, Revision, ServerMetadata, ServerPermissions};
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ServerId, SyncId};
-use crate::server::sync_queue::SyncQueue;
 use crate::settings::{apply_onboarding_settings, AISettings, PrivacySettings};
 use crate::test_util::settings::initialize_settings_for_tests;
 
@@ -52,7 +52,6 @@ fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
 fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_login() {
     App::test((), |mut app| async move {
         initialize_settings_for_tests(&mut app);
-        app.add_singleton_model(SyncQueue::mock);
         app.add_singleton_model(|_| NetworkStatus::new());
         app.add_singleton_model(|_| UpdateManager::new(None));
         app.add_singleton_model(CloudModel::mock);
@@ -89,7 +88,9 @@ fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_l
         // `AIExecutionProfilesModel` reconciles to `Synced`.
         CloudModel::handle(&app).update(&mut app, move |cloud_model, ctx| {
             let server_objects: Vec<ServerAIExecutionProfile> = vec![server_object];
-            cloud_model.update_objects_from_initial_load(server_objects, false, false, ctx);
+            for object in server_objects {
+                cloud_model.add_object(object.id, GenericCloudObject::new_from_server(object));
+            }
             ctx.emit(CloudModelEvent::InitialLoadCompleted);
         });
 
@@ -172,7 +173,6 @@ fn apply_onboarding_settings_enables_ai_for_agent_intent_with_account() {
     let _flag = FeatureFlag::OpenWarpNewSettingsModes.override_enabled(true);
     App::test((), |mut app| async move {
         initialize_settings_for_tests(&mut app);
-        app.add_singleton_model(SyncQueue::mock);
         app.add_singleton_model(|_| NetworkStatus::new());
         app.add_singleton_model(|_| UpdateManager::new(None));
         app.add_singleton_model(CloudModel::mock);

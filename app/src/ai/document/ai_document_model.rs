@@ -317,9 +317,6 @@ impl AIDocumentModel {
 
     fn handle_cloud_model_event(&mut self, event: &CloudModelEvent, ctx: &mut ModelContext<Self>) {
         match event {
-            CloudModelEvent::ObjectSynced { server_id, .. } => {
-                self.reconcile_notebook(SyncId::ServerId(*server_id), ctx);
-            }
             CloudModelEvent::ObjectCreated {
                 type_and_id: CloudObjectTypeAndId::Notebook(sync_id),
             }
@@ -337,10 +334,8 @@ impl AIDocumentModel {
             | CloudModelEvent::ObjectTrashed { .. }
             | CloudModelEvent::ObjectUntrashed { .. }
             | CloudModelEvent::ObjectDeleted { .. }
-            | CloudModelEvent::ObjectPermissionsUpdated { .. }
             | CloudModelEvent::ObjectForceExpanded { .. }
-            | CloudModelEvent::ObjectCreated { .. }
-            | CloudModelEvent::NotebookEditorChangedFromServer { .. } => {}
+            | CloudModelEvent::ObjectCreated { .. } => {}
         }
     }
     /// Reconciles one notebook with its loaded AI document.

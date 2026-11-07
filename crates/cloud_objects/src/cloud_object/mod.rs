@@ -24,18 +24,16 @@ use crate::auth::UserUid;
 use crate::drive::sharing::{SharingAccessLevel, Subject, TeamKind, UserKind};
 use crate::ids::{FolderId, ServerId, SyncId};
 
-mod creation;
+mod actions;
 mod generic_cloud_object;
 mod generic_string_model;
 pub mod models;
 mod server_object;
-mod update;
 
-pub use creation::*;
+pub use actions::*;
 pub use generic_cloud_object::*;
 pub use generic_string_model::*;
 pub use server_object::*;
-pub use update::*;
 /// The type of object id each ObjectType corresponds to.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ObjectIdType {
@@ -633,13 +631,6 @@ impl CloudObjectMetadata {
         )
     }
 
-    pub fn is_errored(&self) -> bool {
-        matches!(
-            self.pending_changes_statuses.content_sync_status,
-            CloudObjectSyncStatus::Errored
-        )
-    }
-
     /// True iff there are unsynced online-only changes for the object.
     pub fn has_pending_online_only_change(&self) -> bool {
         self.pending_changes_statuses.has_pending_permissions_change
@@ -787,21 +778,6 @@ impl CloudObjectStatuses {
     }
 }
 
-// Used for event tracking purposes, matches
-// up with GraphQL enum of the same name.
-#[derive(Copy, Default, Clone, Debug, Eq, PartialEq)]
-pub enum CloudObjectEventEntrypoint {
-    TeamSettings,
-    ResourceCenter,
-    UniversalSearch,
-    ManagementUI,
-    Blocklist,
-    ImportModal,
-    Onboarding,
-    #[default]
-    Unknown,
-}
-
 // A newtype for a serialized model that wraps a plain string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SerializedModel(String);
@@ -824,12 +800,6 @@ impl From<String> for SerializedModel {
     fn from(s: String) -> Self {
         Self(s)
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct RevisionAndLastEditor {
-    pub revision: Revision,
-    pub last_editor_uid: Option<String>,
 }
 
 // GraphQL conversion impls.
@@ -859,22 +829,6 @@ impl From<GenericStringObjectFormat>
             GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer) => {
                 GraphQLFormat::JsonTemplatableMCPServer
             }
-        }
-    }
-}
-
-impl From<CloudObjectEventEntrypoint> for warp_graphql::object::CloudObjectEventEntrypoint {
-    fn from(entrypoint: CloudObjectEventEntrypoint) -> Self {
-        use warp_graphql::object::CloudObjectEventEntrypoint as GraphQLEntrypoint;
-        match entrypoint {
-            CloudObjectEventEntrypoint::TeamSettings => GraphQLEntrypoint::TeamSettings,
-            CloudObjectEventEntrypoint::ResourceCenter => GraphQLEntrypoint::ResourceCenter,
-            CloudObjectEventEntrypoint::UniversalSearch => GraphQLEntrypoint::UniversalSearch,
-            CloudObjectEventEntrypoint::ManagementUI => GraphQLEntrypoint::DriveIndex,
-            CloudObjectEventEntrypoint::Blocklist => GraphQLEntrypoint::Blocklist,
-            CloudObjectEventEntrypoint::ImportModal => GraphQLEntrypoint::ImportModal,
-            CloudObjectEventEntrypoint::Onboarding => GraphQLEntrypoint::Onboarding,
-            CloudObjectEventEntrypoint::Unknown => GraphQLEntrypoint::Unknown,
         }
     }
 }

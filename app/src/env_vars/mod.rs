@@ -12,12 +12,11 @@ pub mod view;
 use crate::cloud_object::model::generic_string_model::StringModel;
 use crate::cloud_object::model::json_model::JsonModel;
 use crate::cloud_object::{
-    GenericStringObjectFormat, GenericStringObjectUniqueKey, JsonObjectType, Revision,
+    GenericStringObjectFormat, GenericStringObjectUniqueKey, JsonObjectType,
 };
 use crate::drive::items::env_var_collection::WarpDriveEnvVarCollection;
 use crate::drive::items::WarpDriveItem;
 use crate::server::ids::SyncId;
-use crate::server::sync_queue::QueueItem;
 use crate::terminal::shell::ShellType;
 use crate::{Appearance, CloudObjectTypeAndId};
 
@@ -119,27 +118,11 @@ impl StringModel for EnvVarCollection {
         }
     }
 
-    fn update_object_queue_item(
-        &self,
-        revision_ts: Option<Revision>,
-        object: &CloudEnvVarCollection,
-    ) -> QueueItem {
-        QueueItem::UpdateEnvVarCollection {
-            model: object.model().clone().into(),
-            id: object.id,
-            revision: revision_ts.or_else(|| object.metadata.revision.clone()),
-        }
-    }
-
     fn uniqueness_key(&self) -> Option<GenericStringObjectUniqueKey> {
         None
     }
 
     fn should_show_activity_toasts() -> bool {
-        true
-    }
-
-    fn warn_if_unsaved_at_quit() -> bool {
         true
     }
 

@@ -53,7 +53,6 @@ use crate::network::NetworkStatus;
 use crate::search::files::model::FileSearchModel;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::ServerApiProvider;
-use crate::server::sync_queue::SyncQueue;
 use crate::settings::import::model::ImportedConfigModel;
 use crate::settings::{
     AliasExpansionSettings, AppEditorSettings, InputBoxType, LongRunningCommandSubmissionMode,
@@ -216,7 +215,6 @@ pub fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(|_| Prompt::mock());
-    app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(ImportedConfigModel::new);
     app.add_singleton_model(|_| UpdateManager::new(None));

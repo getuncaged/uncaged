@@ -19,7 +19,6 @@ use warpui::{
 };
 
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::cloud_object::Revision;
 use crate::editor::{
     EditorOptions, EditorView, Event, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
     TextOptions,
@@ -87,8 +86,6 @@ pub struct WorkflowEnumData {
     pub name: String,
     /// If the enum is shared or not, used when determining if an enum should be displayed in the dropdown
     pub is_shared: bool,
-    /// The revision_ts of the enum, None if it has not yet been created.
-    pub revision_ts: Option<Revision>,
     /// This field contains any new enum data that has not been saved,
     /// i.e. created enums or updated enums.
     pub new_data: Option<EnumVariants>,
@@ -116,8 +113,6 @@ pub struct EnumCreationDialog {
     /// The `sync_id` of the enum in the dialog if it already exists,
     /// `None` if this is a new enum.
     sync_id: Option<SyncId>,
-    /// The revision timestamp of the enum, if it has been loaded in from the server.
-    revision_ts: Option<Revision>,
 
     /// Store the base state of the enum dialog, used for determining if the dialog is dirty
     base_dialog_state: BaseEnumDialogState,
@@ -211,7 +206,6 @@ impl EnumCreationDialog {
             variant_rows: Vec::new(),
             sync_id: None,
             base_dialog_state: Default::default(),
-            revision_ts: None,
             enum_type_handles,
             enum_type_options,
             dynamic_command_editor,
@@ -293,8 +287,6 @@ impl EnumCreationDialog {
     pub fn load_from_cloud_model(&mut self, enum_id: SyncId, ctx: &mut ViewContext<Self>) {
         let cloud_model = CloudModel::as_ref(ctx);
         let workflow_enum_model = cloud_model.get_workflow_enum(&enum_id);
-
-        self.revision_ts = workflow_enum_model.and_then(|model| model.metadata.revision.clone());
 
         let workflow_enum =
             workflow_enum_model.map(|workflow_enum| workflow_enum.model().string_model.clone());
@@ -494,7 +486,6 @@ impl EnumCreationDialog {
                             id,
                             name: self.name_editor.as_ref(ctx).buffer_text(ctx),
                             is_shared: true,
-                            revision_ts: self.revision_ts.clone(),
                             new_data: Some(variants),
                         },
                         false,
@@ -507,7 +498,6 @@ impl EnumCreationDialog {
                     id: SyncId::ClientId(ClientId::default()),
                     name: self.name_editor.as_ref(ctx).buffer_text(ctx),
                     is_shared: true,
-                    revision_ts: self.revision_ts.clone(),
                     new_data: Some(variants),
                 }));
             }
@@ -524,7 +514,6 @@ impl EnumCreationDialog {
             .update(ctx, |buffer, ctx| buffer.clear_buffer(ctx));
         self.variant_rows = Vec::new();
         self.sync_id = None;
-        self.revision_ts = None;
         self.set_selected_type(EnumType::default(), ctx);
 
         ctx.emit(EnumCreationDialogEvent::Close)

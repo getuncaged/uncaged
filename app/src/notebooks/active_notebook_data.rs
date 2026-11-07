@@ -4,7 +4,7 @@ use super::CloudNotebookModel;
 use crate::ai::document::ai_document_model::AIDocumentId;
 use crate::cloud_object::breadcrumbs::ContainingObject;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::cloud_object::model::view::{CloudViewModel, Editor, EditorState};
+use crate::cloud_object::model::view::{CloudViewModel, Editor};
 use crate::cloud_object::{CloudObject, Owner, Space};
 use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
 use crate::notebooks::CloudNotebook;
@@ -74,32 +74,14 @@ impl ActiveNotebookData {
     }
 
     fn handle_cloud_model_event(&mut self, event: &CloudModelEvent, ctx: &mut ModelContext<Self>) {
-        match event {
-            CloudModelEvent::NotebookEditorChangedFromServer { notebook_id } => {
-                if self.is_active_notebook(*notebook_id) {
-                    if let Some(new_editor) =
-                        CloudViewModel::as_ref(ctx).object_current_editor(&notebook_id.uid(), ctx)
-                    {
-                        if self.mode == Mode::Editing
-                            && matches!(new_editor.state, EditorState::OtherUserActive)
-                        {
-                            self.mode = Mode::View;
-                            ctx.emit(ActiveNotebookDataEvent::ModeChangedFromServer);
-                        }
-                    }
-                    ctx.notify();
+        if let CloudModelEvent::ObjectMoved { type_and_id, .. } = event {
+            if let Some(notebook_id) = type_and_id.as_notebook_id() {
+                // Update breadcrumb when a notebook is moved, whether by the user or a
+                // teammate.
+                if self.is_active_notebook(notebook_id) {
+                    ctx.emit(ActiveNotebookDataEvent::BreadcrumbsChanged);
                 }
             }
-            CloudModelEvent::ObjectMoved { type_and_id, .. } => {
-                if let Some(notebook_id) = type_and_id.as_notebook_id() {
-                    // Update breadcrumb when a notebook is moved, whether by the user or a
-                    // teammate.
-                    if self.is_active_notebook(notebook_id) {
-                        ctx.emit(ActiveNotebookDataEvent::BreadcrumbsChanged);
-                    }
-                }
-            }
-            _ => (),
         }
     }
 
@@ -328,8 +310,6 @@ impl ActiveNotebookData {
 }
 
 pub enum ActiveNotebookDataEvent {
-    /// Another user stole the baton for the current object.
-    ModeChangedFromServer,
     /// The editing baton for the current object was successfully grabbed server-side.
     SwitchedToEditMode,
     /// An edit to the current object was rejected.

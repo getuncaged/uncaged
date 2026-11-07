@@ -1,6 +1,5 @@
 pub mod ai;
 pub mod managed_secrets;
-pub mod object;
 
 use std::ops::Deref;
 use std::sync::Arc;
@@ -11,7 +10,6 @@ use anyhow::{anyhow, Context, Result};
 use channel_versions::ChannelVersions;
 use chrono::{DateTime, FixedOffset};
 use instant::Instant;
-use object::ObjectClient;
 use parking_lot::Mutex;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -869,10 +867,6 @@ impl ServerApiProvider {
     }
 
     pub fn get_ai_client(&self) -> Arc<dyn AIClient> {
-        self.server_api.clone()
-    }
-
-    pub fn get_cloud_objects_client(&self) -> Arc<dyn ObjectClient> {
         self.server_api.clone()
     }
 

@@ -11,7 +11,6 @@ use crate::drive::index::DriveIndexSection;
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::ServerApiProvider;
-use crate::server::sync_queue::SyncQueue;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::terminal::resizable_data::ResizableData;
 use crate::test_util::settings::initialize_settings_for_tests;
@@ -23,7 +22,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| Appearance::mock());
-    app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_| ResizableData::default());
     app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(CloudViewModel::mock);

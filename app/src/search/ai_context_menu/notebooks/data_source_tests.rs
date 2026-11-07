@@ -1,10 +1,11 @@
 use chrono::{Duration, Utc};
+use cloud_object_models::ServerNotebook;
 use settings::manager::SettingsManager;
 use warpui::{App, SingletonEntity};
 
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::model::view::CloudViewModel;
-use crate::cloud_object::{Owner, Revision, ServerMetadata, ServerNotebook, ServerPermissions};
+use crate::cloud_object::{Owner, Revision, ServerMetadata, ServerPermissions};
 use crate::notebooks::manager::NotebookManager;
 use crate::notebooks::CloudNotebookModel;
 use crate::search::ai_context_menu::notebooks::data_source::NotebookDataSource;
@@ -13,9 +14,9 @@ use crate::search::mixer::SyncDataSource;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ServerId, SyncId};
 use crate::server::server_api::ServerApiProvider;
-use crate::server::sync_queue::SyncQueue;
 use crate::settings::AISettings;
 use crate::system::SystemStats;
+use crate::test_util::cloud_objects::add_server_object;
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::NetworkStatus;
 
@@ -51,7 +52,6 @@ fn mock_server_notebook_with_revision(id: i64, title: &str, revision: Revision) 
 fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
-    app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
@@ -70,7 +70,8 @@ fn zero_state_scores_reflect_recency() {
 
         let now = Utc::now();
         CloudModel::handle(&app).update(&mut app, |model, ctx| {
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook_with_revision(
                     1,
                     "oldest",
@@ -78,7 +79,8 @@ fn zero_state_scores_reflect_recency() {
                 ),
                 ctx,
             );
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook_with_revision(
                     2,
                     "middle",
@@ -86,7 +88,8 @@ fn zero_state_scores_reflect_recency() {
                 ),
                 ctx,
             );
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook_with_revision(
                     3,
                     "newest",
@@ -117,7 +120,8 @@ fn filtered_state_adds_recency_bonus_to_equal_matches() {
         let now = Utc::now();
         // All titles contain "plan" so fuzzy scores should be similar
         CloudModel::handle(&app).update(&mut app, |model, ctx| {
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook_with_revision(
                     1,
                     "my first plan",
@@ -125,7 +129,8 @@ fn filtered_state_adds_recency_bonus_to_equal_matches() {
                 ),
                 ctx,
             );
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook_with_revision(
                     2,
                     "my second plan",
@@ -133,7 +138,8 @@ fn filtered_state_adds_recency_bonus_to_equal_matches() {
                 ),
                 ctx,
             );
-            model.upsert_from_server_notebook(
+            add_server_object(
+                model,
                 mock_server_notebook_with_revision(
                     3,
                     "my third plan",

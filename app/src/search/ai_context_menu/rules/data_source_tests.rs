@@ -16,9 +16,9 @@ use crate::search::mixer::SyncDataSource;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ServerId, SyncId};
 use crate::server::server_api::ServerApiProvider;
-use crate::server::sync_queue::SyncQueue;
 use crate::settings::AISettings;
 use crate::system::SystemStats;
+use crate::test_util::cloud_objects::add_server_object;
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::NetworkStatus;
 
@@ -59,7 +59,6 @@ fn mock_server_ai_fact(id: i64, name: &str, content: &str, revision: Revision) -
 fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
-    app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
@@ -78,7 +77,8 @@ fn zero_state_scores_reflect_recency() {
 
         let now = Utc::now();
         CloudModel::handle(&app).update(&mut app, |model, ctx| {
-            model.upsert_from_server_object(
+            add_server_object(
+                model,
                 mock_server_ai_fact(
                     1,
                     "oldest rule",
@@ -87,7 +87,8 @@ fn zero_state_scores_reflect_recency() {
                 ),
                 ctx,
             );
-            model.upsert_from_server_object(
+            add_server_object(
+                model,
                 mock_server_ai_fact(
                     2,
                     "middle rule",
@@ -96,7 +97,8 @@ fn zero_state_scores_reflect_recency() {
                 ),
                 ctx,
             );
-            model.upsert_from_server_object(
+            add_server_object(
+                model,
                 mock_server_ai_fact(
                     3,
                     "newest rule",
@@ -127,7 +129,8 @@ fn filtered_state_adds_recency_bonus() {
         let now = Utc::now();
         // All rules contain "rule" so fuzzy scores should be similar
         CloudModel::handle(&app).update(&mut app, |model, ctx| {
-            model.upsert_from_server_object(
+            add_server_object(
+                model,
                 mock_server_ai_fact(
                     1,
                     "my first rule",
@@ -136,7 +139,8 @@ fn filtered_state_adds_recency_bonus() {
                 ),
                 ctx,
             );
-            model.upsert_from_server_object(
+            add_server_object(
+                model,
                 mock_server_ai_fact(
                     2,
                     "my second rule",
@@ -145,7 +149,8 @@ fn filtered_state_adds_recency_bonus() {
                 ),
                 ctx,
             );
-            model.upsert_from_server_object(
+            add_server_object(
+                model,
                 mock_server_ai_fact(
                     3,
                     "my third rule",

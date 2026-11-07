@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use cloud_object_models::ServerAIExecutionProfile;
 use cloud_objects::UserUid;
 use warp_core::features::FeatureFlag;
 use warp_graphql::object_permissions::AccessLevel;
@@ -11,14 +12,14 @@ use crate::ai::execution_profiles::{
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{
-    Owner, Revision, ServerAIExecutionProfile, ServerGuestSubject, ServerMetadata,
-    ServerObjectGuest, ServerPermissions, LOCAL_USER_UID,
+    GenericCloudObject, Owner, Revision, ServerGuestSubject, ServerMetadata, ServerObjectGuest,
+    ServerPermissions, LOCAL_USER_UID,
 };
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ServerId, SyncId};
-use crate::server::sync_queue::SyncQueue;
 use crate::settings::PrivacySettings;
+use crate::test_util::cloud_objects::add_server_object;
 use crate::test_util::settings::initialize_settings_for_tests;
 
 fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
@@ -74,7 +75,6 @@ fn attacker_owned_shared_default_profile(cloud_uid: ServerId) -> ServerAIExecuti
 /// `AIExecutionProfilesModel` and exercise its CloudModel interactions.
 fn install_singletons(app: &mut App) {
     initialize_settings_for_tests(app);
-    app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(CloudModel::mock);
@@ -131,9 +131,8 @@ fn edits_persist_on_unsynced_default_profile_when_logged_out() {
 
 /// Regression test for the "log in to an existing user after onboarding"
 /// bug. Cloud objects arriving via the initial bulk load are inserted into
-/// `CloudModel` *without* firing per-object `ObjectCreated` events —
-/// `update_objects_from_initial_load` passes `emit_events: false` and emits
-/// a single `CloudModelEvent::InitialLoadCompleted` afterward instead.
+/// `CloudModel` *without* firing per-object `ObjectCreated` events, and a
+/// single `CloudModelEvent::InitialLoadCompleted` is emitted afterward instead.
 /// Without the reconciliation handler for `InitialLoadCompleted`, the
 /// existing user's default profile sits in `CloudModel` but
 /// `AIExecutionProfilesModel` stays in `Unsynced`, so a subsequent
@@ -174,12 +173,13 @@ fn reconciles_unsynced_default_profile_with_cloud_after_initial_load() {
             ServerPermissions::mock_personal(),
         );
 
-        // Insert the object into CloudModel via the initial-load path
-        // (`emit_events=false`) and then emit `InitialLoadCompleted` so the
-        // reconciliation handler fires.
+        // Insert the object into CloudModel without per-object events and then
+        // emit `InitialLoadCompleted` so the reconciliation handler fires.
         CloudModel::handle(&app).update(&mut app, move |cloud_model, ctx| {
             let server_objects: Vec<ServerAIExecutionProfile> = vec![server_object];
-            cloud_model.update_objects_from_initial_load(server_objects, false, false, ctx);
+            for object in server_objects {
+                cloud_model.add_object(object.id, GenericCloudObject::new_from_server(object));
+            }
             ctx.emit(CloudModelEvent::InitialLoadCompleted);
         });
 
@@ -243,7 +243,7 @@ fn ignores_shared_default_profile_created_from_cloud() {
         let attacker_sync_id = SyncId::ServerId(ServerId::from(31337));
         let attacker_profile = attacker_owned_shared_default_profile(ServerId::from(31337));
         CloudModel::handle(&app).update(&mut app, move |cloud_model, ctx| {
-            cloud_model.upsert_from_server_object(attacker_profile, ctx);
+            add_server_object(cloud_model, attacker_profile, ctx);
         });
 
         profile_model.read(&app, |model, ctx| {
@@ -275,7 +275,9 @@ fn ignores_shared_default_profile_after_initial_load() {
         let attacker_profile = attacker_owned_shared_default_profile(ServerId::from(31338));
         CloudModel::handle(&app).update(&mut app, move |cloud_model, ctx| {
             let server_objects: Vec<ServerAIExecutionProfile> = vec![attacker_profile];
-            cloud_model.update_objects_from_initial_load(server_objects, false, false, ctx);
+            for object in server_objects {
+                cloud_model.add_object(object.id, GenericCloudObject::new_from_server(object));
+            }
             ctx.emit(CloudModelEvent::InitialLoadCompleted);
         });
 
@@ -332,7 +334,7 @@ fn filters_non_owned_non_default_profile_from_list() {
         );
 
         CloudModel::handle(&app).update(&mut app, move |cloud_model, ctx| {
-            cloud_model.upsert_from_server_object(attacker_server_obj, ctx);
+            add_server_object(cloud_model, attacker_server_obj, ctx);
         });
 
         profile_model.read(&app, |model, ctx| {

@@ -18,7 +18,7 @@ use crate::test_util::settings::initialize_settings_for_tests;
 fn initialize_app_for_ai_document_tests(app: &mut App) {
     initialize_settings_for_tests(app);
     app.add_singleton_model(|_| Appearance::mock());
-    app.add_singleton_model(|_| CloudModel::new(None, Vec::new(), None));
+    app.add_singleton_model(|_| CloudModel::new(None, Vec::new()));
     app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
 }
 fn add_server_backed_plan_notebook(app: &mut App, document_id: AIDocumentId) -> SyncId {
@@ -95,48 +95,6 @@ fn test_create_document() {
         });
     });
 }
-#[test]
-fn cloud_model_sync_event_reconciles_stale_document_client_id() {
-    App::test((), |mut app| async move {
-        initialize_app_for_ai_document_tests(&mut app);
-        let model_handle = app.add_model(|_| AIDocumentModel::new_for_test());
-        let conversation_id = AIConversationId::new();
-        let stale_client_id = ClientId::new();
-        let document_id = model_handle.update(&mut app, |model, ctx| {
-            let document_id = model.create_document("Plan", "# Local", conversation_id, None, ctx);
-            model
-                .documents
-                .get_mut(&document_id)
-                .expect("document should exist")
-                .sync_id = Some(SyncId::ClientId(stale_client_id));
-            document_id
-        });
-        let server_sync_id = add_server_backed_plan_notebook(&mut app, document_id);
-        let server_id = server_sync_id
-            .into_server()
-            .expect("test notebook should be server-backed");
-
-        model_handle.update(&mut app, |model, ctx| {
-            model.handle_cloud_model_event(
-                &CloudModelEvent::ObjectSynced {
-                    type_and_id: crate::drive::CloudObjectTypeAndId::Notebook(server_sync_id),
-                    client_id: stale_client_id,
-                    server_id,
-                },
-                ctx,
-            );
-            assert_eq!(
-                model
-                    .get_current_document(&document_id)
-                    .expect("document should exist")
-                    .sync_id,
-                Some(server_sync_id)
-            );
-            assert!(model.get_document_save_status(&document_id).is_saved());
-        });
-    });
-}
-
 #[test]
 fn publish_saves_plan_as_local_notebook() {
     App::test((), |mut app| async move {

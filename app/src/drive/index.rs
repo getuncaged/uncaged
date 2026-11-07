@@ -973,9 +973,6 @@ impl DriveIndex {
             | CloudModelEvent::ObjectCreated { .. }
             | CloudModelEvent::ObjectMoved { .. }
             | CloudModelEvent::ObjectDeleted { .. }
-            | CloudModelEvent::ObjectPermissionsUpdated { .. }
-            | CloudModelEvent::NotebookEditorChangedFromServer { .. }
-            | CloudModelEvent::ObjectSynced { .. }
             | CloudModelEvent::InitialLoadCompleted => {}
         }
     }
