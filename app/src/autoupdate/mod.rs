@@ -1,5 +1,3 @@
-mod changelog;
-mod channel_versions;
 pub mod github_releases;
 pub mod install_source;
 #[cfg(target_os = "linux")]
@@ -25,11 +23,9 @@ use warpui::windowing::state::ApplicationStage;
 use warpui::windowing::{self, WindowManager};
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, ViewContext};
 
-pub use self::changelog::get_current_changelog;
-use self::channel_versions::fetch_channel_versions;
 use crate::channel::Channel;
 use crate::features::FeatureFlag;
-use crate::server::server_api::ServerApi;
+use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::UpdateSettings;
 use crate::workspace::Workspace;
 use crate::{report_if_error, ChannelState};
@@ -108,7 +104,7 @@ pub struct AutoupdateState {
     /// RequestTypes have different behavior and side-effects, so it's important not to skip any
     /// but to queue them instead.
     request_queue: VecDeque<RequestType>,
-    server_api: Arc<ServerApi>,
+    http_client: Arc<http_client::Client>,
     /// Whether the polling loop has been explicitly started. Requests are silently queued but not
     /// executed until `start_polling` is called. This ensures no version-check requests are made
     /// before onboarding completes.
@@ -116,9 +112,9 @@ pub struct AutoupdateState {
 }
 
 impl AutoupdateState {
-    pub fn new(server_api: Arc<ServerApi>) -> Self {
+    pub fn new(http_client: Arc<http_client::Client>) -> Self {
         Self {
-            server_api,
+            http_client,
             last_successful_daily_update_check: None,
             stage: AutoupdateStage::default(),
             downloaded_update: None,
@@ -127,8 +123,9 @@ impl AutoupdateState {
         }
     }
 
-    pub fn register(ctx: &mut AppContext, server_api: Arc<ServerApi>) {
-        ctx.add_singleton_model(move |_ctx| Self::new(server_api));
+    pub fn register(ctx: &mut AppContext) {
+        let http_client = SharedHttpClient::as_ref(ctx).get();
+        ctx.add_singleton_model(move |_ctx| Self::new(http_client));
     }
 
     /// Start the autoupdate polling loop. Idempotent: subsequent calls are no-ops.
@@ -272,13 +269,12 @@ impl AutoupdateState {
         self.stage = AutoupdateStage::CheckingForUpdate;
         ctx.notify();
 
-        let server_api = self.server_api.clone();
         ctx.spawn(
             async move {
                 let update_id = new_update_id();
                 let channel = ChannelState::channel();
                 log::info!("Checking for update on channel {channel}. Update id is {update_id}");
-                let version = fetch_version(&channel, is_daily, &update_id, server_api)
+                let version = fetch_version(&channel)
                     .await
                     .context("Error checking for new version");
                 report_if_error!(version);
@@ -505,7 +501,7 @@ impl AutoupdateState {
                 new_version.clone(),
                 update_id.clone(),
                 last_successful_update_id,
-                self.server_api.clone(),
+                self.http_client.clone(),
             ),
             move |autoupdate_state, download_ready, ctx| {
                 autoupdate_state.on_download_update_complete(
@@ -810,12 +806,7 @@ fn new_update_id() -> String {
 }
 
 /// Fetch the current version on the given channel.
-async fn fetch_version(
-    channel: &Channel,
-    is_daily: bool,
-    update_id: &str,
-    server_api: Arc<ServerApi>,
-) -> Result<VersionInfo> {
+async fn fetch_version(channel: &Channel) -> Result<VersionInfo> {
     // Uncaged reads GitHub Releases, not an update server.
     //
     // Reaching here at all means the user opted in — `start_polling` will not run
@@ -823,41 +814,32 @@ async fn fetch_version(
     // network about updates. The response carries each asset's URL and the
     // SHA-256 GitHub computed over it; the installer verifies that hash instead
     // of a code signature, which an ad-hoc-signed build cannot have.
-    if matches!(channel, Channel::Oss) {
-        let Some(target) = github_releases::current_target() else {
-            return Err(anyhow!(
-                "no Uncaged builds are published for {}-{}",
-                std::env::consts::OS,
-                std::env::consts::ARCH
-            ));
-        };
-        return github_releases::fetch_latest_release(target)
-            .await?
-            .ok_or_else(|| anyhow!("no published release with a verifiable asset for {target}"));
-    }
-
-    let versions = fetch_channel_versions(update_id, server_api.clone(), false, is_daily).await?;
-
-    let channel_version = match channel {
-        Channel::Stable => versions.stable,
-        Channel::Preview => versions.preview,
-        Channel::Dev => versions.dev,
-        Channel::Integration | Channel::Local | Channel::Oss => {
-            // Oss returns above, from GitHub. Integration and Local ship no
-            // release artifacts, so there's no version to fetch. This branch is
-            // normally unreachable because
-            // `AutoupdateState::register` gates the poll loop on the
-            // `Autoupdate` feature flag, but builds (e.g. local wasm bundles)
-            // can end up with `Autoupdate` enabled while running on one of
-            // these channels. Return an error rather than panicking so the
-            // poll loop just logs and bails.
-            anyhow::bail!(
-                "Local, integration, and open-source channel binaries don't support autoupdate"
-            );
+    match channel {
+        Channel::Oss => {
+            let Some(target) = github_releases::current_target() else {
+                return Err(anyhow!(
+                    "no Uncaged builds are published for {}-{}",
+                    std::env::consts::OS,
+                    std::env::consts::ARCH
+                ));
+            };
+            github_releases::fetch_latest_release(target)
+                .await?
+                .ok_or_else(|| anyhow!("no published release with a verifiable asset for {target}"))
         }
-    };
-    let version_info = channel_version.version_info();
-    Ok(version_info)
+        Channel::Stable
+        | Channel::Preview
+        | Channel::Dev
+        | Channel::Integration
+        | Channel::Local => {
+            // Only Uncaged's own (Oss) releases are published. This branch is
+            // normally unreachable because `AutoupdateState::register` gates the
+            // poll loop on the `Autoupdate` feature flag, but builds can end up
+            // with `Autoupdate` enabled while running on another channel. Return
+            // an error rather than panicking so the poll loop just logs and bails.
+            anyhow::bail!("Only Uncaged release builds support autoupdate")
+        }
+    }
 }
 
 // This method is unimplemented on wasm, so we allow unused variables.
@@ -867,7 +849,7 @@ async fn download_update(
     update_id: String,
     #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
     last_successful_update_id: Option<String>,
-    server_api: Arc<ServerApi>,
+    http_client: Arc<http_client::Client>,
 ) -> Result<DownloadReady> {
     if ChannelState::app_version().is_none() {
         log::info!("No tag set, not performing autoupdate.");
@@ -876,11 +858,11 @@ async fn download_update(
 
     cfg_if::cfg_if! {
         if #[cfg(target_os = "macos")] {
-            mac::download_update_and_cleanup(&version_info, &update_id, last_successful_update_id.as_deref(), server_api.http_client()).await
+            mac::download_update_and_cleanup(&version_info, &update_id, last_successful_update_id.as_deref(), &http_client).await
         } else if #[cfg(target_os = "linux")] {
-            linux::download_update_and_cleanup(&version_info, &update_id, server_api.http_client()).await
+            linux::download_update_and_cleanup(&version_info, &update_id, &http_client).await
         } else if #[cfg(windows)] {
-            windows::download_update_and_cleanup(&version_info, &update_id, server_api.http_client()).await
+            windows::download_update_and_cleanup(&version_info, &update_id, &http_client).await
         } else {
             Err(anyhow::anyhow!("Not implemented"))
         }

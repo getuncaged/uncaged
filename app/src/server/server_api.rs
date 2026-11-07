@@ -5,13 +5,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
-use channel_versions::ChannelVersions;
 use chrono::{DateTime, FixedOffset};
 use instant::Instant;
 use parking_lot::Mutex;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use url::Url;
 use warp_core::context_flag::ContextFlag;
 use warp_core::errors::{register_error, AnyhowErrorExt, ErrorExt};
 use warp_server_client::auth::AuthEvent;
@@ -30,8 +28,6 @@ use crate::ai::predict::generate_am_query_suggestions::GenerateAMQuerySuggestion
 use crate::ai::predict::predict_am_queries::{PredictAMQueriesRequest, PredictAMQueriesResponse};
 use crate::server::network_logging::NetworkLogModel;
 use crate::ChannelState;
-
-pub const FETCH_CHANNEL_VERSIONS_TIMEOUT: std::time::Duration = Duration::from_secs(60);
 
 /// We use a special error code header `X-Warp-Error-Code` to allow the server to send
 /// more specific error code information, so that the client can discern between different
@@ -767,47 +763,6 @@ impl ServerApi {
                 Err(anyhow!(payload).context("fetching time from server failed"))
             }
         }
-    }
-
-    /// Fetches updated Warp Channel Versions from Warp Server. If it is the first such request of
-    /// the current calendar day, first attempts to call the '/client_version/daily'. If that call
-    /// fails or if it not the first request of the calendar day, returns the result of a call to
-    /// `/client_version'. The caller can specify whether or not changelog information should be
-    /// included in the response based on whether or not it will be used.
-    pub async fn fetch_channel_versions(
-        &self,
-        include_changelogs: bool,
-        is_daily: bool,
-    ) -> Result<ChannelVersions> {
-        let mut url = Url::parse(&ChannelState::server_root_url())
-            .expect("Should not fail to parse server root URL");
-        if is_daily {
-            url.set_path("/client_version/daily");
-        } else {
-            url.set_path("/client_version");
-        }
-        url.query_pairs_mut()
-            .append_pair("include_changelogs", &include_changelogs.to_string());
-
-        if include_changelogs {
-            log::info!("Fetching channel versions and changelogs from Warp server");
-        } else {
-            log::info!("Fetching channel versions (without changelogs) from Warp server");
-        }
-
-        let request_builder = self
-            .base_client
-            .http_client()
-            .get(url.as_str())
-            .timeout(FETCH_CHANNEL_VERSIONS_TIMEOUT);
-
-        let response = request_builder.send().await?;
-        if !response.status().is_success() {
-            self.observe_iap_challenge(&response);
-        }
-        let versions: ChannelVersions = response.json().await?;
-        log::info!("Received channel versions from Warp server: {versions}");
-        Ok(versions)
     }
 }
 

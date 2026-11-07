@@ -6,7 +6,7 @@ use std::os::unix::fs::MetadataExt;
 use std::os::unix::io::AsRawFd as _;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use std::{env, fs, str};
+use std::{fs, str};
 
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use channel_versions::VersionInfo;
@@ -175,16 +175,6 @@ pub(super) fn relaunch() -> Result<()> {
     // Pass a flag to the app to let it know it was restarted as part of the
     // autoupdate process.
     launch_command.push(format!(" --args {}", warp_cli::finish_update_flag()));
-    // If we're testing with a local copy of channel_versions.json, have the
-    // newly-started binary also reference that same file (so we can test
-    // displaying an updated changelog after an autoupdate).
-    // Debug-only: see channel_versions.rs. Never propagate the manifest
-    // override into the relaunched process in a shipped build — that would
-    // make a one-shot env var survive the update it just controlled.
-    #[cfg(debug_assertions)]
-    if let Ok(path) = env::var("WARP_CHANNEL_VERSIONS_PATH") {
-        launch_command.push(format!(" --env WARP_CHANNEL_VERSIONS_PATH={path}"));
-    }
 
     // We need to make sure that the current Warp process is no longer running
     // before we spawn the new one, otherwise we can end up showing multiple

@@ -170,16 +170,6 @@ mod appimage {
         // Pass a flag to the app to let it know it was restarted as part of the
         // autoupdate process.
         command.arg(warp_cli::finish_update_flag());
-        // If we're testing with a local copy of channel_versions.json, have the
-        // newly-started binary also reference that same file (so we can test
-        // displaying an updated changelog after an autoupdate).
-        // Debug-only: see channel_versions.rs. Never propagate the manifest
-        // override into the relaunched process in a shipped build — that would
-        // make a one-shot env var survive the update it just controlled.
-        #[cfg(debug_assertions)]
-        if let Ok(path) = std::env::var("WARP_CHANNEL_VERSIONS_PATH") {
-            command.env("WARP_CHANNEL_VERSIONS_PATH", path);
-        }
 
         log::info!("Relaunching warp for update...");
         command.spawn()?;
@@ -322,16 +312,6 @@ mod package_manager {
         // Pass a flag to the app to let it know it was restarted as part of the
         // autoupdate process.
         command.arg(finish_update_flag);
-        // If we're testing with a local copy of channel_versions.json, have the
-        // newly-started binary also reference that same file (so we can test
-        // displaying an updated changelog after an autoupdate).
-        // Debug-only: see channel_versions.rs. Never propagate the manifest
-        // override into the relaunched process in a shipped build — that would
-        // make a one-shot env var survive the update it just controlled.
-        #[cfg(debug_assertions)]
-        if let Ok(path) = std::env::var("WARP_CHANNEL_VERSIONS_PATH") {
-            command.env("WARP_CHANNEL_VERSIONS_PATH", path);
-        }
 
         log::info!("Relaunching warp for update...");
         command.spawn()?;

@@ -99,7 +99,7 @@ pub(crate) fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     app.add_singleton_model(|_ctx| PtySpawner::new_for_test());
     app.add_singleton_model(|_| Prompt::mock());
-    app.add_singleton_model(|ctx| AutoupdateState::new(ServerApiProvider::as_ref(ctx).get()));
+    app.add_singleton_model(|ctx| AutoupdateState::new(SharedHttpClient::as_ref(ctx).get()));
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(CloudModel::mock);
@@ -112,7 +112,7 @@ pub(crate) fn initialize_app(app: &mut App) {
     app.add_singleton_model(PrivacySettings::mock);
     app.add_singleton_model(|_| KeybindingChangedNotifier::new());
     app.add_singleton_model(|_ctx| RelaunchModel::new());
-    app.add_singleton_model(|ctx| ChangelogModel::new(ServerApiProvider::as_ref(ctx).get()));
+    app.add_singleton_model(|_| ChangelogModel::default());
     app.add_singleton_model(|_ctx| SyncedInputState::mock());
     app.add_singleton_model(|_| ResizableData::default());
     app.add_singleton_model(LocalWorkflows::new);

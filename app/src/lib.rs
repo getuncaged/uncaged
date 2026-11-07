@@ -819,12 +819,10 @@ pub(crate) fn initialize_app(
     #[cfg(target_family = "wasm")]
     let iap_state: Option<Arc<IapState>> = None;
 
-    let server_api_provider = ctx.add_singleton_model({
+    ctx.add_singleton_model({
         let iap_state = iap_state.clone();
         move |ctx| ServerApiProvider::new(agent_source, iap_state, ctx)
     });
-
-    let server_api = server_api_provider.as_ref(ctx).get();
 
     ctx.add_singleton_model(|_ctx| GPUState::new());
 
@@ -1115,7 +1113,7 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(|_| DisplayCount(display_count));
 
     ctx.add_singleton_model(|_| RelaunchModel::new());
-    ctx.add_singleton_model(|_| ChangelogModel::new(server_api.clone()));
+    ctx.add_singleton_model(|_| ChangelogModel::default());
     ctx.add_singleton_model(|_| NetworkStatus::new());
     ctx.add_singleton_model(|_| SystemStats::new());
     ctx.add_singleton_model(|_| KeybindingChangedNotifier::new());
@@ -1302,7 +1300,7 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(|_| EnvVarCollectionManager::default());
     ctx.add_singleton_model(|_| WorkflowManager::default());
 
-    AutoupdateState::register(ctx, server_api.clone());
+    AutoupdateState::register(ctx);
 
     ctx.add_singleton_model(LocalWorkflows::new);
 

@@ -9,7 +9,7 @@ use repo_metadata::RepoMetadataModel;
 use warp_core::ui::appearance::Appearance;
 use warp_server_client::iap::IapManager;
 use warpui::platform::WindowStyle;
-use warpui::{App, SingletonEntity, ViewHandle, WindowId};
+use warpui::{App, ViewHandle, WindowId};
 use watcher::HomeDirectoryWatcher;
 
 use super::settings::initialize_history_persistence_for_tests;
@@ -73,7 +73,7 @@ pub fn initialize_app_for_terminal_view(app: &mut App) {
             ctx,
         )
     });
-    app.add_singleton_model(|ctx| ChangelogModel::new(ServerApiProvider::as_ref(ctx).get()));
+    app.add_singleton_model(|_| ChangelogModel::default());
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(|_| Prompt::mock());

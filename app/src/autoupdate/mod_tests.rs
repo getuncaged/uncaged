@@ -1,18 +1,11 @@
 use chrono::{Local, TimeZone};
 use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
-use warpui::{App, ModelHandle, ReadModel, UpdateModel};
+use warpui::{App, ModelHandle, UpdateModel};
 
 use super::*;
-use crate::server::server_api::ServerApiProvider;
 
 fn initialize_app(app: &mut App) -> ModelHandle<AutoupdateState> {
-    let server_api_provider = app.add_singleton_model(|_| ServerApiProvider::new_for_test());
-
-    let server_api = app.read_model(&server_api_provider, |server_api_provider, _| {
-        server_api_provider.get()
-    });
-
-    app.add_model(|_| AutoupdateState::new(server_api))
+    app.add_model(|_| AutoupdateState::new(Arc::new(http_client::Client::new_for_test())))
 }
 
 #[test]
