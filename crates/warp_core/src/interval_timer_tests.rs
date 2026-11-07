@@ -29,3 +29,29 @@ fn test_timing_info() {
     );
     assert!(stats[1].marginal_duration_ms >= 10);
 }
+
+#[test]
+fn test_summary_lists_sub_intervals_under_their_stage() {
+    let mut timer = IntervalTimer::new();
+    let start = timer.start_instant;
+    let at = |ms| start + Duration::from_millis(ms);
+    timer
+        .intervals
+        .push(TimingInterval::new("a".into(), at(10)));
+    timer
+        .intervals
+        .push(TimingInterval::new("b".into(), at(30)));
+    timer
+        .intervals
+        .push(TimingInterval::new("c".into(), at(35)));
+
+    let summary = timer.summary_with_sub_intervals(&[("x", at(4)), ("y", at(10)), ("z", at(25))]);
+    assert_eq!(
+        summary,
+        "a +10ms (=10ms) [x +4ms, y +6ms], b +20ms (=30ms) [z +15ms], c +5ms (=35ms)"
+    );
+    assert_eq!(
+        timer.summary(),
+        "a +10ms (=10ms), b +20ms (=30ms), c +5ms (=35ms)"
+    );
+}

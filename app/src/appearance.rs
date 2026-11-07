@@ -17,6 +17,7 @@ use anyhow::anyhow;
 use macos_app_icon::*;
 pub use warp_core::ui::appearance::{Appearance, AppearanceEvent};
 
+use crate::interval_timer::mark_startup_sub_interval;
 use crate::settings::{
     active_theme_kind, FontSettings, FontSettingsChangedEvent, MonospaceFontSize, Settings,
     ThemeSettings,
@@ -396,6 +397,7 @@ fn get_or_load_font_family(font_name: &str, ctx: &mut AppContext) -> Option<Fami
 fn build_appearance(ctx: &mut AppContext) -> Appearance {
     let default_monospace_font_family = load_default_monospace_font_family(ctx)
         .expect("unable to load default monospace font family");
+    mark_startup_sub_interval("font_hack");
     let monospace_font_name = FontSettings::as_ref(ctx)
         .monospace_font_name
         .value()
@@ -403,14 +405,18 @@ fn build_appearance(ctx: &mut AppContext) -> Appearance {
     let am_font_name = FontSettings::as_ref(ctx).ai_font_name.value().clone();
 
     let monospace_font_family_from_settings = get_or_load_font_family(&monospace_font_name, ctx);
+    mark_startup_sub_interval("font_user_monospace");
 
     let ui_font_family =
         load_default_ui_font_family(ctx).expect("unable to load default ui font family");
+    mark_startup_sub_interval("font_roboto");
 
     let am_font_family_from_settings = get_or_load_font_family(&am_font_name, ctx);
+    mark_startup_sub_interval("font_user_ai");
 
     let password_font_family =
         load_password_font_family(ctx).expect("unable to load password font family");
+    mark_startup_sub_interval("font_password");
 
     let monospace_font_size = *FontSettings::as_ref(ctx).monospace_font_size.value();
 

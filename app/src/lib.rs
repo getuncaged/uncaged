@@ -174,7 +174,7 @@ use anyhow::Context;
 use anyhow::{anyhow, Result};
 use appearance::{Appearance, AppearanceManager};
 use channel::ChannelState;
-use interval_timer::IntervalTimer;
+use interval_timer::{mark_startup_sub_interval, IntervalTimer};
 use itertools::Itertools;
 #[cfg(feature = "integration_tests")]
 pub use persistence::testing as sqlite_testing;
@@ -576,9 +576,12 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     // start spawning any child processes.
     #[cfg(windows)]
     command::windows::init();
+    mark_startup_sub_interval("args_forwarding");
 
     let private_preferences = settings::init_private_user_preferences();
+    mark_startup_sub_interval("private_prefs");
     let (public_preferences, startup_toml_parse_error) = settings::init_public_user_preferences();
+    mark_startup_sub_interval("settings_toml");
 
     // When the SettingsFile feature flag is enabled, public settings live in
     // the TOML-backed store. When disabled, they live in the platform-native
@@ -610,12 +613,14 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     #[cfg(feature = "local_tty")]
     let pty_spawner =
         terminal::local_tty::spawner::PtySpawner::new().context("Failed to create pty spawner")?;
+    mark_startup_sub_interval("pty_spawner");
 
     let mut app_builder = warpui::platform::AppBuilder::new(
         app_callbacks(launch_mode.is_integration_test()),
         Box::new(ASSETS),
         launch_mode.take_test_driver(),
     );
+    mark_startup_sub_interval("app_builder_new");
 
     #[cfg(target_os = "macos")]
     {
@@ -688,7 +693,11 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         crate::util::bindings::custom_tag_to_keystroke,
     );
 
+    mark_startup_sub_interval("app_builder_config");
+
     app_builder.run(move |ctx| {
+        mark_startup_sub_interval("app_launch");
+
         #[cfg(not(target_family = "wasm"))]
         // Rotate the log files in the background.
         ctx.background_executor()
@@ -719,6 +728,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         ctx.add_singleton_model(move |ctx| {
             plugin::PluginHost::new(ctx).expect("Could not instantiate PluginHost")
         });
+        mark_startup_sub_interval("early_singletons");
         let app_state = initialize_app(timer, startup_toml_parse_error, ctx);
 
         // Pinned from the ImprovedPaletteSearch client experiment, which assigned every user
@@ -756,6 +766,7 @@ pub(crate) fn initialize_app(
             warpui_extras::secure_storage::register(&data_domain, ctx);
         }
     }
+    mark_startup_sub_interval("secure_storage");
 
     // One-time migration: give Preview its own config directory by
     // symlinking contents from the shared ~/.warp location. Must run
@@ -770,6 +781,7 @@ pub(crate) fn initialize_app(
     // Empty until the theme gallery is first shown; see `ThemeGalleryCatalogue`.
     ctx.add_singleton_model(|_| themes::theme_gallery::ThemeGalleryCatalogue::new());
     ctx.add_singleton_model(|_ctx| SettingsManager::default());
+    mark_startup_sub_interval("config_watchers");
 
     let user_defaults_on_startup = settings::init(startup_toml_parse_error, ctx);
     timer.mark_interval_end("READ_USER_DEFAULTS_AND_INITIALIZE_SETTINGS");
@@ -798,6 +810,7 @@ pub(crate) fn initialize_app(
     // side). Must precede persistence::initialize so the restore read path
     // sees it.
     FeatureFlag::OneHistory.set_enabled(true);
+    mark_startup_sub_interval("pre_sqlite_singletons");
     let (sqlite_data, writer_handles) = persistence::initialize(persistence_scope);
     timer.mark_interval_end("SQLITE_INITIALIZED");
 
@@ -900,6 +913,7 @@ pub(crate) fn initialize_app(
         }
     }
 
+    mark_startup_sub_interval("singletons_core");
     // Initialize timestamp for session id and last active event
     App::record_last_active_timestamp();
 
@@ -954,7 +968,7 @@ pub(crate) fn initialize_app(
     ctx.on_first_frame_drawn(|ctx| {
         IntervalTimer::handle(ctx).update(ctx, |timer, _| {
             timer.mark_interval_end("FIRST_FRAME_DRAWN");
-            log::info!("Startup timing: {}", timer.summary());
+            log::info!("Startup timing: {}", timer.startup_summary());
         });
     });
 
@@ -1011,6 +1025,7 @@ pub(crate) fn initialize_app(
         });
     }
 
+    mark_startup_sub_interval("watchers");
     ctx.add_singleton_model(|_| GitRepoModels::new());
 
     ctx.add_singleton_model(|ctx| {
@@ -1021,6 +1036,7 @@ pub(crate) fn initialize_app(
 
     ctx.add_singleton_model(CustomSecretRegexUpdater::new);
 
+    mark_startup_sub_interval("history");
     // Register initial keybindings prior to creating menus
     ai::init(ctx);
     app_services::init(ctx);
@@ -1058,6 +1074,7 @@ pub(crate) fn initialize_app(
         code_review::init(ctx);
     }
 
+    mark_startup_sub_interval("view_inits");
     let display_count = ctx.windows().display_count();
     ctx.add_singleton_model(|_| DisplayCount(display_count));
 
@@ -1081,6 +1098,7 @@ pub(crate) fn initialize_app(
     #[cfg(feature = "local_fs")]
     ctx.add_singleton_model(|_| LanguageServerShutdownManager::new());
 
+    mark_startup_sub_interval("misc_models");
     let notebooks = cloud_objects
         .iter()
         .filter_map(|object| {
@@ -1092,6 +1110,7 @@ pub(crate) fn initialize_app(
 
     ctx.add_singleton_model(|_ctx| CloudModel::new(persistence_writer.sender(), cloud_objects));
 
+    mark_startup_sub_interval("cloud_model");
     // Seed the orchestration pin set from persisted conversation data
     // before the conversations vec is consumed by the singletons below.
     // Each conversation's `AgentConversationData.pinned` is the source of
@@ -1131,6 +1150,7 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(BlocklistAIPermissions::new);
     ctx.add_singleton_model(ai::blocklist::orchestration_events::OrchestrationEventService::new);
 
+    mark_startup_sub_interval("conversation_models");
     ctx.add_singleton_model(RepoOutlines::new);
     ctx.add_singleton_model(|ctx| {
         warp_core::sync_queue::SyncQueue::<SyncTask>::new_with_rate_limit(
@@ -1147,6 +1167,7 @@ pub(crate) fn initialize_app(
 
     ctx.add_singleton_model(|_| UpdateManager::new(persistence_writer.sender()));
 
+    mark_startup_sub_interval("profiles_update_manager");
     // LogManager must be registered before any subsystem (e.g. MCP, LSP) that creates file-based loggers.
     ctx.add_singleton_model(|_| simple_logger::manager::LogManager::new());
 
@@ -1170,6 +1191,7 @@ pub(crate) fn initialize_app(
         )
     });
 
+    mark_startup_sub_interval("mcp_managers");
     // SkillManager is used to cache SKILL.md files for all active terminal views and their working directories
     ctx.add_singleton_model(SkillManager::new);
 
@@ -1187,6 +1209,7 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(TerminalKeybindings::new);
     ctx.add_singleton_model(|_| ActiveSession::default());
 
+    mark_startup_sub_interval("drive_code_models");
     #[cfg(all(not(target_family = "wasm"), feature = "local_tty"))]
     {
         ctx.add_singleton_model(LocalShellState::new);
@@ -1209,6 +1232,7 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(LLMPreferences::new);
     ctx.add_singleton_model(HarnessAvailabilityModel::new);
 
+    mark_startup_sub_interval("prompt_workflows_llm");
     let tip_model_handle = ctx.add_singleton_model(|ctx| {
         ai::agent_tips::AITipModel::<ai::AgentTip>::new_for_agent_tips(ctx)
     });
@@ -1231,6 +1255,7 @@ pub(crate) fn initialize_app(
         });
     }
 
+    mark_startup_sub_interval("tips");
     timer.mark_interval_end("SINGLETON_MODELS_REGISTERED");
 
     ctx.add_singleton_model(move |_| timer);

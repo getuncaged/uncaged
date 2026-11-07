@@ -78,6 +78,7 @@ use crate::cloud_object::model::generic_string_model::{CloudStringObject, Generi
 use crate::cloud_object::{CloudObject, ObjectIdType};
 use crate::code::editor_management::CodeSource;
 use crate::drive::OpenWarpDriveObjectSettings;
+use crate::interval_timer::mark_startup_sub_interval;
 use crate::notebooks::NotebookId;
 use crate::persistence::agent::read_agent_conversations;
 use crate::persistence::block_list::{
@@ -130,6 +131,7 @@ pub fn initialize(scope: PersistenceScope) -> (Option<Box<PersistedData>>, Optio
                     None
                 }
             };
+            mark_startup_sub_interval("sqlite_start_writer");
             (persisted_data, writer_handles)
         }
         Err(err) => {
@@ -323,6 +325,7 @@ fn setup_database(database_path: &Path) -> Result<SqliteConnection> {
         .to_str()
         .ok_or_else(|| anyhow!("Failed to convert db path to a string"))?;
     let mut conn = establish_connection(db_url, false)?;
+    mark_startup_sub_interval("sqlite_open");
 
     safe_info!(
         safe: ("Connecting to SQLite database"),
@@ -331,6 +334,7 @@ fn setup_database(database_path: &Path) -> Result<SqliteConnection> {
     conn.run_pending_migrations(persistence::MIGRATIONS)
         .map_err(|e| anyhow!(e))
         .context("Failed to perform migrations")?;
+    mark_startup_sub_interval("sqlite_migrations");
     Ok(conn)
 }
 
@@ -2156,29 +2160,35 @@ fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error>
             },
         )
         .collect();
+    mark_startup_sub_interval("read_windows");
 
     let read_context = load_cloud_object_read_context(conn)?;
+    mark_startup_sub_interval("read_cloud_object_metadata");
     let mut cloud_objects: Vec<Box<dyn CloudObject>> = Vec::new();
     cloud_objects.extend(
         workflow_persistence::read_workflows(conn, &read_context)?
             .into_iter()
             .map(|workflow| Box::new(workflow) as Box<dyn CloudObject>),
     );
+    mark_startup_sub_interval("read_workflows");
     cloud_objects.extend(
         notebook_persistence::read_notebooks(conn, &read_context)?
             .into_iter()
             .map(|notebook| Box::new(notebook) as Box<dyn CloudObject>),
     );
+    mark_startup_sub_interval("read_notebooks");
     cloud_objects.extend(
         folder_persistence::read_folders(conn, &read_context)?
             .into_iter()
             .map(|folder| Box::new(folder) as Box<dyn CloudObject>),
     );
+    mark_startup_sub_interval("read_folders");
     cloud_objects.extend(
         generic_string_persistence::read_generic_string_objects(conn, &read_context)?
             .into_iter()
             .map(box_persisted_generic_string_object),
     );
+    mark_startup_sub_interval("read_generic_string_objects");
 
     let commands = schema::commands::dsl::commands
         // Ensure the commands come into memory sorted chronologically.
@@ -2187,6 +2197,7 @@ fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error>
         .filter_map(|command| command.ok())
         .map(PersistedCommand::from)
         .collect();
+    mark_startup_sub_interval("read_commands");
 
     let user_profiles = schema::user_profiles::dsl::user_profiles
         .load_iter::<model::UserProfile, DefaultLoadingMode>(conn)?
@@ -2199,6 +2210,7 @@ fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error>
         .filter_map(|object_action| object_action.ok()) // parse into PersistedObjectAction
         .filter_map(|action| object_action_from_persisted(action).ok())
         .collect();
+    mark_startup_sub_interval("read_profiles_object_actions");
 
     // Uncaged one-history: the turn_index-driven read, with the legacy
     // heuristic byte-identical behind the kill-switch.
@@ -2207,6 +2219,7 @@ fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error>
     } else {
         get_all_restored_blocks(conn)?
     };
+    mark_startup_sub_interval("read_blocks");
 
     // Load active MCP servers from database
     let running_mcp_servers = load_active_mcp_servers(conn)?;
@@ -2219,15 +2232,19 @@ fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error>
     };
 
     let ai_queries = read_ai_queries(conn)?;
+    mark_startup_sub_interval("read_ai_queries");
 
     let codebase_indices = get_all_codebase_index_metadata(conn)?;
     let workspace_language_servers = get_all_workspace_language_servers_by_workspace(conn)?;
+    mark_startup_sub_interval("read_indices_language_servers");
     let multi_agent_conversations = read_agent_conversations(conn)?;
+    mark_startup_sub_interval("read_conversations");
     let projects = get_all_projects(conn)?;
     let project_rules = get_all_project_rules(conn)?;
     let ignored_suggestions = get_all_ignored_suggestions(conn)?;
     let mcp_server_installations = get_all_mcp_server_installations(conn)?;
     let mcp_servers_to_restore = get_mcp_servers_to_restore(conn)?;
+    mark_startup_sub_interval("read_projects_rules_mcp");
 
     Ok(PersistedData {
         app_state,

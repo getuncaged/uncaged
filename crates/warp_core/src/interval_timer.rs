@@ -1,6 +1,8 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use instant::Instant;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use warpui_core::{Entity, SingletonEntity};
 
@@ -92,16 +94,72 @@ impl IntervalTimer {
 
     /// One line with every interval so far, e.g. `SQLITE_INITIALIZED +12ms (=40ms), ...`.
     pub fn summary(&self) -> String {
+        self.summary_with_sub_intervals(&[])
+    }
+
+    /// Like [`Self::summary`], but also stops collecting startup sub-intervals (see
+    /// [`mark_startup_sub_interval`]) and lists the ones collected so far after the interval they
+    /// fall in, e.g. `SQLITE_INITIALIZED +12ms (=40ms) [open +1ms, migrations +3ms], ...`.
+    pub fn startup_summary(&self) -> String {
+        STARTUP_SUB_INTERVALS_DONE.store(true, Ordering::Relaxed);
+        let sub_intervals = std::mem::take(&mut *STARTUP_SUB_INTERVALS.lock());
+        self.summary_with_sub_intervals(&sub_intervals)
+    }
+
+    fn summary_with_sub_intervals(&self, sub_intervals: &[(&'static str, Instant)]) -> String {
+        let mut sub_intervals = sub_intervals.iter().peekable();
         self.compute_stats()
             .iter()
-            .map(|point| {
-                format!(
+            .zip(&self.intervals)
+            .enumerate()
+            .map(|(idx, (point, interval))| {
+                let mut entry = format!(
                     "{} +{}ms (={}ms)",
                     point.name, point.marginal_duration_ms, point.cumulative_duration_ms
-                )
+                );
+                let mut since = if idx == 0 {
+                    self.start_instant
+                } else {
+                    self.intervals[idx - 1].instant
+                };
+                let mut parts = Vec::new();
+                while let Some((name, instant)) =
+                    sub_intervals.next_if(|(_, instant)| *instant <= interval.instant)
+                {
+                    let marginal_ms = instant.saturating_duration_since(since).as_millis();
+                    parts.push(format!("{name} +{marginal_ms}ms"));
+                    since = *instant;
+                }
+                if !parts.is_empty() {
+                    entry.push_str(&format!(" [{}]", parts.join(", ")));
+                }
+                entry
             })
             .collect::<Vec<_>>()
             .join(", ")
+    }
+}
+
+/// Sub-intervals marked inside the startup stages, oldest first.
+static STARTUP_SUB_INTERVALS: Mutex<Vec<(&'static str, Instant)>> = Mutex::new(Vec::new());
+
+/// Set once the startup summary has been logged; later sub-intervals are dropped.
+static STARTUP_SUB_INTERVALS_DONE: AtomicBool = AtomicBool::new(false);
+
+/// Upper bound on collected sub-intervals, so code that also runs outside startup (e.g. in tests,
+/// which never log a startup summary) can't grow the list without bound.
+const MAX_STARTUP_SUB_INTERVALS: usize = 128;
+
+/// Marks the end of a step inside the current startup stage. The startup timing line lists each
+/// step's duration (since the previous step or stage) after the stage it falls in. Costs one
+/// clock read and a push until the startup summary is logged, and nothing after.
+pub fn mark_startup_sub_interval(name: &'static str) {
+    if STARTUP_SUB_INTERVALS_DONE.load(Ordering::Relaxed) {
+        return;
+    }
+    let mut sub_intervals = STARTUP_SUB_INTERVALS.lock();
+    if sub_intervals.len() < MAX_STARTUP_SUB_INTERVALS {
+        sub_intervals.push((name, Instant::now()));
     }
 }
 

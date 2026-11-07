@@ -20,6 +20,7 @@ use super::{
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
 use crate::banner::BannerState;
 use crate::drive::settings::WarpDriveSettings;
+use crate::interval_timer::mark_startup_sub_interval;
 use crate::resource_center::TipsCompleted;
 use crate::search::command_search::settings::CommandSearchSettings;
 use crate::terminal::alt_screen_reporting::AltScreenReporting;
@@ -110,6 +111,7 @@ pub fn init(
     ctx: &mut AppContext,
 ) -> UserDefaultsOnStartup {
     register_all_settings(ctx);
+    mark_startup_sub_interval("settings_register");
 
     // Uncaged: one-time reset of input autodetection, run on every launch. See the function's
     // own docs.
@@ -195,7 +197,10 @@ pub fn init(
         },
     );
 
+    mark_startup_sub_interval("settings_validate");
+
     appearance::register(ctx);
+    mark_startup_sub_interval("appearance");
 
     // Set up hot-reload for the settings file. When the WarpConfig watcher
     // detects a change to settings.toml, reload preferences from disk and
