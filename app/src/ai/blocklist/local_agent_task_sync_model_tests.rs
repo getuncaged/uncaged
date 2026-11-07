@@ -104,18 +104,6 @@ fn invalid_api_key_is_failed_with_auth_required() {
 }
 
 #[test]
-fn aws_bedrock_credentials_is_failed_with_auth_required() {
-    assert_update(
-        classify_renderable_error(&RenderableAIError::AwsBedrockCredentialsExpiredOrInvalid {
-            model_name: "claude-v2".into(),
-        }),
-        AgentTaskState::Failed,
-        Some(PlatformErrorCode::AuthenticationRequired),
-        Some("claude-v2"),
-    );
-}
-
-#[test]
 fn other_error_is_error_with_internal() {
     assert_update(
         classify_renderable_error(&RenderableAIError::Other {

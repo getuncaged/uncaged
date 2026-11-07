@@ -741,8 +741,7 @@ fn should_fork_from_last_known_good_state(
         RenderableAIError::QuotaLimit { .. }
         | RenderableAIError::ServerOverloaded
         | RenderableAIError::ContextWindowExceeded(_)
-        | RenderableAIError::InvalidApiKey { .. }
-        | RenderableAIError::AwsBedrockCredentialsExpiredOrInvalid { .. } => false,
+        | RenderableAIError::InvalidApiKey { .. } => false,
         RenderableAIError::InternalWarpError => true,
         RenderableAIError::Other {
             will_attempt_resume,

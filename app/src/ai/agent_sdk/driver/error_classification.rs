@@ -250,13 +250,6 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
                 PlatformErrorCode::InternalError,
             ),
         ),
-        AgentDriverError::AwsBedrockCredentialsFailed(msg) => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::with_error_code(
-                format!("Failed to initialize AWS Bedrock credentials: {msg}"),
-                PlatformErrorCode::EnvironmentSetupFailed,
-            ),
-        ),
         AgentDriverError::ConversationLoadFailed(msg) => (
             AgentTaskState::Error,
             TaskStatusUpdate::with_error_code(

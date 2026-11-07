@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use ai::api_keys::{ApiKeyManager, AwsCredentialsRefreshStrategy};
 use ai::skills::{ParsedSkill, SKILL_PROVIDER_DEFINITIONS};
 use anyhow::{anyhow, Context as _};
 use futures::channel::oneshot;
@@ -49,7 +48,6 @@ use crate::ai::ambient_agents::task::HarnessModelConfig;
 use crate::ai::ambient_agents::{
     conversation_output_status_from_conversation, AmbientAgentTaskId, AmbientConversationStatus,
 };
-use crate::ai::bedrock_credentials;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::local_agent_task_sync_model::LocalAgentTaskSyncModel;
 use crate::ai::blocklist::orchestration_event_streamer::{
@@ -109,19 +107,15 @@ use environment::PrepareEnvironmentError;
 pub(crate) use snapshot::upload_snapshot_for_handoff;
 use terminal::TerminalDriverEvent;
 
-/// Races `run_future` against optional background credential refresh loops,
-/// dropping the loops automatically when `run_future` resolves.
+/// Races `run_future` against the optional background git credential refresh loop,
+/// dropping the loop automatically when `run_future` resolves.
 ///
-/// Both refresh loops run forever when active; they are dropped when
-/// `futures::select!` picks the `run_future` arm. This consolidates the
-/// otherwise-repeated 4-arm `match (git, bedrock)` pattern that would
-/// otherwise appear once per harness type.
+/// The refresh loop runs forever when active; it is dropped when
+/// `futures::select!` picks the `run_future` arm.
 async fn with_credential_refreshes<F, T>(
     run_future: F,
     git_task_id: Option<String>,
     ai_client: Arc<dyn AIClient>,
-    oidc_strategy: Option<(String, String, String)>,
-    foreground: &ModelSpawner<AgentDriver>,
 ) -> T
 where
     F: Future<Output = T>,
@@ -134,22 +128,11 @@ where
     }
     .fuse();
 
-    let bedrock_refresh = async move {
-        match oidc_strategy {
-            Some((task_id, role_arn, region)) => {
-                bedrock_credentials::refresh_loop(task_id, role_arn, region, foreground).await
-            }
-            None => future::pending::<()>().await,
-        }
-    }
-    .fuse();
-
     let run_future = run_future.fuse();
-    futures::pin_mut!(run_future, git_refresh, bedrock_refresh);
+    futures::pin_mut!(run_future, git_refresh);
     futures::select! {
         result = run_future => result,
         _ = git_refresh => unreachable!("git credentials refresh loop resolved unexpectedly"),
-        _ = bedrock_refresh => unreachable!("Bedrock credentials refresh loop resolved unexpectedly"),
     }
 }
 
@@ -529,8 +512,6 @@ pub enum AgentDriverError {
     SecretsFetchFailed(#[source] anyhow::Error),
     #[error("Failed to load conversation: {0}")]
     ConversationLoadFailed(String),
-    #[error("Failed to initialize AWS Bedrock credentials: {0}")]
-    AwsBedrockCredentialsFailed(String),
     #[error(
         "Conversation {conversation_id} was produced by the {expected} harness, but --harness {got} was requested. \
          Re-run with --harness {expected} (or omit --harness to match) to continue this conversation."
@@ -2237,7 +2218,7 @@ impl AgentDriver {
                 .await;
         }
 
-        let (task_id_for_refresh, ai_client_for_refresh, oidc_strategy_for_refresh) = foreground
+        let (task_id_for_refresh, ai_client_for_refresh) = foreground
             .spawn(|me, ctx| {
                 let task_id = if FeatureFlag::GitCredentialRefresh.is_enabled() {
                     me.task_id.map(|id| id.to_string())
@@ -2245,29 +2226,13 @@ impl AgentDriver {
                     None
                 };
                 let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client().clone();
-                // Capture OidcManaged strategy parameters for the proactive Bedrock credential
-                // refresh loop. Only populated when Bedrock OIDC inference is configured.
-                let oidc_strategy = match ApiKeyManager::handle(ctx)
-                    .as_ref(ctx)
-                    .aws_credentials_refresh_strategy()
-                {
-                    AwsCredentialsRefreshStrategy::OidcManaged {
-                        task_id,
-                        role_arn,
-                        region,
-                    } => task_id
-                        .as_ref()
-                        .map(|tid| (tid.clone(), role_arn.clone(), region.clone())),
-                    AwsCredentialsRefreshStrategy::LocalChain => None,
-                };
-                (task_id, ai_client, oidc_strategy)
+                (task_id, ai_client)
             })
             .await?;
 
-        // Run the harness with a prompt, racing it against optional background refresh
-        // loops for git credentials and Bedrock OIDC credentials via
-        // `with_credential_refreshes`. Refresh futures never resolve on their own —
-        // they are dropped automatically when the harness result resolves.
+        // Run the harness with a prompt, racing it against the optional background git
+        // credential refresh loop via `with_credential_refreshes`. The refresh future never
+        // resolves on its own — it is dropped automatically when the harness result resolves.
         match task.harness {
             HarnessKind::Oz => {
                 let status_rx = foreground
@@ -2283,8 +2248,6 @@ impl AgentDriver {
                     },
                     task_id_for_refresh,
                     ai_client_for_refresh,
-                    oidc_strategy_for_refresh,
-                    &foreground,
                 )
                 .await?;
 
@@ -2336,8 +2299,6 @@ impl AgentDriver {
                     ),
                     task_id_for_refresh,
                     ai_client_for_refresh,
-                    oidc_strategy_for_refresh,
-                    &foreground,
                 )
                 .await
             }

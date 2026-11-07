@@ -9,7 +9,6 @@ use warpui::ModelSpawner;
 use super::terminal::TerminalDriver;
 use crate::ai::cloud_environments::ProvidersConfig;
 
-mod aws;
 mod gcp;
 
 pub(crate) type Result<T> = std::result::Result<T, CloudProviderSetupError>;
@@ -59,10 +58,6 @@ pub(crate) fn load_providers(
     run_id: &str,
 ) -> Result<Vec<Box<dyn CloudProvider>>> {
     let mut result: Vec<Box<dyn CloudProvider>> = Vec::new();
-
-    if let Some(aws) = &providers.aws {
-        result.push(Box::new(aws::AwsCloudProvider::new(aws, run_id)?));
-    }
 
     if let Some(gcp) = &providers.gcp {
         result.push(Box::new(gcp::GcpCloudProvider::new(gcp, run_id)?));

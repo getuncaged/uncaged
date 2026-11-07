@@ -729,9 +729,6 @@ pub enum WorkspaceAction {
     /// Reset the build plan migration modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
     ResetBuildPlanMigrationModalState,
-    /// Reset the AWS Bedrock login banner dismissed state (for debugging).
-    #[cfg(debug_assertions)]
-    DebugResetAwsBedrockLoginBannerDismissed,
     /// Open the Oz Launch Modal (for debugging)
     #[cfg(debug_assertions)]
     OpenOzLaunchModal,
@@ -1237,7 +1234,6 @@ impl WorkspaceAction {
             #[cfg(debug_assertions)]
             OpenBuildPlanMigrationModal
             | ResetBuildPlanMigrationModalState
-            | DebugResetAwsBedrockLoginBannerDismissed
             | OpenOzLaunchModal
             | ResetOzLaunchModalState
             | OpenOpenWarpLaunchModal
