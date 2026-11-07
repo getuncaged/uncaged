@@ -135,8 +135,6 @@ const CONTEXT_WINDOW_INPUT_BOX_WIDTH: f32 = 120.;
 const NEXT_COMMAND_DESCRIPTION: &str = "Let AI suggest the next command to run based on your command history, outputs, and common workflows.";
 const PROMPT_SUGGESTIONS_DESCRIPTION: &str = "Let AI suggest natural language prompts, as inline banners in the input, based on recent commands and their outputs.";
 const SUGGESTED_CODE_BANNERS_DESCRIPTION: &str = "Let AI suggest code diffs and queries as inline banners in the blocklist, based on recent commands and their outputs.";
-const NATURAL_LANGUAGE_AUTOSUGGESTIONS: &str =
-    "Let AI suggest natural language autosuggestions, based on recent commands and their outputs.";
 const SHARED_BLOCK_TITLE_GENERATION_DESCRIPTION: &str =
     "Let AI generate a title for your shared block based on the command and output.";
 const WISPR_FLOW_URL: &str = "https://wisprflow.ai/";
@@ -356,19 +354,6 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             .collect();
         app.register_fixed_bindings(lrc_mode_bindings);
     }
-    ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
-        vec![ToggleSettingActionPair::new(
-            "natural language autosuggestions",
-            builder(SettingsAction::AI(
-                AISettingsPageAction::ToggleNaturalLanguageAutosuggestions,
-            )),
-            &(context.clone() & id!(flags::IS_ACTIVE_AI_ENABLED)),
-            flags::NATURAL_LANGUAGE_AUTOSUGGESTIONS_FLAG,
-        )
-        .with_group(bindings::BindingGroup::WarpAi)
-        .with_enabled(|| FeatureFlag::PredictAMQueries.is_enabled())],
-        app,
-    );
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![ToggleSettingActionPair::new(
             "shared block title generation",
@@ -2206,10 +2191,6 @@ impl AISettingsPageView {
                     || ai_settings
                         .prompt_suggestions_enabled_internal
                         .is_supported_on_current_platform()
-                    || (FeatureFlag::PredictAMQueries.is_enabled()
-                        && ai_settings
-                            .natural_language_autosuggestions_enabled_internal
-                            .is_supported_on_current_platform())
                     || (FeatureFlag::SharedBlockTitleGeneration.is_enabled()
                         && ai_settings
                             .shared_block_title_generation_enabled_internal
@@ -2252,10 +2233,6 @@ impl AISettingsPageView {
                     || ai_settings
                         .prompt_suggestions_enabled_internal
                         .is_supported_on_current_platform()
-                    || (FeatureFlag::PredictAMQueries.is_enabled()
-                        && ai_settings
-                            .natural_language_autosuggestions_enabled_internal
-                            .is_supported_on_current_platform())
                     || (FeatureFlag::SharedBlockTitleGeneration.is_enabled()
                         && ai_settings
                             .shared_block_title_generation_enabled_internal
@@ -3007,7 +2984,6 @@ pub enum AISettingsPageAction {
     ToggleIntelligentAutosuggestions,
     TogglePromptSuggestions,
     ToggleCodeSuggestions,
-    ToggleNaturalLanguageAutosuggestions,
     ToggleSharedTitleGeneration,
     ToggleAIInputAutoDetection,
     TogglePreferShellForKnownCommands,
@@ -3146,18 +3122,6 @@ impl TypedActionView for AISettingsPageView {
                         .toggle_and_save_value(ctx)
                 }) {
                     log::warn!("Failed to set value for Code Suggestions setting: {e:?}");
-                }
-                ctx.notify();
-            }
-            AISettingsPageAction::ToggleNaturalLanguageAutosuggestions => {
-                if let Err(e) = AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    settings
-                        .natural_language_autosuggestions_enabled_internal
-                        .toggle_and_save_value(ctx)
-                }) {
-                    log::warn!(
-                        "Failed to set value for Natural Language Autosuggestions setting: {e:?}"
-                    );
                 }
                 ctx.notify();
             }
@@ -3931,7 +3895,6 @@ struct ActiveAIWidget {
     intelligent_autosuggestions_toggle: SwitchStateHandle,
     prompt_suggestions_toggle: SwitchStateHandle,
     code_suggestions_toggle: SwitchStateHandle,
-    natural_language_autosuggestions_toggle: SwitchStateHandle,
     shared_block_title_generation_toggle: SwitchStateHandle,
 }
 
@@ -3952,13 +3915,6 @@ impl ActiveAIWidget {
         AISettings::as_ref(app)
             .code_suggestions_enabled_internal
             .is_supported_on_current_platform()
-    }
-
-    fn is_natural_language_autosuggestions_toggleable(&self, app: &AppContext) -> bool {
-        FeatureFlag::PredictAMQueries.is_enabled()
-            && AISettings::as_ref(app)
-                .natural_language_autosuggestions_enabled_internal
-                .is_supported_on_current_platform()
     }
 
     // TODO: Check if the user's enterprise billing policy allows toggling this feature.
@@ -4036,29 +3992,6 @@ impl ActiveAIWidget {
             .finish()
     }
 
-    fn render_natural_language_autosuggestions_section(
-        &self,
-        app: &warpui::AppContext,
-    ) -> Box<dyn warpui::Element> {
-        let ai_settings = AISettings::as_ref(app);
-        let is_toggleable = ai_settings.is_active_ai_enabled(app);
-        Flex::column()
-            .with_child(render_ai_setting_toggle(
-                "Natural Language Autosuggestions",
-                AISettingsPageAction::ToggleNaturalLanguageAutosuggestions,
-                *ai_settings.natural_language_autosuggestions_enabled_internal,
-                is_toggleable,
-                self.natural_language_autosuggestions_toggle.clone(),
-                app,
-            ))
-            .with_child(render_ai_setting_description(
-                NATURAL_LANGUAGE_AUTOSUGGESTIONS,
-                is_toggleable,
-                app,
-            ))
-            .finish()
-    }
-
     fn render_shared_block_title_generation_section(
         &self,
         app: &warpui::AppContext,
@@ -4094,7 +4027,6 @@ impl SettingsWidget for ActiveAIWidget {
         self.is_next_command_toggleable(app)
             || self.is_prompt_suggestions_toggleable(app)
             || self.is_suggested_code_banners_toggleable(app)
-            || self.is_natural_language_autosuggestions_toggleable(app)
             || self.is_shared_block_title_generation_toggleable(app)
     }
 
@@ -4148,10 +4080,6 @@ impl SettingsWidget for ActiveAIWidget {
 
         if self.is_suggested_code_banners_toggleable(app) {
             column.add_child(self.render_suggested_code_banners_section(app));
-        }
-
-        if self.is_natural_language_autosuggestions_toggleable(app) {
-            column.add_child(self.render_natural_language_autosuggestions_section(app));
         }
 
         if self.is_shared_block_title_generation_toggleable(app) {

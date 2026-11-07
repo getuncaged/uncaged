@@ -518,7 +518,6 @@ default = [
     # "ambient_agents_command_line",  # Uncaged: needs Warp servers
     # "ambient_agents_image_upload",  # Uncaged: needs Warp servers
     # "scheduled_ambient_agents",  # Uncaged: needs Warp servers
-    # "warp_managed_secrets",  # Uncaged: needs Warp servers
     "v4a_file_diffs",
     "classic_completions",
     "force_classic_completions",
@@ -719,7 +718,6 @@ plugin_host = ["dep:rquickjs", "dep:warp_js", "warp_cli/plugin_host"]
 # generated profile will be written to profile.pb in the current directory.
 # NOTE: This may slow down program execution.
 pprof_cpu_profiling = ["dep:pprof"]
-predict_am_queries = []
 quake_mode = []
 recording_mode = []
 
@@ -844,7 +842,6 @@ revert_to_checkpoints = []
 rewind_slash_command = []
 agent_view = []
 agent_view_block_context = ["agent_view"]
-warp_managed_secrets = []
 v4a_file_diffs = []
 agent_tips = []
 agent_toolbar_editor = ["agent_view"]

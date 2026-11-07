@@ -199,9 +199,6 @@ pub enum FeatureFlag {
     /// Forces users to login.
     ForceLogin,
 
-    /// Enables prediction of Agent Mode queries.
-    PredictAMQueries,
-
     /// Enables full source code embedding of repos when using codebase context.
     FullSourceCodeEmbedding,
 
@@ -507,9 +504,6 @@ pub enum FeatureFlag {
 
     /// Enables host selection in cloud mode.
     CloudModeHostSelector,
-
-    /// Enables Warp Managed Secrets functionality.
-    WarpManagedSecrets,
 
     /// Enables support for AM file diffs backed by the V4A patch format.
     V4AFileDiffs,
