@@ -1,5 +1,4 @@
 mod docker;
-pub mod parse_url_paths;
 pub mod web_intent_parser;
 
 #[cfg(target_family = "wasm")]

@@ -31,8 +31,6 @@ mod drive;
 mod dynamic_libraries;
 mod env_vars;
 mod external_secrets;
-#[cfg(target_family = "wasm")]
-mod font_fallback;
 mod gist_sync;
 mod global_resource_handles;
 mod gpu_state;
@@ -163,7 +161,6 @@ use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::mcp::{FileBasedMCPManager, FileMCPWatcher};
 use crate::settings::CodeSettings;
-use crate::uri::web_intent_parser::maybe_rewrite_web_url_to_intent;
 pub mod workflows;
 pub mod workspace;
 
@@ -945,17 +942,6 @@ pub(crate) fn initialize_app(
         apply_scroll_multiplier(event, ctx);
     });
 
-    // Rewrite recognized Warp web URLs (sessions, Drive, settings, home) into local
-    // intent URLs when possible so they open directly in the desktop app.
-    ctx.set_before_open_url(|url_str, _ctx| {
-        if let Ok(url) = Url::parse(url_str) {
-            if let Some(intent) = maybe_rewrite_web_url_to_intent(&url) {
-                return intent.to_string();
-            }
-        }
-        url_str.to_owned()
-    });
-
     ctx.set_a11y_verbosity(*AccessibilitySettings::as_ref(ctx).a11y_verbosity);
 
     #[cfg(enable_crash_recovery)]
@@ -1671,10 +1657,6 @@ fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode
     IntervalTimer::handle(ctx).update(ctx, |timer, _ctx| {
         timer.mark_interval_end("KEYBINDINGS_LOADED");
     });
-
-    // For now, we only specify application-level fallback fonts on web.
-    #[cfg(target_family = "wasm")]
-    ctx.set_fallback_font_fn(font_fallback::fallback_font_fn);
 
     // Attempt to restore windows from the persisted application state.
     let arg = OpenFromRestoredArg { app_state };
