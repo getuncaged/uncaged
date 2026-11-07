@@ -220,11 +220,9 @@ pub struct InputSuggestions {
 pub enum Event {
     ConfirmAndExecuteSuggestion {
         suggestion: String,
-        match_type: MatchType,
     },
     ConfirmSuggestion {
         suggestion: String,
-        match_type: MatchType,
     },
     CloseSuggestion {
         should_restore_buffer_before_history_up: bool,
@@ -611,7 +609,6 @@ impl InputSuggestions {
         if let Some(item) = self.get_selected_item() {
             ctx.emit(Event::ConfirmSuggestion {
                 suggestion: item.text.to_owned(),
-                match_type: item.match_type,
             });
         } else {
             ctx.emit(Event::CloseSuggestion {
@@ -632,7 +629,6 @@ impl InputSuggestions {
         if let Some(item) = self.get_selected_item() {
             ctx.emit(Event::ConfirmAndExecuteSuggestion {
                 suggestion: item.text.to_owned(),
-                match_type: item.match_type,
             });
         } else {
             ctx.emit(Event::CloseSuggestion {

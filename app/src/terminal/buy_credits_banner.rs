@@ -146,7 +146,6 @@ impl BuyCreditsBanner {
                 };
 
                 // Things we always do:
-                // - emit telemetry
                 // - hide banner
 
                 self.should_display_banner = false;

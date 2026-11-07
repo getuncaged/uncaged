@@ -228,7 +228,7 @@ impl TerminalView {
                     ctx,
                 );
             }
-            UseAgentToolbarEvent::ToggleFileExplorer(_) => {
+            UseAgentToolbarEvent::ToggleFileExplorer => {
                 self.toggle_file_tree(ctx);
             }
             UseAgentToolbarEvent::OpenRichInput => {
@@ -452,8 +452,6 @@ impl TerminalView {
         }
 
         let should_insert_after_block = !InputModeSettings::as_ref(ctx).is_pinned_to_top();
-
-        // Send telemetry when showing CLI agent footer
 
         self.insert_rich_content(
             None,
@@ -1067,8 +1065,8 @@ impl UseAgentToolbar {
             AgentInputFooterEvent::ToggleCodeReviewPane(agent) => {
                 ctx.emit(UseAgentToolbarEvent::ToggleCodeReviewPane(*agent));
             }
-            AgentInputFooterEvent::ToggleFileExplorer(agent) => {
-                ctx.emit(UseAgentToolbarEvent::ToggleFileExplorer(*agent));
+            AgentInputFooterEvent::ToggleFileExplorer => {
+                ctx.emit(UseAgentToolbarEvent::ToggleFileExplorer);
             }
             AgentInputFooterEvent::OpenRichInput => {
                 ctx.emit(UseAgentToolbarEvent::OpenRichInput);
@@ -1162,7 +1160,7 @@ pub enum UseAgentToolbarEvent {
     /// Toggle the code review pane (from CLI agent view).
     ToggleCodeReviewPane(CLIAgent),
     /// Toggle the file explorer (from CLI agent view).
-    ToggleFileExplorer(CLIAgent),
+    ToggleFileExplorer,
     /// Open the rich input editor for composing a prompt.
     OpenRichInput,
     /// Hide the rich input editor (same as Escape).

@@ -1488,10 +1488,7 @@ impl AgentInputFooter {
         use crate::editor::VoiceTranscriber;
 
         match result {
-            VoiceSessionResult::Audio {
-                wav_base64,
-                session_duration_ms: _,
-            } => {
+            VoiceSessionResult::Audio { wav_base64 } => {
                 let voice_transcriber = VoiceTranscriber::as_ref(ctx);
                 if let Some(transcriber) = voice_transcriber.transcriber() {
                     let transcriber = transcriber.clone();
@@ -1509,7 +1506,7 @@ impl AgentInputFooter {
                     self.cli_voice_input_state = CLIVoiceInputState::Stopped;
                 }
             }
-            VoiceSessionResult::Aborted { .. } => {
+            VoiceSessionResult::Aborted => {
                 self.cli_voice_input_state = CLIVoiceInputState::Stopped;
             }
         }
@@ -2109,8 +2106,8 @@ impl TypedActionView for AgentInputFooter {
                 }
             }
             AgentInputFooterAction::ToggleFileExplorer => {
-                if let Some(agent) = self.cli_agent(ctx) {
-                    ctx.emit(AgentInputFooterEvent::ToggleFileExplorer(agent));
+                if self.cli_agent(ctx).is_some() {
+                    ctx.emit(AgentInputFooterEvent::ToggleFileExplorer);
                 }
             }
             AgentInputFooterAction::ToggleRichInput => {
@@ -2217,7 +2214,7 @@ pub enum AgentInputFooterEvent {
     /// Insert text into the CLI agent rich input.
     InsertIntoCLIRichInput(String),
     ToggleCodeReviewPane(CLIAgent),
-    ToggleFileExplorer(CLIAgent),
+    ToggleFileExplorer,
     OpenRichInput,
     HideRichInput,
     ToggledChipMenu {

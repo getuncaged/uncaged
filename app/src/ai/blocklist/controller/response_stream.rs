@@ -11,7 +11,7 @@ use warpui::{Entity, ModelContext, SingletonEntity};
 
 use crate::ai::agent::api::{self, generate_multi_agent_output, ConvertToAPITypeError};
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::agent::{AIIdentifiers, CancellationReason};
+use crate::ai::agent::CancellationReason;
 use crate::network::NetworkStatus;
 use crate::report_error;
 use crate::server::server_api::{AIApiError, ServerApiProvider};
@@ -89,13 +89,9 @@ pub struct ResponseStream {
     start_time: DateTime<Local>,
     time_to_latest_event: TimeDelta,
     cancellation_tx: Option<oneshot::Sender<()>>,
-    /// Store the original error for telemetry when retries succeed
-    original_error: Option<String>,
     /// Track whether we've received any client actions
     /// If true, we cannot retry on subsequent errors since actions may have been executed
     has_received_client_actions: bool,
-    /// AI identifiers for telemetry emission
-    ai_identifiers: AIIdentifiers,
 
     /// Whether this request can attempt to resume the conversation on error.
     /// This is true for all requests except those that are themselves the result of a resume
@@ -142,9 +138,7 @@ impl ResponseStream {
             start_time: Local::now(),
             time_to_latest_event: TimeDelta::seconds(0),
             cancellation_tx: Some(cancellation_tx),
-            original_error: None,
             has_received_client_actions: false,
-            ai_identifiers: AIIdentifiers::default(),
             can_attempt_resume_on_error: false,
             should_resume_conversation_after_stream_finished: false,
             stream_finished_received: false,
@@ -156,7 +150,6 @@ impl ResponseStream {
 
     pub fn new(
         params: api::RequestParams,
-        ai_identifiers: AIIdentifiers,
         can_attempt_resume_on_error: bool,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
@@ -182,9 +175,7 @@ impl ResponseStream {
             time_to_latest_event: TimeDelta::seconds(0),
             cancellation_tx: Some(cancellation_tx),
             retry_count: 0,
-            original_error: None,
             has_received_client_actions: false,
-            ai_identifiers,
             can_attempt_resume_on_error,
             should_resume_conversation_after_stream_finished: false,
             stream_finished_received: false,
@@ -304,37 +295,19 @@ impl ResponseStream {
             Ok(response_event) => {
                 if let Some(event_type) = &response_event.r#type {
                     match event_type {
-                        warp_multi_agent_api::response_event::Type::Init(init_event) => {
-                            // Capture server_output_id from StreamInit event
-                            self.ai_identifiers.server_output_id =
-                                Some(crate::ai::agent::ServerOutputId::new(
-                                    init_event.request_id.clone(),
-                                ));
-                        }
+                        warp_multi_agent_api::response_event::Type::Init(_) => {}
                         warp_multi_agent_api::response_event::Type::ClientActions(_) => {
                             // Mark that we've received client actions
                             self.has_received_client_actions = true;
                         }
-                        warp_multi_agent_api::response_event::Type::Finished(finished_event) => {
+                        warp_multi_agent_api::response_event::Type::Finished(_) => {
                             self.stream_finished_received = true;
-                            // Emit retry success telemetry on successful completion
-                            if matches!(
-                                finished_event.reason,
-                                Some(warp_multi_agent_api::response_event::stream_finished::Reason::Done(_)) | None
-                            ) {
-                                // Emit retry success telemetry if this was a successful completion after retries
-                            }
                         }
                     }
                 }
                 ctx.emit(ResponseStreamEvent::ReceivedEvent(Consumable::new(event)));
             }
             Err(e) => {
-                // Store original error if this is the first error
-                if self.retry_count == 0 {
-                    self.original_error = Some(format!("{e:?}"));
-                }
-
                 let is_online = NetworkStatus::as_ref(ctx).is_online();
                 match recovery_action(
                     self.has_received_client_actions,

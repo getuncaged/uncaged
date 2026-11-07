@@ -54,12 +54,12 @@ use crate::GlobalResourceHandlesProvider;
 
 /// Controls the behavior of `spawn_server_impl`.
 enum SpawnMode {
-    /// Initial spawn - clears logs and sends telemetry.
+    /// Initial spawn - clears logs.
     Initial {
         /// Whether to persist running state to SQLite.
         persist_running_state_to_sqlite: bool,
     },
-    /// Reconnection after transport closed - preserves logs, no telemetry.
+    /// Reconnection after transport closed - preserves logs.
     ///
     /// Waiters are notified via `pending_reconnections` when the connection completes.
     Reconnect,

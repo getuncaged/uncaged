@@ -13,7 +13,6 @@ use async_channel::Sender;
 pub use command_executor::*;
 use futures::future::{BoxFuture, Shared};
 use futures::FutureExt;
-use instant::Instant;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use smol_str::SmolStr;
@@ -67,9 +66,8 @@ pub use warp_core::SessionId;
 /// session (whether it's a true subshell or an SSH session).
 #[derive(Debug)]
 pub struct Sessions {
-    /// The start time for pending sessions, keyed by the session's
-    /// unique ID.
-    pending_session_start_times: HashMap<SessionId, Instant>,
+    /// The unique IDs of pending sessions.
+    pending_sessions: HashSet<SessionId>,
 
     /// The set of known sessions, keyed by the session's unique ID.
     sessions: HashMap<SessionId, Arc<Session>>,
@@ -119,7 +117,7 @@ impl Entity for Sessions {
 impl Sessions {
     pub fn new(executor_command_tx: Sender<ExecutorCommandEvent>) -> Self {
         Self {
-            pending_session_start_times: Default::default(),
+            pending_sessions: Default::default(),
             sessions: Default::default(),
             executor_command_tx,
             in_band_command_output_tx_map: Default::default(),
@@ -143,7 +141,7 @@ impl Sessions {
     pub fn new_for_test() -> Self {
         let (executor_command_tx, _executor_command_rx) = async_channel::unbounded();
         Self {
-            pending_session_start_times: Default::default(),
+            pending_sessions: Default::default(),
             sessions: Default::default(),
             executor_command_tx,
             in_band_command_output_tx_map: Default::default(),
@@ -192,8 +190,7 @@ impl Sessions {
         session_info: &SessionInfo,
         ctx: &mut ModelContext<Self>,
     ) {
-        self.pending_session_start_times
-            .insert(session_info.session_id, Instant::now());
+        self.pending_sessions.insert(session_info.session_id);
         ctx.emit(SessionsEvent::SessionInitialized {
             session_id: session_info.session_id,
         })
@@ -207,8 +204,7 @@ impl Sessions {
         ctx: &mut ModelContext<Self>,
     ) {
         // Remove the session from the list of pending sessions.
-        self.pending_session_start_times
-            .remove(&session_info.session_id);
+        self.pending_sessions.remove(&session_info.session_id);
 
         let session_id = session_info.session_id;
 
@@ -290,15 +286,14 @@ impl Sessions {
     /// Returns whether we're aware of the existence of any sessions, whether
     /// they are pending or fully bootstrapped.
     pub fn has_pending_or_bootstrapped_session(&self) -> bool {
-        !self.pending_session_start_times.is_empty() || !self.sessions.is_empty()
+        !self.pending_sessions.is_empty() || !self.sessions.is_empty()
     }
 
     /// Returns whether the given `session_id` is tracked by this [`Sessions`]
     /// model, either as a pending session (registered via [`Self::register_pending_session`])
     /// or a fully bootstrapped one.
     pub fn tracks_session(&self, session_id: SessionId) -> bool {
-        self.sessions.contains_key(&session_id)
-            || self.pending_session_start_times.contains_key(&session_id)
+        self.sessions.contains_key(&session_id) || self.pending_sessions.contains(&session_id)
     }
 
     /// Returns a map of the spawning commands for all subshell sessions, keyed the session's `SessionId`.

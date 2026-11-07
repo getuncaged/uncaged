@@ -64,8 +64,6 @@ impl EnableAutoReloadModalBody {
                         if me.update_workspace_settings_loading {
                             me.update_workspace_settings_loading = false;
 
-                            // Emit telemetry for successful auto-reload enablement
-
                             ctx.emit(EnableAutoReloadModalBodyEvent::ShowToast {
                                 message: "Auto-reload settings updated".to_string(),
                                 flavor: ToastFlavor::Success,

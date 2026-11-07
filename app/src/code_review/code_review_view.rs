@@ -1553,8 +1553,8 @@ impl CodeReviewView {
     }
 
     /// Shared body for `CodeReviewAction::SetDiffMode` and
-    /// `DiffSelectorEvent::SelectMode`: sends a telemetry event for the
-    /// mode change and updates the diff state model.
+    /// `DiffSelectorEvent::SelectMode`: updates the diff state model for the
+    /// mode change.
     fn apply_diff_mode(&mut self, mode: DiffMode, ctx: &mut ViewContext<Self>) {
         if self
             .diff_state_model

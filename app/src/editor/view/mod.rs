@@ -5899,10 +5899,7 @@ impl EditorView {
             self.autosuggestion_state = Some(Arc::new(new_autosuggestion_state));
         }
 
-        let buffer_char_length = self.buffer_text(ctx).chars().count();
         ctx.emit(Event::AutosuggestionAccepted {
-            insertion_length: insertion_text.len(),
-            buffer_char_length,
             autosuggestion_type: current_autosuggestion_state.autosuggestion_type.clone(),
         });
 
@@ -8254,8 +8251,6 @@ pub enum Event {
     Focused,
     SelectionChanged,
     AutosuggestionAccepted {
-        insertion_length: usize,
-        buffer_char_length: usize,
         autosuggestion_type: AutosuggestionType,
     },
     Navigate(NavigationKey),

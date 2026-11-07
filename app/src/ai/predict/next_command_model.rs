@@ -115,18 +115,13 @@ impl NextCommandSuggestionState {
     }
 }
 
-/// Struct storing the result of the zero-state next command suggestion,
-/// used for telemetry purposes.
+/// Struct storing the result of the zero-state next command suggestion.
 #[derive(Clone)]
 pub struct ZeroStateSuggestionInfo {
-    pub request: Box<GenerateAIInputSuggestionsRequest>,
     pub response: GenerateAIInputSuggestionsResponseV2,
-    /// How long the request took to complete, in milliseconds.
-    pub request_duration_ms: i64,
     /// If true, we made a call to an LLM to generate this.
     /// Otherwise it came from history.
     pub is_from_ai: bool,
-    pub history_based_autosuggestion_state: HistoryBasedAutosuggestionState,
 }
 
 pub struct NextCommandModel {
@@ -607,12 +602,8 @@ impl NextCommandModel {
                     }
                 } else {
                     self.zerostate_suggestion_info = Some(ZeroStateSuggestionInfo {
-                        request: Box::new(request.clone()),
                         response: response.clone(),
-                        request_duration_ms,
                         is_from_ai,
-                        history_based_autosuggestion_state: history_based_autosuggestion_state
-                            .clone(),
                     });
                 }
 

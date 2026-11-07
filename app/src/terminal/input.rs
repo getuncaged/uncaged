@@ -446,26 +446,6 @@ lazy_static! {
     };
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Serialize)]
-pub enum TelemetryInputSuggestionsMode {
-    HistoryFuzzySearch,
-    CompletionSuggestions,
-    HistoryUp,
-    NaturalLanguageCommandSearch,
-    StaticWorkflowEnumSuggestions,
-    DynamicWorkflowEnumSuggestions,
-    AIContextMenu,
-    SlashCommands,
-    ConversationMenu,
-    ModelSelector,
-    ProfileSelector,
-    PromptsMenu,
-    SkillMenu,
-    InlineHistoryMenu,
-    IndexedReposMenu,
-    PlanMenu,
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum HistorySearchMode {
     /// Prefix match commands.
@@ -1939,7 +1919,7 @@ impl Input {
                 AgentInputFooterEvent::WriteToPty(_)
                 | AgentInputFooterEvent::InsertIntoCLIRichInput(_)
                 | AgentInputFooterEvent::ToggleCodeReviewPane(_)
-                | AgentInputFooterEvent::ToggleFileExplorer(_)
+                | AgentInputFooterEvent::ToggleFileExplorer
                 | AgentInputFooterEvent::OpenRichInput
                 | AgentInputFooterEvent::HideRichInput => {}
                 AgentInputFooterEvent::ToggledChipMenu { open } => {
@@ -3348,8 +3328,6 @@ impl Input {
                     ctx,
                 );
             });
-
-            // Emit telemetry for @ menu opened
         } else if self.suggestions_mode_model.as_ref(ctx).is_ai_context_menu() {
             self.close_ai_context_menu(ctx);
         }
@@ -6608,14 +6586,14 @@ impl Input {
         }
 
         match event {
-            InputSuggestionsEvent::ConfirmSuggestion { suggestion, .. } => {
+            InputSuggestionsEvent::ConfirmSuggestion { suggestion } => {
                 if !self.confirm_suggestion(suggestion, ctx) {
                     return;
                 }
 
                 self.close_input_suggestions(/*should_focus_input=*/ true, ctx);
             }
-            InputSuggestionsEvent::ConfirmAndExecuteSuggestion { suggestion, .. } => {
+            InputSuggestionsEvent::ConfirmAndExecuteSuggestion { suggestion } => {
                 if !self.confirm_and_execute_suggestion(suggestion, ctx) {
                     return;
                 }
@@ -8770,7 +8748,6 @@ impl Input {
             }
             EditorEvent::AutosuggestionAccepted {
                 autosuggestion_type,
-                ..
             } => {
                 ctx.emit(Event::AutosuggestionAccepted);
 
@@ -11222,8 +11199,6 @@ impl Input {
             // trigger is stripped at each actual submit point below (not here), so that an
             // early-return guard doesn't leave the buffer stripped and drop a retry into Shell.
 
-            // If we're submitting an AI query, we want to send telemetry for the input type.
-
             // Strip the explicit agent trigger (`>` / trigger word) from the buffer now, right
             // before submitting, so `submit_ai_query` re-reads only the prompt.
             if let Some(stripped) = agent_trigger.clone() {
@@ -11233,8 +11208,6 @@ impl Input {
             }
             self.submit_ai_query(None, ctx);
         } else {
-            // If we're submitting a shell command, we want to send telemetry for the input type.
-
             if FeatureFlag::WorkflowAliases.is_enabled() {
                 let mut command_string = self.editor.as_ref(ctx).buffer_text(ctx);
                 // If the alias was inserted from the completions menu, it will have trailing
