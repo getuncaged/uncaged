@@ -3,7 +3,6 @@ use std::default::Default;
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
 use warpui::elements::{
     ChildAnchor, Empty, OffsetPositioning, PositionedElementAnchor, PositionedElementOffsetBounds,
@@ -24,7 +23,6 @@ use crate::ui_components::blended_colors;
 use crate::workflows::workflow_view::{WorkflowView, WorkflowViewEvent};
 use crate::workflows::{WorkflowSelectionSource, WorkflowSource, WorkflowType};
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::TelemetryEvent;
 
 const SUGGESTED_PROMPT_MODAL_HEADER: &str = "Prompt";
 
@@ -179,17 +177,10 @@ impl SuggestedAgentModeWorkflowModal {
                 self.close(ctx);
             }
             WorkflowViewEvent::CreatedWorkflow(created_workflow_id) => {
-                if let Some(SuggestedAgentModeWorkflowAndId { sync_id, workflow }) =
-                    &self.workflow_and_id
+                if let Some(SuggestedAgentModeWorkflowAndId { sync_id, .. }) = &self.workflow_and_id
                 {
                     if sync_id == created_workflow_id {
                         ctx.emit(SuggestedAgentModeWorkflowModalEvent::WorkflowCreated);
-                        send_telemetry_from_ctx!(
-                            TelemetryEvent::AISuggestedAgentModeWorkflowAdded {
-                                logging_id: workflow.logging_id.clone(),
-                            },
-                            ctx
-                        );
                     }
                 }
                 self.close(ctx);

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use ai::agent::action::{AIAgentActionType, FileEdit};
 use ai::diff_validation::ParsedDiff;
-use chrono::{DateTime, Utc};
 use parking_lot::FairMutex;
 use warp_core::features::FeatureFlag;
 use warpui::r#async::SpawnedFutureHandle;
@@ -12,8 +11,7 @@ use super::super::controller::{BlocklistAIController, BlocklistAIControllerEvent
 use crate::ai::agent::api::generate_multi_agent_output;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{
-    AIIdentifiers, FileContext, PassiveCodeDiffEntry, PassiveSuggestionTrigger,
-    ShellCommandCompletedTrigger,
+    FileContext, PassiveCodeDiffEntry, PassiveSuggestionTrigger, ShellCommandCompletedTrigger,
 };
 use crate::ai::block_context::BlockContext;
 use crate::ai::blocklist::inline_action::code_diff_view::FileDiff;
@@ -22,7 +20,6 @@ use crate::ai::blocklist::{
     SessionContext,
 };
 use crate::ai::paths::host_native_absolute_path;
-use crate::auth::auth_state::AuthStateProvider;
 use crate::server::server_api::ServerApiProvider;
 use crate::settings::AISettings;
 use crate::terminal::event::{BlockType, UserBlockCompleted};
@@ -49,7 +46,6 @@ pub enum PassiveSuggestionsEvent {
     NewPromptSuggestion {
         prompt: String,
         label: Option<String>,
-        request_duration_ms: u64,
         /// The trigger for the suggestion. `None` when the server indicated the
         /// trigger is not relevant to the suggestion.
         trigger: Option<PassiveSuggestionTrigger>,
@@ -68,12 +64,7 @@ pub enum PassiveSuggestionsEvent {
         /// with agent" or "accept and continue". `None` for ephemeral triggers
         /// (shell command with no prior conversation).
         conversation_id: Option<AIConversationId>,
-        request_duration_ms: u64,
         trigger: PassiveSuggestionTrigger,
-        /// The server-assigned request token from the passive suggestion
-        /// request. Used to join client-side telemetry with server-side logs.
-        /// `None` on the legacy code path.
-        server_request_token: Option<String>,
     },
 }
 
@@ -82,7 +73,6 @@ struct Request {
     /// Conversation ID for the passive suggestion request.
     conversation_id: AIConversationId,
     trigger: PassiveSuggestionTrigger,
-    start_ts: DateTime<Utc>,
 
     /// Handle to the spawned future processing the response stream.
     _stream_handle: SpawnedFutureHandle,
@@ -188,10 +178,6 @@ impl PassiveSuggestionsModel {
                     return;
                 };
 
-                let request_duration_ms = Utc::now()
-                    .signed_duration_since(latest_request.start_ts)
-                    .num_milliseconds()
-                    .max(0) as u64;
                 let trigger = latest_request.trigger.clone();
 
                 let StreamExtractionResult {
@@ -216,7 +202,6 @@ impl PassiveSuggestionsModel {
                         ctx.emit(PassiveSuggestionsEvent::NewPromptSuggestion {
                             prompt,
                             label,
-                            request_duration_ms,
                             trigger,
                             conversation_id: continuable_conversation_id,
                             server_request_token,
@@ -234,19 +219,12 @@ impl PassiveSuggestionsModel {
 
                         let session_context =
                             SessionContext::from_session(me.active_session.as_ref(ctx), ctx);
-                        let identifiers = AIIdentifiers::default();
-                        let background_executor = ctx.background_executor();
-                        let auth_state = AuthStateProvider::as_ref(ctx).get().clone();
 
                         ctx.spawn(
                             async move {
                                 apply_edits(
                                     file_edits,
                                     &session_context,
-                                    &identifiers,
-                                    background_executor,
-                                    auth_state,
-                                    true,
                                     |path| async move {
                                         FileReadResult::from(std::fs::read_to_string(path))
                                     },
@@ -288,9 +266,7 @@ impl PassiveSuggestionsModel {
                                     title,
                                     original_edits: original_edits.clone(),
                                     conversation_id: continuable_conversation_id,
-                                    request_duration_ms,
                                     trigger,
-                                    server_request_token: server_request_token.clone(),
                                 });
                             },
                         );
@@ -304,7 +280,6 @@ impl PassiveSuggestionsModel {
             _cancellation_tx: cancellation_tx,
             conversation_id,
             trigger,
-            start_ts: Utc::now(),
         });
     }
 

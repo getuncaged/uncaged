@@ -47,7 +47,6 @@ use crate::ai::persisted_workspace::{
     EnablementState, LspRepoStatus, PersistedWorkspace, PersistedWorkspaceEvent,
 };
 use crate::appearance::Appearance;
-use crate::code::lsp_telemetry::{LspControlActionType, LspEnablementSource, LspTelemetryEvent};
 use crate::settings::{AISettings, CodeSettings};
 use crate::terminal::general_settings::GeneralSettings;
 use crate::ui_components::avatar::{Avatar, AvatarContent, StatusElementTypes};
@@ -60,7 +59,6 @@ use crate::workspace::ToastStack;
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::workspaces::workspace::AdminEnablementSetting;
-use crate::{send_telemetry_from_ctx, TelemetryEvent};
 
 const MAIN_SECTION_MARGIN: f32 = 12.;
 const SUB_SECTION_MARGIN: f32 = 8.;
@@ -574,18 +572,8 @@ impl TypedActionView for CodeSettingsPageView {
                 }
 
                 CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
-                    match settings.codebase_context_enabled.toggle_and_save_value(ctx) {
-                        Ok(new_value) => {
-                            send_telemetry_from_ctx!(
-                                TelemetryEvent::ToggleCodebaseContext {
-                                    is_codebase_context_enabled: new_value
-                                },
-                                ctx
-                            );
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to set value for Codebase Context: {e:?}");
-                        }
+                    if let Err(e) = settings.codebase_context_enabled.toggle_and_save_value(ctx) {
+                        log::warn!("Failed to set value for Codebase Context: {e:?}");
                     }
                 });
 
@@ -593,18 +581,8 @@ impl TypedActionView for CodeSettingsPageView {
             }
             CodeSettingsPageAction::ToggleAutoIndexing => {
                 CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
-                    match settings.auto_indexing_enabled.toggle_and_save_value(ctx) {
-                        Ok(new_value) => {
-                            send_telemetry_from_ctx!(
-                                TelemetryEvent::ToggleAutoIndexing {
-                                    is_autoindexing_enabled: new_value
-                                },
-                                ctx
-                            );
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to set value for auto indexing: {e:?}");
-                        }
+                    if let Err(e) = settings.auto_indexing_enabled.toggle_and_save_value(ctx) {
+                        log::warn!("Failed to set value for auto indexing: {e:?}");
                     }
                 });
 
@@ -633,13 +611,6 @@ impl TypedActionView for CodeSettingsPageView {
             } => {
                 if *currently_enabled {
                     // Toggling OFF: stop and disable
-                    send_telemetry_from_ctx!(
-                        LspTelemetryEvent::ServerRemoved {
-                            server_type: server_type.binary_name().to_string(),
-                            source: LspEnablementSource::Settings,
-                        },
-                        ctx
-                    );
                     LspManagerModel::handle(ctx).update(ctx, |manager, ctx| {
                         manager.remove_server(workspace_path, *server_type, ctx);
                     });
@@ -648,14 +619,6 @@ impl TypedActionView for CodeSettingsPageView {
                     });
                 } else {
                     // Toggling ON: enable and spawn
-                    send_telemetry_from_ctx!(
-                        LspTelemetryEvent::ServerEnabled {
-                            server_type: server_type.binary_name().to_string(),
-                            source: LspEnablementSource::Settings,
-                            needed_install: false,
-                        },
-                        ctx
-                    );
                     let workspace_path = workspace_path.clone();
                     PersistedWorkspace::handle(ctx).update(ctx, |workspace, _ctx| {
                         workspace.enable_lsp_server_for_path(&workspace_path, *server_type);
@@ -671,26 +634,11 @@ impl TypedActionView for CodeSettingsPageView {
                 ctx.notify();
             }
             CodeSettingsPageAction::RestartLspServer { server } => {
-                let server_name = server.as_ref(ctx).server_name();
-                send_telemetry_from_ctx!(
-                    LspTelemetryEvent::ControlAction {
-                        action: LspControlActionType::Restart,
-                        server_type: Some(server_name),
-                    },
-                    ctx
-                );
                 server.update(ctx, |server, ctx| {
                     server.restart(ctx);
                 });
             }
             CodeSettingsPageAction::OpenLspLogs { log_path } => {
-                send_telemetry_from_ctx!(
-                    LspTelemetryEvent::ControlAction {
-                        action: LspControlActionType::OpenLogs,
-                        server_type: None,
-                    },
-                    ctx
-                );
                 ctx.emit(CodeSettingsPageEvent::OpenLspLogs {
                     log_path: log_path.clone(),
                 });
@@ -744,31 +692,12 @@ impl TypedActionView for CodeSettingsPageView {
                         .auto_open_code_review_pane_on_first_agent_change
                         .toggle_and_save_value(ctx));
                 });
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::FeaturesPageAction {
-                        action: "ToggleAutoOpenCodeReviewPane".to_string(),
-                        value: format!(
-                            "{}",
-                            *GeneralSettings::as_ref(ctx)
-                                .auto_open_code_review_pane_on_first_agent_change
-                        )
-                    },
-                    ctx
-                );
                 ctx.notify();
             }
             CodeSettingsPageAction::InstallAndEnableLspServer {
                 workspace_path,
                 server_type,
             } => {
-                send_telemetry_from_ctx!(
-                    LspTelemetryEvent::ServerEnabled {
-                        server_type: server_type.binary_name().to_string(),
-                        source: LspEnablementSource::Settings,
-                        needed_install: true,
-                    },
-                    ctx
-                );
                 #[cfg(feature = "local_fs")]
                 {
                     let workspace_path = workspace_path.clone();
@@ -792,14 +721,6 @@ impl TypedActionView for CodeSettingsPageView {
                 workspace_path,
                 server_type,
             } => {
-                send_telemetry_from_ctx!(
-                    LspTelemetryEvent::ServerEnabled {
-                        server_type: server_type.binary_name().to_string(),
-                        source: LspEnablementSource::Settings,
-                        needed_install: false,
-                    },
-                    ctx
-                );
                 let workspace_path = workspace_path.clone();
                 let server_type = *server_type;
                 PersistedWorkspace::handle(ctx).update(ctx, |workspace, _ctx| {

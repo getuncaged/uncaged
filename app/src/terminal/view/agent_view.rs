@@ -1,5 +1,4 @@
 use warp_core::features::FeatureFlag;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
 use warpui::keymap::Keystroke;
 use warpui::{EntityId, SingletonEntity, ViewContext};
@@ -13,7 +12,6 @@ use crate::ai::blocklist::history_model::CloudConversationData;
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
 use crate::persistence::ModelEvent;
-use crate::server::telemetry::TelemetryAgentViewEntryOrigin;
 use crate::terminal::input::message_bar::{Message, MessageItem};
 use crate::terminal::view::load_ai_conversation::{
     RestoreConversationEntryBehavior, RestoredAIConversation,
@@ -21,7 +19,6 @@ use crate::terminal::view::load_ai_conversation::{
 use crate::terminal::TerminalView;
 use crate::view_components::DismissibleToast;
 use crate::workspace::ToastStack;
-use crate::TelemetryEvent;
 
 pub const ENTER_AGAIN_TO_SEND_MESSAGE_ID: &str = "enter_again_to_send";
 
@@ -276,7 +273,6 @@ impl TerminalView {
             }
         }
 
-        let mut did_auto_trigger_request = false;
         // Show ephemeral message when entering agent view via input with a prompt
         if let Some(initial_prompt) = initial_prompt {
             let should_auto_submit = match origin.should_autotrigger_request() {
@@ -303,7 +299,6 @@ impl TerminalView {
                         ctx,
                     );
                 });
-                did_auto_trigger_request = true;
             } else {
                 let appearance = Appearance::handle(ctx).as_ref(ctx);
                 let message = Message::new(vec![
@@ -332,14 +327,6 @@ impl TerminalView {
                 });
             }
         }
-
-        send_telemetry_from_ctx!(
-            TelemetryEvent::AgentViewEntered {
-                origin: TelemetryAgentViewEntryOrigin::from(origin),
-                did_auto_trigger_request,
-            },
-            ctx
-        );
 
         Ok(conversation_id)
     }

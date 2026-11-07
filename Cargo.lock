@@ -13557,7 +13557,6 @@ dependencies = [
  "mach2",
  "markdown_parser",
  "mcp",
- "memchr",
  "memo-map",
  "mermaid_to_svg",
  "mime_guess",

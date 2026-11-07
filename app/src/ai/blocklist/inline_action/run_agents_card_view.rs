@@ -11,7 +11,6 @@ use ai::agent::action_result::{RunAgentsAgentOutcomeKind, RunAgentsResult};
 use ai::agent::orchestration_config::{OrchestrationConfig, OrchestrationConfigStatus};
 use ai::skills::SkillReference;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::send_telemetry_from_ctx;
 use warpui::elements::{
     Border, ChildView, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, MainAxisSize,
     OffsetPositioning, ParentElement, Radius, Stack, Text,
@@ -22,7 +21,6 @@ use warpui::{
     ViewHandle,
 };
 
-use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{icons, AIAgentActionId, AIAgentActionResultType};
 use crate::ai::blocklist::action_model::{
     AIActionStatus, BlocklistAIActionEvent, BlocklistAIActionModel, RunAgentsExecutor,
@@ -41,12 +39,7 @@ use crate::ai::blocklist::inline_action::orchestration_controls::{
 use crate::ai::blocklist::inline_action::requested_action::{
     render_requested_action_row_for_text, CTRL_C_KEYSTROKE, ENTER_KEYSTROKE,
 };
-use crate::ai::blocklist::telemetry::{
-    orchestration_modified_field, BlocklistOrchestrationTelemetryEvent,
-    OrchestrationApprovalStatus, OrchestrationEnteredEvent, OrchestrationEntrySource,
-    OrchestrationExecutionModeKind, OrchestrationHarnessKind, RunAgentsCardDecision,
-    RunAgentsCardDecisionEvent,
-};
+use crate::ai::blocklist::telemetry::orchestration_modified_field;
 use crate::ai::harness_availability::{HarnessAvailabilityEvent, HarnessAvailabilityModel};
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
 use crate::appearance::Appearance;
@@ -207,10 +200,6 @@ pub struct RunAgentsCardView {
     /// stream. Used at decision time to diff the run-wide config
     /// fields the user changed before accepting.
     original_tool_call_request: RunAgentsRequest,
-    /// Guards `OrchestrationEntered` against double-fires on re-renders.
-    entered_event_emitted: bool,
-    /// Guards the terminal decision event against double-fires.
-    decision_event_emitted: bool,
 }
 
 /// Resolves UI-only interactive defaults on edit state that has
@@ -341,9 +330,6 @@ impl RunAgentsCardView {
                 resolve_interactive_defaults(&mut me.state, &*me.block_model, ctx);
                 oc::repopulate_all_pickers(&mut me.state.orch, &me.handles.pickers, ctx);
                 me.refresh_accept_button_state(ctx);
-                if let Some(conversation_id) = me.block_model.conversation_id(ctx) {
-                    me.emit_orchestration_entered_once(conversation_id, ctx);
-                }
                 ctx.notify();
             }
             _ => {}
@@ -407,8 +393,6 @@ impl RunAgentsCardView {
             block_model,
             saved_model_per_harness: HashMap::new(),
             original_tool_call_request,
-            entered_event_emitted: false,
-            decision_event_emitted: false,
         };
 
         view.ensure_pickers(ctx);
@@ -481,83 +465,10 @@ impl RunAgentsCardView {
             return;
         }
         let request = self.state.to_request();
-        self.emit_decision(RunAgentsCardDecision::Accept, ctx);
         let action_id = self.action_id.clone();
         self.action_model.update(ctx, |action_model, action_ctx| {
             action_model.execute_run_agents(&action_id, request, action_ctx);
         });
-    }
-
-    /// Emits `OrchestrationEntered::RunAgentsCardShown` at most once
-    /// per card instance.
-    fn emit_orchestration_entered_once(
-        &mut self,
-        conversation_id: AIConversationId,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if self.entered_event_emitted {
-            return;
-        }
-        self.entered_event_emitted = true;
-        send_telemetry_from_ctx!(
-            BlocklistOrchestrationTelemetryEvent::OrchestrationEntered(OrchestrationEnteredEvent {
-                conversation_id,
-                plan_id: (!self.state.plan_id.is_empty()).then(|| self.state.plan_id.clone()),
-                entry_source: OrchestrationEntrySource::RunAgentsCardShown,
-            }),
-            ctx
-        );
-    }
-
-    /// Emits `RunAgentsCardDecision` at most once per card instance.
-    fn emit_decision(&mut self, decision: RunAgentsCardDecision, ctx: &mut ViewContext<Self>) {
-        if self.decision_event_emitted {
-            return;
-        }
-        self.decision_event_emitted = true;
-        let Some(conversation_id) = self.block_model.conversation_id(ctx) else {
-            return;
-        };
-        let modified_fields_from_tool_call =
-            diverged_orch_fields(&self.state.orch, &self.original_tool_call_request);
-        let (had_active_config, active_config_status, modified_fields_from_active_config) =
-            match &self.active_config {
-                Some((cfg, status)) => {
-                    let status_enum = if status.is_approved() {
-                        Some(OrchestrationApprovalStatus::Approved)
-                    } else if status.is_disapproved() {
-                        Some(OrchestrationApprovalStatus::Disapproved)
-                    } else {
-                        None
-                    };
-                    let diff = if status.is_approved() {
-                        diverged_orch_fields_against_config(&self.state.orch, cfg)
-                    } else {
-                        Vec::new()
-                    };
-                    (true, status_enum, diff)
-                }
-                None => (false, None, Vec::new()),
-            };
-        send_telemetry_from_ctx!(
-            BlocklistOrchestrationTelemetryEvent::RunAgentsCardDecision(
-                RunAgentsCardDecisionEvent {
-                    conversation_id,
-                    plan_id: (!self.state.plan_id.is_empty()).then(|| self.state.plan_id.clone()),
-                    decision,
-                    agent_count: self.state.agent_run_configs.len(),
-                    harness: OrchestrationHarnessKind::from_str(&self.state.orch.harness_type),
-                    execution_mode: OrchestrationExecutionModeKind::from_run_agents(
-                        &self.state.orch.execution_mode,
-                    ),
-                    modified_fields_from_tool_call,
-                    modified_fields_from_active_config,
-                    had_active_config,
-                    active_config_status,
-                }
-            ),
-            ctx
-        );
     }
 
     /// Re-derives the Accept button's `disabled` + tooltip from the gate.
@@ -871,7 +782,6 @@ impl TypedActionView for RunAgentsCardView {
                 self.handle_accept(ctx);
             }
             RunAgentsCardViewAction::AcceptWithoutOrchestration => {
-                self.emit_decision(RunAgentsCardDecision::AcceptWithoutOrchestration, ctx);
                 let action_id = self.action_id.clone();
                 self.action_model.update(ctx, |action_model, action_ctx| {
                     action_model.deny_run_agents(&action_id, String::new(), action_ctx);
@@ -881,7 +791,6 @@ impl TypedActionView for RunAgentsCardView {
                 self.toggle_accept_menu(ctx);
             }
             RunAgentsCardViewAction::Reject => {
-                self.emit_decision(RunAgentsCardDecision::Reject, ctx);
                 ctx.emit(RunAgentsCardViewEvent::RejectRequested);
             }
             RunAgentsCardViewAction::ExecutionModeToggled { is_remote } => {

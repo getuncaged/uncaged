@@ -167,7 +167,7 @@ impl EmbeddingSearchMenu {
             SearchBarEvent::Close => {
                 self.close(ctx);
             }
-            SearchBarEvent::BufferCleared { .. } => {}
+            SearchBarEvent::BufferCleared => {}
             SearchBarEvent::ResultAccepted { action, .. } => {
                 self.handle_result_selected(action.clone(), ctx);
             }

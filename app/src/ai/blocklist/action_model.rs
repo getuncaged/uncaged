@@ -20,16 +20,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::Local;
-pub(crate) use execute::{
-    apply_edits, coerce_integer_args, FileReadResult, MalformedFinalLineProxyEvent,
-};
+pub(crate) use execute::{apply_edits, coerce_integer_args, FileReadResult};
 #[cfg(test)]
 pub(crate) use execute::{compose_run_agents_child_prompt, run_agents_to_start_agent_mode};
 pub use execute::{
-    read_local_file_context, EditAcceptAndContinueClickedEvent, EditAcceptClickedEvent,
-    EditResolvedEvent, EditStats, NewConversationDecision, PromptSuggestionExecutor,
-    RequestFileEditsExecutor, RequestFileEditsFormatKind, RequestFileEditsTelemetryEvent,
-    RunAgentsExecutor, RunAgentsExecutorEvent, RunAgentsSpawningSnapshot, ShellCommandExecutor,
+    read_local_file_context, NewConversationDecision, PromptSuggestionExecutor,
+    RequestFileEditsExecutor, RequestFileEditsFormatKind, RunAgentsExecutor,
+    RunAgentsExecutorEvent, RunAgentsSpawningSnapshot, ShellCommandExecutor,
     ShellCommandExecutorEvent, StartAgentExecutor, StartAgentExecutorEvent, StartAgentRequest,
     StartAgentRequestId,
 };
@@ -900,12 +897,10 @@ impl BlocklistAIActionModel {
     fn preprocess_action(
         &mut self,
         action: &AIAgentAction,
-        conversation_id: AIConversationId,
         ctx: &mut ModelContext<Self>,
     ) -> BoxFuture<'static, ()> {
-        self.executor.update(ctx, |executor, ctx| {
-            executor.preprocess_action(action, conversation_id, ctx)
-        })
+        self.executor
+            .update(ctx, |executor, ctx| executor.preprocess_action(action, ctx))
     }
 
     /// Queues the `actions` in the given iterator for the given conversation,
@@ -929,7 +924,7 @@ impl BlocklistAIActionModel {
 
         for action in actions.iter() {
             action_ids.insert(action.id.clone());
-            preprocess_future.push(self.preprocess_action(action, conversation_id, ctx));
+            preprocess_future.push(self.preprocess_action(action, ctx));
         }
 
         let preprocess_id = self

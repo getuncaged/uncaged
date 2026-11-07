@@ -5,7 +5,6 @@ use std::time::Duration;
 use ai::index::build_outline;
 use async_channel::Sender;
 use futures::stream::AbortHandle;
-use instant::Instant;
 use repo_metadata::repositories::{DetectedRepositories, DetectedRepositoriesEvent};
 use repo_metadata::repository::{
     BufferingRepositorySubscriber, RepositorySubscriber, SubscriberId,
@@ -21,7 +20,7 @@ use crate::settings::{
     InputSettingsChangedEvent,
 };
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{safe_info, safe_warn, send_telemetry_from_ctx, TelemetryEvent};
+use crate::{safe_info, safe_warn};
 
 /// State for a repository outline, containing both the repository handle and the outline status.
 #[derive(Debug)]
@@ -210,7 +209,6 @@ impl RepoOutlines {
     fn compute_outline_for_repo(&mut self, repo_root: PathBuf, ctx: &mut ModelContext<Self>) {
         let root_path_clone = repo_root.clone();
 
-        let scan_start = Instant::now();
         let scan_abort_handle = ctx
             .spawn(
                 async move {
@@ -221,22 +219,14 @@ impl RepoOutlines {
                     let canonicalized_path = CanonicalizedPath::try_from(&repo_root)?;
                     build_outline(canonicalized_path.as_path(), Some(MAX_REPO_FILE_SIZE_LIMIT))
                         .await
-                        .map(|outline| (canonicalized_path, outline, scan_start.elapsed()))
+                        .map(|outline| (canonicalized_path, outline))
                 },
                 move |me, res, ctx| {
                     // Don't process this result if the setting has been disabled.
                     // The abort handle doesn't always abort.
                     if me.should_build_outlines(ctx) {
                         match res {
-                            Ok((canonicalized_path, outline, parse_duration)) => {
-                                send_telemetry_from_ctx!(
-                                    TelemetryEvent::RepoOutlineConstructionSuccess {
-                                        total_parse_seconds: parse_duration.as_secs() as usize,
-                                        file_count: outline.file_count(),
-                                    },
-                                    ctx
-                                );
-
+                            Ok((canonicalized_path, outline)) => {
                                 safe_info!(
                                     safe: ("Successfully constructed symbols outline for repo."),
                                     full: (
@@ -285,12 +275,6 @@ impl RepoOutlines {
                                     )
                                 );
 
-                                send_telemetry_from_ctx!(
-                                    TelemetryEvent::RepoOutlineConstructionFailed {
-                                        error: e.to_string()
-                                    },
-                                    ctx
-                                );
                                 if let Some(outline_state) = me.outlines.get_mut(&root_path_clone) {
                                     outline_state.status = OutlineStatus::Failed;
                                 }

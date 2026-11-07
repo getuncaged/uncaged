@@ -16,7 +16,6 @@ pub enum FinalState {
     BackToTerminal,
 }
 
-
 /// Prompt information for the onboarding callout
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OnboardingQuery {

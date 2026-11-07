@@ -12,7 +12,6 @@ pub enum OnboardingIntention {
     AgentDrivenDevelopment,
 }
 
-
 pub use callout::{OnboardingCalloutView, OnboardingKeybindings};
 
 /// User-facing descriptions of the AI features enabled when the agent intention is selected.
@@ -42,7 +41,6 @@ pub enum SessionDefault {
     Agent,
     Terminal,
 }
-
 
 pub use agent_onboarding_view::{AgentOnboardingAction, AgentOnboardingEvent, AgentOnboardingView};
 pub use model::{OnboardingAuthState, SelectedSettings, UICustomizationSettings};

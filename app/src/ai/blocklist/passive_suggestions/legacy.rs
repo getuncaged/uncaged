@@ -4,7 +4,6 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::Utc;
 #[cfg(not(target_family = "wasm"))]
 use command::r#async::Command;
 use parking_lot::FairMutex;
@@ -55,8 +54,6 @@ pub enum PassiveSuggestionsEvent {
     PromptSuggestionsGenerated {
         prompt_suggestion: AgentModePromptSuggestion,
         block_id: BlockId,
-        command: String,
-        request_duration_ms: u64,
     },
     PassiveCodeDiffRequestStarted {
         prompt_suggestion_id: String,
@@ -251,15 +248,11 @@ impl PassiveSuggestionsModel {
         ctx: &mut ModelContext<Self>,
     ) {
         let block_id = block_completed.serialized_block.id.clone();
-        let command = block_completed.command.clone();
-        let start_ts_ms = Utc::now().timestamp_millis();
 
         if let Some(suggestion) = fetch_static_prompt_suggestion(&block_completed) {
             ctx.emit(PassiveSuggestionsEvent::PromptSuggestionsGenerated {
                 prompt_suggestion: suggestion.clone(),
                 block_id: block_id.clone(),
-                command,
-                request_duration_ms: 0,
             });
             self.maybe_generate_passive_code_diff(suggestion, block_id, ctx);
             return;
@@ -287,8 +280,6 @@ impl PassiveSuggestionsModel {
         self.prompt_suggestions_future_handle =
             Some(ctx.spawn(request_future, move |me, result, ctx| {
                 me.prompt_suggestions_future_handle = None;
-                let end_ts_ms = Utc::now().timestamp_millis();
-                let request_duration_ms = end_ts_ms.saturating_sub(start_ts_ms) as u64;
                 let prompt_suggestion = match result {
                     Ok(response) => map_prompt_suggestions_response(response),
                     Err(err) => {
@@ -302,8 +293,6 @@ impl PassiveSuggestionsModel {
                 ctx.emit(PassiveSuggestionsEvent::PromptSuggestionsGenerated {
                     prompt_suggestion: prompt_suggestion.clone(),
                     block_id: block_id.clone(),
-                    command,
-                    request_duration_ms,
                 });
                 me.maybe_generate_passive_code_diff(prompt_suggestion, block_id, ctx);
             }));

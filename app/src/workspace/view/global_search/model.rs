@@ -25,17 +25,9 @@ struct ActiveSearch {
     search_id: u32,
     remaining_sources: usize,
     completed_sources: usize,
-    local_source_failed: bool,
-    remote_source_failures: usize,
     total_match_count: usize,
     /// True when any remote source hit the server-side match cap.
     capped: bool,
-}
-
-#[derive(Clone, Copy)]
-enum SearchSource {
-    Local,
-    Remote,
 }
 
 /// Result of one search source (the local ripgrep run, or one remote
@@ -136,8 +128,6 @@ impl GlobalSearch {
                 search_id,
                 total_match_count: 0,
                 capped: false,
-                local_source_failed: false,
-                remote_source_failures: 0,
             });
             return;
         }
@@ -146,8 +136,6 @@ impl GlobalSearch {
             search_id,
             remaining_sources: source_count,
             completed_sources: 0,
-            local_source_failed: false,
-            remote_source_failures: 0,
             total_match_count: 0,
             capped: false,
         });
@@ -176,7 +164,6 @@ impl GlobalSearch {
         let spawner = ctx.spawner();
         self.spawn_source(
             search_id,
-            SearchSource::Local,
             async move {
                 let result = Self::run_warp_ripgrep_cli(
                     search_id,
@@ -211,12 +198,11 @@ impl GlobalSearch {
     fn spawn_source(
         &mut self,
         search_id: u32,
-        source_kind: SearchSource,
         source: impl Future<Output = Option<SourceResult>> + Send + 'static,
         ctx: &mut ModelContext<Self>,
     ) {
         let task = ctx.spawn(source, move |me, outcome, ctx| {
-            me.handle_source_completed(search_id, source_kind, outcome, ctx);
+            me.handle_source_completed(search_id, outcome, ctx);
         });
         self.search_handles.push(task);
     }
@@ -227,7 +213,6 @@ impl GlobalSearch {
     fn handle_source_completed(
         &mut self,
         search_id: u32,
-        source_kind: SearchSource,
         outcome: Option<SourceResult>,
         ctx: &mut ModelContext<Self>,
     ) {
@@ -238,19 +223,14 @@ impl GlobalSearch {
             return;
         }
 
-        match outcome {
-            Some(SourceResult {
-                match_count,
-                capped,
-            }) => {
-                active.completed_sources += 1;
-                active.total_match_count += match_count;
-                active.capped |= capped;
-            }
-            None => match source_kind {
-                SearchSource::Local => active.local_source_failed = true,
-                SearchSource::Remote => active.remote_source_failures += 1,
-            },
+        if let Some(SourceResult {
+            match_count,
+            capped,
+        }) = outcome
+        {
+            active.completed_sources += 1;
+            active.total_match_count += match_count;
+            active.capped |= capped;
         }
 
         active.remaining_sources = active.remaining_sources.saturating_sub(1);
@@ -272,8 +252,6 @@ impl GlobalSearch {
                 search_id,
                 total_match_count: active.total_match_count,
                 capped: active.capped,
-                local_source_failed: active.local_source_failed,
-                remote_source_failures: active.remote_source_failures,
             });
         }
     }

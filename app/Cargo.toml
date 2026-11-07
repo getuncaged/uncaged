@@ -127,7 +127,6 @@ warp_logging.workspace = true
 lz4_flex = "0.11"
 markdown_parser.workspace = true
 mcp.workspace = true
-memchr.workspace = true
 memo-map.workspace = true
 mermaid_to_svg.workspace = true
 num-traits.workspace = true

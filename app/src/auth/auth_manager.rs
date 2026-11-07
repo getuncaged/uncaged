@@ -34,7 +34,6 @@ use crate::server::server_api::auth::{
     UserAuthenticationError,
 };
 use crate::server::server_api::{ServerApi, ServerApiProvider};
-use crate::server::telemetry::AnonymousUserSignupEntrypoint;
 use crate::settings::cloud_preferences_syncer::CloudPreferencesSyncer;
 use crate::settings::initializer::SettingsInitializer;
 use crate::settings::PrivacySettings;
@@ -43,8 +42,7 @@ use crate::terminal::general_settings::GeneralSettings;
 use crate::uri::browser_url_handler::{parse_current_url, update_browser_url};
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::{
-    persistence, report_error, report_if_error, send_telemetry_from_ctx,
-    send_telemetry_sync_from_ctx, GlobalResourceHandlesProvider, TelemetryEvent,
+    persistence, report_error, report_if_error, GlobalResourceHandlesProvider, TelemetryEvent,
 };
 
 #[derive(Debug)]
@@ -208,7 +206,6 @@ impl AuthManager {
                 ctx.emit(AuthManagerEvent::LoginOverrideDetected(auth_payload));
                 return;
             }
-            send_telemetry_from_ctx!(TelemetryEvent::AnonymousUserLinkedFromBrowser, ctx);
         }
 
         let _ = ctx.spawn(
@@ -486,19 +483,6 @@ impl AuthManager {
                     |_, _, _| {},
                 );
 
-                // Once the user is authenticated, attempt to report the sandbox that Warp is running in, if any.
-                ctx.spawn(
-                    async { warp_isolation_platform::detect() },
-                    |_, platform, ctx| {
-                        if let Some(platform) = platform {
-                            send_telemetry_from_ctx!(
-                                TelemetryEvent::DetectedIsolationPlatform { platform },
-                                ctx
-                            );
-                        }
-                    },
-                );
-
                 ctx.emit(AuthManagerEvent::AuthComplete);
             }
             Err(error) => {
@@ -570,7 +554,6 @@ impl AuthManager {
         let became_true = self.auth_state.set_needs_reauth(needs_reauth);
 
         if became_true {
-            send_telemetry_from_ctx!(TelemetryEvent::NeedsReauth, ctx);
             ctx.emit(AuthManagerEvent::NeedsReauth);
         }
     }
@@ -639,7 +622,6 @@ impl AuthManager {
 
     pub fn attempt_login_gated_feature(
         &self,
-        feature: LoginGatedFeature,
         auth_view_variant: AuthViewVariant,
         ctx: &mut ModelContext<Self>,
     ) {
@@ -653,10 +635,6 @@ impl AuthManager {
             return;
         }
         if self.auth_state.is_anonymous_or_logged_out() {
-            send_telemetry_from_ctx!(
-                TelemetryEvent::AnonymousUserAttemptLoginGatedFeature { feature },
-                ctx
-            );
             ctx.emit(AuthManagerEvent::AttemptedLoginGatedFeature { auth_view_variant });
         };
     }
@@ -670,18 +648,13 @@ impl AuthManager {
             return;
         }
         if self.auth_state.is_anonymous_or_logged_out() {
-            send_telemetry_from_ctx!(TelemetryEvent::AnonymousUserHitCloudObjectLimit, ctx);
             ctx.emit(AuthManagerEvent::AttemptedLoginGatedFeature {
                 auth_view_variant: AuthViewVariant::HitDriveObjectLimitCloseable,
             });
         };
     }
 
-    pub fn initiate_anonymous_user_linking(
-        &self,
-        entrypoint: AnonymousUserSignupEntrypoint,
-        ctx: &mut ModelContext<Self>,
-    ) {
+    pub fn initiate_anonymous_user_linking(&self, ctx: &mut ModelContext<Self>) {
         let auth_client = self.auth_client.clone();
         let _ = ctx.spawn(
             async move { auth_client.fetch_new_custom_token().await },
@@ -690,12 +663,6 @@ impl AuthManager {
 
                 match custom_token {
                     Ok(custom_token) => {
-                        // Send synchronously since this is an important event in the sign up funnel and we
-                        // don't want to lose events if the user quits before the event queue is flushed.
-                        send_telemetry_sync_from_ctx!(
-                            TelemetryEvent::InitiateAnonymousUserSignup { entrypoint },
-                            ctx
-                        );
                         let login_options_url = me.login_options_url(&custom_token);
                         if cfg!(target_family = "wasm") {
                             #[cfg(target_family = "wasm")]

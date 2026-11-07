@@ -1,4 +1,3 @@
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::icons::Icon;
 use warpui::elements::{
     ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Expanded, Fill, Flex,
@@ -11,11 +10,8 @@ use warpui::{
     ViewContext, ViewHandle,
 };
 
-use crate::ai::blocklist::telemetry_banner::should_collect_ai_ugc_telemetry;
 use crate::appearance::Appearance;
 use crate::coding_entrypoints::glowing_editor::{GlowingEditor, GlowingEditorEvent};
-use crate::settings::PrivacySettings;
-use crate::TelemetryEvent;
 
 const ICON_MARGIN_LEFT: f32 = 12.;
 const ICON_MARGIN_RIGHT: f32 = 8.;
@@ -74,29 +70,7 @@ impl CreateProjectView {
     fn handle_editor_event(&mut self, event: &GlowingEditorEvent, ctx: &mut ViewContext<Self>) {
         match event {
             GlowingEditorEvent::Submit(prompt) => {
-                // Always send metadata event for custom prompts
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::CreateProjectPromptSubmitted {
-                        is_custom_prompt: true,
-                        suggested_prompt: None,
-                        is_ftux: self.is_ftux,
-                    },
-                    ctx
-                );
-
                 // Send content event only if UGC collection is enabled
-                let should_collect_ugc = should_collect_ai_ugc_telemetry(
-                    ctx,
-                    PrivacySettings::as_ref(ctx).is_telemetry_enabled,
-                );
-                if should_collect_ugc {
-                    send_telemetry_from_ctx!(
-                        TelemetryEvent::CreateProjectPromptSubmittedContent {
-                            custom_prompt: prompt.clone(),
-                        },
-                        ctx
-                    );
-                }
 
                 ctx.emit(CreateProjectEvent::SubmitPrompt(prompt.clone()));
             }
@@ -192,15 +166,6 @@ impl TypedActionView for CreateProjectView {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
             CreateProjectAction::SuggestionSelected { prompt } => {
-                // Always send metadata event with suggested prompt content (non-UGC)
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::CreateProjectPromptSubmitted {
-                        is_custom_prompt: false,
-                        suggested_prompt: Some(prompt.clone()),
-                        is_ftux: self.is_ftux,
-                    },
-                    ctx
-                );
                 ctx.emit(CreateProjectEvent::SubmitPrompt(prompt.clone()));
             }
         }

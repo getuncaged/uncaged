@@ -33,7 +33,6 @@ use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
 use crate::terminal::shell::ShellType;
 use crate::terminal::TerminalModel;
-use crate::{send_telemetry_from_ctx, TelemetryEvent};
 
 pub struct ShellCommandExecutor {
     active_session: ModelHandle<ActiveSession>,
@@ -133,13 +132,7 @@ impl ShellCommandExecutor {
                     Some(self.terminal_view_id),
                     ctx,
                 );
-                if let CommandExecutionPermission::Allowed(reason) = autoexecution_permission {
-                    send_telemetry_from_ctx!(
-                        TelemetryEvent::AutoexecutedAgentModeRequestedCommand { reason },
-                        ctx
-                    );
-                } else if let CommandExecutionPermission::Denied(reason) = autoexecution_permission
-                {
+                if let CommandExecutionPermission::Denied(reason) = autoexecution_permission {
                     if AppExecutionMode::as_ref(ctx).is_autonomous() {
                         log::warn!(
                             "Command denied during autonomous execution, reason: {reason:?}"
@@ -169,17 +162,6 @@ impl ShellCommandExecutor {
                             .has_agent_written_to_block(),
                         _ => false,
                     };
-
-                    if should_autoexecute {
-                        send_telemetry_from_ctx!(
-                            TelemetryEvent::CLISubagentActionExecuted {
-                                conversation_id: input.conversation_id,
-                                block_id: block_id.clone(),
-                                is_autoexecuted: true,
-                            },
-                            ctx
-                        );
-                    }
 
                     should_autoexecute
                 }

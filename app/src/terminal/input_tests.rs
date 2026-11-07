@@ -21,8 +21,6 @@ use warp_completer::completer::{
 use warp_completer::meta::Span;
 use warp_util::user_input::UserInput;
 use warpui::platform::WindowStyle;
-use warpui::r#async::Timer;
-use warpui::telemetry::EventPayload;
 use warpui::text::SelectionType;
 use warpui::{App, ReadModel, UpdateView, WindowId};
 use watcher::HomeDirectoryWatcher;
@@ -364,14 +362,12 @@ fn bootstrap_terminal(
             let BootstrappedEvent {
                 session_info,
                 restored_block_commands,
-                rcfiles_duration_seconds,
                 spawning_command,
             } = bootstrapped_event;
             sessions.initialize_bootstrapped_session(
                 *session_info,
                 spawning_command,
                 restored_block_commands,
-                rcfiles_duration_seconds,
                 ctx,
             );
         });
@@ -432,7 +428,6 @@ pub async fn add_window_with_bootstrapped_terminal_and_window_id(
             .into_iter()
             .map(|command| HistoryEntry::command_at_time(command, Local::now(), None, true))
             .collect_vec(),
-        rcfiles_duration_seconds: None,
         spawning_command: "test command".to_string(),
     };
     bootstrap_terminal(&terminal, bootstrapped_event, app);
@@ -1242,7 +1237,6 @@ fn queued_command_completion_preserves_draft() {
             input.latest_block_id = BlockId::new();
             input.handle_block_completed_event(
                 BlockCompletedEvent {
-                    block_latency_data: None,
                     block_type: BlockType::User(UserBlockCompleted {
                         index: BlockIndex::zero(),
                         serialized_block: Arc::new(SerializedBlock::new_for_test(
@@ -1258,7 +1252,6 @@ fn queued_command_completion_preserves_draft() {
                         num_output_lines: 0,
                         num_output_lines_truncated: 0,
                     }),
-                    num_secrets_obfuscated: 0,
                     block_index: BlockIndex::zero(),
                     block_id: BlockId::new(),
                     session_id: None,
@@ -6820,67 +6813,6 @@ fn test_source_less_locked_config_clears_decision_source() {
     });
 }
 
-#[test]
-fn test_input_buffer_submitted_telemetry_uses_raw_input_type_decision_source() {
-    fn input_buffer_submitted_events() -> Vec<serde_json::Value> {
-        warpui::telemetry::flush_events()
-            .into_iter()
-            .filter_map(|event| match event.payload {
-                EventPayload::NamedEvent { name, value, .. }
-                    if name == "AgentMode.NaturalLanguageDetection.InputBufferSubmitted" =>
-                {
-                    value
-                }
-                _ => None,
-            })
-            .collect_vec()
-    }
-    async fn wait_for_input_buffer_submitted_events() -> Vec<serde_json::Value> {
-        let mut events = Vec::new();
-        for _ in 0..100 {
-            events.extend(input_buffer_submitted_events());
-            if !events.is_empty() {
-                break;
-            }
-            Timer::after(Duration::from_millis(10)).await;
-        }
-        events
-    }
-
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-        crate::server::telemetry::clear_event_queue();
-
-        let terminal = add_window_with_bootstrapped_terminal(&mut app, None, None).await;
-        let input = terminal.read(&app, |terminal, _| terminal.input().clone());
-
-        input.update(&mut app, |input, ctx| {
-            input.ai_input_model().update(ctx, |input_model, ctx| {
-                input_model.set_input_config(
-                    InputConfig {
-                        input_type: InputType::Shell,
-                        is_locked: true,
-                    },
-                    true,
-                    None,
-                    ctx,
-                );
-            });
-            input.clear_buffer_and_reset_undo_stack(ctx);
-            input.user_insert("pwd", ctx);
-            input.input_enter(ctx);
-        });
-
-        let telemetry_events = wait_for_input_buffer_submitted_events().await;
-        assert_eq!(telemetry_events.len(), 1);
-        assert_eq!(telemetry_events[0]["input_type"], "Shell");
-        assert_eq!(telemetry_events[0]["is_locked"], true);
-        assert_eq!(
-            telemetry_events[0]["input_type_decision_source"],
-            serde_json::Value::Null
-        );
-    });
-}
 #[test]
 fn test_image_attachment_preserves_lock_state() {
     App::test((), |mut app| async move {

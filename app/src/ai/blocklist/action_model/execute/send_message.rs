@@ -7,7 +7,6 @@ use futures::future::BoxFuture;
 #[cfg(not(target_family = "wasm"))]
 use futures::future::Either;
 use futures::FutureExt;
-use warp_core::send_telemetry_from_ctx;
 #[cfg(not(target_family = "wasm"))]
 use warpui::r#async::Timer;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
@@ -19,11 +18,6 @@ use crate::ai::agent::{
 };
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
-use crate::ai::blocklist::telemetry::{
-    BlocklistOrchestrationTelemetryEvent, TeamAgentCommunicationFailedEvent,
-    TeamAgentCommunicationFailureReason, TeamAgentCommunicationKind,
-    TeamAgentCommunicationTransport, TeamAgentOrchestrationVersion,
-};
 use crate::server::server_api::ai::{SendAgentMessageRequest, SendAgentMessageResponse};
 use crate::server::server_api::ServerApiProvider;
 
@@ -181,7 +175,7 @@ impl SendMessageToAgentExecutor {
             async move {
                 send_agent_message_with_timeout(server_api, ai_client, task_id, request).await
             },
-            move |result, ctx| match result {
+            move |result, _| match result {
                 Ok(response) => {
                     let message_id = response.message_ids.into_iter().next().unwrap_or_default();
                     log::info!(
@@ -193,23 +187,6 @@ impl SendMessageToAgentExecutor {
                 }
                 Err(err) => {
                     let error_message = err.to_string();
-                    send_telemetry_from_ctx!(
-                        BlocklistOrchestrationTelemetryEvent::TeamAgentCommunicationFailed(
-                            TeamAgentCommunicationFailedEvent {
-                                communication_kind: TeamAgentCommunicationKind::Message,
-                                transport: TeamAgentCommunicationTransport::ServerApi,
-                                orchestration_version: TeamAgentOrchestrationVersion::V2,
-                                failure_reason: TeamAgentCommunicationFailureReason::RequestFailed,
-                                source_conversation_id: conversation_id,
-                                source_run_id: (!log_sender_run_id.is_empty())
-                                    .then(|| log_sender_run_id.clone()),
-                                target_count: Some(log_addresses.len()),
-                                lifecycle_event_type: None,
-                                error_message: Some(error_message.clone()),
-                            }
-                        ),
-                        ctx
-                    );
                     log::warn!(
                         "Failed to send child-agent message via server API: conversation_id={conversation_id:?} resolution={task_resolution:?} sender_run_id={log_sender_run_id:?} task_id={log_task_id:?} target_agent_ids={log_addresses:?} subject={log_subject:?} body_len={log_body_len} error={err:#}"
                     );

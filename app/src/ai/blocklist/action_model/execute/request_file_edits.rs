@@ -13,29 +13,20 @@ use futures::channel::oneshot;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use itertools::Itertools;
-pub(crate) use telemetry::MalformedFinalLineProxyEvent;
-#[allow(unused_imports)]
-pub use telemetry::{EditAcceptAndContinueClickedEvent, EditAcceptClickedEvent};
-pub use telemetry::{
-    EditReceivedEvent, EditResolvedEvent, EditStats, RequestFileEditsFormatKind,
-    RequestFileEditsTelemetryEvent,
-};
+pub use telemetry::RequestFileEditsFormatKind;
 use vec1::{vec1, Vec1};
-use warp_core::send_telemetry_from_ctx;
 use warp_util::file::FileSaveError;
 use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _, ViewHandle};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
-use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{
-    AIAgentAction, AIAgentActionId, AIAgentActionResultType, AIAgentActionType,
-    AIAgentOutputMessage, AIAgentOutputMessageType, AIIdentifiers, AnyFileContent, FileContext,
-    FileLocations, RequestFileEditsResult, UpdatedFileContext,
+    AIAgentAction, AIAgentActionId, AIAgentActionResultType, AIAgentActionType, AnyFileContent,
+    FileContext, FileLocations, RequestFileEditsResult, UpdatedFileContext,
 };
 use crate::ai::blocklist::inline_action::code_diff_view::{
     CodeDiffView, CodeDiffViewEvent, FileDiff,
 };
-use crate::ai::blocklist::{BlocklistAIPermissions, RequestedEditResolution};
+use crate::ai::blocklist::BlocklistAIPermissions;
 use crate::ai::paths::host_native_absolute_path;
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::{safe_warn, BlocklistAIHistoryModel};
@@ -159,17 +150,10 @@ impl RequestFileEditsExecutor {
             ));
         }
 
-        let identifiers = self
-            .generate_ai_identifiers(&input.conversation_id, id, ctx)
-            .unwrap_or_else(|| AIIdentifiers {
-                client_conversation_id: Some(input.conversation_id),
-                ..Default::default()
-            });
-
         let (result_tx, result_rx) = oneshot::channel();
         let mut result_tx = Some(result_tx);
 
-        ctx.subscribe_to_view(diff_view, move |_me, _, event, ctx| match event {
+        ctx.subscribe_to_view(diff_view, move |_me, _, event, _| match event {
             CodeDiffViewEvent::Rejected => {
                 let Some(result_tx) = result_tx.take() else {
                     return;
@@ -203,22 +187,6 @@ impl RequestFileEditsExecutor {
                     let _ = result_tx.send(RequestFileEditsResult::DiffApplicationFailed { error });
                     return;
                 }
-
-                let passive_diff = BlocklistAIHistoryModel::as_ref(ctx)
-                    .is_entirely_passive_conversation(&input.conversation_id);
-                send_telemetry_from_ctx!(
-                    RequestFileEditsTelemetryEvent::EditResolved(EditResolvedEvent {
-                        identifiers: identifiers.clone(),
-                        response: RequestedEditResolution::Accept,
-                        stats: EditStats {
-                            files_edited: updated_files.len(),
-                            lines_added: diff.lines_added,
-                            lines_removed: diff.lines_removed,
-                        },
-                        passive_diff,
-                    },),
-                    ctx
-                );
 
                 // Build a map of file path → content from the editor buffers.
                 // This avoids re-reading files from disk or the remote server.
@@ -263,33 +231,13 @@ impl RequestFileEditsExecutor {
             return futures::future::ready(()).boxed();
         };
 
-        let ai_identifiers = self
-            .generate_ai_identifiers(&input.conversation_id, id, ctx)
-            .unwrap_or_else(|| AIIdentifiers {
-                client_conversation_id: Some(input.conversation_id),
-                ..Default::default()
-            });
-
-        let passive_diff = BlocklistAIHistoryModel::as_ref(ctx)
-            .is_entirely_passive_conversation(&input.conversation_id);
-
-        send_telemetry_from_ctx!(
-            RequestFileEditsTelemetryEvent::EditReceived(EditReceivedEvent {
-                identifiers: ai_identifiers.clone(),
-                unique_files: file_edits.iter().map(|file| file.file()).unique().count(),
-                diffs: file_edits.len(),
-                passive_diff,
-            }),
-            ctx
-        );
-
         let (tx, rx) = oneshot::channel();
         let files = file_edits.clone();
         let id = id.clone();
 
-        let apply_future = self.apply_diff_model.update(ctx, |model, ctx| {
-            model.apply_diffs(files, &ai_identifiers, passive_diff, ctx)
-        });
+        let apply_future = self
+            .apply_diff_model
+            .update(ctx, |model, ctx| model.apply_diffs(files, ctx));
 
         ctx.spawn(
             async move {
@@ -364,39 +312,6 @@ impl RequestFileEditsExecutor {
         diff_view.update(ctx, |diff_view, ctx| {
             diff_view.set_candidate_diffs(diffs, ctx);
         });
-    }
-
-    fn generate_ai_identifiers(
-        &self,
-        conversation_id: &AIConversationId,
-        action_id: &AIAgentActionId,
-        ctx: &mut ModelContext<Self>,
-    ) -> Option<AIIdentifiers> {
-        let history_model = BlocklistAIHistoryModel::as_ref(ctx);
-        let conversation = history_model.conversation(conversation_id)?;
-
-        // Find the `AIAgentExchange` and its corresponding `AIAgentOutput` for this given action.
-        let (exchange, output) = conversation.all_exchanges().into_iter().find_map(|exchange| {
-            let output = exchange.output_status.output()?;
-            let contains_action = output.get().messages.iter().any(|step| {
-                matches!(step, AIAgentOutputMessage{ message: AIAgentOutputMessageType::Action(AIAgentAction { id, .. }), .. } if id == action_id)
-            });
-
-            contains_action.then_some((exchange, output))
-        })?;
-
-        let server_output_id = output.get().server_output_id.clone();
-        let model_id = output.get().model_info.as_ref().map(|m| m.model_id.clone());
-        Some(AIIdentifiers {
-            client_conversation_id: Some(*conversation_id),
-            client_exchange_id: Some(exchange.id),
-            server_output_id,
-            server_conversation_id: conversation
-                .server_conversation_token()
-                .cloned()
-                .map(Into::into),
-            model_id,
-        })
     }
 }
 

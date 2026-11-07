@@ -6,19 +6,14 @@ use itertools::Itertools;
 use warpui::SingletonEntity;
 use warpui::{Entity, EntityId, ModelContext, ModelHandle};
 
-#[cfg(not(target_family = "wasm"))]
-use super::get_server_output_id;
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
-use crate::terminal::model::session::active_session::ActiveSession;
 #[cfg(not(target_family = "wasm"))]
-use crate::{
-    ai::{
-        agent::{AIAgentAction, AIAgentActionResultType, CallMCPToolResult},
-        blocklist::{action_model::AIAgentActionType, BlocklistAIPermissions},
-        mcp::TemplatableMCPServerManager,
-    },
-    send_telemetry_from_app_ctx, TelemetryEvent,
+use crate::ai::{
+    agent::{AIAgentAction, AIAgentActionResultType, CallMCPToolResult},
+    blocklist::{action_model::AIAgentActionType, BlocklistAIPermissions},
+    mcp::TemplatableMCPServerManager,
 };
+use crate::terminal::model::session::active_session::ActiveSession;
 
 pub struct CallMCPToolExecutor {
     _active_session: ModelHandle<ActiveSession>,
@@ -85,7 +80,6 @@ impl CallMCPToolExecutor {
 
         #[cfg(not(target_family = "wasm"))]
         {
-            let server_output_id = get_server_output_id(input.conversation_id, ctx);
             let AIAgentAction {
                 action:
                     AIAgentActionType::CallMCPTool {
@@ -100,7 +94,6 @@ impl CallMCPToolExecutor {
             };
 
             let name_owned = name.to_owned();
-            let name_clone = name_owned.clone();
 
             let serde_json::Value::Object(mut arguments) = input.clone() else {
                 return ActionExecution::Sync(AIAgentActionResultType::CallMCPTool(
@@ -138,17 +131,16 @@ impl CallMCPToolExecutor {
                 ));
             };
 
-            let name_owned_inner = name_owned.clone();
             ActionExecution::new_async(
                 async move {
                     reconnecting_peer
                         .call_tool(
-                            rmcp::model::CallToolRequestParams::new(name_owned_inner)
+                            rmcp::model::CallToolRequestParams::new(name_owned)
                                 .with_arguments(arguments),
                         )
                         .await
                 },
-                move |res, ctx| handle_call_tool_result(res, server_output_id, name_clone, ctx),
+                |res, _| handle_call_tool_result(res),
             )
         }
     }
@@ -293,9 +285,6 @@ mod tests;
 #[cfg(not(target_family = "wasm"))]
 fn handle_call_tool_result(
     res: Result<rmcp::model::CallToolResult, rmcp::ServiceError>,
-    server_output_id: Option<crate::ai::blocklist::action_model::execute::ServerOutputId>,
-    tool_name: String,
-    ctx: &warpui::AppContext,
 ) -> AIAgentActionResultType {
     let action_result = match res {
         Ok(result) => {
@@ -325,42 +314,14 @@ fn handle_call_tool_result(
                             content_str
                         }
                     });
-                send_telemetry_from_app_ctx!(
-                    TelemetryEvent::MCPToolCallAccepted {
-                        server_output_id,
-                        tool_call: tool_name,
-                        error: Some(
-                            crate::server::telemetry::MCPServerTelemetryError::ResponseError(
-                                error_message.clone()
-                            )
-                        ),
-                    },
-                    ctx
-                );
                 CallMCPToolResult::Error(error_message)
             } else {
-                send_telemetry_from_app_ctx!(
-                    TelemetryEvent::MCPToolCallAccepted {
-                        server_output_id,
-                        tool_call: tool_name,
-                        error: None,
-                    },
-                    ctx
-                );
                 CallMCPToolResult::Success { result }
             }
         }
         Err(e) => {
             let error_message = e.to_string();
             log::warn!("Executing MCP tool resulted in error: {e:?}");
-            send_telemetry_from_app_ctx!(
-                TelemetryEvent::MCPToolCallAccepted {
-                    server_output_id,
-                    tool_call: tool_name,
-                    error: Some(rmcp::RmcpError::Service(e).into()),
-                },
-                ctx
-            );
             CallMCPToolResult::Error(error_message)
         }
     };

@@ -14,12 +14,9 @@ use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent as _, UiComponentStyles};
 use warpui::{AppContext, Element, Entity, SingletonEntity as _, View, ViewContext, ViewHandle};
 
-use crate::features::FeatureFlag;
 use crate::menu::MenuItemFields;
 use crate::modal::{Modal, ModalEvent, MODAL_PADDING, MODAL_WIDTH};
 use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
-use crate::send_telemetry_from_ctx;
-use crate::server::telemetry::{AutoReloadModalAction, TelemetryEvent};
 use crate::settings_view::create_discount_badge;
 use crate::ui_components::blended_colors;
 use crate::view_components::{Dropdown, DropdownAction, ToastFlavor};
@@ -47,20 +44,6 @@ pub struct EnableAutoReloadModal {
     modal: ViewHandle<Modal<EnableAutoReloadModalBody>>,
 }
 
-/// Called when user clicks the 'x' OR cancel button
-fn send_auto_reload_dismissed_telemetry<V: View>(ctx: &mut ViewContext<V>) {
-    send_telemetry_from_ctx!(
-        TelemetryEvent::AutoReloadModalClosed {
-            action: AutoReloadModalAction::Dismissed,
-            selected_credits: None,
-            banner_toggle_flag_enabled: FeatureFlag::BuildPlanAutoReloadBannerToggle.is_enabled(),
-            post_purchase_modal_flag_enabled: FeatureFlag::BuildPlanAutoReloadPostPurchaseModal
-                .is_enabled(),
-        },
-        ctx
-    );
-}
-
 impl EnableAutoReloadModalBody {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
         ctx.subscribe_to_model(
@@ -82,21 +65,6 @@ impl EnableAutoReloadModalBody {
                             me.update_workspace_settings_loading = false;
 
                             // Emit telemetry for successful auto-reload enablement
-                            let selected_credits = me
-                                .addon_credits_options
-                                .get(me.selected_denomination_index)
-                                .map(|option| option.credits);
-                            send_telemetry_from_ctx!(
-                                TelemetryEvent::AutoReloadModalClosed {
-                                    action: AutoReloadModalAction::EnabledAutoReload,
-                                    selected_credits,
-                                    banner_toggle_flag_enabled:
-                                        FeatureFlag::BuildPlanAutoReloadBannerToggle.is_enabled(),
-                                    post_purchase_modal_flag_enabled:
-                                        FeatureFlag::BuildPlanAutoReloadPostPurchaseModal.is_enabled(),
-                                },
-                                ctx
-                            );
 
                             ctx.emit(EnableAutoReloadModalBodyEvent::ShowToast {
                                 message: "Auto-reload settings updated".to_string(),
@@ -381,7 +349,6 @@ impl warpui::TypedActionView for EnableAutoReloadModalBody {
                 ctx.notify();
             }
             Action::Cancel => {
-                send_auto_reload_dismissed_telemetry(ctx);
                 ctx.emit(EnableAutoReloadModalBodyEvent::Close);
             }
             Action::Enable => {
@@ -433,7 +400,6 @@ impl EnableAutoReloadModal {
         ctx.subscribe_to_view(&modal, |_, _, event, ctx| match event {
             ModalEvent::Close => {
                 // "x" clicked
-                send_auto_reload_dismissed_telemetry(ctx);
                 ctx.emit(EnableAutoReloadModalEvent::Close);
             }
         });

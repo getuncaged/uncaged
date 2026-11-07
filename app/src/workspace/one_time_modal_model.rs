@@ -3,14 +3,10 @@ use std::future::Future;
 use ai::api_keys::ApiKeyManager;
 use settings::Setting as _;
 use warp_core::features::FeatureFlag;
-use warp_core::send_telemetry_from_ctx;
 use warp_util::sync::Condition;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, WindowId};
 
 use super::hoa_onboarding;
-use super::view::free_ai_removal_modal::{
-    FreeAiRemovalModalTelemetryEvent, FreeAiRemovalModalVariant,
-};
 use crate::ai::{AIRequestUsageModel, AIRequestUsageModelEvent};
 use crate::auth::auth_manager::AuthManagerEvent;
 use crate::auth::{AuthManager, AuthStateProvider};
@@ -475,14 +471,6 @@ impl OneTimeModalModel {
         }
 
         let should_show = !matches!(ChannelState::channel(), Channel::Integration);
-        if should_show {
-            send_telemetry_from_ctx!(
-                FreeAiRemovalModalTelemetryEvent::Shown {
-                    variant: FreeAiRemovalModalVariant::Notice,
-                },
-                ctx
-            );
-        }
         self.set_free_ai_removal_modal_open(should_show, ctx);
         should_show
     }

@@ -107,7 +107,7 @@ use crate::util::bindings::{
 use crate::view_components::{Dropdown, DropdownItem, FilterableDropdown};
 use crate::workspace::tab_settings::{NewTabPlacement, TabSettings, TabSettingsChangedEvent};
 use crate::workspace::WorkspaceAction;
-use crate::{report_if_error, send_telemetry_from_ctx, themes, GlobalResourceHandles};
+use crate::{report_if_error, themes, GlobalResourceHandles};
 
 cfg_if::cfg_if! {
     if #[cfg(target_os = "macos")] {
@@ -2107,8 +2107,6 @@ impl TypedActionView for FeaturesPageView {
                 });
             }
         }
-
-        send_telemetry_from_ctx!(action.telemetry_event(ctx), ctx);
     }
 }
 

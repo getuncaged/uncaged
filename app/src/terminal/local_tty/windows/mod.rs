@@ -343,8 +343,8 @@ impl Pty {
     ) -> anyhow::Result<Self> {
         let size = options.size;
         PtySpawner::handle(ctx)
-            .update(ctx, |pty_spawner, ctx| {
-                pty_spawner.spawn_pty(options, event_loop_tx, ctx)
+            .update(ctx, |pty_spawner, _| {
+                pty_spawner.spawn_pty(options, event_loop_tx)
             })
             .map(
                 |(

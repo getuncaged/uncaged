@@ -179,14 +179,9 @@ pub enum AIContextMenuAction {
 }
 
 pub enum AIContextMenuEvent {
-    Close {
-        query_length: usize,
-        item_count: Option<usize>,
-    },
+    Close,
     ResultAccepted {
         action: AIContextMenuSearchableAction,
-        query_length: usize,
-        item_count: Option<usize>,
     },
     CategorySelected {
         category: AIContextMenuCategory,
@@ -312,12 +307,8 @@ impl TypedActionView for AIContextMenu {
                 self.select_current_item(ctx);
             }
             AIContextMenuAction::ResultAccepted { action } => {
-                let query_length = self.query(ctx).len();
-                let item_count = self.item_count(ctx);
                 ctx.emit(AIContextMenuEvent::ResultAccepted {
                     action: action.clone(),
-                    query_length,
-                    item_count,
                 });
             }
             AIContextMenuAction::CategorySelected { category } => {
@@ -695,8 +686,6 @@ impl AIContextMenu {
 
     pub fn close(&mut self, ctx: &mut ViewContext<Self>) {
         self.num_consecutive_empty_results_events = 0;
-        let query_length = self.query(ctx).len();
-        let item_count = self.item_count(ctx);
         let categories = Self::get_categories_for_mode(
             self.state.is_ai_or_autodetect_mode,
             self.state.is_in_ambient_agent,
@@ -706,10 +695,7 @@ impl AIContextMenu {
         if categories.len() > 1 {
             self.state.navigation_state = NavigationState::MainMenu;
         }
-        ctx.emit(AIContextMenuEvent::Close {
-            query_length,
-            item_count,
-        });
+        ctx.emit(AIContextMenuEvent::Close);
         ctx.notify();
     }
 

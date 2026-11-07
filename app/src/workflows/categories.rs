@@ -32,8 +32,6 @@ use super::WorkflowSource;
 use crate::appearance::Appearance;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::editor::Event as EditorEvent;
-use crate::send_telemetry_from_ctx;
-use crate::server::telemetry::TelemetryEvent;
 use crate::themes::theme::{self, Blend, WarpTheme};
 use crate::user_config::{WarpConfig, WarpConfigUpdateEvent};
 use crate::util::bindings::CustomAction;
@@ -1262,7 +1260,6 @@ impl VoltronFeatureViewMeta for CategoriesView {
 
         self.load_cloud_workflows(ctx);
 
-        send_telemetry_from_ctx!(TelemetryEvent::OpenWorkflowSearch, ctx);
         self.search_term = String::new();
         ctx.notify();
     }

@@ -133,7 +133,6 @@ pub enum AiSetupChoice {
     ThirdParty,
 }
 
-
 /// The access method selected on the "Choose how to access AI" slide (Warp Agent path).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AiAccessChoice {
@@ -141,7 +140,6 @@ pub enum AiAccessChoice {
     Subscription,
     SetUpLater,
 }
-
 
 /// Which opt-out entry point opened the "Are you sure you don't want AI?" modal.
 /// Determines where "Give me AI features" routes the user on cancel.

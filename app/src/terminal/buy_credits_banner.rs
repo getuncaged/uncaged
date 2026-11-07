@@ -28,9 +28,7 @@ use crate::auth::AuthStateProvider;
 use crate::features::FeatureFlag;
 use crate::menu::MenuItemFields;
 use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
-use crate::send_telemetry_from_ctx;
 use crate::server::ids::ServerId;
-use crate::server::telemetry::{OutOfCreditsBannerAction, TelemetryEvent};
 use crate::settings_view::create_discount_badge;
 use crate::view_components::{Dropdown, DropdownAction};
 use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
@@ -150,16 +148,6 @@ impl BuyCreditsBanner {
                 // Things we always do:
                 // - emit telemetry
                 // - hide banner
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::OutOfCreditsBannerClosed {
-                        action: OutOfCreditsBannerAction::CreditsPurchased,
-                        selected_credits,
-                        auto_reload_checkbox_enabled: self.auto_reload_enabled,
-                        banner_toggle_flag_enabled,
-                        post_purchase_modal_flag_enabled,
-                    },
-                    ctx
-                );
 
                 self.should_display_banner = false;
                 AIRequestUsageModel::handle(ctx).update(ctx, |ai_request_usage_model, ctx| {
@@ -862,19 +850,6 @@ impl warpui::TypedActionView for BuyCreditsBanner {
                 ctx.notify();
             }
             Action::Close => {
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::OutOfCreditsBannerClosed {
-                        action: OutOfCreditsBannerAction::Dismissed,
-                        selected_credits: None,
-                        auto_reload_checkbox_enabled: self.auto_reload_enabled,
-                        banner_toggle_flag_enabled: FeatureFlag::BuildPlanAutoReloadBannerToggle
-                            .is_enabled(),
-                        post_purchase_modal_flag_enabled:
-                            FeatureFlag::BuildPlanAutoReloadPostPurchaseModal.is_enabled(),
-                    },
-                    ctx
-                );
-
                 self.should_display_banner = false;
                 AIRequestUsageModel::handle(ctx).update(ctx, |model, ctx| {
                     model.dismiss_buy_credits_banner(ctx);

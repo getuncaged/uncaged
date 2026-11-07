@@ -3,7 +3,6 @@ use std::fmt::{Debug, Formatter};
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::sync::Arc;
-use std::time::Duration;
 
 use instant::Instant;
 
@@ -13,7 +12,6 @@ use super::model::block::BlockId;
 use super::model::session::{SessionId, SessionInfo};
 use super::model::terminal_model::{BlockIndex, ExitReason};
 use crate::server::ids::SyncId;
-use crate::server::telemetry::ImageProtocol;
 use crate::terminal::model::block::{BlockMetadata, SerializedBlock};
 use crate::terminal::model::completions::ShellCompletion;
 use crate::terminal::model::terminal_model::HandlerEvent;
@@ -108,7 +106,6 @@ pub enum Event {
     ImageReceived {
         image_id: u32,
         image_data: Vec<u8>,
-        image_protocol: ImageProtocol,
     },
     BootstrapPrecmdDone,
     /// A pluggable notification triggered via OSC 9 or OSC 777 escape sequences.
@@ -162,18 +159,11 @@ pub struct BootstrappedEvent {
     // functionally needs to be wrapped in an `Box`.
     pub session_info: Box<SessionInfo>,
     pub restored_block_commands: Vec<HistoryEntry>,
-    /// The time we spent sourcing the user's rcfiles, in seconds.  This may be
-    /// None if the information was not provided by the shell.
-    pub rcfiles_duration_seconds: Option<f64>,
 }
 
 #[derive(Clone)]
 pub struct BlockCompletedEvent {
-    /// This will be None when we don't want to collect telemetry
-    /// for this block's latency.
-    pub block_latency_data: Option<BlockLatencyData>,
     pub block_type: BlockType,
-    pub num_secrets_obfuscated: usize,
     pub block_index: BlockIndex,
     pub block_id: BlockId,
     pub session_id: Option<SessionId>,
@@ -182,26 +172,13 @@ pub struct BlockCompletedEvent {
 
 #[derive(Clone)]
 pub struct AfterBlockCompletedEvent {
-    /// The delay from the CommandFinished ansi hook to the Precmd hook.
-    /// This value is only provided for the blocks that the user directly
-    /// executes (so it's not provided if this is a restored block from session
-    /// restoration or a bootstrapping block).
-    pub command_finished_to_precmd_delay: Option<Duration>,
     pub block_type: BlockType,
-    pub num_secrets_obfuscated: usize,
 
     /// If the completed block was a workflow, this is its id.
     pub cloud_workflow_id: Option<SyncId>,
 
     /// If the completed block had an env var object associated.
     pub cloud_env_var_collection_id: Option<SyncId>,
-}
-
-#[derive(Clone)]
-pub struct BlockLatencyData {
-    pub command: &'static str,
-    /// When the block's command grid was started (i.e. when the user hit enter).
-    pub started_at: Instant,
 }
 
 #[derive(Clone, Debug)]

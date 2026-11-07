@@ -35,7 +35,6 @@ impl WslInfo {
                 // This error merely occurs when user doesn't have WSL installed/enabled.
                 Error::MainKey(err) => {
                     log::info!("{err:#}");
-                    send_telemetry_from_ctx!(TelemetryEvent::WSLRegistryError, ctx);
                 }
                 _ => {
                     log::error!("{err:#}");

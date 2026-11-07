@@ -9,7 +9,6 @@ use warp_core::features::FeatureFlag;
 use warpui::r#async::FutureExt as AsyncFutureExt;
 use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
-use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{
     AIAgentAction, AIAgentActionResultType, AIAgentActionType, FileGlobResult, FileGlobV2Match,
     FileGlobV2Result,
@@ -21,23 +20,17 @@ use crate::terminal::model::session::command_executor::shell_quote_arg;
 use crate::terminal::model::session::{ExecuteCommandOptions, Session};
 use crate::terminal::shell::ShellType;
 use crate::terminal::ShellLaunchData;
-use crate::{send_telemetry_from_app_ctx, TelemetryEvent};
 
 const FILE_GLOB_TIMEOUT: Duration = Duration::from_secs(10);
 
 use super::{
-    get_server_output_id, is_git_repository, ActionExecution, AnyActionExecution,
-    ExecuteActionInput, PreprocessActionInput,
+    is_git_repository, ActionExecution, AnyActionExecution, ExecuteActionInput,
+    PreprocessActionInput,
 };
 
 pub struct FileGlobExecutor {
     active_session: ModelHandle<ActiveSession>,
     terminal_view_id: EntityId,
-}
-
-fn log_file_glob_error(conversation_id: AIConversationId, ctx: &mut AppContext) {
-    let server_output_id = get_server_output_id(conversation_id, ctx);
-    send_telemetry_from_app_ctx!(TelemetryEvent::FileGlobToolFailed { server_output_id }, ctx);
 }
 
 impl FileGlobExecutor {
@@ -127,7 +120,6 @@ impl FileGlobExecutor {
         let session = self.active_session.as_ref(ctx).session(ctx);
 
         let patterns_clone = patterns.clone();
-        let conversation_id_clone = input.conversation_id;
         let is_file_glob_v2 = is_file_glob_v2(&input);
         ActionExecution::new_async(
             async move {
@@ -139,20 +131,10 @@ impl FileGlobExecutor {
                     Err(_) => Err(anyhow::anyhow!("File glob operation timed out")),
                 }
             },
-            move |result, ctx| match result {
+            move |result, _| match result {
                 Ok(file_glob_result) => {
-                    match file_glob_result {
-                        FileGlobV2Result::Error(ref e) => {
-                            log::warn!("Executing file_glob resulted in error: {e:?}");
-                            log_file_glob_error(conversation_id_clone, ctx);
-                        }
-                        FileGlobV2Result::Success { .. } => {
-                            send_telemetry_from_app_ctx!(
-                                TelemetryEvent::FileGlobToolSucceeded,
-                                ctx
-                            );
-                        }
-                        _ => {}
+                    if let FileGlobV2Result::Error(ref e) = file_glob_result {
+                        log::warn!("Executing file_glob resulted in error: {e:?}");
                     }
                     // Convert FileGlobV2Result to FileGlobResult if the request was not V2.
                     if is_file_glob_v2 {
@@ -163,7 +145,6 @@ impl FileGlobExecutor {
                 }
                 Err(e) => {
                     log::warn!("Failed to execute file_glob: {e:?}");
-                    log_file_glob_error(conversation_id_clone, ctx);
                     if is_file_glob_v2 {
                         AIAgentActionResultType::FileGlobV2(FileGlobV2Result::Error(e.to_string()))
                     } else {

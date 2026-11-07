@@ -35,7 +35,6 @@ use warpui::{
 
 use crate::appearance::Appearance;
 use crate::editor::{EditOrigin, EditorView, Event as EditorEvent};
-use crate::server::telemetry::TelemetryEvent;
 use crate::settings_view::settings_page::{
     build_toggle_element, render_segmented_control, render_settings_description, render_slider_row,
     render_sub_header, render_sub_header_with_description, settings_card,
@@ -45,7 +44,7 @@ use crate::settings_view::settings_page::{
 use crate::themes::theme::{CustomTheme, InMemoryThemeOptions, ThemeKind};
 use crate::themes::theme_background_image;
 use crate::window_settings::{BackgroundBlurRadius, BackgroundOpacity, WindowSettings};
-use crate::{report_if_error, send_telemetry_from_ctx, user_config};
+use crate::{report_if_error, user_config};
 
 /// The number of editable color slots in the manual editor (background + optional gradient bottom,
 /// foreground, accent, cursor, then 8 normal + 8 bright ANSI colors).
@@ -459,7 +458,6 @@ impl ThemeCreatorBody {
         let theme = self.generated_theme(&theme_options);
         let mut errored = true;
         ThemeCreatorBody::write_theme(&theme, dir, theme_yaml_file_name, image_option, |path| {
-            send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
             ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
                 theme: ThemeKind::Custom(CustomTheme::new(theme_name, path)),
             });
@@ -773,7 +771,6 @@ impl ThemeCreatorBody {
 
         let mut errored = true;
         ThemeCreatorBody::write_theme(&theme, dir, file_name, image_option, |path| {
-            send_telemetry_from_ctx!(TelemetryEvent::CreateCustomTheme, ctx);
             ctx.emit(ThemeCreatorBodyEvent::SetCustomTheme {
                 theme: ThemeKind::Custom(CustomTheme::new(name.clone(), path)),
             });

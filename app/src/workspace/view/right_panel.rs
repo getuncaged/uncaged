@@ -33,7 +33,6 @@ use crate::code_review::code_review_view::{
     CodeReviewViewEvent, ReviewActionTargetProvider, CONTENT_LEFT_MARGIN, CONTENT_RIGHT_MARGIN,
 };
 use crate::code_review::diff_state::DiffStateModel;
-use crate::code_review::telemetry_event::CodeReviewContextDestination;
 use crate::drive::panel::{MAX_SIDEBAR_WIDTH_RATIO, MIN_SIDEBAR_WIDTH};
 use crate::pane_group::pane::view::header::components::HEADER_EDGE_PADDING;
 use crate::pane_group::pane::view::header::PANE_HEADER_HEIGHT;
@@ -72,11 +71,7 @@ pub enum ReviewDestination {
 
 /// Result of attempting to submit review comments to a terminal.
 pub enum ReviewSubmissionResult {
-    Success {
-        comment_count: usize,
-        file_count: usize,
-        destination: CodeReviewContextDestination,
-    },
+    Success,
     Error,
 }
 
@@ -1325,35 +1320,16 @@ impl RightPanelView {
             return;
         };
 
-        let comment_count = comments.comments.len();
-        let file_count = comments
-            .comments
-            .iter()
-            .filter_map(|c| {
-                c.target
-                    .absolute_file_path()
-                    .map(LocalOrRemotePath::display_path)
-            })
-            .collect::<std::collections::HashSet<_>>()
-            .len();
-
         let active_cli_agent = terminal_view.read(ctx, |t, ctx| t.active_cli_agent(ctx));
 
-        let (result, destination) = if active_cli_agent.is_some() {
-            let r = terminal_view.update(ctx, |terminal, ctx| {
+        let result = if active_cli_agent.is_some() {
+            terminal_view.update(ctx, |terminal, ctx| {
                 terminal.send_review_to_cli_agent_or_rich_input(&comments, ctx)
-            });
-            let dest = if terminal_view.read(ctx, |t, ctx| t.is_cli_agent_rich_input_open(ctx)) {
-                CodeReviewContextDestination::RichInput
-            } else {
-                CodeReviewContextDestination::Pty
-            };
-            (r, dest)
+            })
         } else {
-            let r = terminal_view.update(ctx, |terminal, ctx| {
+            terminal_view.update(ctx, |terminal, ctx| {
                 terminal.send_inline_review(comments, ctx)
-            });
-            (r, CodeReviewContextDestination::AgentReview)
+            })
         };
 
         if let Err(err) = &result {
@@ -1361,11 +1337,7 @@ impl RightPanelView {
         }
 
         let submission_result = if result.is_ok() {
-            ReviewSubmissionResult::Success {
-                comment_count,
-                file_count,
-                destination,
-            }
+            ReviewSubmissionResult::Success
         } else {
             ReviewSubmissionResult::Error
         };

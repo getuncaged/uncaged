@@ -46,7 +46,6 @@ pub enum AgentAutonomy {
     None,
 }
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AgentDevelopmentSettings {
     /// The selected model's ID.

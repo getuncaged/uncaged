@@ -30,7 +30,6 @@ use crate::ai::predict::prompt_suggestions::ACCEPT_PROMPT_SUGGESTION_KEYBINDING;
 use crate::ai::AIRequestUsageModel;
 use crate::appearance::Appearance;
 use crate::server::ids::ServerId;
-use crate::server::telemetry::InteractionSource;
 use crate::settings::InputSettings;
 use crate::terminal::view::passive_suggestions::PromptSuggestionResolution;
 use crate::terminal::view::{ContextMenuAction, InputType, PromptSuggestion, TerminalAction};
@@ -436,9 +435,7 @@ impl View for PromptSuggestionsView {
                             );
                         } else {
                             ctx.dispatch_typed_action(TerminalAction::ResolvePromptSuggestion(
-                                PromptSuggestionResolution::Accept {
-                                    interaction_source: InteractionSource::Button,
-                                },
+                                PromptSuggestionResolution::Accept,
                             ));
                         }
                     }),

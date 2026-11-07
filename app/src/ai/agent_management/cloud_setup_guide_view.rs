@@ -20,13 +20,12 @@ use warpui::text_layout::TextStyle;
 use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
 
-use crate::ai::agent_management::telemetry::{AgentManagementTelemetryEvent, SetupGuideStep};
+use crate::ai::agent_management::telemetry::SetupGuideStep;
 use crate::ai::blocklist::code_block::{
     render_code_block_plain, CodeBlockOptions, CodeSnippetButtonHandles,
 };
 use crate::appearance::Appearance;
 use crate::completer::SessionAgnosticContext;
-use crate::send_telemetry_from_ctx;
 use crate::view_components::action_button::{ActionButton, SecondaryTheme};
 use crate::workflows::workflow::{Argument, ArgumentType, Workflow};
 use crate::workflows::WorkflowType;
@@ -636,31 +635,17 @@ impl TypedActionView for CloudSetupGuideView {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            CloudSetupGuideAction::CopyCode { code, step } => {
-                send_telemetry_from_ctx!(
-                    AgentManagementTelemetryEvent::SetupGuideStepCopy { step: *step },
-                    ctx
-                );
+            CloudSetupGuideAction::CopyCode { code, .. } => {
                 ctx.clipboard()
                     .write(ClipboardContent::plain_text(code.clone()));
             }
-            CloudSetupGuideAction::RunWorkflow { workflow, step } => {
-                send_telemetry_from_ctx!(
-                    AgentManagementTelemetryEvent::SetupGuideStepRun { step: *step },
-                    ctx
-                );
+            CloudSetupGuideAction::RunWorkflow { workflow, .. } => {
                 ctx.emit(CloudSetupGuideEvent::OpenNewTabAndInsertWorkflow(
                     (**workflow).clone(),
                 ));
             }
             CloudSetupGuideAction::VisitOz => {
                 ctx.open_url(OZ_URL);
-                send_telemetry_from_ctx!(
-                    AgentManagementTelemetryEvent::SetupGuideStepRun {
-                        step: SetupGuideStep::VisitOz
-                    },
-                    ctx
-                );
             }
             CloudSetupGuideAction::OpenDocs { docs } => {
                 let url = match docs {
@@ -669,10 +654,6 @@ impl TypedActionView for CloudSetupGuideView {
                     SetupGuideDocs::Integration => DOCS_URL,
                 };
                 ctx.open_url(url);
-                send_telemetry_from_ctx!(
-                    AgentManagementTelemetryEvent::SetupGuideDocsLink { docs: *docs },
-                    ctx
-                );
             }
         }
     }

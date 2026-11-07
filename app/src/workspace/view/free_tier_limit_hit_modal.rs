@@ -3,7 +3,6 @@ use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use thousands::Separable;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::{Fill, WarpTheme};
 use warp_graphql::billing::{PlanPricing, StripeSubscriptionPlan};
@@ -26,7 +25,6 @@ use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::TelemetryEvent;
 
 const BUTTON_DIAMETER: f32 = 20.;
 const MODAL_HEIGHT: f32 = 440.;
@@ -440,18 +438,11 @@ impl TypedActionView for FreeTierLimitHitModal {
         match action {
             FreeTierLimitHitModalAction::Close => {
                 ctx.emit(FreeTierLimitHitModalEvent::Close);
-
-                send_telemetry_from_ctx!(TelemetryEvent::FreeTierLimitHitInterstitialClosed, ctx);
             }
             FreeTierLimitHitModalAction::OpenUpgrade => {
                 let upgrade_url = Self::get_upgrade_url(ctx);
                 ctx.open_url(&upgrade_url);
                 ctx.emit(FreeTierLimitHitModalEvent::Close);
-
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::FreeTierLimitHitInterstitialUpgradeButtonClicked,
-                    ctx
-                );
             }
             FreeTierLimitHitModalAction::OpenUrl(url) => {
                 ctx.open_url(url);

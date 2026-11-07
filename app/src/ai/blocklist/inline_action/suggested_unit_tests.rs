@@ -20,7 +20,6 @@ use crate::ai::agent::{AIAgentActionId, AIIdentifiers};
 use crate::ai::predict::prompt_suggestions::{
     ACCEPT_PROMPT_SUGGESTION_KEYBINDING, REJECT_PROMPT_SUGGESTION_KEYSTROKE,
 };
-use crate::server::telemetry::ToggleCodeSuggestionsSettingSource;
 use crate::settings::AISettings;
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
@@ -30,7 +29,6 @@ use crate::view_components::action_button::{
 use crate::view_components::compactible_action_button::{
     render_compact_and_regular_button_rows, CompactibleActionButton, MEDIUM_SIZE_SWITCH_THRESHOLD,
 };
-use crate::{send_telemetry_from_ctx, TelemetryEvent};
 
 const ACCEPT_LABEL: &str = "Generate tests";
 const CANCEL_LABEL: &str = "Dismiss";
@@ -404,22 +402,12 @@ impl TypedActionView for SuggestedUnitTestsView {
             SuggestedUnitTestsAction::Accept => ctx.emit(SuggestedUnitTestsEvent::Accept),
             SuggestedUnitTestsAction::Cancel => ctx.emit(SuggestedUnitTestsEvent::Cancel),
             SuggestedUnitTestsAction::ToggleSetting => {
-                let checked = AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    settings
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let _ = settings
                         .code_suggestions_enabled_internal
-                        .toggle_and_save_value(ctx)
+                        .toggle_and_save_value(ctx);
                 });
                 ctx.notify();
-
-                if let Ok(checked) = checked {
-                    send_telemetry_from_ctx!(
-                        TelemetryEvent::ToggleCodeSuggestionsSetting {
-                            source: ToggleCodeSuggestionsSettingSource::Speedbump,
-                            is_code_suggestions_enabled: checked,
-                        },
-                        ctx
-                    );
-                }
             }
             SuggestedUnitTestsAction::OpenSettings => {
                 ctx.emit(SuggestedUnitTestsEvent::OpenSettings)

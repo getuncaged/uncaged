@@ -5,7 +5,6 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -366,7 +365,6 @@ pub enum DiffStateModelEvent {
     /// Event dispatched when new diffs are computed (full reload).
     NewDiffsComputed {
         diffs: Option<Arc<GitDiffWithBaseContent>>,
-        load_duration: Option<Duration>,
     },
     /// Event dispatched when a single file's diff is updated incrementally.
     SingleFileUpdated {
@@ -445,13 +443,9 @@ impl DiffStateModel {
             DiffStateModelEvent::CurrentBranchChanged => {
                 ctx.emit(DiffStateModelEvent::CurrentBranchChanged);
             }
-            DiffStateModelEvent::NewDiffsComputed {
-                diffs,
-                load_duration,
-            } => {
+            DiffStateModelEvent::NewDiffsComputed { diffs } => {
                 ctx.emit(DiffStateModelEvent::NewDiffsComputed {
                     diffs: diffs.clone(),
-                    load_duration: *load_duration,
                 });
             }
             DiffStateModelEvent::SingleFileUpdated { path, diff } => {
@@ -571,13 +565,12 @@ impl DiffStateModel {
         &self,
         mode: DiffMode,
         should_fetch_base: bool,
-        track_load_duration: bool,
         ctx: &mut ModelContext<Self>,
     ) {
         match self {
             Self::Local(local) => {
                 local.update(ctx, |local, ctx| {
-                    local.set_diff_mode(mode, should_fetch_base, track_load_duration, ctx);
+                    local.set_diff_mode(mode, should_fetch_base, ctx);
                 });
             }
         }
@@ -600,13 +593,12 @@ impl DiffStateModel {
     pub(crate) fn load_diffs_for_current_repo(
         &self,
         should_fetch_base: bool,
-        track_load_duration: bool,
         ctx: &mut ModelContext<Self>,
     ) {
         match self {
             Self::Local(local) => {
                 local.update(ctx, |local, ctx| {
-                    local.load_diffs_for_current_repo(should_fetch_base, track_load_duration, ctx);
+                    local.load_diffs_for_current_repo(should_fetch_base, ctx);
                 });
             }
         }

@@ -6,11 +6,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_channel::Sender;
-use instant::Instant;
 use pathfinder_geometry::vector::vec2f;
 use string_offset::{ByteOffset, CharCounter};
 use warp_core::r#async::debounce;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
@@ -52,7 +50,6 @@ use crate::util::path::{display_name_with_host, display_path_with_host};
 use crate::view_components::action_button::{ActionButton, ButtonSize, NakedTheme};
 use crate::workspace::view::global_search::model::GlobalSearch;
 use crate::workspace::view::global_search::{GlobalSearchMatch, SearchConfig};
-use crate::TelemetryEvent;
 
 const BORDER_RADIUS: f32 = 6.;
 const BORDER_WIDTH: f32 = 1.;
@@ -125,12 +122,6 @@ pub enum GlobalSearchEvent {
         total_match_count: usize,
         /// True when a remote source hit the server-side match cap.
         capped: bool,
-        /// Whether the local search source failed while another source
-        /// completed. Results from the surviving sources remain valid.
-        local_source_failed: bool,
-        /// Number of remote host search sources that failed while another
-        /// source completed. Results from the surviving sources remain valid.
-        remote_source_failures: usize,
     },
     Failed {
         search_id: u32,
@@ -328,8 +319,6 @@ pub struct GlobalSearchView {
     is_search_in_progress: bool,
     capped_matches: bool,
     last_error: Option<String>,
-    /// When the current search started, for completion telemetry.
-    search_started_at: Option<Instant>,
     active_search_remote_host_count: usize,
     scroll_state: ScrollStateHandle,
     uniform_list_state: UniformListState,
@@ -708,7 +697,6 @@ impl GlobalSearchView {
             is_search_in_progress: false,
             capped_matches: false,
             last_error: None,
-            search_started_at: None,
             active_search_remote_host_count: 0,
             scroll_state: ScrollStateHandle::default(),
             uniform_list_state: UniformListState::new(),
@@ -823,7 +811,6 @@ impl GlobalSearchView {
     fn cancel_search(&mut self, ctx: &mut ViewContext<Self>) {
         self.is_search_in_progress = false;
         self.current_search_id = None;
-        self.search_started_at = None;
 
         self.find_model.update(ctx, |model, _| {
             model.abort_search();
@@ -935,10 +922,7 @@ impl GlobalSearchView {
                 search_id,
                 remote_host_count,
             } => {
-                send_telemetry_from_ctx!(TelemetryEvent::GlobalSearchQueryStarted, ctx);
-
                 self.current_search_id = Some(*search_id);
-                self.search_started_at = Some(Instant::now());
                 self.active_search_remote_host_count = *remote_host_count;
 
                 self.is_search_in_progress = true;
@@ -971,8 +955,6 @@ impl GlobalSearchView {
                 search_id,
                 total_match_count,
                 capped,
-                local_source_failed,
-                remote_source_failures,
             } => {
                 if Some(*search_id) != self.current_search_id {
                     return;
@@ -982,19 +964,6 @@ impl GlobalSearchView {
                 self.total_match_count = *total_match_count;
                 self.capped_matches |= capped;
 
-                if let Some(started_at) = self.search_started_at.take() {
-                    send_telemetry_from_ctx!(
-                        TelemetryEvent::GlobalSearchQueryCompleted {
-                            duration_ms: started_at.elapsed().as_millis() as u64,
-                            remote_host_count: self.active_search_remote_host_count,
-                            total_match_count: *total_match_count,
-                            capped: self.capped_matches,
-                            local_source_failed: *local_source_failed,
-                            remote_source_failures: *remote_source_failures,
-                        },
-                        ctx
-                    );
-                }
                 ctx.notify();
             }
             GlobalSearchEvent::Failed { search_id, error } => {
@@ -1003,7 +972,6 @@ impl GlobalSearchView {
                 }
 
                 self.is_search_in_progress = false;
-                self.search_started_at = None;
                 self.reset_search_state(false);
                 self.last_error = Some(error.clone());
                 ctx.notify();

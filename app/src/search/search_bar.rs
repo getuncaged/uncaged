@@ -126,7 +126,7 @@ pub enum SearchBarEvent<T: Action + Clone> {
     /// The search view should be closed.
     Close,
     /// The search query buffer was explicitly cleared, via something like ctrl-c.
-    BufferCleared { buffer_len: usize },
+    BufferCleared,
     /// The user accepted a result by hitting enter.
     ResultAccepted { index: usize, action: T },
     /// The selected result was changed.
@@ -463,9 +463,7 @@ impl<T: Action + Clone> SearchBar<T> {
                 }
             }
             EditorEvent::Escape => self.close(ctx),
-            EditorEvent::CtrlC {
-                cleared_buffer_len: buffer_len,
-            } => self.buffer_cleared(ctx, *buffer_len),
+            EditorEvent::CtrlC { .. } => self.buffer_cleared(ctx),
             EditorEvent::BackspaceOnEmptyBuffer => {
                 self.set_query_filter(None, ctx);
             }
@@ -480,8 +478,8 @@ impl<T: Action + Clone> SearchBar<T> {
         ctx.emit(SearchBarEvent::Close);
     }
 
-    fn buffer_cleared(&self, ctx: &mut ViewContext<Self>, buffer_len: usize) {
-        ctx.emit(SearchBarEvent::BufferCleared { buffer_len });
+    fn buffer_cleared(&self, ctx: &mut ViewContext<Self>) {
+        ctx.emit(SearchBarEvent::BufferCleared);
     }
 
     /// Returns the current search query in the editor.

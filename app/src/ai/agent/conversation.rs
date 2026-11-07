@@ -13,7 +13,6 @@ use warp_cli::agent::Harness;
 use warp_core::command::ExitCode;
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
-use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::color::internal_colors;
 use warp_core::ui::theme::WarpTheme;
@@ -48,7 +47,7 @@ use crate::ai::agent::icons::{
 use crate::ai::agent::linearization::compute_task_depths;
 use crate::ai::agent::todos::AIAgentTodoList;
 use crate::ai::agent::{
-    AIAgentOutputMessage, AIAgentOutputMessageType, AIIdentifiers, CancellationReason,
+    AIAgentOutputMessage, AIAgentOutputMessageType, CancellationReason,
     MessageToAIAgentOutputMessageError, SummarizationType,
 };
 use crate::ai::ambient_agents::AmbientAgentTaskId;
@@ -59,7 +58,6 @@ use crate::ai::blocklist::{
 };
 use crate::ai::llms::LLMPreferences;
 use crate::ai::skills::SkillDescriptor;
-use crate::code_review::CodeReviewTelemetryEvent;
 use crate::notebooks::NotebookId;
 use crate::persistence::model::{
     AgentConversationData, ContextWindowSegment, ConversationUsageMetadata, ModelTokenUsage,
@@ -2188,28 +2186,6 @@ impl AIConversation {
             self.commit_transaction()
         }
 
-        let AddedExchange {
-            exchange_id: initial_exchange_id,
-            ..
-        } = added_exchanges.first();
-        let identifiers = AIIdentifiers {
-            server_output_id: None,
-            server_conversation_id: self.server_conversation_token.clone().map(Into::into),
-            client_conversation_id: Some(self.id),
-            client_exchange_id: Some(*initial_exchange_id),
-            model_id: None,
-        };
-
-        send_telemetry_from_ctx!(
-            crate::TelemetryEvent::AgentModeError {
-                identifiers,
-                error: error.to_string(),
-                is_user_visible: true,
-                will_attempt_to_resume: recovery_pending,
-            },
-            ctx
-        );
-
         for AddedExchange {
             exchange_id,
             task_id,
@@ -2588,18 +2564,10 @@ impl AIConversation {
                         Some(api::message::Message::UpdateReviewComments(comments)) => {
                             if let Some(comments_op) = comments.operation.as_ref() {
                                 if let Some(active_code_review) = self.code_review.as_mut() {
-                                    let resolved_count = update_comment_from_comment_operation(
+                                    update_comment_from_comment_operation(
                                         active_code_review,
                                         comments_op.clone(),
                                     );
-                                    if resolved_count > 0 {
-                                        send_telemetry_from_ctx!(
-                                            CodeReviewTelemetryEvent::CommentResolved {
-                                                resolved_count
-                                            },
-                                            ctx
-                                        );
-                                    }
                                 } else {
                                     log::error!(
                                         "Received an UpdateReviewComments message but there's no active code review state"

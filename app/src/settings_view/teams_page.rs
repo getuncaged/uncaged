@@ -61,7 +61,6 @@ use crate::menu::{self, Menu, MenuItem, MenuItemFields};
 use crate::modal::{Modal, ModalEvent, ModalViewState};
 use crate::network::NetworkStatus;
 use crate::pricing::PricingInfoModel;
-use crate::send_telemetry_from_ctx;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::ServerId;
 use crate::server::telemetry::TelemetryEvent;
@@ -497,11 +496,8 @@ impl TypedActionView for TeamsPageView {
             && action.blocked_for_anonymous_user()
         {
             AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                auth_manager.attempt_login_gated_feature(
-                    action.into(),
-                    AuthViewVariant::RequireLoginCloseable,
-                    ctx,
-                )
+                auth_manager
+                    .attempt_login_gated_feature(AuthViewVariant::RequireLoginCloseable, ctx)
             });
             return;
         }
@@ -633,10 +629,6 @@ impl TypedActionView for TeamsPageView {
                 self.set_team_member_role(*user_uid, *team_uid, *role, ctx);
             }
         };
-
-        if let Ok(event) = TelemetryEvent::try_from(action) {
-            send_telemetry_from_ctx!(event, ctx);
-        }
     }
 }
 

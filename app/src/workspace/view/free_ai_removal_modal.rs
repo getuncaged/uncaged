@@ -2,7 +2,6 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use serde_json::{json, Value};
 use strum_macros::{EnumDiscriminants, EnumIter};
-use warp_core::send_telemetry_from_ctx;
 use warp_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
@@ -300,22 +299,9 @@ impl TypedActionView for FreeAiRemovalModal {
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
             FreeAiRemovalModalAction::Close => {
-                send_telemetry_from_ctx!(
-                    FreeAiRemovalModalTelemetryEvent::Dismissed {
-                        variant: self.variant,
-                    },
-                    ctx
-                );
                 ctx.emit(FreeAiRemovalModalEvent::Close);
             }
             FreeAiRemovalModalAction::SetUpByok => {
-                send_telemetry_from_ctx!(
-                    FreeAiRemovalModalTelemetryEvent::CtaClicked {
-                        variant: self.variant,
-                        cta: FreeAiRemovalModalCta::SetUpByok,
-                    },
-                    ctx
-                );
                 // Deferred so the close-driven refocus below doesn't steal focus from
                 // the settings page this opens.
                 ctx.dispatch_typed_action_deferred(WorkspaceAction::ShowSettingsPageWithSearch {
@@ -325,13 +311,6 @@ impl TypedActionView for FreeAiRemovalModal {
                 ctx.emit(FreeAiRemovalModalEvent::Close);
             }
             FreeAiRemovalModalAction::Upgrade => {
-                send_telemetry_from_ctx!(
-                    FreeAiRemovalModalTelemetryEvent::CtaClicked {
-                        variant: self.variant,
-                        cta: FreeAiRemovalModalCta::Upgrade,
-                    },
-                    ctx
-                );
                 let upgrade_url = Self::upgrade_url(ctx);
                 ctx.open_url(&upgrade_url);
                 ctx.emit(FreeAiRemovalModalEvent::Close);

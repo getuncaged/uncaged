@@ -26,7 +26,6 @@ use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
 use warpui::image_cache::{resize_dimensions, FitType};
 
 use super::{AbsolutePoint, FullGridClearBehavior, GridHandler, PerformResetGridChecks, TermMode};
-use crate::server::telemetry::ImageProtocol;
 use crate::terminal::event::Event;
 use crate::terminal::event_listener::ChannelEventListener;
 use crate::terminal::model::ansi::{
@@ -1371,7 +1370,6 @@ impl ansi::Handler for GridHandler {
             .send_terminal_event(Event::ImageReceived {
                 image_id,
                 image_data: image.data,
-                image_protocol: ImageProtocol::ITerm,
             });
 
         self.images.add_image_placement_data(
@@ -1770,7 +1768,6 @@ impl GridHandler {
                     .send_terminal_event(Event::ImageReceived {
                         image_id: action.image_id,
                         image_data: action.image.data,
-                        image_protocol: ImageProtocol::Kitty,
                     });
             }
             KittyAction::StoreAndDisplay(action) => {
@@ -1831,7 +1828,6 @@ impl GridHandler {
                     .send_terminal_event(Event::ImageReceived {
                         image_id: action.image_id,
                         image_data: action.image.data,
-                        image_protocol: ImageProtocol::Kitty,
                     });
 
                 self.images.add_image_placement_data(

@@ -11,13 +11,12 @@ use ai::index::locations::CodeContextLocation;
 use ai::index::FileSymbols;
 use anyhow::anyhow;
 use futures_util::stream::AbortHandle;
-use instant::Instant;
 use warp_core::features::FeatureFlag;
 use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::ai::agent::{AIAgentActionId, SearchCodebaseResult};
 use crate::ai::outline::{OutlineStatus, RepoOutlines};
-use crate::{report_error, send_telemetry_from_ctx, TelemetryEvent};
+use crate::report_error;
 
 #[derive(Debug)]
 pub enum GetRelevantFilesControllerEvent {
@@ -68,7 +67,6 @@ enum RequestHandle {
     RetrievalID {
         repo_path: PathBuf,
         retrieval_id: RetrievalID,
-        start_time: Instant,
     },
 }
 
@@ -79,7 +77,6 @@ impl RequestHandle {
             RequestHandle::RetrievalID {
                 repo_path,
                 retrieval_id,
-                start_time: _,
             } => {
                 CodebaseIndexManager::handle(ctx).update(ctx, |index_manager, ctx| {
                     if let Err(err) =
@@ -109,21 +106,21 @@ impl GetRelevantFilesController {
         Self::default()
     }
 
-    fn pending_request_details_for_retrieval_id(
+    fn pending_action_id_for_retrieval_id(
         &self,
         pending_retrieval_id: &RetrievalID,
-    ) -> Option<(&AIAgentActionId, &Instant)> {
+    ) -> Option<&AIAgentActionId> {
         // Full-source embedding completion events only carry the retrieval ID, so map them back to
-        // the agent action that initiated the request before emitting results/telemetry.
+        // the agent action that initiated the request before emitting results.
         self.pending_requests
             .iter()
             .find_map(|(action_id, request_handle)| match request_handle {
                 RequestHandle::AbortHandle(_) => None,
-                RequestHandle::RetrievalID {
-                    retrieval_id,
-                    start_time,
-                    ..
-                } if retrieval_id == pending_retrieval_id => Some((action_id, start_time)),
+                RequestHandle::RetrievalID { retrieval_id, .. }
+                    if retrieval_id == pending_retrieval_id =>
+                {
+                    Some(action_id)
+                }
                 RequestHandle::RetrievalID { .. } => None,
             })
     }
@@ -139,18 +136,9 @@ impl GetRelevantFilesController {
                 retrieval_id,
                 error_message: error,
             } => {
-                let Some((action_id, _search_start)) =
-                    self.pending_request_details_for_retrieval_id(retrieval_id)
-                else {
+                let Some(action_id) = self.pending_action_id_for_retrieval_id(retrieval_id) else {
                     return;
                 };
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::FullEmbedCodebaseContextSearchFailed {
-                        action_id: action_id.clone(),
-                        error: error.to_string(),
-                    },
-                    ctx
-                );
 
                 self.handle_relevant_file_paths_result(
                     Err(anyhow!(error.to_owned())),
@@ -161,21 +149,11 @@ impl GetRelevantFilesController {
             CodebaseIndexManagerEvent::RetrievalRequestCompleted {
                 retrieval_id,
                 fragments,
-                out_of_sync_delay,
+                ..
             } => {
-                let Some((action_id, search_start)) =
-                    self.pending_request_details_for_retrieval_id(retrieval_id)
-                else {
+                let Some(action_id) = self.pending_action_id_for_retrieval_id(retrieval_id) else {
                     return;
                 };
-                send_telemetry_from_ctx!(
-                    TelemetryEvent::FullEmbedCodebaseContextSearchSuccess {
-                        action_id: action_id.clone(),
-                        total_search_duration: search_start.elapsed(),
-                        out_of_sync_delay: *out_of_sync_delay,
-                    },
-                    ctx
-                );
 
                 self.handle_relevant_file_paths_result(
                     Ok(fragments.clone()),
@@ -223,13 +201,11 @@ impl GetRelevantFilesController {
                 }) {
                     Ok(retrieval_request_id) => {
                         log::info!("Using full source code embedding for search");
-                        let search_start = Instant::now();
                         self.pending_requests.insert(
                             action_id,
                             RequestHandle::RetrievalID {
                                 repo_path: base_path.clone(),
                                 retrieval_id: retrieval_request_id,
-                                start_time: search_start,
                             },
                         );
 

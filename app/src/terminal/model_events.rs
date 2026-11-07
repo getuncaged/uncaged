@@ -10,7 +10,6 @@ use super::model::block::BlockId;
 use super::model::completions::ShellCompletion;
 use super::model::session::{SessionId, SessionInfo};
 use super::model::terminal_model::{CommandType, ExitReason, HandlerEvent};
-use crate::server::telemetry::ImageProtocol;
 use crate::terminal::event::{
     AfterBlockCompletedEvent, BlockCompletedEvent, BlockMetadataReceivedEvent,
     BlockWorkingDirectoryUpdatedEvent, Event, ExecutedExecutorCommandEvent, InitSubshellEvent,
@@ -203,11 +202,9 @@ impl ModelEventDispatcher {
             Event::ImageReceived {
                 image_id,
                 image_data,
-                image_protocol,
             } => ModelEvent::ImageReceived {
                 image_id,
                 image_data,
-                image_protocol,
             },
             Event::BootstrapPrecmdDone => ModelEvent::BootstrapPrecmdDone,
             Event::AgentTaggedInChanged {
@@ -236,7 +233,6 @@ impl ModelEventDispatcher {
             session_info,
             spawning_command,
             restored_block_commands,
-            rcfiles_duration_seconds,
         } = event;
 
         self.sessions.update(ctx, |sessions, ctx| {
@@ -244,7 +240,6 @@ impl ModelEventDispatcher {
                 *session_info,
                 spawning_command,
                 restored_block_commands,
-                rcfiles_duration_seconds,
                 ctx,
             );
         });
@@ -339,7 +334,6 @@ pub enum ModelEvent {
     ImageReceived {
         image_id: u32,
         image_data: Vec<u8>,
-        image_protocol: ImageProtocol,
     },
     BootstrapPrecmdDone,
     AgentTaggedInChanged {

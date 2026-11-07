@@ -6,12 +6,8 @@ use strum_macros::{EnumDiscriminants, EnumIter};
 use warp_core::features::FeatureFlag;
 use warpui::{Entity, ModelContext, SingletonEntity};
 
-#[cfg(target_os = "macos")]
-use super::config::HotkeyError;
 use super::config::{SettingType, ThemeType};
-use crate::interval_timer::IntervalTimer;
 use crate::settings::import::config::{Config, ConfigError};
-use crate::{send_telemetry_from_ctx, TelemetryEvent};
 
 #[derive(Clone, Copy, Debug, EnumDiscriminants, Eq, Hash, PartialEq)]
 #[strum_discriminants(derive(EnumIter, Hash, Serialize))]
@@ -78,47 +74,12 @@ impl ImportedConfigModel {
         self.started
     }
 
-    #[cfg(target_os = "macos")]
-    fn maybe_send_multiple_hotkeys_telemetry_event(
-        &self,
-        terminal_type: &TerminalType,
-        configs: &Result<Vec<Config>, ConfigError>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if let TerminalType::ITerm = terminal_type {
-            if let Ok(configs) = configs {
-                if configs.iter().any(|config| {
-                    matches!(
-                        config.hotkey_mode.setting,
-                        Err(HotkeyError::MultipleHotkeys)
-                    )
-                }) {
-                    send_telemetry_from_ctx!(TelemetryEvent::ITermMultipleHotkeys, ctx);
-                }
-            }
-        }
-    }
-
     pub fn write_parse_results(
         &mut self,
         terminal_type: TerminalType,
-        (configs, timer): (Result<Vec<Config>, ConfigError>, IntervalTimer),
+        configs: Result<Vec<Config>, ConfigError>,
         ctx: &mut ModelContext<Self>,
     ) {
-        send_telemetry_from_ctx!(
-            TelemetryEvent::SettingsImportConfigParsed {
-                timing_data: timer.compute_stats(),
-                terminal_type,
-                settings_shown_to_user: configs
-                    .as_ref()
-                    .ok()
-                    .and_then(|configs| configs.first())
-                    .map(|config| config.valid_setting_types())
-            },
-            ctx
-        );
-        #[cfg(target_os = "macos")]
-        self.maybe_send_multiple_hotkeys_telemetry_event(&terminal_type, &configs, ctx);
         self.parsed_terminals.insert(terminal_type, configs);
         ctx.emit(CompletedParseEvent {
             terminal: terminal_type,
