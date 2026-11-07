@@ -149,6 +149,11 @@ fn main() -> Result<()> {
 /// invoke the config generator binary and write the JSON output to `OUT_DIR` so it can be
 /// embedded via `include_str!` in the binary entry points.
 fn generate_channel_config_if_needed(target_family: &str, target_os: &str) {
+    // Uncaged: `load_config!` embeds a channel's config only when this script generated it,
+    // so a release_bundle build without Warp's private generator (every Uncaged checkout, and
+    // `--all-features` clippy) loads it at runtime instead of failing on a missing file.
+    println!("cargo:rustc-check-cfg=cfg(embedded_channel_config)");
+
     if env::var("CARGO_FEATURE_RELEASE_BUNDLE").is_err() {
         // For non-bundled builds, config is loaded at runtime — nothing to embed.
         return;
@@ -209,6 +214,7 @@ fn generate_channel_config_if_needed(target_family: &str, target_os: &str) {
             panic!("Failed to write config to {}: {err}", config_path.display())
         });
     }
+    println!("cargo:rustc-cfg=embedded_channel_config");
 }
 
 fn get_build_profile_name() -> String {

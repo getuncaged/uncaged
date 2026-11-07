@@ -1,4 +1,4 @@
-# Uncaged CI — build & lint the GUI binary on push / PR to master|main.
+# Uncaged CI — build & lint the GUI binary on push / PR to master|main|uncaged-0.3.
 # No secrets required. macOS is the gating job; Linux/Windows are best-effort.
 #
 # This is Uncaged's OWN workflow (getuncaged/uncaged), independent of the
@@ -8,9 +8,10 @@ name: Uncaged CI
 
 on:
   push:
-    branches: [master, main]
+    # uncaged-0.3 is where Uncaged's work lands and releases are cut from.
+    branches: [master, main, uncaged-0.3]
   pull_request:
-    branches: [master, main]
+    branches: [master, main, uncaged-0.3]
 
 # Cancel superseded runs on the same ref to save runner minutes.
 concurrency:
@@ -81,13 +82,28 @@ jobs:
         timeout-minutes: 25
         run: cargo check --bin warp-oss --features gui,voice_input
 
-      # clippy after a successful build reuses artifacts; keep it non-fatal on
-      # warnings for now (large fork, many upstream lints) — flip to -D warnings
-      # once the tree is clean.
-      - name: cargo clippy (warp-oss)
-        continue-on-error: true
-        timeout-minutes: 25
-        run: cargo clippy --bin warp-oss || true
+      # The tree is clippy-clean, so lints gate the job. Two runs, because each
+      # feature set compiles code the other doesn't (local_tty without
+      # remote_tty, cloud_environments tests, release_bundle). dead_code is
+      # allowed: features removed in the account-free fork leave plenty behind.
+      - name: cargo clippy (default features)
+        timeout-minutes: 40
+        run: >-
+          cargo clippy -p warp -p warp_tui -p warp_channel_config -p uncaged_engine
+          --all-targets --tests -- -D warnings
+          -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
+
+      # command-signatures-v2 (pulled in by --all-features) builds its JS with
+      # the Yarn version package.json pins, which Corepack provides.
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: cargo clippy (all features)
+        timeout-minutes: 40
+        run: >-
+          cargo clippy -p warp -p warp_tui -p warp_channel_config -p uncaged_engine
+          --all-targets --all-features --tests -- -D warnings
+          -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
       # Run the fast, default-member unit tests. The heavy integration crate is
       # excluded from default members, so this stays reasonable.
@@ -144,6 +160,12 @@ jobs:
       - name: Build warp-oss (GUI binary)
         run: cargo build --bin warp-oss
 
+      # Catches code only this platform compiles, which the macOS lint never sees.
+      - name: cargo clippy (warp-oss)
+        run: >-
+          cargo clippy -p warp --lib --tests --bin warp-oss -- -D warnings
+          -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
+
   windows:
     name: Build (Windows, best-effort)
     runs-on: windows-latest
@@ -175,3 +197,9 @@ jobs:
 
       - name: Build warp-oss (GUI binary)
         run: cargo build --bin warp-oss
+
+      # Catches code only this platform compiles, which the macOS lint never sees.
+      - name: cargo clippy (warp-oss)
+        run: >-
+          cargo clippy -p warp --lib --tests --bin warp-oss -- -D warnings
+          -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion

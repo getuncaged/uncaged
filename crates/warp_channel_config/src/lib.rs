@@ -31,14 +31,14 @@ macro_rules! path_concat {
 
 /// Loads the [`ChannelConfig`] for the given channel name.
 ///
-/// In `release_bundle` builds the config is embedded at compile time (the
-/// consuming crate's build script must generate `<channel>_config.json` into
-/// `OUT_DIR`); otherwise the `warp-channel-config` generator is invoked at
-/// runtime.
+/// In `release_bundle` builds the config is embedded at compile time when the
+/// consuming crate's build script generated `<channel>_config.json` into
+/// `OUT_DIR` and set the `embedded_channel_config` cfg; otherwise the
+/// `warp-channel-config` generator is invoked at runtime.
 #[macro_export]
 macro_rules! load_config {
     ($channel:expr) => {{
-        #[cfg(feature = "release_bundle")]
+        #[cfg(all(feature = "release_bundle", embedded_channel_config))]
         {
             $crate::load_config_from_embedded(include_str!($crate::path_concat!(
                 env!("OUT_DIR"),
@@ -46,7 +46,7 @@ macro_rules! load_config {
             )))
         }
 
-        #[cfg(not(feature = "release_bundle"))]
+        #[cfg(not(all(feature = "release_bundle", embedded_channel_config)))]
         {
             $crate::load_config_from_generator($channel)
         }
