@@ -35,7 +35,6 @@ pub enum SharedObjectsCreationDeniedModalAction {
 
 pub enum SharedObjectsCreationDeniedModalEvent {
     Close,
-    TeamSettings,
 }
 
 pub fn init(app: &mut AppContext) {
@@ -172,27 +171,20 @@ impl SharedObjectsCreationDeniedModal {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            SharedObjectsCreationDeniedBodyEvent::Upgrade => match self.team_uid {
-                // If team_uid is set, then open up the upgrade page for the team
-                // directly.
-                Some(team_uid) => {
+            // The modal only opens for a team (`update_modal_state` sets `team_uid`), and
+            // Uncaged has no team settings page to fall back to.
+            SharedObjectsCreationDeniedBodyEvent::Upgrade => {
+                if let Some(team_uid) = self.team_uid {
                     ctx.open_url(UserWorkspaces::upgrade_link_for_team(team_uid).as_str());
                 }
-                // Otherwise redirect them to the team settings page.
-                None => ctx.emit(SharedObjectsCreationDeniedModalEvent::TeamSettings),
-            },
-            SharedObjectsCreationDeniedBodyEvent::ManageBilling => match self.team_uid {
-                // If team_uid is set, then open up the manage billing page for the team
-                // directly. The actual logic that opens the billing portal url in the
-                // browser is in the handle_model_event method of TeamsPageView.
-                Some(team_uid) => {
+            }
+            SharedObjectsCreationDeniedBodyEvent::ManageBilling => {
+                if let Some(team_uid) = self.team_uid {
                     UserWorkspaces::handle(ctx).update(ctx, move |user_workspaces, ctx| {
                         user_workspaces.generate_stripe_billing_portal_link(team_uid, ctx);
                     });
                 }
-                // Otherwise redirect them to the team settings page.
-                None => ctx.emit(SharedObjectsCreationDeniedModalEvent::TeamSettings),
-            },
+            }
         }
     }
 }

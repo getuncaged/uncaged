@@ -26,15 +26,9 @@ use crate::workspace::WorkspaceAction;
 
 const VERTICAL_TEXT_MARGIN: f32 = 16.;
 
-#[derive(Debug, Clone)]
-pub enum WarpifySuccessBlockEvent {
-    OpenWarpifySettings,
-}
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum WarpifySuccessBlockAction {
     ClearAutoWarpifySnippet,
-    OpenWarpifySettings,
     OpenUrl(String),
 }
 
@@ -304,7 +298,7 @@ impl WarpifySuccessBlock {
 }
 
 impl Entity for WarpifySuccessBlock {
-    type Event = WarpifySuccessBlockEvent;
+    type Event = ();
 }
 
 pub const WARPIFY_SUCCESS_BLOCK_VISIBLE_KEY: &str = "WarpifySuccessBlockVisible";
@@ -341,9 +335,6 @@ impl TypedActionView for WarpifySuccessBlock {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            WarpifySuccessBlockAction::OpenWarpifySettings => {
-                ctx.emit(WarpifySuccessBlockEvent::OpenWarpifySettings);
-            }
             WarpifySuccessBlockAction::OpenUrl(url) => {
                 ctx.open_url(url);
             }

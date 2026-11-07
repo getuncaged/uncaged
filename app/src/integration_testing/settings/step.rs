@@ -1,10 +1,11 @@
-use settings::Setting;
+use settings::{Setting, ToggleableSetting as _};
 use warpui::integration::TestStep;
 use warpui::windowing::WindowManager;
 use warpui::{async_assert, SingletonEntity};
 
 use crate::integration_testing::step::new_step_with_default_assertions;
 use crate::settings_view::SettingsAction;
+use crate::terminal::safe_mode_settings::SafeModeSettings;
 use crate::user_config::WarpConfig;
 use crate::window_settings::WindowSettings;
 use crate::workspace::{Workspace, WorkspaceAction};
@@ -30,6 +31,20 @@ pub fn toggle_setting(action: SettingsAction) -> TestStep {
             );
         },
     )
+}
+
+/// Builds a step that flips whether detected secrets are hidden in the block list. Uncaged has no
+/// settings page or palette entry for it (it is set in the settings file), so the step updates
+/// the setting directly.
+pub fn toggle_hide_secrets_in_block_list() -> TestStep {
+    TestStep::new("Toggle hiding secrets in the block list").with_action(|app, _, _| {
+        SafeModeSettings::handle(app).update(app, |settings, ctx| {
+            settings
+                .hide_secrets_in_block_list
+                .toggle_and_save_value(ctx)
+                .expect("Could not toggle hiding secrets in the block list");
+        })
+    })
 }
 
 /// Asserts how many loaded themes are named like `theme_name` — the themes the theme gallery and

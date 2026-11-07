@@ -8,7 +8,6 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use settings::Setting;
 use warp_core::settings::SyncToCloud;
-use warp_core::ui::color::blend::Blend;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::new_scrollable::{
     ClippedAxisConfiguration, DualAxisConfig, ScrollableAppearance, SingleAxisConfig,
@@ -31,21 +30,13 @@ use warpui::{Action, AppContext, SingletonEntity, ViewContext, ViewHandle};
 use super::about_page::AboutPageView;
 use super::ai_page::{AISettingsPageAction, AISettingsPageView};
 use super::appearance_page::AppearanceSettingsPageView;
-use super::billing_and_usage_dispatch::BillingAndUsageDispatchView;
 use super::code_page::CodeSettingsPageView;
 use super::customize_ui_page::CustomizeUiSettingsPageView;
 use super::features_page::FeaturesPageView;
 use super::keybindings::KeybindingsView;
-use super::main_page::MainSettingsPageView;
 use super::mcp_servers_page::MCPServersSettingsPageView;
-use super::privacy_page::PrivacyPageView;
-use super::referrals_page::ReferralsPageView;
-use super::show_blocks_view::ShowBlocksView;
-use super::teams_page::TeamsPageView;
 use super::theme_creator_page::ThemeCreatorPageView;
 use super::theme_gallery_page::ThemeGalleryPageView;
-use super::warp_drive_page::WarpDriveSettingsPageView;
-use super::warpify_page::WarpifyPageView;
 use super::SettingsSection;
 use crate::appearance::Appearance;
 use crate::settings::CloudPreferencesSettings;
@@ -121,22 +112,13 @@ pub trait SettingsPageMeta {
 /// It is required to allow for SettingsPage struct be put in the collection (ie. vector).
 #[derive(Clone)]
 pub enum SettingsPageViewHandle {
-    Main(ViewHandle<MainSettingsPageView>),
     Appearance(ViewHandle<AppearanceSettingsPageView>),
     Features(ViewHandle<FeaturesPageView>),
-    SharedBlocks(ViewHandle<ShowBlocksView>),
     Keybindings(ViewHandle<KeybindingsView>),
     About(ViewHandle<AboutPageView>),
     Code(ViewHandle<CodeSettingsPageView>),
-    Teams(ViewHandle<TeamsPageView>),
-    OzCloudAPIKeys(ViewHandle<super::platform_page::PlatformPageView>),
-    Privacy(ViewHandle<PrivacyPageView>),
-    Warpify(ViewHandle<WarpifyPageView>),
-    Referrals(ViewHandle<ReferralsPageView>),
     AI(ViewHandle<AISettingsPageView>),
-    BillingAndUsage(ViewHandle<BillingAndUsageDispatchView>),
     MCPServers(ViewHandle<MCPServersSettingsPageView>),
-    WarpDrive(ViewHandle<WarpDriveSettingsPageView>),
     CustomizeUi(ViewHandle<CustomizeUiSettingsPageView>),
     ThemeCreator(ViewHandle<ThemeCreatorPageView>),
     ThemeGallery(ViewHandle<ThemeGalleryPageView>),
@@ -146,22 +128,13 @@ impl SettingsPageViewHandle {
     pub fn child_view(&self) -> Box<dyn Element> {
         use SettingsPageViewHandle::*;
         match self {
-            Main(view_handle) => ChildView::new(view_handle).finish(),
             Appearance(view_handle) => ChildView::new(view_handle).finish(),
             Features(view_handle) => ChildView::new(view_handle).finish(),
-            SharedBlocks(view_handle) => ChildView::new(view_handle).finish(),
             Keybindings(view_handle) => ChildView::new(view_handle).finish(),
             About(view_handle) => ChildView::new(view_handle).finish(),
             Code(view_handle) => ChildView::new(view_handle).finish(),
-            Teams(view_handle) => ChildView::new(view_handle).finish(),
-            OzCloudAPIKeys(view_handle) => ChildView::new(view_handle).finish(),
-            Privacy(view_handle) => ChildView::new(view_handle).finish(),
-            Warpify(view_handle) => ChildView::new(view_handle).finish(),
-            Referrals(view_handle) => ChildView::new(view_handle).finish(),
             AI(view_handle) => ChildView::new(view_handle).finish(),
-            BillingAndUsage(view_handle) => ChildView::new(view_handle).finish(),
             MCPServers(view_handle) => ChildView::new(view_handle).finish(),
-            WarpDrive(view_handle) => ChildView::new(view_handle).finish(),
             CustomizeUi(view_handle) => ChildView::new(view_handle).finish(),
             ThemeCreator(view_handle) => ChildView::new(view_handle).finish(),
             ThemeGallery(view_handle) => ChildView::new(view_handle).finish(),
@@ -218,38 +191,6 @@ pub enum SettingsPageEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PaneEventWrapper {
     Close,
-}
-
-pub fn render_customer_type_badge(appearance: &Appearance, text: String) -> Box<dyn Element> {
-    Container::new(
-        Text::new_inline(text, appearance.ui_font_family(), appearance.ui_font_size())
-            .with_color(
-                appearance
-                    .theme()
-                    .background()
-                    .blend(
-                        &appearance
-                            .theme()
-                            .foreground()
-                            .with_opacity(GREY_TEXT_OPACITY),
-                    )
-                    .into(),
-            )
-            .with_style(Properties::default().weight(Weight::Medium))
-            .finish(),
-    )
-    .with_uniform_padding(4.)
-    .with_background(
-        appearance
-            .theme()
-            .background()
-            .blend(&appearance.theme().foreground().with_opacity(25)),
-    )
-    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-        warp_core::ui::radius::SMALL,
-    )))
-    .with_margin_left(10.)
-    .finish()
 }
 
 /// Adds padding to the sub header
@@ -1326,41 +1267,6 @@ pub fn render_input_list<SettingsPageAction: Action + Clone>(
     }
 
     column.finish()
-}
-
-pub fn render_alternating_color_list<
-    ListItem: Display,
-    SettingsPageAction: Action + Clone,
-    F: Fn(usize) -> SettingsPageAction,
->(
-    body: &mut Flex,
-    patterns: &[ListItem],
-    mouse_states: &[MouseStateHandle],
-    create_action: F,
-    appearance: &Appearance,
-) {
-    debug_assert!(
-        mouse_states.len() >= patterns.len(),
-        "mouse_states length ({}) is less than patterns length ({})",
-        mouse_states.len(),
-        patterns.len()
-    );
-    for (i, pattern) in patterns.iter().enumerate() {
-        let background = if i % 2 == 0 {
-            internal_colors::fg_overlay_1(appearance.theme())
-        } else {
-            Fill::Solid(ColorU::transparent_black())
-        };
-
-        body.add_child(render_alternating_color_list_item::<SettingsPageAction>(
-            background,
-            pattern.to_string(),
-            mouse_states[i].clone(),
-            create_action(i),
-            false,
-            appearance,
-        ));
-    }
 }
 
 fn render_workspace_override_row_tooltip(

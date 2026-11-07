@@ -748,9 +748,6 @@ impl Input {
                     )
                 });
             }
-            usage if command.name == commands::USAGE.name => {
-                ctx.dispatch_typed_action(&TerminalAction::OpenBillingAndUsagePane);
-            }
             cost if command.name == commands::COST.name => {
                 let history = BlocklistAIHistoryModel::handle(ctx);
                 let conversation = history

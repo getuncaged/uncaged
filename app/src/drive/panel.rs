@@ -70,7 +70,6 @@ pub enum DrivePanelEvent {
     },
     OpenSearch,
     OpenSharedObjectsCreationDeniedModal(DriveObjectType, ServerId),
-    OpenTeamSettingsPage,
     OpenAIFactCollection,
     OpenMCPServerCollection,
     OpenImportModal {
@@ -279,9 +278,6 @@ impl DrivePanel {
             #[cfg(not(feature = "local_fs"))]
             DriveIndexEvent::ExportObject(_cloud_object_type_and_id) => {
                 // No-op when no local filesystem.
-            }
-            DriveIndexEvent::OpenTeamSettingsPage => {
-                ctx.emit(DrivePanelEvent::OpenTeamSettingsPage)
             }
             DriveIndexEvent::RunObject(id) => {
                 let cloud_model = CloudModel::as_ref(ctx);

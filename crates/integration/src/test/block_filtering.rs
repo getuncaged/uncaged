@@ -1,11 +1,12 @@
 use warp::cmd_or_ctrl_shift;
+use warp::integration_testing::settings::toggle_hide_secrets_in_block_list;
 use warp::integration_testing::terminal::util::current_shell_starter_and_version;
 use warp::integration_testing::terminal::{
     assert_context_menu_is_open, initialize_secret_regexes,
     wait_until_bootstrapped_single_pane_for_tab,
 };
 use warp::integration_testing::view_getters::single_terminal_view_for_tab;
-use warp::settings_view::{PrivacyPageAction, SettingsAction};
+use warp::settings_view::{SettingToggleAction, SettingsAction};
 use warp::terminal::model::index::Point;
 use warp::terminal::model::terminal_model::{BlockIndex, WithinBlock, WithinModel};
 use warp::terminal::shell::ShellType;
@@ -270,12 +271,10 @@ pub fn test_block_filtering_with_secrets() -> Builder {
         .with_step(initialize_secret_regexes())
         .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
         .with_step(clear_blocklist_to_remove_bootstrapped_blocks())
-        .with_step(toggle_setting(SettingsAction::PrivacyPageToggle(
-            PrivacyPageAction::ToggleSafeMode,
+        .with_step(toggle_setting(SettingsAction::ToggleSetting(
+            SettingToggleAction::SecretRedaction,
         )))
-        .with_step(toggle_setting(SettingsAction::PrivacyPageToggle(
-            PrivacyPageAction::ToggleHideSecretsInBlockList,
-        )))
+        .with_step(toggle_hide_secrets_in_block_list())
         .with_step(SecretTestCase::execute_command())
         .with_step(open_block_filter_editor())
         .with_step(SecretTestCase::perform_filter_query())
