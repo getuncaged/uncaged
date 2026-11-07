@@ -3710,9 +3710,6 @@ impl TypedActionView for AISettingsPageView {
                 ctx.notify();
             }
             AISettingsPageAction::ToggleAgentAttribution => {
-                // The updated value syncs to warp-server automatically via
-                // `CloudPreferencesSyncer` as a `JsonPreference` GSO keyed
-                // `Global_AgentAttributionEnabled`; no bespoke server call needed.
                 AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings
                         .agent_attribution_enabled

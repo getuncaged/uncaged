@@ -24,20 +24,13 @@ impl CustomSecretRegexUpdater {
     }
 
     fn update_custom_secret_regex_list(&self, ctx: &mut ModelContext<Self>) {
-        let privacy_settings = PrivacySettings::as_ref(ctx);
-
-        // Get enterprise and user secrets separately
-        let enterprise_secrets = privacy_settings
-            .enterprise_secret_regex_list
-            .iter()
-            .map(CustomSecretRegex::pattern);
-
-        let user_secrets = privacy_settings
+        let user_secrets = PrivacySettings::as_ref(ctx)
             .user_secret_regex_list
             .iter()
             .map(CustomSecretRegex::pattern);
 
-        set_user_and_enterprise_secret_regexes(user_secrets, enterprise_secrets);
+        // Uncaged has no organization, so there are never enterprise secret regexes.
+        set_user_and_enterprise_secret_regexes(user_secrets, std::iter::empty());
     }
 }
 

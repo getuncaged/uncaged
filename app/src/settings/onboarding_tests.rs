@@ -46,9 +46,8 @@ fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
 ///      arrives via initial bulk load and `InitialLoadCompleted` fires.
 ///   3. The reconciliation handler promotes the local state to `Synced`
 ///      with the cloud profile's `sync_id`.
-///   4. `apply_onboarding_settings` runs (as it would from
-///      `handle_cloud_preferences_syncer_event`) with onboarding-selected
-///      values that differ from what's on the cloud profile.
+///   4. `apply_onboarding_settings` runs with onboarding-selected values that
+///      differ from what's on the cloud profile.
 ///   5. The cloud profile's stored values must be preserved.
 #[test]
 fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_login() {

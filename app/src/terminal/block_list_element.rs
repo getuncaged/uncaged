@@ -60,9 +60,7 @@ use crate::appearance::Appearance;
 use crate::drive::settings::WarpDriveSettings;
 use crate::features::FeatureFlag;
 use crate::pane_group::SplitPaneState;
-use crate::settings::{
-    AISettings, DebugSettings, EnforceMinimumContrast, PrivacySettings, TerminalSpacing,
-};
+use crate::settings::{AISettings, DebugSettings, EnforceMinimumContrast, TerminalSpacing};
 use crate::terminal::alt_screen::{should_intercept_mouse, should_intercept_scroll};
 use crate::terminal::block_list_viewport::AutoscrollBehavior;
 use crate::terminal::blockgrid_renderer::BlockGridParams;
@@ -151,7 +149,6 @@ const TAG_AGENT_FOR_ASSISTANCE_TEXT: &str = "Tag agent for assistance";
 const ASK_AI_TO_FIX_TEXT: &str = "Ask Uncaged AI to fix";
 
 const SAVE_AS_WORKFLOW_TEXT: &str = "Save as Workflow";
-const SAVE_AS_WORKFLOW_SECRETS_TEXT: &str = "Blocks containing secrets cannot be saved.";
 
 enum ScrollingAcceleration {
     Polynomial(f32),
@@ -1192,54 +1189,25 @@ impl BlockListElement {
             )
             .with_uniform_padding(4.);
 
-            let element = if PrivacySettings::as_ref(app).is_enterprise_secret_redaction_enabled()
-                && model
-                    .block_list()
-                    .block_at(block_index)
-                    .is_some_and(|block| block.num_secrets_obfuscated() > 0)
-            {
-                // If enterprise secret redaction is enabled and the block contains secrets,
-                // disable save as workflow button + show different tooltip messaging.
-                render_hoverable_block_button(
-                    icon,
-                    Some(ToolbeltButtonTooltip {
-                        label: SAVE_AS_WORKFLOW_SECRETS_TEXT.to_owned(),
-                        tool_tip_below_button: should_render_tooltip_below_button,
-                    }),
-                    false,
-                    false,
-                    self.mouse_states
-                        .save_as_workflow_button_mouse_state
-                        .clone(),
-                    &self.warp_theme,
-                    &self.ui_builder,
-                    move |ctx: &mut EventContext, _, _| {
-                        ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalForBlock(
-                            block_index,
-                        ));
-                    },
-                )
-            } else {
-                render_hoverable_block_button(
-                    icon,
-                    Some(ToolbeltButtonTooltip {
-                        label: SAVE_AS_WORKFLOW_TEXT.to_owned(),
-                        tool_tip_below_button: should_render_tooltip_below_button,
-                    }),
-                    false,
-                    true,
-                    self.mouse_states
-                        .save_as_workflow_button_mouse_state
-                        .clone(),
-                    &self.warp_theme,
-                    &self.ui_builder,
-                    move |ctx: &mut EventContext, _, _| {
-                        ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalForBlock(
-                            block_index,
-                        ));
-                    },
-                )
-            };
+            let element = render_hoverable_block_button(
+                icon,
+                Some(ToolbeltButtonTooltip {
+                    label: SAVE_AS_WORKFLOW_TEXT.to_owned(),
+                    tool_tip_below_button: should_render_tooltip_below_button,
+                }),
+                false,
+                true,
+                self.mouse_states
+                    .save_as_workflow_button_mouse_state
+                    .clone(),
+                &self.warp_theme,
+                &self.ui_builder,
+                move |ctx: &mut EventContext, _, _| {
+                    ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalForBlock(
+                        block_index,
+                    ));
+                },
+            );
 
             self.save_as_workflow_button = Some(element);
         }
