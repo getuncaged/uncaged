@@ -13893,7 +13893,6 @@ dependencies = [
  "base64 0.22.1",
  "bincode",
  "blocking",
- "bounded-vec-deque",
  "cfg-if",
  "chrono",
  "cloud_object_models",

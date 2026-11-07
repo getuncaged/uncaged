@@ -39,6 +39,7 @@ use crate::network::NetworkStatus;
 use crate::search::files::model::FileSearchModel;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::ServerApiProvider;
+use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::PrivacySettings;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::suggestions::ignored_suggestions_model::IgnoredSuggestionsModel;
@@ -60,6 +61,8 @@ pub fn initialize_app_for_terminal_view(app: &mut App) {
     initialize_history_persistence_for_tests(app);
 
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
+
+    app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     // Register a disabled `IapManager` (no IAP state) so code paths that read
     // the singleton (e.g. the shared-session viewer network) don't panic in
     // tests. With `None` state it is an inert no-op.

@@ -52,6 +52,7 @@ use crate::network::NetworkStatus;
 use crate::search::files::model::FileSearchModel;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::ServerApiProvider;
+use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::import::model::ImportedConfigModel;
 use crate::settings::{
     AliasExpansionSettings, AppEditorSettings, InputBoxType, LongRunningCommandSubmissionMode,
@@ -210,6 +211,7 @@ pub fn initialize_app(app: &mut App) {
 
     // Initialize any global models required by the Input view.
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
+    app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     app.add_singleton_model(|ctx| ChangelogModel::new(ServerApiProvider::as_ref(ctx).get()));
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());

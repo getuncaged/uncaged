@@ -2,7 +2,7 @@ use std::fmt;
 
 use bounded_vec_deque::BoundedVecDeque;
 use chrono::{DateTime, FixedOffset};
-use warpui_core::{Entity, ModelContext, SingletonEntity};
+use warpui::{Entity, ModelContext, SingletonEntity};
 
 /// Maximum number of network log items retained in memory. Matches the
 /// previous file-rotation threshold so the pane surface behaves consistently
@@ -71,25 +71,27 @@ impl NetworkLogModel {
         for client in http_clients {
             let request_tx = tx.clone();
             client.set_before_request_fn(Box::new(move |request, serialized_payload| {
-                if !request_tx.is_closed()
-                    && let Err(error) = request_tx.try_send(NetworkLogItem::request(
-                        request,
-                        serialized_payload.clone(),
-                        chrono::Local::now().fixed_offset(),
-                    ))
-                {
+                if request_tx.is_closed() {
+                    return;
+                }
+                if let Err(error) = request_tx.try_send(NetworkLogItem::request(
+                    request,
+                    serialized_payload.clone(),
+                    chrono::Local::now().fixed_offset(),
+                )) {
                     log::error!("Error sending request from HTTP client to logging task: {error}");
                 }
             }));
 
             let response_tx = tx.clone();
             client.set_after_response_fn(Box::new(move |response| {
-                if !response_tx.is_closed()
-                    && let Err(error) = response_tx.try_send(NetworkLogItem::response(
-                        response,
-                        chrono::Local::now().fixed_offset(),
-                    ))
-                {
+                if response_tx.is_closed() {
+                    return;
+                }
+                if let Err(error) = response_tx.try_send(NetworkLogItem::response(
+                    response,
+                    chrono::Local::now().fixed_offset(),
+                )) {
                     log::error!("Error sending response from HTTP client to logging task: {error}");
                 }
             }));

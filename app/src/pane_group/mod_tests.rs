@@ -60,6 +60,7 @@ use crate::search::files::model::FileSearchModel;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::ServerId;
 use crate::server::server_api::ServerApiProvider;
+use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::PrivacySettings;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::suggestions::ignored_suggestions_model::IgnoredSuggestionsModel;
@@ -84,6 +85,8 @@ fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);
 
     app.add_singleton_model(|_ctx| ServerApiProvider::new_for_test());
+
+    app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     // Disabled (`None`) IapManager so code that reads the singleton doesn't
     // panic in tests; it is an inert no-op.
     app.add_singleton_model(|ctx| {

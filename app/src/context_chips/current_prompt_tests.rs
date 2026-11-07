@@ -28,6 +28,7 @@ use crate::context_chips::{ChipAvailability, ChipDisabledReason, ContextChipKind
 use crate::features::FeatureFlag;
 use crate::menu::MenuItem;
 use crate::server::server_api::ServerApiProvider;
+use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::WarpPromptSeparator;
 #[cfg(windows)]
 use crate::system::SystemInfo;
@@ -252,6 +253,7 @@ fn test_shell_chip_is_disabled_when_required_executable_is_missing() {
             )
         });
         app.add_singleton_model(|_| ServerApiProvider::new_for_test());
+        app.add_singleton_model(|_| SharedHttpClient::new_for_test());
         app.add_singleton_model(|_| crate::settings::manager::SettingsManager::default());
         crate::settings::InputSettings::register(&mut app);
         app.update(crate::settings::AISettings::register_and_subscribe_to_events);
@@ -397,6 +399,7 @@ fn test_disabling_chips() {
             )
         });
         app.add_singleton_model(|_| ServerApiProvider::new_for_test());
+        app.add_singleton_model(|_| SharedHttpClient::new_for_test());
 
         // Register required singleton models to fix the singleton model error
         app.add_singleton_model(|_| crate::settings::manager::SettingsManager::default());

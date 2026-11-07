@@ -185,7 +185,9 @@ use itertools::Itertools;
 pub use persistence::testing as sqlite_testing;
 #[cfg(feature = "plugin_host")]
 pub use plugin::{run_plugin_host, PLUGIN_HOST_FLAG};
+use server::network_logging::NetworkLogModel;
 use server::server_api::ServerApiProvider;
+use server::shared_http_client::SharedHttpClient;
 use settings::{ExtraMetaKeys, PrivacySettings};
 use terminal::input;
 use terminal::session_settings::SessionSettings;
@@ -199,7 +201,6 @@ pub use warp_core::{safe_debug, safe_error, safe_info, safe_warn};
 #[cfg(feature = "local_fs")]
 use warp_files::FileModel;
 use warp_server_client::iap::{IapManager, IapManagerEvent, IapState};
-use warp_server_client::network_logging::NetworkLogModel;
 use warpui::integration::TestDriver;
 use warpui::platform::app::{ApproveTerminateResult, TerminationRequestSource};
 use warpui::platform::TerminationMode;
@@ -804,10 +805,11 @@ pub(crate) fn initialize_app(
 
     let agent_source = Some(crate::ai::ambient_agents::AgentSource::CloudMode);
 
-    // NetworkLogModel must be registered before ServerApiProvider so that
+    // NetworkLogModel must be registered before SharedHttpClient and ServerApiProvider so that
     // `NetworkLogModel::install_on_clients` can reach it when forwarding items
     // captured by the HTTP client hooks.
     ctx.add_singleton_model(|_ctx| NetworkLogModel::default());
+    ctx.add_singleton_model(SharedHttpClient::new);
 
     // Create a shared IAP state for staging builds. The same `Arc<IapState>`
     // is handed to both `ServerApi` (for sync reads on the request path) and

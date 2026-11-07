@@ -14,6 +14,7 @@ use crate::search::mixer::SyncDataSource;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ServerId, SyncId};
 use crate::server::server_api::ServerApiProvider;
+use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::AISettings;
 use crate::system::SystemStats;
 use crate::test_util::cloud_objects::add_server_object;
@@ -58,6 +59,7 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(CloudViewModel::new);
     app.add_singleton_model(NotebookManager::mock);
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
+    app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     app.add_singleton_model(|_| SettingsManager::default());
     app.update(crate::settings::init_and_register_user_preferences);
     app.update(AISettings::register_and_subscribe_to_events);

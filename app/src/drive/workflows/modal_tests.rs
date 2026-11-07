@@ -6,6 +6,7 @@ use super::WorkflowModal;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::editor::PlainTextEditorViewAction as EditorAction;
 use crate::server::server_api::ServerApiProvider;
+use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workflows::workflow::{Argument, Workflow};
@@ -16,6 +17,7 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| Appearance::mock());
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
+    app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     app.add_singleton_model(|_| KeybindingChangedNotifier::mock());
 }
 

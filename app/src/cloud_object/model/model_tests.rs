@@ -21,6 +21,7 @@ use crate::features::FeatureFlag;
 use crate::notebooks::CloudNotebookModel;
 use crate::server::ids::{ClientId, ServerId};
 use crate::server::server_api::ServerApiProvider;
+use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::init_and_register_user_preferences;
 use crate::system::SystemStats;
 use crate::workflows::workflow::Workflow;
@@ -42,6 +43,7 @@ fn initialize_app(app: &mut App, cached_objects: Vec<Box<dyn CloudObject>>) {
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
+    app.add_singleton_model(|_| SharedHttpClient::new_for_test());
     app.add_singleton_model(|_ctx| CloudModel::new(None, cached_objects));
     app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));

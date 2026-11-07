@@ -19,7 +19,6 @@ use warp_server_client::base_client::{
     AmbientHeaderPolicy, AuthenticatedGraphqlConfig, BaseClient, GraphqlRoutingConfig,
 };
 use warp_server_client::iap::{IapManager, IapState};
-use warp_server_client::network_logging::NetworkLogModel;
 pub use warp_server_client::HttpStatusError;
 use warpui::r#async::BoxFuture;
 use warpui::{Entity, ModelContext, SingletonEntity};
@@ -29,6 +28,7 @@ use crate::ai::get_relevant_files::api::{GetRelevantFiles, GetRelevantFilesRespo
 use crate::ai::predict::generate_am_query_suggestions;
 use crate::ai::predict::generate_am_query_suggestions::GenerateAMQuerySuggestionsRequest;
 use crate::ai::predict::predict_am_queries::{PredictAMQueriesRequest, PredictAMQueriesResponse};
+use crate::server::network_logging::NetworkLogModel;
 use crate::ChannelState;
 
 pub const FETCH_CHANNEL_VERSIONS_TIMEOUT: std::time::Duration = Duration::from_secs(60);

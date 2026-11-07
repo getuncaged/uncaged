@@ -17,7 +17,6 @@ async-trait.workspace = true
 base64.workspace = true
 bincode.workspace = true
 blocking.workspace = true
-bounded-vec-deque.workspace = true
 cfg-if.workspace = true
 chrono.workspace = true
 cloud_object_models.workspace = true
