@@ -157,7 +157,6 @@ use repo_metadata::{
     repositories::DetectedRepositories, watcher::DirectoryWatcher, RepoMetadataModel,
 };
 use server::network_log_pane_manager::NetworkLogPaneManager;
-use server::telemetry::context_provider::AppTelemetryContextProvider;
 use server::voice_transcriber::ServerVoiceTranscriber;
 #[cfg(feature = "local_fs")]
 use settings::import::model::ImportedConfigModel;
@@ -207,9 +206,6 @@ pub use warp_core::errors::{report_error, report_if_error};
 use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
 // Re-export the debounce function to simplify imports.
 pub use warp_core::r#async::debounce;
-// Re-export the send_telemetry_from_ctx macro at the crate root level
-pub use warp_core::send_telemetry_from_app_ctx;
-pub use warp_core::send_telemetry_from_ctx;
 // Re-export the safe logging macros at the crate root level for backwards compatibility
 pub use warp_core::{safe_debug, safe_error, safe_info, safe_warn};
 #[cfg(feature = "local_fs")]
@@ -271,7 +267,6 @@ use crate::server::cloud_objects::listener::Listener;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::experiments::ServerExperiments;
 use crate::server::sync_queue::{QueueItem, SyncQueue};
-use crate::server::telemetry::TelemetryCollector;
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
 use crate::settings::cloud_preferences_syncer::initialize_cloud_preferences_syncer;
 use crate::settings::manager::SettingsManager;
@@ -896,8 +891,6 @@ pub(crate) fn initialize_app(
 
     ctx.add_singleton_model(|_ctx| AuthStateProvider::new(auth_state.clone()));
 
-    ctx.add_singleton_model(AppTelemetryContextProvider::new_context_provider);
-
     ctx.add_singleton_model(|ctx| {
         AuthManager::new(
             server_api.clone(),
@@ -1258,15 +1251,6 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(move |_| History::new(command_history));
 
     ctx.add_singleton_model(CustomSecretRegexUpdater::new);
-
-    // Register the `TelemetryCollection` singleton model.
-    let server_api_clone = server_api.clone();
-    ctx.add_singleton_model(|ctx| {
-        let telemetry_collector = TelemetryCollector::new(server_api_clone);
-        telemetry_collector.initialize_telemetry_collection(ctx);
-        telemetry_collector
-    });
-    timer.mark_interval_end("INITIALIZE_TELEMETRY_COLLECTION");
 
     // Register initial keybindings prior to creating menus
     ai::init(ctx);
@@ -1708,13 +1692,6 @@ pub(crate) fn app_callbacks(is_integration_test: bool) -> warpui::platform::AppC
             NetworkStatus::handle(ctx)
                 .update(ctx, move |me, ctx| me.reachability_changed(reachable, ctx));
         })),
-        on_become_active: Some(Box::new(move |ctx| {
-            let auth_state = AuthStateProvider::as_ref(ctx).get();
-            ctx.record_app_focus(
-                auth_state.user_id().map(|uid| uid.as_string()),
-                auth_state.anonymous_id(),
-            );
-        })),
         on_screen_changed: Some(Box::new(move |ctx| {
             ctx.dispatch_global_action(
                 "root_view:move_quake_mode_window_from_screen_change",
@@ -1762,12 +1739,6 @@ pub(crate) fn app_callbacks(is_integration_test: bool) -> warpui::platform::AppC
                 }
             }
             ctx.dispatch_global_action("root_view:update_quake_mode_state", &update_quake_mode_arg);
-
-            let auth_state = AuthStateProvider::as_ref(ctx).get();
-            ctx.record_app_blur(
-                auth_state.user_id().map(|uid| uid.as_string()),
-                auth_state.anonymous_id(),
-            );
         })),
         on_will_terminate: Some(Box::new(move |ctx| {
             NotebookManager::handle(ctx).update(ctx, |manager, ctx| {
@@ -1778,15 +1749,6 @@ pub(crate) fn app_callbacks(is_integration_test: bool) -> warpui::platform::AppC
 
             PersistenceWriter::handle(ctx).update(ctx, |writer, _ctx| {
                 writer.terminate();
-            });
-
-            let auth_state = AuthStateProvider::as_ref(ctx).get();
-            ctx.try_record_daily_app_focus_duration(
-                auth_state.user_id().map(|uid| uid.as_string()),
-                auth_state.anonymous_id(),
-            );
-            TelemetryCollector::handle(ctx).update(ctx, |telemetry_collector, ctx| {
-                telemetry_collector.flush_telemetry_events_for_shutdown(ctx);
             });
 
             // Shutdown all LSP servers gracefully before app termination

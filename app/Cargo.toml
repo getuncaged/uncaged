@@ -683,7 +683,6 @@ agent_mode_evals = [
     "cross_repo_context",
     "cloud_object_models/agent_mode_evals",
     "rust-embed/debug-embed",
-    "warpui/log_named_telemetry_events",
     "warp_logging/agent_mode_evals",
     "warp_multi_agent_client/agent_mode_evals",
     "warp_server_client/agent_mode_evals",
@@ -752,7 +751,6 @@ plugin_host = ["dep:rquickjs", "dep:warp_js", "warp_cli/plugin_host"]
 pprof_cpu_profiling = ["dep:pprof"]
 predict_am_queries = []
 quake_mode = []
-record_app_active_events = []
 recording_mode = []
 
 # This feature should only be enabled when building a release bundle with
@@ -837,7 +835,6 @@ search_codebase_ui = []
 linked_code_blocks = []
 tabbed_editor_view = []
 selection_as_context = []
-send_telemetry_to_file = []
 multi_profile = []
 pr_comments_slash_command = []
 pr_comments_v2 = []

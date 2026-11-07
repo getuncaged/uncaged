@@ -6,9 +6,7 @@ use parking_lot::Mutex;
 use url::{Origin, ParseError, Url};
 
 use super::Channel;
-use crate::channel::config::{
-    ChannelConfig, IapConfig, McpOAuthProviderConfig, RudderStackDestination, WarpServerConfig,
-};
+use crate::channel::config::{ChannelConfig, IapConfig, McpOAuthProviderConfig, WarpServerConfig};
 use crate::features::FeatureFlag;
 use crate::AppId;
 
@@ -166,16 +164,6 @@ impl ChannelState {
         CHANNEL_STATE.lock().config.logfile_name.clone()
     }
 
-    pub fn telemetry_file_name() -> Cow<'static, str> {
-        CHANNEL_STATE
-            .lock()
-            .config
-            .telemetry_config
-            .as_ref()
-            .map(|tc| tc.telemetry_file_name.clone())
-            .unwrap_or_default()
-    }
-
     /// Returns whether this build has a telemetry config and can therefore ship
     /// telemetry events. Builds like OpenWarp intentionally ship with
     /// `telemetry_config: None`, in which case UI that controls telemetry
@@ -258,32 +246,6 @@ impl ChannelState {
         Url::parse(&Self::server_root_url())
             .expect("Server root URL should be valid")
             .origin()
-    }
-
-    /// Returns the rudderstack destination for all events that don't contain user-generated content.
-    pub fn rudderstack_non_ugc_destination() -> RudderStackDestination {
-        let state = CHANNEL_STATE.lock();
-
-        state
-            .config
-            .telemetry_config
-            .as_ref()
-            .and_then(|tc| tc.rudderstack_config.as_ref())
-            .map(|rs| rs.non_ugc_destination())
-            .unwrap_or_default()
-    }
-
-    /// Returns the rudderstack destination for all events that contain user-generated content.
-    pub fn rudderstack_ugc_destination() -> RudderStackDestination {
-        let state = CHANNEL_STATE.lock();
-
-        state
-            .config
-            .telemetry_config
-            .as_ref()
-            .and_then(|tc| tc.rudderstack_config.as_ref())
-            .map(|rs| rs.ugc_destination())
-            .unwrap_or_default()
     }
 
     pub fn channel() -> Channel {

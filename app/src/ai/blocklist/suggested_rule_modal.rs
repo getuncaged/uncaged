@@ -155,10 +155,8 @@ impl SuggestedRuleModal {
 
     fn handle_view_event(&mut self, event: &SuggestedRuleDialogEvent, ctx: &mut ViewContext<Self>) {
         match event {
-            SuggestedRuleDialogEvent::AddNewRule { .. } => {
-                ctx.emit(SuggestedRuleModalEvent::AddNewRule)
-            }
-            SuggestedRuleDialogEvent::OpenRuleForEditing { .. } => {
+            SuggestedRuleDialogEvent::AddNewRule => ctx.emit(SuggestedRuleModalEvent::AddNewRule),
+            SuggestedRuleDialogEvent::OpenRuleForEditing => {
                 ctx.emit(SuggestedRuleModalEvent::OpenRuleForEditing)
             }
             SuggestedRuleDialogEvent::Close => ctx.emit(SuggestedRuleModalEvent::Close),
@@ -203,8 +201,8 @@ enum SuggestedRuleDialogAction {
 
 #[derive(Debug, Clone)]
 pub enum SuggestedRuleDialogEvent {
-    AddNewRule { rule: SuggestedRule },
-    OpenRuleForEditing { rule: SuggestedRule },
+    AddNewRule,
+    OpenRuleForEditing,
     Close,
 }
 
@@ -520,7 +518,7 @@ impl SuggestedRuleView {
             });
         }
         self.on_add_rule(ctx);
-        ctx.emit(SuggestedRuleDialogEvent::AddNewRule { rule });
+        ctx.emit(SuggestedRuleDialogEvent::AddNewRule);
     }
 
     /// Updates the UI state to reflect that a rule has been added.
@@ -645,8 +643,8 @@ impl TypedActionView for SuggestedRuleView {
                 self.add_rule(ctx);
             }
             SuggestedRuleDialogAction::Edit => {
-                if let Some(SuggestedRuleAndId { rule, .. }) = &self.rule_and_id {
-                    ctx.emit(SuggestedRuleDialogEvent::OpenRuleForEditing { rule: rule.clone() });
+                if self.rule_and_id.is_some() {
+                    ctx.emit(SuggestedRuleDialogEvent::OpenRuleForEditing);
                 } else {
                     log::warn!("No rule to edit in suggested rule dialog");
                 }
