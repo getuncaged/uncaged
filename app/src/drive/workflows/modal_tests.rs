@@ -3,7 +3,6 @@ use warpui::platform::WindowStyle;
 use warpui::{App, SingletonEntity, ViewHandle};
 
 use super::WorkflowModal;
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::editor::PlainTextEditorViewAction as EditorAction;
 use crate::server::server_api::ServerApiProvider;
@@ -18,7 +17,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| KeybindingChangedNotifier::mock());
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
 }
 
 fn create_modal(app: &mut App) -> ViewHandle<WorkflowModal> {

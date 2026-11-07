@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use ai::agent::action::{RunAgentsAgentRunConfig, RunAgentsExecutionMode};
 use ai::agent::action_result::StartAgentVersion;
 use ai::skills::SkillReference;
+use cloud_objects::UserUid;
 use settings::Setting;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 use warpui::{App, SingletonEntity};
@@ -17,7 +18,6 @@ use crate::ai::agent::{AIAgentActionType, StartAgentExecutionMode};
 use crate::ai::blocklist::action_model::{
     compose_run_agents_child_prompt, run_agents_to_start_agent_mode,
 };
-use crate::auth::UserUid;
 use crate::settings::{AISettings, OrchestrationMessageDisplayMode};
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspaces::user_profiles::{UserProfileWithUID, UserProfiles};

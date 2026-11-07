@@ -6,8 +6,6 @@ use anyhow::anyhow;
 use chrono::{DateTime, Duration, Utc};
 use cloud_object_client::MockObjectClient;
 use cloud_objects::cloud_object::ServerPermissions;
-use firebase::FirebaseError;
-use itertools::Itertools;
 use warpui::r#async::Timer;
 use warpui::{App, Entity, ModelHandle, SingletonEntity};
 
@@ -26,7 +24,6 @@ use crate::drive::CloudObjectTypeAndId;
 use crate::notebooks::{CloudNotebookModel, NotebookId};
 use crate::server::cloud_objects::update_manager::InitiatedBy;
 use crate::server::ids::{ClientId, HashableId, ServerId, ServerIdAndType, SyncId};
-use crate::server::server_api::auth::UserAuthenticationError;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::{
     CreationFailureReason, GenericStringObjectToCreate, QueueItemId, SerializedModel,
@@ -502,124 +499,6 @@ fn test_dequeue_after_transient_failure() {
                     }
                 ]
             );
-        });
-    });
-}
-
-#[test]
-fn test_no_dequeue_after_intransient_failure() {
-    App::test((), |mut app| async move {
-        let owner = Owner::mock_current_user();
-        let failure_notebook_id = ClientId::default();
-        let failure_notebook = CloudNotebookModel {
-            title: "Failed Notebook".to_string(),
-            data: "Hello :(".to_string(),
-            ai_document_id: None,
-            conversation_id: None,
-        };
-        let second_notebook = CloudNotebookModel {
-            title: "Second Notebook".to_string(),
-            data: "I'd like to be created! But I won't be :(".to_string(),
-            ai_document_id: None,
-            conversation_id: None,
-        };
-        let second_notebook_id = ClientId::default();
-        let second_notebook_item = QueueItem::CreateObject {
-            object_type: ObjectType::Notebook,
-            owner,
-            id: second_notebook_id,
-            title: None,
-            serialized_model: Some(Arc::new(second_notebook.serialized())),
-            initial_folder_id: None,
-            entrypoint: CloudObjectEventEntrypoint::Unknown,
-            initiated_by: InitiatedBy::User,
-        };
-
-        let failure_attempts = 1 + super::DEFAULT_RETRY_OPTION.remaining_retries();
-        let mut cloud_objects_client_mock = MockObjectClient::new();
-        cloud_objects_client_mock
-            .expect_create_notebook()
-            // Note that even though we don't dequeue future items because we know they'll fail,
-            // we're still stuck retrying the initial item.
-            .times(failure_attempts)
-            .returning(move |_| {
-                // This is one of the types of errors that won't cause us to keep dequeueing;
-                // if Firebase rejects the user once, they'll likely reject requests for other queue items.
-                Err(UserAuthenticationError::DeniedAccessToken(FirebaseError {
-                    code: 401,
-                    message: "Unauthenticated".to_string(),
-                })
-                .into())
-            });
-
-        initialize_app(&mut app);
-
-        let sync_queue = create_sync_queue(
-            &mut app,
-            vec![
-                QueueItem::CreateObject {
-                    object_type: ObjectType::Notebook,
-                    owner,
-                    id: failure_notebook_id,
-                    title: None,
-                    serialized_model: Some(Arc::new(failure_notebook.serialized())),
-                    initial_folder_id: None,
-                    entrypoint: CloudObjectEventEntrypoint::Unknown,
-                    initiated_by: InitiatedBy::User,
-                },
-                second_notebook_item.clone(),
-            ],
-            cloud_objects_client_mock,
-            false,
-        );
-
-        let sync_queue_events = app.add_model(|_ctx| Events::default());
-        sync_queue_events.update(&mut app, |_, ctx| {
-            ctx.subscribe_to_model(&sync_queue, |me, _, event, _ctx| me.0.push(event.clone()))
-        });
-
-        sync_queue
-            .update(&mut app, |queue, ctx| {
-                queue.start_dequeueing(ctx);
-                ctx.await_spawned_future(queue.spawned_futures[0])
-            })
-            .await;
-
-        // Wait for the first notebook's creation to fail.
-        // The failures are retried, but their futures are spawned on background threads,
-        // so we can't access them. Instead, we wait for a SyncQueue event to appear in the model.
-        let mut timeout = Timer::after(std::time::Duration::from_secs(20));
-        let mut has_event = false;
-        while !has_event {
-            if futures::poll!(&mut timeout).is_ready() {
-                panic!("Timed out waiting for failure");
-            }
-
-            Timer::after(std::time::Duration::from_millis(500)).await;
-            sync_queue_events.read(&app, |events, _ctx| {
-                has_event = !events.0.is_empty();
-            });
-        }
-
-        sync_queue_events.read(&app, |events, _| {
-            assert_eq!(
-                &events.0[0],
-                &SyncQueueEvent::ObjectCreationFailure {
-                    reason: CreationFailureReason::Other {
-                        id: failure_notebook_id.to_hash(),
-                        initiated_by: InitiatedBy::User
-                    },
-                }
-            );
-        });
-
-        // The second notebook should not be dequeued.
-        sync_queue.read(&app, |queue, _ctx| {
-            // The queue will still be in a "dequeueing" state, so it processes new items, but it
-            // will not process the existing item.
-            assert_eq!(queue.spawned_futures.len(), 1);
-            let items = queue.queue().iter().map(|(_, item)| item).collect_vec();
-            assert_eq!(items, &[&second_notebook_item]);
         });
     });
 }

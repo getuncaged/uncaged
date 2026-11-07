@@ -44,10 +44,6 @@ pub struct ParentOpts {
 #[command(name = "uncaged", display_name = "Uncaged")]
 #[clap(args_conflicts_with_subcommands = true)]
 pub struct Args {
-    /// API key for server authentication. Only used on dogfood channels.
-    #[arg(long = "api-key", hide = true, env = "WARP_API_KEY")]
-    api_key: Option<String>,
-
     /// Override the server root URL.
     #[arg(
         long = "server-root-url",
@@ -143,11 +139,6 @@ impl Args {
     /// Extract the main Warp application args.
     pub fn into_app_args(self) -> AppArgs {
         self.args
-    }
-
-    /// Returns the API key if provided.
-    pub fn api_key(&self) -> Option<&String> {
-        self.api_key.as_ref()
     }
 
     pub fn server_root_url(&self) -> Option<&str> {

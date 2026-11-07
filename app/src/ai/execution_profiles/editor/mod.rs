@@ -4,14 +4,10 @@ use ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent};
 use itertools::Itertools;
 use regex::Regex;
 use thousands::Separable;
-use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
-    Align, Border, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
-    Container, CrossAxisAlignment, Expanded, Flex, Highlight, MouseStateHandle, ParentElement,
-    PartialClickableElement, ScrollbarWidth, Text,
+    Align, ChildView, ClippedScrollStateHandle, ClippedScrollable, Container, Flex,
+    MouseStateHandle, ParentElement, ScrollbarWidth,
 };
-use warpui::fonts::Properties;
-use warpui::platform::Cursor;
 use warpui::ui_components::slider::SliderStateHandle;
 use warpui::ui_components::switch::SwitchStateHandle;
 use warpui::{
@@ -45,76 +41,9 @@ use crate::view_components::dropdown::DropdownAction;
 use crate::view_components::{
     Dropdown, DropdownItem, FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent,
 };
-use crate::workspace::WorkspaceAction;
 use crate::{Appearance, TemplatableMCPServerManager};
 
 const MODEL_MENU_WIDTH: f32 = 250.;
-
-/// Renders a footer banner for model dropdowns informing free-plan users that
-/// frontier models require an upgrade, with a clickable "Upgrade" link.
-fn render_upgrade_footer(
-    upgrade_mouse_state: MouseStateHandle,
-    app: &AppContext,
-) -> Box<dyn Element> {
-    let appearance = Appearance::as_ref(app);
-    let theme = appearance.theme();
-    let surface = theme.surface_2();
-    let text_color = theme.main_text_color(surface);
-
-    let info_icon = ConstrainedBox::new(
-        warp_core::ui::Icon::Info
-            .to_warpui_icon(text_color)
-            .finish(),
-    )
-    .with_width(16.)
-    .with_height(16.)
-    .finish();
-
-    let label = "Frontier models are unavailable on free plans. Upgrade";
-    let upgrade_start = label.len() - "Upgrade".len();
-    let info_text = Text::new(
-        label,
-        appearance.ui_font_family(),
-        appearance.ui_font_size(),
-    )
-    .with_color(text_color.into())
-    .with_single_highlight(
-        Highlight::new()
-            .with_properties(Properties::default())
-            .with_foreground_color(internal_colors::accent_fg(theme).into()),
-        (upgrade_start..label.len()).collect(),
-    )
-    .with_hoverable_char_range(
-        upgrade_start..label.len(),
-        upgrade_mouse_state,
-        Some(Cursor::PointingHand),
-        |_is_hovered, _ctx, _app| {},
-    )
-    .with_clickable_char_range(upgrade_start..label.len(), move |_modifiers, ctx, _app| {
-        ctx.dispatch_typed_action(WorkspaceAction::ShowUpgrade);
-    })
-    .finish();
-
-    let inner = Container::new(
-        Flex::row()
-            .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(
-                Container::new(info_icon)
-                    .with_margin_right(6.)
-                    .with_margin_top(2.)
-                    .finish(),
-            )
-            .with_child(Expanded::new(1., info_text).finish())
-            .finish(),
-    )
-    .with_horizontal_padding(16.)
-    .with_vertical_padding(6.)
-    .with_background(internal_colors::fg_overlay_1(theme))
-    .with_border(Border::top(1.).with_border_color(internal_colors::neutral_3(theme)))
-    .finish();
-
-    Container::new(inner).with_background(surface).finish()
-}
 
 #[derive(Default)]
 struct TooltipMouseStateHandles {

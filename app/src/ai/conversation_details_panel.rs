@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Local};
+use cloud_objects::UserUid;
 use instant::Instant;
 use parking_lot::RwLock;
 use pathfinder_color::ColorU;
@@ -45,7 +46,6 @@ use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::ai::harness_display;
 use crate::appearance::Appearance;
-use crate::auth::UserUid;
 use crate::notebooks::NotebookId;
 use crate::server::server_api::ai::AmbientAgentTask;
 #[cfg(not(target_family = "wasm"))]

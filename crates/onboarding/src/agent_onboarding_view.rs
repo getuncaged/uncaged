@@ -14,8 +14,8 @@ use crate::model::{
 };
 use crate::slides::{
     AgentSlide, AiAccessSlide, AiAccessSlideEvent, AiSetupSlide, ConnectGalleryData,
-    CustomizeUISlide, IntentionSlide, IntroSlide, IntroSlideEvent, OnboardingModelInfo,
-    OnboardingSlide, ProjectSlide, ThemePickerSlide, ThemePickerSlideEvent, ThirdPartySlide,
+    CustomizeUISlide, IntentionSlide, IntroSlide, OnboardingModelInfo, OnboardingSlide,
+    ProjectSlide, ThemePickerSlide, ThemePickerSlideEvent, ThirdPartySlide,
 };
 
 const APP_BECAME_ACTIVE_DEBOUNCE: Duration = Duration::from_secs(15);
@@ -51,16 +51,6 @@ pub enum AgentOnboardingEvent {
     /// gallery to actually wire up a model.
     OnboardingCompleted(SelectedSettings, bool),
     OnboardingSkipped,
-    LoginFromWelcomeRequested,
-    /// Emitted when the user clicks the "Privacy Settings" link on the terminal
-    /// intention theme slide. The variant name encodes that the event is only
-    /// emitted from the terminal-intention theme slide; consumers (e.g. a
-    /// `LoginSlideView` with `LoginSlideSource::PrivacySettingsFromTerminalIntentionTheme`)
-    /// rely on that to select the right visual / back-routing behavior.
-    PrivacySettingsFromTerminalThemeSlideRequested,
-    UpgradeRequested,
-    UpgradeCopyUrlRequested,
-    UpgradePasteTokenFromClipboardRequested,
     /// The user clicked "Connect" on a catalog preset in the onboarding connect
     /// gallery. The app crate (root_view) calls the uncaged bridge to connect it
     /// and pushes a refreshed gallery back.
@@ -151,9 +141,6 @@ impl AgentOnboardingView {
                 OnboardingStateEvent::Completed => {
                     me.handle_onboarding_completed(ctx);
                 }
-                OnboardingStateEvent::UpgradeRequested => {
-                    ctx.emit(AgentOnboardingEvent::UpgradeRequested);
-                }
                 OnboardingStateEvent::ModelsUpdated
                 | OnboardingStateEvent::SelectedSlideChanged
                 | OnboardingStateEvent::IntentionChanged
@@ -165,12 +152,6 @@ impl AgentOnboardingView {
             let onboarding_state = onboarding_state.clone();
             ctx.add_typed_action_view(move |_| IntroSlide::new(onboarding_state))
         };
-
-        ctx.subscribe_to_view(&intro_slide, |_me, _view, event, ctx| match event {
-            IntroSlideEvent::LoginRequested => {
-                ctx.emit(AgentOnboardingEvent::LoginFromWelcomeRequested);
-            }
-        });
 
         let theme_picker_slide = {
             let themes = theme_picker_themes.clone();
@@ -433,9 +414,6 @@ impl AgentOnboardingView {
             }
             ThemePickerSlideEvent::SyncWithOsToggled { enabled } => {
                 ctx.emit(AgentOnboardingEvent::SyncWithOsToggled { enabled: *enabled });
-            }
-            ThemePickerSlideEvent::PrivacySettingsRequested => {
-                ctx.emit(AgentOnboardingEvent::PrivacySettingsFromTerminalThemeSlideRequested);
             }
         }
     }

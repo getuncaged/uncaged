@@ -8,8 +8,6 @@ license.workspace = true
 
 [features]
 agent_mode_evals = ["dep:rand"]
-integration_tests = ["warp_server_auth/integration_tests"]
-skip_login = ["warp_server_auth/skip_login"]
 test-util = ["cloud_object_client/test-util", "cloud_objects/test-util", "dep:mockall"]
 
 [dependencies]
@@ -28,7 +26,6 @@ cloud_objects.workspace = true
 command.workspace = true
 cynic.workspace = true
 derivative.workspace = true
-firebase.workspace = true
 futures.workspace = true
 http.workspace = true
 http_client.workspace = true
@@ -37,7 +34,6 @@ itertools.workspace = true
 lasso.workspace = true
 log.workspace = true
 mockall = { workspace = true, optional = true }
-oauth2.workspace = true
 parking_lot.workspace = true
 pathfinder_geometry.workspace = true
 reqwest.workspace = true
@@ -53,7 +49,6 @@ uuid.workspace = true
 warp_core.workspace = true
 warp_graphql.workspace = true
 warp_isolation_platform.workspace = true
-warp_server_auth.workspace = true
 warpui_core.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
@@ -64,4 +59,3 @@ websocket.workspace = true
 mockall.workspace = true
 mockito.workspace = true
 warp_core = { workspace = true, features = ["test-util"] }
-warp_server_auth = { workspace = true, features = ["test-util"] }

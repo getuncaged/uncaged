@@ -36,7 +36,6 @@ use crate::ai::blocklist::history_model::{
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, ConversationStatusUpdate,
 };
 use crate::ai::conversation_navigation::ConversationNavigationData;
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::{Owner, Revision, ServerMetadata, ServerPermissions};
 use crate::server::ids::ServerId;
 use crate::server::server_api::HttpStatusError;
@@ -208,7 +207,6 @@ fn test_title_update_refreshes_shadowing_task_title() {
         let _interactive_management_guard =
             FeatureFlag::InteractiveConversationManagementView.override_enabled(true);
         initialize_history_persistence_for_tests(&mut app);
-        app.add_singleton_model(|_| AuthStateProvider::new_for_test());
         app.add_singleton_model(|_| ActiveAgentViewsModel::new());
         let history_model = app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], &[]));
         let agent_model = app.add_singleton_model(|_| create_test_model());
@@ -746,7 +744,6 @@ fn all_owner_filters() -> AgentManagementFilters {
 }
 
 fn add_entry_projection_test_models(app: &mut App) {
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], &[]));
     app.add_singleton_model(|_| ActiveAgentViewsModel::new());
 }

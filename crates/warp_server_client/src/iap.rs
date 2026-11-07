@@ -198,8 +198,7 @@ impl IapManager {
         self.state.as_ref().map(|s| s.state())
     }
 
-    /// Returns a handle to the shared IAP credential state, if IAP is active.
-    /// Mirrors how `AuthStateProvider` hands out the `Arc<AuthState>`, letting
+    /// Returns a handle to the shared IAP credential state, if IAP is active, letting
     /// callers read cached credentials (e.g. to build a proxy-auth header) off
     /// a `ModelContext` without reaching through `ServerApi`.
     pub fn iap_state(&self) -> Option<Arc<IapState>> {

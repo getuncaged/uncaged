@@ -15,7 +15,6 @@ use warpui::text::point::Point;
 use warpui::units::IntoPixels;
 use warpui::{App, SingletonEntity, TypedActionView, UpdateModel, ViewHandle};
 
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::code::editor::view::{CodeEditorRenderOptions, CodeEditorView, CodeEditorViewAction};
 use crate::notebooks::editor::keys::NotebookKeybindings;
@@ -40,7 +39,6 @@ fn initialize_code_editor_app(app: &mut App) {
     initialize_settings_for_tests(app);
 
     // Add required singleton models for CodeEditorView
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.add_singleton_model(|_| Appearance::mock());
     app.add_singleton_model(|_| SyncedInputState::mock());
     app.add_singleton_model(|_| VimRegisters::new());

@@ -148,7 +148,6 @@ pub(crate) enum OnboardingStateEvent {
     SelectedSlideChanged,
     IntentionChanged,
     Completed,
-    UpgradeRequested,
     NoAiConfirmationChanged,
 }
 
@@ -463,10 +462,6 @@ impl OnboardingStateModel {
 
     pub(crate) fn set_intention_agent_driven_development(&mut self, ctx: &mut ModelContext<Self>) {
         self.set_intention(OnboardingIntention::AgentDrivenDevelopment, ctx);
-    }
-
-    pub(crate) fn request_upgrade(&mut self, ctx: &mut ModelContext<Self>) {
-        ctx.emit(OnboardingStateEvent::UpgradeRequested);
     }
 
     pub(crate) fn on_user_selected_model(&mut self, model_id: LLMId, ctx: &mut ModelContext<Self>) {

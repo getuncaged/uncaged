@@ -5,7 +5,6 @@ use warpui::{App, SingletonEntity};
 
 use super::*;
 use crate::ai::request_usage_model::{RequestLimitInfo, RequestLimitRefreshDuration};
-use crate::auth::AuthStateProvider;
 use crate::test_util::settings::initialize_settings_for_tests;
 
 fn create_test_request_limit_info(
@@ -29,10 +28,6 @@ fn create_test_request_limit_info(
         max_files_per_repo: 5000,
         embedding_generation_batch_size: 100,
     }
-}
-
-fn add_ai_enablement_dependencies_for_test(app: &mut App) {
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
 }
 
 // FocusedTerminalInfo Tests
@@ -387,7 +382,6 @@ fn test_toolbar_command_map_matched_agent() {
 fn orchestration_is_enabled_when_ai_is_enabled() {
     App::test((), |mut app| async move {
         initialize_settings_for_tests(&mut app);
-        add_ai_enablement_dependencies_for_test(&mut app);
 
         AISettings::handle(&app).read(&app, |settings, ctx| {
             assert!(settings.is_orchestration_enabled(ctx));

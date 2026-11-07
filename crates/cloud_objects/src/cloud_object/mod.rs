@@ -332,11 +332,7 @@ impl Owner {
     /// A mock [`Owner`] ID for testing.
     #[cfg(any(test, feature = "test-util"))]
     pub fn mock_current_user() -> Owner {
-        use crate::auth::TEST_USER_UID;
-
-        Owner::User {
-            user_uid: UserUid::new(TEST_USER_UID),
-        }
+        Owner::local_user()
     }
 }
 

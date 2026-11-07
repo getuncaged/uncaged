@@ -212,7 +212,6 @@ warp_editor.workspace = true
 warp_graphql.workspace = true
 warp_js = { workspace = true, optional = true }
 warp_search_core.workspace = true
-warp_server_auth.workspace = true
 warp_server_client.workspace = true
 warp_util.workspace = true
 warpui = { workspace = true, features = ["schema_gen", "settings_value"] }
@@ -372,7 +371,6 @@ winreg.workspace = true
 [dev-dependencies]
 ai = { workspace = true, features = ["test-util"] }
 async-process.workspace = true
-firebase.workspace = true
 jsonschema = { workspace = true, default-features = false }
 async-executor = "1.5.1"
 command = { workspace = true, features = ["test-util"] }
@@ -388,7 +386,6 @@ warp_completer = { workspace = true, features = ["test-util"] }
 warp_core = { workspace = true, features = ["test-util"] }
 warp_editor = { workspace = true, features = ["test-util"] }
 warp_server_client = { workspace = true, features = ["test-util"] }
-warp_server_auth = { workspace = true, features = ["test-util"] }
 warp_terminal = { workspace = true, features = ["test-util"] }
 warpui = { workspace = true, features = ["test-util"] }
 warpui_core = { workspace = true, features = ["test-util"] }
@@ -508,7 +505,6 @@ default = [
     "mcp_oauth",
     "expand_edit_to_pane",
     "fallback_model_load_output_messaging",
-    # "api_key_authentication",  # Uncaged: needs Warp servers
     # "api_key_management",  # Uncaged: needs Warp servers
     "summarization_cancellation_confirmation",
     "ui_zoom",
@@ -603,7 +599,6 @@ default = [
     "codex_plugin",
     "trim_trailing_blank_lines",
     "open_warp_new_settings_modes",
-    "skip_firebase_anonymous_user",
     "settings_file",
     "directory_tab_colors",
     "git_credential_refresh",
@@ -645,7 +640,7 @@ enforce_revisions_to_cloud_objects = []
 suggested_agent_mode_workflows = []
 ssh_enable_host_denylist_in_settings = []
 extern_plist = []
-fast_dev = ["skip_login"]
+fast_dev = []
 full_screen_zen_mode = []
 grab_the_baton_editing = []
 grep_tool = []
@@ -754,14 +749,13 @@ runtime_feature_flags = []
 selectable_prompt = []
 settings_file = []
 sequential_storage = []
-skip_login = ["warp_server_client/skip_login"]
 # This feature should only be enabled when building a self-contained binary with the bundle script.
 standalone = ["warp_assets/standalone"]
 prompt_suggestions_via_maa = []
 system_theme = []
 tab_close_button_on_left = []
 team_features_override = []
-test-util = ["cloud_object_client/test-util", "warp_server_auth/test-util"]
+test-util = ["cloud_object_client/test-util"]
 team_workflows = ["team_features_override"]
 toggle_bootstrap_block = []
 # Feature enabled only when app is compiled for integration tests.
@@ -770,7 +764,6 @@ integration_tests = [
     "warpui/integration_tests",
     "warpui/test-util",
     "warp_core/integration_tests",
-    "warp_server_client/integration_tests",
 ]
 traces = []
 workflow_aliases = []
@@ -839,7 +832,6 @@ revert_diff_hunk = []
 code_review_save_changes = []
 file_tree = []
 code_launch_modal = []
-api_key_authentication = []
 api_key_management = []
 diff_set_as_context = []
 discard_per_file_and_all_changes = []
@@ -919,7 +911,6 @@ handoff_local_cloud = []
 hoa_notifications = []
 open_code_notifications = []
 transfer_control_tool = []
-skip_firebase_anonymous_user = []
 custom_inference_endpoints = []
 custom_model_routers = []
 solo_user_byok = []

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
+use cloud_objects::UserUid;
 use derivative::Derivative;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -23,7 +24,6 @@ use self::model::generic_string_model::{
 };
 use self::model::persistence::CloudModel;
 use crate::appearance::Appearance;
-use crate::auth::UserUid;
 use crate::channel::ChannelState;
 use crate::drive::items::WarpDriveItem;
 use crate::drive::{CloudObjectTypeAndId, OpenWarpDriveObjectArgs, OpenWarpDriveObjectSettings};

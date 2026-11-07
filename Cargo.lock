@@ -2279,7 +2279,6 @@ dependencies = [
  "uuid",
  "warp_core",
  "warp_graphql",
- "warp_server_auth",
  "warpui_core",
 ]
 
@@ -4115,14 +4114,6 @@ name = "finl_unicode"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9844ddc3a6e533d62bba727eb6c28b5d360921d5175e9ff0f1e621a5c590a4d5"
-
-[[package]]
-name = "firebase"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
-]
 
 [[package]]
 name = "fixedbitset"
@@ -13303,7 +13294,6 @@ dependencies = [
  "env_logger",
  "event-listener",
  "field_mask",
- "firebase",
  "flate2",
  "float-cmp",
  "freedesktop-desktop-entry",
@@ -13476,7 +13466,6 @@ dependencies = [
  "warp_multi_agent_api",
  "warp_ripgrep",
  "warp_search_core",
- "warp_server_auth",
  "warp_server_client",
  "warp_terminal",
  "warp_util",
@@ -13915,26 +13904,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "warp_server_auth"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "cynic",
- "lasso",
- "log",
- "parking_lot",
- "serde",
- "serde_json",
- "thiserror 2.0.17",
- "uuid",
- "warp_core",
- "warp_graphql",
- "warpui_core",
- "warpui_extras",
-]
-
-[[package]]
 name = "warp_server_client"
 version = "0.1.0"
 dependencies = [
@@ -13955,7 +13924,6 @@ dependencies = [
  "cynic",
  "derivative",
  "diesel",
- "firebase",
  "futures",
  "http",
  "http_client",
@@ -13965,7 +13933,6 @@ dependencies = [
  "log",
  "mockall",
  "mockito",
- "oauth2",
  "parking_lot",
  "pathfinder_geometry",
  "rand 0.8.6",
@@ -13980,7 +13947,6 @@ dependencies = [
  "warp_core",
  "warp_graphql",
  "warp_isolation_platform",
- "warp_server_auth",
  "warpui_core",
  "websocket",
 ]

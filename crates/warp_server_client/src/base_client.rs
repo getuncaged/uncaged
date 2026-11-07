@@ -1,15 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use futures::StreamExt as _;
 use instant::Duration;
 use parking_lot::{Mutex, RwLock};
 use warp_graphql::client::RequestOptions;
-use warp_server_auth::auth_state::AuthState;
-use warp_server_auth::credentials::AuthToken;
 
-use crate::auth::{AuthEvent, AuthSession, UserUid};
+use crate::auth::{AuthEvent, AuthToken};
 
 /// Header key for the ambient agent workload token attached to authenticated requests.
 pub const AMBIENT_WORKLOAD_TOKEN_HEADER: &str = "X-Warp-Ambient-Workload-Token";
@@ -107,9 +105,7 @@ pub struct AuthenticatedGraphqlConfig {
 /// Owns shared transport, authentication, and authenticated request decoration.
 pub struct BaseClient {
     client: Arc<http_client::Client>,
-    auth_state: Arc<AuthState>,
     event_sender: async_channel::Sender<AuthEvent>,
-    auth_session: Arc<AuthSession>,
     ambient_workload_token: Arc<Mutex<Option<warp_isolation_platform::WorkloadToken>>>,
     ambient_agent_task_id: Arc<RwLock<Option<String>>>,
     agent_source: Option<String>,
@@ -123,7 +119,6 @@ pub struct BaseClient {
 impl BaseClient {
     pub fn new(
         client: Arc<http_client::Client>,
-        auth_state: Arc<AuthState>,
         event_sender: async_channel::Sender<AuthEvent>,
         agent_source: Option<String>,
         graphql_routing: GraphqlRoutingConfig,
@@ -151,16 +146,9 @@ impl BaseClient {
                 .headers
                 .insert(EVAL_USER_ID_HEADER.to_string(), eval_user_id.to_string());
         }
-        let auth_session = Arc::new(AuthSession::new(
-            client.clone(),
-            auth_state.clone(),
-            event_sender.clone(),
-        ));
         Self {
             client,
-            auth_state,
             event_sender,
-            auth_session,
             ambient_workload_token: Arc::new(Mutex::new(None)),
             ambient_agent_task_id: Arc::new(RwLock::new(None)),
             agent_source,
@@ -201,18 +189,6 @@ impl BaseClient {
         self.client.clone()
     }
 
-    pub fn auth_session(&self) -> Arc<AuthSession> {
-        self.auth_session.clone()
-    }
-
-    pub fn anonymous_id(&self) -> String {
-        self.auth_state.anonymous_id()
-    }
-
-    pub fn user_id(&self) -> Option<UserUid> {
-        self.auth_state.user_id()
-    }
-
     /// Returns the eval user selected for this client, if eval routing is enabled.
     pub fn eval_user_id(&self) -> Option<i32> {
         #[cfg(feature = "agent_mode_evals")]
@@ -225,16 +201,9 @@ impl BaseClient {
         }
     }
 
-    pub fn access_token_ignoring_validity(&self) -> Option<String> {
-        self.auth_state.get_access_token_ignoring_validity()
-    }
-
-    pub fn allowed_to_refresh_token(&self) -> bool {
-        self.auth_session.allowed_to_refresh_token()
-    }
-
+    /// Uncaged has no Warp account, so there is never a token to send.
     pub async fn get_or_refresh_access_token(&self) -> Result<AuthToken> {
-        self.auth_session.get_or_refresh_access_token().await
+        bail!("missing authentication credentials")
     }
 
     /// Returns a sender for asynchronous work that emits auth events without borrowing this client.
@@ -247,10 +216,6 @@ impl BaseClient {
         event: AuthEvent,
     ) -> Result<(), async_channel::TrySendError<AuthEvent>> {
         self.event_sender.try_send(event)
-    }
-
-    pub fn is_auth_refresh_allowed(&self) -> bool {
-        self.allowed_to_refresh_token()
     }
 
     /// Sets the default cloud-agent identifier inherited by subsequent requests.

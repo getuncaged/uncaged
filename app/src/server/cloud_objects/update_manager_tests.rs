@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use cloud_object_client::MockObjectClient;
 use cloud_object_models::JsonSerializer;
 use cloud_objects::drive::sharing::{Subject, UserKind};
+use cloud_objects::UserUid;
 use futures_lite::future;
 use settings::{RespectUserSyncSetting, SyncToCloud};
 use warp_core::features::FeatureFlag;
@@ -14,8 +15,6 @@ use warp_graphql::scalars::time::ServerTimestamp;
 use warpui::{App, ModelHandle, SingletonEntity};
 
 use super::{GetCloudObjectResponse, InitialLoadResponse, UpdateManager};
-use crate::auth::user::TEST_USER_UID;
-use crate::auth::UserUid;
 use crate::cloud_object::model::actions::{
     ObjectAction, ObjectActionHistory, ObjectActionSubtype, ObjectActionType, ObjectActions,
 };
@@ -28,7 +27,7 @@ use crate::cloud_object::{
     ObjectIdType, ObjectMetadataUpdateResult, ObjectPermissionsUpdateData, ObjectType, Owner,
     Revision, RevisionAndLastEditor, ServerCloudObject, ServerFolder, ServerGuestSubject,
     ServerNotebook, ServerObject, ServerObjectGuest, ServerPreference, ServerWorkflow,
-    ServerWorkflowEnum, Space, UpdateCloudObjectResult,
+    ServerWorkflowEnum, Space, UpdateCloudObjectResult, LOCAL_USER_UID,
 };
 use crate::drive::folders::{CloudFolder, CloudFolderModel, FolderId};
 use crate::drive::sharing::SharingAccessLevel;
@@ -3062,7 +3061,7 @@ fn test_metadata_after_optimistic_grab_baton_success() {
 
         // Mock a successful baton grab.
         let mut grab_metadata = notebook_metadata.clone();
-        grab_metadata.current_editor_uid = Some(TEST_USER_UID.to_string());
+        grab_metadata.current_editor_uid = Some(LOCAL_USER_UID.to_string());
         grab_metadata.metadata_last_updated_ts = (initial_ts + chrono::Duration::seconds(1)).into();
         server_api
             .expect_grab_notebook_edit_access()
@@ -3080,7 +3079,7 @@ fn test_metadata_after_optimistic_grab_baton_success() {
             })
             .await;
 
-        assert_current_editor_for_object(&mut app, &sync_id.uid(), Some(TEST_USER_UID));
+        assert_current_editor_for_object(&mut app, &sync_id.uid(), Some(LOCAL_USER_UID));
         // Ensure that the metadata timestamp from the server response is used.
         assert_metadata_ts_for_object(
             &mut app,
@@ -3093,7 +3092,7 @@ fn test_metadata_after_optimistic_grab_baton_success() {
         match &events[0] {
             ModelEvent::UpdateObjectMetadata { id, metadata } => {
                 assert_eq!(id, &sync_id.sqlite_uid_hash(ObjectIdType::Notebook));
-                assert_eq!(metadata.current_editor_uid.as_deref(), Some(TEST_USER_UID));
+                assert_eq!(metadata.current_editor_uid.as_deref(), Some(LOCAL_USER_UID));
             }
             _ => panic!("Expected an UpdateObjectMetadata event"),
         }

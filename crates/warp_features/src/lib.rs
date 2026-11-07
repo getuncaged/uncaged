@@ -369,9 +369,6 @@ pub enum FeatureFlag {
     /// Enables the one-time modal on app startup for existing users for the Code launch.
     CodeLaunchModal,
 
-    /// Enables API key authentication for Agent SDK
-    APIKeyAuthentication,
-
     /// Enables API key management UI in settings
     APIKeyManagement,
 
@@ -736,11 +733,6 @@ pub enum FeatureFlag {
     /// Enables the install/update chip for the Gemini CLI Warp extension.
     /// Requires HOANotifications to also be enabled.
     GeminiNotifications,
-
-    /// When enabled, the "Skip for now" login flow does not create a Firebase
-    /// anonymous user. The user remains fully logged out (no credentials) and
-    /// login-gated features are disabled until they sign in.
-    SkipFirebaseAnonymousUser,
 
     /// Enables tab configs — user-definable TOML templates for launching custom tab layouts.
     TabConfigs,

@@ -1,7 +1,7 @@
+use cloud_objects::UserUid;
 use warpui::{App, SingletonEntity};
 
 use super::editor_display_name;
-use crate::auth::UserUid;
 use crate::workspaces::user_profiles::{UserProfileWithUID, UserProfiles};
 
 fn initialize_app(app: &mut App) {

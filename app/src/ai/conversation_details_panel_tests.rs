@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{Local, Utc};
+use cloud_objects::UserUid;
 use persistence::model::{AgentConversationData, ConversationUsageMetadata};
 use warp_cli::agent::Harness;
 use warp_multi_agent_api as api;
@@ -15,7 +16,6 @@ use crate::ai::ambient_agents::agent_config::HarnessConfig;
 use crate::ai::ambient_agents::task::{AgentConfigSnapshot, TaskPrincipalInfo};
 use crate::ai::ambient_agents::{AmbientAgentTask, AmbientAgentTaskState};
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
-use crate::auth::UserUid;
 use crate::cloud_object::{Revision, ServerMetadata, ServerPermissions};
 use crate::server::ids::ServerId;
 use crate::workspaces::user_profiles::UserProfileWithUID;

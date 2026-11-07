@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use cloud_objects::UserUid;
 use warp_core::features::FeatureFlag;
 use warp_graphql::object_permissions::AccessLevel;
 use warpui::{App, SingletonEntity};
@@ -8,12 +9,10 @@ use crate::ai::execution_profiles::{
     AIExecutionProfile, ActionPermission, CloudAIExecutionProfileModel, WriteToPtyPermission,
 };
 use crate::ai::mcp::TemplatableMCPServerManager;
-use crate::auth::user::TEST_USER_UID;
-use crate::auth::{AuthStateProvider, UserUid};
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{
     Owner, Revision, ServerAIExecutionProfile, ServerGuestSubject, ServerMetadata,
-    ServerObjectGuest, ServerPermissions,
+    ServerObjectGuest, ServerPermissions, LOCAL_USER_UID,
 };
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
@@ -61,7 +60,7 @@ fn attacker_owned_shared_default_profile(cloud_uid: ServerId) -> ServerAIExecuti
             space: attacker_owner,
             guests: vec![ServerObjectGuest {
                 subject: ServerGuestSubject::User {
-                    firebase_uid: TEST_USER_UID.to_string(),
+                    firebase_uid: LOCAL_USER_UID.to_string(),
                 },
                 access_level: AccessLevel::Editor,
                 source: None,
@@ -74,9 +73,8 @@ fn attacker_owned_shared_default_profile(cloud_uid: ServerId) -> ServerAIExecuti
 
 /// Install the minimal singleton graph needed to construct an
 /// `AIExecutionProfilesModel` and exercise its CloudModel interactions.
-fn install_singletons(app: &mut App, auth_state: AuthStateProvider) {
+fn install_singletons(app: &mut App) {
     initialize_settings_for_tests(app);
-    app.add_singleton_model(|_| auth_state);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(TeamTesterStatus::mock);
@@ -96,7 +94,7 @@ fn install_singletons(app: &mut App, auth_state: AuthStateProvider) {
 #[test]
 fn edits_persist_on_unsynced_default_profile_when_logged_out() {
     App::test((), |mut app| async move {
-        install_singletons(&mut app, AuthStateProvider::new_logged_out_for_test());
+        install_singletons(&mut app);
         let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         let default_profile_id = profile_model.read(&app, |model, _ctx| model.default_profile_id());
@@ -147,7 +145,7 @@ fn edits_persist_on_unsynced_default_profile_when_logged_out() {
 #[test]
 fn reconciles_unsynced_default_profile_with_cloud_after_initial_load() {
     App::test((), |mut app| async move {
-        install_singletons(&mut app, AuthStateProvider::new_for_test());
+        install_singletons(&mut app);
         let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         // Baseline: CloudModel is empty, so the model starts Unsynced and
@@ -232,7 +230,7 @@ fn ignores_shared_default_profile_created_from_cloud() {
     let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
 
     App::test((), |mut app| async move {
-        install_singletons(&mut app, AuthStateProvider::new_for_test());
+        install_singletons(&mut app);
         let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         profile_model.read(&app, |model, ctx| {
@@ -272,7 +270,7 @@ fn ignores_shared_default_profile_after_initial_load() {
     let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
 
     App::test((), |mut app| async move {
-        install_singletons(&mut app, AuthStateProvider::new_for_test());
+        install_singletons(&mut app);
         let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         let attacker_sync_id = SyncId::ServerId(ServerId::from(31338));
@@ -305,7 +303,7 @@ fn filters_non_owned_non_default_profile_from_list() {
     let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
 
     App::test((), |mut app| async move {
-        install_singletons(&mut app, AuthStateProvider::new_for_test());
+        install_singletons(&mut app);
         let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         // Create a non-default profile owned by an attacker, shared with victim
@@ -325,7 +323,7 @@ fn filters_non_owned_non_default_profile_from_list() {
                 space: attacker_owner,
                 guests: vec![ServerObjectGuest {
                     subject: ServerGuestSubject::User {
-                        firebase_uid: TEST_USER_UID.to_string(),
+                        firebase_uid: LOCAL_USER_UID.to_string(),
                     },
                     access_level: AccessLevel::Editor,
                     source: None,

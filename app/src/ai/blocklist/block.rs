@@ -27,6 +27,7 @@ use ai::agent::action::{AskUserQuestionItem, InsertReviewComment, RunAgentsReque
 use base64::Engine as _;
 use chrono::Duration;
 use cli_controller::{CLISubagentController, CLISubagentEvent};
+use cloud_objects::UserUid;
 use find::FindState;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -138,7 +139,6 @@ use crate::ai::get_relevant_files::controller::{
     GetRelevantFilesController, GetRelevantFilesControllerEvent,
 };
 use crate::ai::{AIRequestUsageModel, AIRequestUsageModelEvent};
-use crate::auth::UserUid;
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::code::editor::comment_editor::create_readonly_comment_markdown_editor;

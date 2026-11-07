@@ -8,11 +8,7 @@ use warp_core::features::FeatureFlag;
 use warpui::keymap::ContextPredicate;
 use warpui::{id, Action, AppContext, SingletonEntity};
 
-use super::{
-    flags, SettingActionPairContexts, SettingActionPairDescriptions, SettingsAction,
-    ToggleSettingActionPair,
-};
-use crate::drive::settings::WarpDriveSettings;
+use super::{flags, SettingsAction, ToggleSettingActionPair};
 use crate::report_if_error;
 use crate::settings::PrivacySettings;
 use crate::terminal::safe_mode_settings::SafeModeSettings;
@@ -23,7 +19,6 @@ pub enum SettingToggleAction {
     SecretRedaction,
     CloudConversationStorage,
     SshWarpification,
-    WarpDrive,
 }
 
 pub fn init_actions_from_parent_view<T: Action + Clone>(
@@ -49,16 +44,6 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             flags::CLOUD_CONVERSATION_STORAGE_FLAG,
         )
         .with_enabled(|| FeatureFlag::CloudConversations.is_enabled()),
-        ToggleSettingActionPair::custom(
-            SettingActionPairDescriptions::new("Enable Warp Drive", "Disable Warp Drive"),
-            toggle(SettingToggleAction::WarpDrive),
-            SettingActionPairContexts::new(
-                context.clone() & !id!(flags::ENABLE_WARP_DRIVE) & !id!("IsAnonymousUser"),
-                context.clone() & id!(flags::ENABLE_WARP_DRIVE) & !id!("IsAnonymousUser"),
-            ),
-            None,
-        )
-        .with_enabled(|| FeatureFlag::OpenWarpNewSettingsModes.is_enabled()),
     ];
 
     if WarpifySettings::as_ref(app)
@@ -93,11 +78,6 @@ pub fn toggle_setting(action: SettingToggleAction, ctx: &mut AppContext) {
         SettingToggleAction::SshWarpification => {
             WarpifySettings::handle(ctx).update(ctx, |settings, ctx| {
                 report_if_error!(settings.enable_ssh_warpification.toggle_and_save_value(ctx));
-            });
-        }
-        SettingToggleAction::WarpDrive => {
-            WarpDriveSettings::handle(ctx).update(ctx, |settings, ctx| {
-                report_if_error!(settings.enable_warp_drive.toggle_and_save_value(ctx));
             });
         }
     }

@@ -15,7 +15,6 @@ use crate::test_util::settings::initialize_settings_for_tests;
 use crate::vim_registers::VimRegisters;
 use crate::workspace::sync_inputs::SyncedInputState;
 use crate::workspace::ActiveSession;
-use crate::AuthStateProvider;
 
 fn initialize_editor(app: &mut App) -> (WindowId, ViewHandle<CodeEditorView>) {
     initialize_settings_for_tests(app);
@@ -25,7 +24,6 @@ fn initialize_editor(app: &mut App) -> (WindowId, ViewHandle<CodeEditorView>) {
     app.add_singleton_model(|_| SyncedInputState::mock());
     app.add_singleton_model(|_| VimRegisters::new());
     app.add_singleton_model(|_| KeybindingChangedNotifier::mock());
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
 
     // Add mocks required by rich text editor (used in CommentEditor)
     app.add_singleton_model(CloudModel::mock);

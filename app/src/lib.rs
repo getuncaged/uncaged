@@ -6,10 +6,8 @@ mod alloc;
 mod app_menus;
 mod app_services;
 mod app_state;
-mod auth;
 mod autoupdate;
 mod banner;
-mod billing;
 /// Uncaged brand — the single source of truth for name, palette, and logo
 /// paths. See `brand.rs`.
 mod brand;
@@ -140,8 +138,6 @@ use ai::execution_profiles::editor::ExecutionProfileEditorManager;
 use ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use ai::metadata_project_rules::read_project_rule_contents;
 use ai::persisted_workspace::PersistedWorkspace;
-use auth::auth_manager::AuthManager;
-use auth::auth_state::{AuthState, AuthStateProvider};
 use code::editor_management::CodeManager;
 use code::opened_files::OpenedFilesModel;
 use code_review::git_repo_model::GitRepoModels;
@@ -205,7 +201,6 @@ use warp_files::FileModel;
 use warp_server_client::iap::{IapManager, IapManagerEvent, IapState};
 use warp_server_client::network_logging::NetworkLogModel;
 use warpui::integration::TestDriver;
-use warpui::modals::{AlertDialogWithCallbacks, AppModalCallback};
 use warpui::platform::app::{ApproveTerminateResult, TerminationRequestSource};
 use warpui::platform::TerminationMode;
 use warpui::windowing::state::ApplicationStage;
@@ -289,12 +284,7 @@ pub static ASSETS: warp_assets::Assets = warp_assets::Assets;
 #[allow(clippy::large_enum_variant)]
 pub enum LaunchMode {
     /// Run the regular GUI application.
-    App {
-        args: warp_cli::AppArgs,
-        /// API key for server authentication, if provided via `--api-key` or `WARP_API_KEY`.
-        /// Only used on dogfood channels.
-        api_key: Option<String>,
-    },
+    App { args: warp_cli::AppArgs },
 
     /// Run a test - this may be an integration test or an eval.
     Test {
@@ -486,10 +476,8 @@ pub fn run() -> Result<()> {
         }
     }
 
-    let api_key = args.api_key().cloned();
     run_internal(LaunchMode::App {
         args: args.into_app_args(),
-        api_key,
     })
 }
 
@@ -759,7 +747,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         ctx.add_singleton_model(move |ctx| {
             plugin::PluginHost::new(ctx).expect("Could not instantiate PluginHost")
         });
-        let app_state = initialize_app(&launch_mode, timer, startup_toml_parse_error, ctx);
+        let app_state = initialize_app(timer, startup_toml_parse_error, ctx);
 
         // Pinned from the ImprovedPaletteSearch client experiment, which assigned every user
         // (100% of buckets) to the full-text palette search.
@@ -775,7 +763,6 @@ pub struct UpdateQuakeModeEventArg {
 
 #[::tracing::instrument(skip_all, fields(tags.cloud_agent = true))]
 pub(crate) fn initialize_app(
-    launch_mode: &LaunchMode,
     mut timer: IntervalTimer,
     startup_toml_parse_error: Option<warpui_extras::user_preferences::Error>,
     ctx: &mut warpui::AppContext,
@@ -819,38 +806,6 @@ pub(crate) fn initialize_app(
         ctx.set_zoom_factor(WindowSettings::as_ref(ctx).zoom_level.as_zoom_factor());
     }
 
-    // Extract API key from command line options, if applicable.
-    let api_key = match launch_mode {
-        LaunchMode::App { api_key, .. } if ChannelState::channel().is_dogfood() => api_key.clone(),
-        _ => None,
-    };
-    let api_key = if FeatureFlag::APIKeyAuthentication.is_enabled() {
-        api_key
-    } else {
-        None
-    };
-
-    // A key supplied to an App launch but dropped here means Warp will start logged out
-    // (non-dogfood channel or feature disabled). Surface this loudly so it isn't silent.
-    if api_key.is_none()
-        && matches!(
-            launch_mode,
-            LaunchMode::App {
-                api_key: Some(_),
-                ..
-            }
-        )
-    {
-        let channel = ChannelState::channel();
-        let warning = format!(
-            "WARNING: --api-key/WARP_API_KEY was provided but IGNORED on the '{channel}' channel — Warp is starting LOGGED OUT. API-key auth is only available on internal (dogfood) builds."
-        );
-        eprintln!("{warning}");
-    }
-
-    let auth_state = Arc::new(AuthState::initialize(ctx, api_key));
-    timer.mark_interval_end("AUTH_MANAGER_SET_USER");
-
     let agent_source = Some(crate::ai::ambient_agents::AgentSource::CloudMode);
 
     // NetworkLogModel must be registered before ServerApiProvider so that
@@ -867,23 +822,12 @@ pub(crate) fn initialize_app(
     let iap_state: Option<Arc<IapState>> = None;
 
     let server_api_provider = ctx.add_singleton_model({
-        let auth_state = auth_state.clone();
         let iap_state = iap_state.clone();
-        move |ctx| ServerApiProvider::new(auth_state, agent_source, iap_state, ctx)
+        move |ctx| ServerApiProvider::new(agent_source, iap_state, ctx)
     });
 
     let server_api = server_api_provider.as_ref(ctx).get();
     let ai_client = server_api_provider.as_ref(ctx).get_ai_client();
-
-    ctx.add_singleton_model(|_ctx| AuthStateProvider::new(auth_state.clone()));
-
-    ctx.add_singleton_model(|ctx| {
-        AuthManager::new(
-            server_api.clone(),
-            server_api_provider.as_ref(ctx).get_auth_client(),
-            ctx,
-        )
-    });
 
     ctx.add_singleton_model(|_ctx| GPUState::new());
 
@@ -1077,50 +1021,13 @@ pub(crate) fn initialize_app(
         });
     });
 
-    let user_is_logged_in = auth_state.is_logged_in();
-
-    if user_is_logged_in {
-        AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-            auth_manager.refresh_user(ctx);
+    // Uncaged: log where startup time went, so a slow launch can be traced from the log.
+    ctx.on_first_frame_drawn(|ctx| {
+        IntervalTimer::handle(ctx).update(ctx, |timer, _| {
+            timer.mark_interval_end("FIRST_FRAME_DRAWN");
+            log::info!("Startup timing: {}", timer.summary());
         });
-
-        // Log where startup time went once the first frame is drawn.
-        ctx.on_first_frame_drawn(move |ctx| {
-            IntervalTimer::handle(ctx).update(ctx, |timer, _| {
-                timer.mark_interval_end("FIRST_FRAME_DRAWN");
-                log::info!("Startup timing: {}", timer.summary());
-            });
-
-            GPUState::handle(ctx).update(ctx, |gpu_state, ctx| {
-                gpu_state
-                    .set_has_lower_power_gpu(warpui::rendering::is_low_power_gpu_available(), ctx);
-            });
-
-            for window_id in ctx.window_ids().collect_vec() {
-                SettingsPaneManager::handle(ctx)
-                    .read(ctx, |model, _| model.settings_view(window_id))
-                    .update(ctx, |settings, ctx| {
-                        settings.refresh_preferred_graphics_backend_dropdown(ctx);
-                    })
-            }
-        });
-
-        #[cfg(enable_crash_recovery)]
-        ctx.on_frame_drawn(|ctx, window_id| {
-            crash_recovery::CrashRecovery::handle(ctx).update(ctx, |crash_recovery, ctx| {
-                crash_recovery.on_frame_drawn(window_id, ctx);
-            });
-        })
-    } else {
-        // Uncaged: there are no accounts, so most launches land here. Log where startup
-        // time went, so a slow launch can be traced from the log.
-        ctx.on_first_frame_drawn(|ctx| {
-            IntervalTimer::handle(ctx).update(ctx, |timer, _| {
-                timer.mark_interval_end("FIRST_FRAME_DRAWN");
-                log::info!("Startup timing: {}", timer.summary());
-            });
-        });
-    }
+    });
 
     #[cfg(not(target_family = "wasm"))]
     {
@@ -1203,7 +1110,6 @@ pub(crate) fn initialize_app(
     workflows::init(ctx);
     root_view::init(ctx);
     voltron::init(ctx);
-    auth::init(ctx);
     crate::view_components::find::init(ctx);
     prompt::editor_modal::init(ctx);
     ai::blocklist::agent_view::editor::init(ctx);
@@ -1853,34 +1759,6 @@ pub(crate) fn app_callbacks(is_integration_test: bool) -> warpui::platform::AppC
             ctx.dispatch_global_action("workspace:save_app", &());
         })),
         ..Default::default()
-    }
-}
-
-/// Focuses the active window or if there isn't one then a window with a running process
-/// and then shows the native modal.
-fn focus_running_window_and_show_native_modal(
-    sessions_summary: RunningSessionSummary,
-    dialog_with_callbacks: AlertDialogWithCallbacks<AppModalCallback>,
-    ctx: &mut AppContext,
-) {
-    let windowing_model = ctx.windows();
-    let active_window_id = windowing_model.active_window();
-    // Show the nav palette in the active window. If there is no active window,
-    // arbitrarily pick one of the windows having a running process.
-    let window_id_to_focus = active_window_id.unwrap_or_else(|| {
-        *sessions_summary
-            .windows_running()
-            .iter()
-            .next()
-            .expect("already checked len > 0")
-    });
-    ctx.windows().show_window_and_focus_app(window_id_to_focus);
-    if let Some(workspaces) = ctx.views_of_type::<Workspace>(window_id_to_focus) {
-        if let Some(handle) = workspaces.first() {
-            handle.update(ctx, |view, ctx| {
-                view.show_native_modal(dialog_with_callbacks, ctx);
-            });
-        }
     }
 }
 

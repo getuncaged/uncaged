@@ -10,7 +10,6 @@ use crate::ai::execution_profiles::{
     AIExecutionProfile, ActionPermission, CloudAIExecutionProfileModel,
 };
 use crate::ai::mcp::TemplatableMCPServerManager;
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{Revision, ServerAIExecutionProfile, ServerMetadata, ServerPermissions};
 use crate::network::NetworkStatus;
@@ -55,7 +54,6 @@ fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
 fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_login() {
     App::test((), |mut app| async move {
         initialize_settings_for_tests(&mut app);
-        app.add_singleton_model(|_| AuthStateProvider::new_for_test());
         app.add_singleton_model(SyncQueue::mock);
         app.add_singleton_model(|_| NetworkStatus::new());
         app.add_singleton_model(TeamTesterStatus::mock);
@@ -123,7 +121,7 @@ fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_l
         };
 
         app.update(|ctx| {
-            apply_onboarding_settings(&onboarding_settings, true, ctx);
+            apply_onboarding_settings(&onboarding_settings, ctx);
         });
 
         // Post-condition: the cloud profile retains its stored values.
@@ -177,7 +175,6 @@ fn apply_onboarding_settings_enables_ai_for_agent_intent_with_account() {
     let _flag = FeatureFlag::OpenWarpNewSettingsModes.override_enabled(true);
     App::test((), |mut app| async move {
         initialize_settings_for_tests(&mut app);
-        app.add_singleton_model(|_| AuthStateProvider::new_for_test());
         app.add_singleton_model(SyncQueue::mock);
         app.add_singleton_model(|_| NetworkStatus::new());
         app.add_singleton_model(TeamTesterStatus::mock);
@@ -202,7 +199,7 @@ fn apply_onboarding_settings_enables_ai_for_agent_intent_with_account() {
 
         // Having an account turns AI on, including for third-party agents.
         app.update(|ctx| {
-            apply_onboarding_settings(&onboarding_settings, true, ctx);
+            apply_onboarding_settings(&onboarding_settings, ctx);
         });
         let ai_enabled = app.read(|ctx| *AISettings::as_ref(ctx).is_any_ai_enabled);
         assert!(

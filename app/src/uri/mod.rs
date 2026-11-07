@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, ensure, Result};
-use itertools::Itertools;
 use url::Url;
 use warp_util::path::LineAndColumnArg;
 use warpui::notification::UserNotification;
@@ -50,7 +49,6 @@ pub struct OpenMCPSettingsArgs {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum UriHost {
-    Auth,
     Team,
     /// A host prefix for all actions (e.g.: new tab, new window).
     Action,
@@ -82,7 +80,6 @@ impl FromStr for UriHost {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "auth" => Ok(Self::Auth),
             "team" => Ok(Self::Team),
             "action" => Ok(Self::Action),
             "launch" => Ok(Self::Launch),
@@ -104,27 +101,6 @@ impl UriHost {
     fn handle(&self, primary_window_id: Option<WindowId>, url: &Url, ctx: &mut AppContext) {
         // Handle host
         match self {
-            UriHost::Auth => {
-                ctx.window_ids()
-                    .collect_vec()
-                    .into_iter()
-                    .for_each(|window_id| {
-                        let Some(root_view_id) = ctx.root_view_id(window_id) else {
-                            return;
-                        };
-                        safe_info!(
-                            safe: ("Dispatched auth url to window {window_id}"),
-                            full: ("Dispatched auth url {url} to window {window_id}")
-                        );
-                        ctx.dispatch_action(
-                            window_id,
-                            &[root_view_id],
-                            "root_view:handle_incoming_auth_url",
-                            &url.clone(),
-                            log::Level::Info,
-                        );
-                    });
-            }
             UriHost::Team => {
                 // TODO: Parse URL to ensure the user is logged into the right account
                 // Shows the user the settings view of their newly joined team within the app.
@@ -410,9 +386,6 @@ impl UriHost {
     fn window_behavior_hint(&self) -> WindowBehaviorHint {
         use WindowBehaviorHint as W;
         match self {
-            Self::Auth => W::ShowPrimaryWindow(WindowActivationFallbackBehavior::NewWindow {
-                replace_existing: true,
-            }),
             Self::Team | Self::Drive | Self::Settings => W::default(),
             // These URLs always open new windows.
             Self::Launch | Self::Conversation | Self::Home => W::Nothing,
@@ -492,8 +465,7 @@ enum WindowActivationFallbackBehavior {
     NewWindow {
         /// Close the former "primary window" as determined by [`get_primary_window`]. This should
         /// generally default to `false` to avoid closing a window with information that the user
-        /// may still want. One exception is the Auth route where the old window just showed the
-        /// auth page.
+        /// may still want.
         replace_existing: bool,
     },
 }
@@ -1221,8 +1193,8 @@ fn validate_custom_uri(url: &Url) -> Result<UriHost> {
         | UriHost::Linear
         | UriHost::TabConfig
         | UriHost::Session => true,
-        // Auth and Home only allow the desktop redirect path
-        UriHost::Auth | UriHost::Home => false,
+        // Home only allows the desktop redirect path
+        UriHost::Home => false,
     };
 
     ensure!(

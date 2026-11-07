@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
+use cloud_objects::UserUid;
 use futures_util::future::BoxFuture;
 use warp_core::ui::appearance::Appearance;
 use warp_editor::editor::EditorView;
@@ -13,8 +14,6 @@ use warpui::{
 };
 
 use super::{NotebookEvent, NotebookView, SAVE_PERIOD};
-use crate::auth::auth_manager::AuthManager;
-use crate::auth::{AuthStateProvider, UserUid};
 use crate::cloud_object::model::actions::ObjectActions;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::model::view::{CloudViewModel, Editor, EditorState};
@@ -71,8 +70,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| ActiveSession::default());
     app.add_singleton_model(|_| ObjectActions::new(Vec::new()));
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
-    app.add_singleton_model(AuthManager::new_for_test);
 }
 
 /// Container so that [`NotebookView`] can be registered as a typed action view.

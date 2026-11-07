@@ -8,7 +8,6 @@ use warpui::{App, AppContext, Element, Entity, TypedActionView, View, ViewContex
 
 use super::{Event, OpenOverlay};
 use crate::ai::blocklist::BlocklistAIHistoryModel;
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::menu::MenuItemFields;
 use crate::pane_group::focus_state::PaneFocusHandle;
@@ -114,7 +113,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|ctx| UpdateManager::new(None, Arc::new(MockObjectClient::new()), ctx));
     app.add_singleton_model(|_| KeybindingChangedNotifier::mock());
     app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
 }
 
 #[test]

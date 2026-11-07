@@ -2,13 +2,11 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use cloud_object_client::MockObjectClient;
+use cloud_objects::UserUid;
 use settings::{RespectUserSyncSetting, SyncToCloud};
 use warpui::{App, ModelHandle};
 
 use super::*;
-use crate::auth::auth_manager::AuthManager;
-use crate::auth::user::TEST_USER_UID;
-use crate::auth::{AuthStateProvider, UserUid};
 use crate::cloud_object::model::actions::ObjectActions;
 use crate::cloud_object::model::generic_string_model::GenericStringModel;
 use crate::cloud_object::model::view::{
@@ -16,7 +14,7 @@ use crate::cloud_object::model::view::{
 };
 use crate::cloud_object::{
     CloudObjectMetadata, CloudObjectPermissions, CloudObjectStatuses, CloudObjectSyncStatus,
-    NumInFlightRequests, ObjectIdType, Owner, ServerMetadata, ServerPermissions,
+    NumInFlightRequests, ObjectIdType, Owner, ServerMetadata, ServerPermissions, LOCAL_USER_UID,
 };
 use crate::drive::folders::{CloudFolderModel, FolderId};
 use crate::drive::DriveIndexVariant;
@@ -52,8 +50,6 @@ fn initialize_app(
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
-    app.add_singleton_model(AuthManager::new_for_test);
     app.add_singleton_model(TeamTesterStatus::new);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_ctx| CloudModel::new(None, cached_objects, None));
@@ -1214,7 +1210,7 @@ fn test_unshared_personal_object() {
             CloudObjectMetadata::new_from_server(mock_server_metadata()),
             CloudObjectPermissions {
                 owner: Owner::User {
-                    user_uid: UserUid::new(TEST_USER_UID),
+                    user_uid: UserUid::new(LOCAL_USER_UID),
                 },
                 guests: Vec::new(),
                 permissions_last_updated_ts: None,

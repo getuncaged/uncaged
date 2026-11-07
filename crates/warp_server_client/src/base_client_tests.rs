@@ -2,15 +2,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use futures::executor::block_on;
-use warp_server_auth::auth_state::AuthState;
 
 use super::{
     AGENT_SOURCE_HEADER, AMBIENT_WORKLOAD_TOKEN_HEADER, AmbientHeaderPolicy,
     AuthenticatedGraphqlConfig, BaseClient, CLOUD_AGENT_ID_HEADER, GraphqlRoutingConfig,
     HeaderOverride,
 };
-#[cfg(feature = "agent_mode_evals")]
-use super::{EVAL_USER_ID_HEADER, EVAL_USER_IDS};
 
 struct StaticIapTokenProvider;
 
@@ -26,7 +23,6 @@ fn client() -> BaseClient {
     authenticated_headers.insert("X-Test-Authenticated".to_string(), "true".to_string());
     BaseClient::new(
         Arc::new(http_client::Client::new()),
-        Arc::new(AuthState::new_for_test()),
         event_sender,
         Some("cloud_mode".to_string()),
         GraphqlRoutingConfig {
@@ -44,7 +40,6 @@ fn iap_proxy_auth_header_uses_configured_provider() {
     let (event_sender, _) = async_channel::unbounded();
     let client = BaseClient::new(
         Arc::new(http_client::Client::new()),
-        Arc::new(AuthState::new_for_test()),
         event_sender,
         None,
         GraphqlRoutingConfig::default(),
@@ -58,26 +53,6 @@ fn iap_proxy_auth_header_uses_configured_provider() {
             http_client::iap::IAP_PROXY_AUTH_HEADER,
             "Bearer iap-token".to_string()
         ))
-    );
-}
-
-#[cfg(feature = "agent_mode_evals")]
-#[test]
-fn eval_user_id_is_selected_once_and_used_for_authenticated_graphql() {
-    let client = client();
-    let eval_user_id = client.eval_user_id().unwrap();
-
-    assert!(EVAL_USER_IDS.contains(&eval_user_id));
-
-    let options = block_on(client.graphql_request_options(None)).unwrap();
-    let eval_user_id = eval_user_id.to_string();
-    assert_eq!(
-        options.headers.get(EVAL_USER_ID_HEADER).map(String::as_str),
-        Some(eval_user_id.as_str())
-    );
-    assert_eq!(
-        client.eval_user_id().map(|id| id.to_string()),
-        Some(eval_user_id)
     );
 }
 
@@ -130,89 +105,4 @@ fn ambient_policy_supports_inherit_override_and_omit() {
 
     let omitted = block_on(client.ambient_headers(AmbientHeaderPolicy::omit_all())).unwrap();
     assert!(omitted.is_empty());
-}
-
-#[test]
-fn authenticated_graphql_options_include_configured_and_ambient_headers() {
-    let client = client();
-    client.set_ambient_agent_task_id(Some("ambient-task".to_string()));
-
-    let options = block_on(client.graphql_request_options(None)).unwrap();
-
-    assert_eq!(options.path_prefix.as_deref(), Some("/routing-only"));
-    assert_eq!(
-        options
-            .headers
-            .get("X-Test-Authenticated")
-            .map(String::as_str),
-        Some("true")
-    );
-    assert_eq!(
-        options
-            .headers
-            .get(CLOUD_AGENT_ID_HEADER)
-            .map(String::as_str),
-        Some("ambient-task")
-    );
-    assert_eq!(
-        options.headers.get(AGENT_SOURCE_HEADER).map(String::as_str),
-        Some("cloud_mode")
-    );
-}
-
-#[test]
-fn authenticated_graphql_configuration_cannot_override_base_client_owned_headers() {
-    let (event_sender, _) = async_channel::unbounded();
-    let mut headers = HashMap::new();
-    headers.insert("authorization".to_string(), "malicious".to_string());
-    headers.insert("content-type".to_string(), "text/plain".to_string());
-    headers.insert("CONTENT-LENGTH".to_string(), "9999".to_string());
-    headers.insert(
-        http_client::iap::IAP_PROXY_AUTH_HEADER.to_string(),
-        "malicious".to_string(),
-    );
-    headers.insert(
-        CLOUD_AGENT_ID_HEADER.to_ascii_lowercase(),
-        "malicious".to_string(),
-    );
-    headers.insert("x-eval-user-id".to_string(), "1234".to_string());
-    let client = BaseClient::new(
-        Arc::new(http_client::Client::new()),
-        Arc::new(AuthState::new_for_test()),
-        event_sender,
-        None,
-        GraphqlRoutingConfig::default(),
-        AuthenticatedGraphqlConfig { headers },
-        None,
-    );
-
-    let options = block_on(client.graphql_request_options(None)).unwrap();
-
-    assert!(!options.headers.contains_key("authorization"));
-    assert!(!options.headers.contains_key("content-type"));
-    assert!(!options.headers.contains_key("CONTENT-LENGTH"));
-    assert!(
-        !options
-            .headers
-            .contains_key(http_client::iap::IAP_PROXY_AUTH_HEADER)
-    );
-    assert!(
-        !options
-            .headers
-            .contains_key(&CLOUD_AGENT_ID_HEADER.to_ascii_lowercase())
-    );
-    #[cfg(feature = "agent_mode_evals")]
-    {
-        let eval_user_id = client.eval_user_id().unwrap().to_string();
-        assert!(!options.headers.contains_key("x-eval-user-id"));
-        assert_eq!(
-            options.headers.get(EVAL_USER_ID_HEADER).map(String::as_str),
-            Some(eval_user_id.as_str())
-        );
-    }
-    #[cfg(not(feature = "agent_mode_evals"))]
-    assert_eq!(
-        options.headers.get("x-eval-user-id").map(String::as_str),
-        Some("1234")
-    );
 }

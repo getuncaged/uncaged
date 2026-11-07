@@ -13,15 +13,7 @@ use crate::settings::{AISettings, CodeSettings};
 use crate::workspace::tab_settings::TabSettings;
 
 /// Applies onboarding settings based on the user's selected mode.
-///
-/// `has_account` indicates whether the user has (or is creating) a real Warp
-/// account. Warp's AI features run on a Warp account, so agent intent only
-/// enables AI when `has_account` is true; skipping login leaves AI off.
-pub fn apply_onboarding_settings(
-    selected_settings: &SelectedSettings,
-    has_account: bool,
-    app: &mut AppContext,
-) {
+pub fn apply_onboarding_settings(selected_settings: &SelectedSettings, app: &mut AppContext) {
     let is_ai_enabled = match selected_settings {
         SelectedSettings::AgentDrivenDevelopment {
             agent_settings,
@@ -32,11 +24,9 @@ pub fn apply_onboarding_settings(
             if let Some(ui) = ui_customization {
                 apply_ui_customization_settings(ui, true, app);
             }
-            // Agent intent means the user wants AI. Uncaged: a configured local
-            // engine (bring-your-own model/CLI) enables AI with no Warp account,
-            // so agent intent turns AI on whenever an account exists OR the local
-            // engine is active.
-            has_account || crate::uncaged::engine_active()
+            // Agent intent means the user wants AI. Uncaged has no accounts: a configured
+            // local engine (bring-your-own model/CLI) is what enables AI.
+            crate::uncaged::engine_active()
         }
         SelectedSettings::Terminal {
             ui_customization,

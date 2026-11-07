@@ -1,5 +1,4 @@
 pub mod ai;
-pub mod auth;
 pub mod managed_secrets;
 pub mod object;
 
@@ -7,10 +6,8 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
-use ::http::header::CONTENT_LENGTH;
 use ai::AIClient;
 use anyhow::{anyhow, Context, Result};
-use auth::AuthClient;
 use channel_versions::ChannelVersions;
 use chrono::{DateTime, FixedOffset};
 use instant::Instant;
@@ -21,8 +18,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 use warp_core::context_flag::ContextFlag;
 use warp_core::errors::{register_error, AnyhowErrorExt, ErrorExt};
-use warp_managed_secrets::client::ManagedSecretsClient;
-use warp_server_client::auth::{AuthClientImpl, AuthEvent, EXPERIMENT_ID_HEADER};
+use warp_server_client::auth::AuthEvent;
 use warp_server_client::base_client::{
     AmbientHeaderPolicy, AuthenticatedGraphqlConfig, BaseClient, GraphqlRoutingConfig,
 };
@@ -37,8 +33,6 @@ use crate::ai::get_relevant_files::api::{GetRelevantFiles, GetRelevantFilesRespo
 use crate::ai::predict::generate_am_query_suggestions;
 use crate::ai::predict::generate_am_query_suggestions::GenerateAMQuerySuggestionsRequest;
 use crate::ai::predict::predict_am_queries::{PredictAMQueriesRequest, PredictAMQueriesResponse};
-use crate::auth::auth_manager::AuthManager;
-use crate::auth::auth_state::AuthState;
 use crate::ChannelState;
 
 pub const FETCH_CHANNEL_VERSIONS_TIMEOUT: std::time::Duration = Duration::from_secs(60);
@@ -292,7 +286,6 @@ pub struct ServerApi {
 
 impl ServerApi {
     fn new(
-        auth_state: Arc<AuthState>,
         event_sender: async_channel::Sender<AuthEvent>,
         agent_source: Option<ai::AgentSource>,
         iap_state: Option<Arc<IapState>>,
@@ -310,7 +303,6 @@ impl ServerApi {
         }
         Self::new_with_parts(
             Arc::new(client),
-            auth_state,
             event_sender,
             agent_source,
             iap_token_provider,
@@ -319,7 +311,6 @@ impl ServerApi {
 
     fn new_with_parts(
         client: Arc<http_client::Client>,
-        auth_state: Arc<AuthState>,
         event_sender: async_channel::Sender<AuthEvent>,
         agent_source: Option<ai::AgentSource>,
         iap_token_provider: Option<Arc<dyn http_client::iap::IapTokenProvider>>,
@@ -333,7 +324,6 @@ impl ServerApi {
         let authenticated_graphql = AuthenticatedGraphqlConfig::default();
         let base_client = Arc::new(BaseClient::new(
             client,
-            auth_state,
             event_sender,
             agent_source.map(|source| source.as_str().to_string()),
             graphql_routing,
@@ -350,28 +340,9 @@ impl ServerApi {
     #[cfg(test)]
     fn new_for_test() -> Self {
         let (tx, _) = async_channel::unbounded();
-        let auth_state = Arc::new(AuthState::new_for_test());
         let client = Arc::new(http_client::Client::new_for_test());
 
-        Self::new_with_parts(client, auth_state, tx, None, None)
-    }
-
-    #[cfg(all(test, feature = "skip_login"))]
-    fn new_for_test_with_bearer_token(
-        bearer_token: Option<String>,
-        event_sender: async_channel::Sender<AuthEvent>,
-    ) -> Self {
-        let auth_state = Arc::new(AuthState::new_logged_out_for_test());
-        if let Some(bearer_token) = bearer_token {
-            auth_state.set_remote_server_bearer_token(bearer_token);
-        }
-        Self::new_with_parts(
-            Arc::new(http_client::Client::new_for_test()),
-            auth_state,
-            event_sender,
-            None,
-            None,
-        )
+        Self::new_with_parts(client, tx, None, None)
     }
 
     /// Sets the ambient agent task ID to be sent with all subsequent requests.
@@ -664,35 +635,6 @@ impl ServerApi {
         }
     }
 
-    /// Sends an authenticated empty POST request to /client/login, which signals to the server
-    /// that the user is logged in.
-    pub async fn notify_login(&self) {
-        match self.get_or_refresh_access_token().await {
-            Ok(auth_token) => {
-                let url = format!("{}/client/login", ChannelState::server_root_url());
-                let mut request = self.base_client.http_client().post(&url);
-                if let Some(token) = auth_token.as_bearer_token() {
-                    request = request.bearer_auth(token);
-                }
-                request = request
-                    // Set the content-length header to 0 because the request has no body.
-                    // Otherwise, the server will return a 411 error. (In other cases, setting
-                    // content-type is sufficient (elides the content-length requirement), but
-                    // since this request has no body, it makes more sense to set content-length.
-                    .header(CONTENT_LENGTH, 0)
-                    .header(EXPERIMENT_ID_HEADER, self.anonymous_id());
-
-                let response = request.send().await;
-                if let Err(err) = response {
-                    log::error!("Failed to send POST request to /client/login: {err:?}");
-                }
-            }
-            Err(err) => {
-                log::error!("Could not retrieve access token for notifying user login: {err:?}");
-            }
-        }
-    }
-
     pub async fn get_relevant_files(
         &self,
         request: &GetRelevantFiles,
@@ -857,25 +799,11 @@ impl ServerApi {
             log::info!("Fetching channel versions (without changelogs) from Warp server");
         }
 
-        let mut request_builder = self
+        let request_builder = self
             .base_client
             .http_client()
             .get(url.as_str())
-            .timeout(FETCH_CHANNEL_VERSIONS_TIMEOUT)
-            .header(EXPERIMENT_ID_HEADER, self.anonymous_id());
-
-        // Authorization for /client_version is optional. Attach authorization header if an access
-        // token is present. First, try to get a valid token. If our cached one is expired, try to
-        // refresh. Failing that, send the expired token.
-        let auth_token = self
-            .get_or_refresh_access_token()
-            .await
-            .ok()
-            .and_then(|token| token.bearer_token())
-            .or_else(|| self.access_token_ignoring_validity());
-        if let Some(token_str) = auth_token {
-            request_builder = request_builder.bearer_auth(token_str);
-        }
+            .timeout(FETCH_CHANNEL_VERSIONS_TIMEOUT);
 
         let response = request_builder.send().await?;
         if !response.status().is_success() {
@@ -891,48 +819,24 @@ impl ServerApi {
 /// or any of its implemented trait objects.
 pub struct ServerApiProvider {
     server_api: Arc<ServerApi>,
-    auth_client: Arc<dyn AuthClient>,
 }
 
 impl ServerApiProvider {
     /// Constructs a new ServerApiProvider.
     #[cfg_attr(target_family = "wasm", allow(unused_variables))]
     pub fn new(
-        auth_state: Arc<AuthState>,
         agent_source: Option<ai::AgentSource>,
         iap_state: Option<Arc<IapState>>,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
         let (event_sender, event_receiver) = async_channel::bounded(10);
 
-        let server_api = ServerApi::new(
-            auth_state.clone(),
-            event_sender,
-            agent_source,
-            iap_state,
-            ctx,
-        );
+        let server_api = ServerApi::new(event_sender, agent_source, iap_state, ctx);
 
         ctx.spawn_stream_local(
             event_receiver,
             move |_, event, ctx| {
                 match event {
-                    AuthEvent::UserAccountDisabled => {
-                        // We dispatch a global action here because the log out code requires
-                        // `server_api`, causing a circular model reference panic when it calls
-                        // `ServerApiProvider` to get access.
-                        // TODO: We should remove this pattern where `ServerApiProvider` responds
-                        // to events; it's prone to these sorts of circular reference issues.
-                        ctx.dispatch_global_action("app:log_out", ());
-                    }
-                    AuthEvent::NeedsReauth => {
-                        // AuthManager depends on a reference to ServerApi, so ServerApi can't easily
-                        // hold a ref to AuthManager. To get around this, we emit an event on ServerApi
-                        // and handle calling the AuthManager here instead.
-                        AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                            auth_manager.set_needs_reauth(true, ctx);
-                        });
-                    }
                     AuthEvent::IapChallengeReceived => {
                         IapManager::handle(ctx)
                             .update(ctx, |manager, ctx| manager.handle_challenge(ctx));
@@ -940,27 +844,21 @@ impl ServerApiProvider {
                     // Re-emit the event for subscribers.
                     // TODO: we probably want a different type for the event emitted to subscribers
                     // from the one that's used for the async channel.
-                    _ => ctx.emit(event),
+                    AuthEvent::StagingAccessBlocked => ctx.emit(event),
                 }
             },
             |_, _| {},
         );
-        let server_api = Arc::new(server_api);
-        let auth_client = Arc::new(AuthClientImpl::new(server_api.base_client.clone()));
         Self {
-            server_api,
-            auth_client,
+            server_api: Arc::new(server_api),
         }
     }
 
     /// Constructs a new SeverApiProvider for tests.
     #[cfg(test)]
     pub fn new_for_test() -> Self {
-        let server_api = Arc::new(ServerApi::new_for_test());
-        let auth_client = Arc::new(AuthClientImpl::new(server_api.base_client.clone()));
         Self {
-            server_api,
-            auth_client,
+            server_api: Arc::new(ServerApi::new_for_test()),
         }
     }
 
@@ -970,19 +868,11 @@ impl ServerApiProvider {
         self.server_api.clone()
     }
 
-    pub fn get_auth_client(&self) -> Arc<dyn AuthClient> {
-        self.auth_client.clone()
-    }
-
     pub fn get_ai_client(&self) -> Arc<dyn AIClient> {
         self.server_api.clone()
     }
 
     pub fn get_cloud_objects_client(&self) -> Arc<dyn ObjectClient> {
-        self.server_api.clone()
-    }
-
-    pub fn get_managed_secrets_client(&self) -> Arc<dyn ManagedSecretsClient> {
         self.server_api.clone()
     }
 

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use cloud_objects::UserUid;
 use session_sharing_protocol::common::SessionId;
 use warp_cli::agent::Harness;
 use warp_core::features::FeatureFlag;
@@ -16,7 +17,6 @@ use crate::ai::ambient_agents::{AgentSource, AmbientAgentTask, AmbientAgentTaskI
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::history_model::{AIConversationMetadata, BlocklistAIHistoryModel};
 use crate::ai::conversation_navigation::ConversationNavigationData;
-use crate::auth::UserUid;
 use crate::util::time_format::human_readable_precise_duration;
 use crate::workspace::RestoreConversationLayout;
 use crate::workspaces::user_profiles::{UserProfileWithUID, UserProfiles};

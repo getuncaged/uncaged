@@ -5,7 +5,6 @@ use cloud_object_client::MockObjectClient;
 use settings::manager::SettingsManager;
 use warpui::{App, SingletonEntity};
 
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::model::view::CloudViewModel;
 use crate::cloud_object::{Owner, Revision, ServerMetadata, ServerNotebook, ServerPermissions};
@@ -65,7 +64,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(NotebookManager::mock);
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| SettingsManager::default());
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.update(crate::settings::init_and_register_user_preferences);
     app.update(AISettings::register_and_subscribe_to_events);
 }

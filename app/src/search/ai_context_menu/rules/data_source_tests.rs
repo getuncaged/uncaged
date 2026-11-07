@@ -6,7 +6,6 @@ use settings::manager::SettingsManager;
 use warpui::{App, SingletonEntity};
 
 use crate::ai::facts::{AIFact, AIMemory, CloudAIFactModel};
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::generic_string_model::GenericStringModel;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::model::view::CloudViewModel;
@@ -73,7 +72,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(NotebookManager::mock);
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| SettingsManager::default());
-    app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.update(crate::settings::init_and_register_user_preferences);
     app.update(AISettings::register_and_subscribe_to_events);
 }

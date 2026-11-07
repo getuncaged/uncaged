@@ -16,7 +16,6 @@ use warpui::{Entity, ModelContext, RequestState, RetryOption, SingletonEntity};
 
 use super::graphql::GraphQLError;
 use super::ids::{ClientId, HashableId, ObjectUid, ServerId, SyncId, ToServerId};
-use super::server_api::auth::UserAuthenticationError;
 use super::server_api::object::ObjectClient;
 use crate::ai::execution_profiles::CloudAIExecutionProfileModel;
 use crate::ai::facts::CloudAIFactModel;
@@ -383,16 +382,6 @@ impl SyncQueue {
     pub fn start_dequeueing(&mut self, ctx: &mut ModelContext<Self>) {
         self.should_dequeue = true;
         self.dequeue(ctx)
-    }
-
-    // Clear the SyncQueue. This is used during Logout.
-    pub fn clear(&mut self) {
-        self.queue.clear();
-        self.waiting_response.clear();
-        self.in_flight_bulk_create_objects.clear();
-        self.queue_dependencies.clear();
-        self.client_id_to_server.clear();
-        self.server_id_to_client_hash.clear();
     }
 
     // Remove the (id, item) pair that matches `remove_id` from the SyncQueue
@@ -1627,10 +1616,6 @@ impl SyncQueue {
                 if err.is_connect() {
                     return true;
                 }
-            }
-
-            if cause.is::<UserAuthenticationError>() {
-                return true;
             }
 
             if let Some(err) = cause.downcast_ref::<GraphQLError>() {

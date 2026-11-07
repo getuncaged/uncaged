@@ -14,8 +14,6 @@ use crate::ai::llms::{
     ModelsByFeature,
 };
 use crate::ai::mcp::TemplatableMCPServerManager;
-use crate::auth::auth_manager::AuthManager;
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
@@ -62,8 +60,6 @@ fn assert_context_window_limit_for_request(
 
         initialize_settings_for_tests(&mut app);
         app.add_singleton_model(|_| ServerApiProvider::new_for_test());
-        app.add_singleton_model(|_| AuthStateProvider::new_for_test());
-        app.add_singleton_model(AuthManager::new_for_test);
         app.add_singleton_model(|_| NetworkStatus::new());
         app.add_singleton_model(CloudModel::mock);
         app.add_singleton_model(TeamTesterStatus::mock);

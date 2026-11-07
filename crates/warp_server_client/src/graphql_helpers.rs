@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use anyhow::{Result, anyhow};
-use http::StatusCode;
 use instant::Duration;
 use warp_graphql::client::{GraphQLError, Operation};
 use warpui_core::r#async::BoxFuture;
@@ -38,18 +37,6 @@ where
                 anyhow::bail!(GraphQLError::IapChallengeBlocked);
             }
             Err(err) => {
-                let is_auth_rejection = match &err {
-                    GraphQLError::HttpError { status, .. } => {
-                        *status == StatusCode::UNAUTHORIZED || *status == StatusCode::FORBIDDEN
-                    }
-                    GraphQLError::RequestError(_)
-                    | GraphQLError::StagingAccessBlocked
-                    | GraphQLError::IapChallengeBlocked
-                    | GraphQLError::ResponseError(_) => false,
-                };
-                if !base_client.is_auth_refresh_allowed() && is_auth_rejection {
-                    anyhow::bail!("server rejected authentication credentials");
-                }
                 anyhow::bail!(err);
             }
         };
@@ -59,20 +46,6 @@ where
                 safe: ("graphql response for {:?} had errors", operation_name),
                 full: ("graphql response for {:?} had errors {:?}", operation_name, errors)
             );
-            // The "User not in context: Not found" response indicates that warp-server
-            // could not resolve the required user because the user's account was disabled
-            // or deleted.
-            if errors
-                .iter()
-                .any(|error| error.message.contains("User not in context: Not found"))
-            {
-                if base_client.is_auth_refresh_allowed() {
-                    log::error!("GraphQL request failed due to unauthenticated user");
-                    let _ = base_client.send_auth_event(AuthEvent::UserAccountDisabled);
-                } else {
-                    anyhow::bail!("server rejected authentication credentials");
-                }
-            }
         }
 
         response.data.ok_or_else(|| {

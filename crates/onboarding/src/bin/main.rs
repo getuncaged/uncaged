@@ -164,11 +164,6 @@ impl OnboardingMainView {
                 ctx.notify();
             }
             AgentOnboardingEvent::SyncWithOsToggled { .. }
-            | AgentOnboardingEvent::UpgradeRequested
-            | AgentOnboardingEvent::UpgradeCopyUrlRequested
-            | AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested
-            | AgentOnboardingEvent::LoginFromWelcomeRequested
-            | AgentOnboardingEvent::PrivacySettingsFromTerminalThemeSlideRequested
             | AgentOnboardingEvent::AppBecameActive
             | AgentOnboardingEvent::ConnectPresetRequested(_)
             | AgentOnboardingEvent::ActivateConnectionRequested(_) => {

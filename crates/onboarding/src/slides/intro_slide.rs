@@ -21,14 +21,8 @@ use super::OnboardingSlide;
 use crate::model::OnboardingStateModel;
 
 #[derive(Clone, Debug)]
-pub enum IntroSlideEvent {
-    LoginRequested,
-}
-
-#[derive(Clone, Debug)]
 pub enum IntroSlideAction {
     GetStartedClicked,
-    LoginClicked,
 }
 
 pub struct IntroSlide {
@@ -48,7 +42,7 @@ impl IntroSlide {
 }
 
 impl Entity for IntroSlide {
-    type Event = IntroSlideEvent;
+    type Event = ();
 }
 
 impl View for IntroSlide {
@@ -158,9 +152,6 @@ impl TypedActionView for IntroSlide {
         match action {
             IntroSlideAction::GetStartedClicked => {
                 self.get_started_clicked(ctx);
-            }
-            IntroSlideAction::LoginClicked => {
-                ctx.emit(IntroSlideEvent::LoginRequested);
             }
         }
     }
