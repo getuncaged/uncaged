@@ -41,7 +41,6 @@ use crate::ai::blocklist::{
 };
 use crate::ai::conversation_navigation::ConversationNavigationData;
 use crate::network::{NetworkStatus, NetworkStatusEvent, NetworkStatusKind};
-use crate::server::cloud_objects::update_manager::{UpdateManager, UpdateManagerEvent};
 use crate::server::retry_strategies::{
     is_transient_http_error, OUT_OF_BAND_REQUEST_RETRY_STRATEGY, PERIODIC_POLL_RETRY_STRATEGY,
 };
@@ -629,12 +628,6 @@ impl AgentConversationsModel {
             me.sync_conversations(ctx);
         });
 
-        // Subscribe to UpdateManager for RTC task updates
-        if FeatureFlag::AmbientAgentsRTC.is_enabled() {
-            let update_manager = UpdateManager::handle(ctx);
-            ctx.subscribe_to_model(&update_manager, Self::handle_update_manager_event);
-        }
-
         let mut model = Self {
             tasks: HashMap::new(),
             conversations: HashMap::new(),
@@ -694,87 +687,6 @@ impl AgentConversationsModel {
                 }
             }
         }
-    }
-
-    fn handle_update_manager_event(
-        &mut self,
-        _: ModelHandle<UpdateManager>,
-        event: &UpdateManagerEvent,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let UpdateManagerEvent::AmbientTaskUpdated { task_id, timestamp } = event else {
-            return;
-        };
-
-        let has_list_consumers = self
-            .active_data_consumers_per_window
-            .values()
-            .any(|views| !views.is_empty());
-        if has_list_consumers {
-            // (a) If management view or conversation list is open, throttled list-fetch.
-            self.handle_rtc_for_list_views(*timestamp, ctx);
-        } else {
-            let has_open_tab = ActiveAgentViewsModel::as_ref(ctx)
-                .get_terminal_view_id_for_ambient_task(*task_id)
-                .is_some();
-            if has_open_tab {
-                // (b) If this task has an open tab (any window), force a re-fetch.
-                self.async_fetch_task(task_id, ctx);
-            } else {
-                // (c) No list surface open: record earliest timestamp for flush on next view open.
-                record_earliest_rtc_task_refresh_timestamp(&mut self.dirty_since, *timestamp);
-            }
-        }
-    }
-
-    // Handle RTC invalidations for list views, respecting the refresh throttling.
-    fn handle_rtc_for_list_views(
-        &mut self,
-        timestamp: DateTime<Utc>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        match std::mem::take(&mut self.rtc_task_refresh_throttle_state) {
-            RtcTaskRefreshThrottleState::Idle => {
-                self.fetch_tasks_updated_after(timestamp, ctx);
-                self.start_rtc_task_refresh_throttle_timer(ctx);
-            }
-            RtcTaskRefreshThrottleState::CoolingDown {
-                mut pending_timestamp,
-                timer_abort_handle,
-            } => {
-                record_earliest_rtc_task_refresh_timestamp(&mut pending_timestamp, timestamp);
-                self.rtc_task_refresh_throttle_state = RtcTaskRefreshThrottleState::CoolingDown {
-                    pending_timestamp,
-                    timer_abort_handle,
-                };
-            }
-        }
-    }
-
-    fn start_rtc_task_refresh_throttle_timer(&mut self, ctx: &mut ModelContext<Self>) {
-        let future_handle = ctx.spawn(
-            async move {
-                Timer::after(RTC_TASK_REFRESH_THROTTLE).await;
-            },
-            |model, _, ctx| {
-                let pending_timestamp =
-                    match std::mem::take(&mut model.rtc_task_refresh_throttle_state) {
-                        RtcTaskRefreshThrottleState::Idle => None,
-                        RtcTaskRefreshThrottleState::CoolingDown {
-                            pending_timestamp, ..
-                        } => pending_timestamp,
-                    };
-
-                if let Some(timestamp) = pending_timestamp {
-                    model.fetch_tasks_updated_after(timestamp, ctx);
-                    model.start_rtc_task_refresh_throttle_timer(ctx);
-                }
-            },
-        );
-        self.rtc_task_refresh_throttle_state = RtcTaskRefreshThrottleState::CoolingDown {
-            pending_timestamp: None,
-            timer_abort_handle: future_handle.abort_handle(),
-        };
     }
 
     fn abort_rtc_task_refresh_throttle(&mut self) {

@@ -19,9 +19,8 @@ use cloud_object_models::notebook::persistence::upsert_notebooks;
 use cloud_object_models::workflow::persistence as workflow_persistence;
 use cloud_object_models::workflow::persistence::upsert_workflows;
 use cloud_object_persistence::{
-    delete_cloud_object, delete_generic_string_object, increment_retry_count,
-    load_cloud_object_read_context, mark_object_as_synced, read_time_of_next_force_object_refresh,
-    record_time_of_next_refresh, update_object_after_server_creation, update_object_metadata,
+    delete_cloud_object, delete_generic_string_object, load_cloud_object_read_context,
+    read_time_of_next_force_object_refresh, record_time_of_next_refresh, update_object_metadata,
     upsert_generic_string_objects as upsert_generic_string_object_rows,
     GenericStringObjectPersistenceData,
 };
@@ -444,28 +443,9 @@ fn handle_model_event(event: ModelEvent, connection: &mut SqliteConnection) -> a
         ModelEvent::UpsertFolder { folder } => {
             upsert_folders(connection, vec![folder]).context("error upserting folder")
         }
-        ModelEvent::MarkObjectAsSynced {
-            revision_and_editor,
-            metadata_ts,
-            hashed_sqlite_id,
-        } => mark_object_as_synced(
-            connection,
-            hashed_sqlite_id,
-            revision_and_editor,
-            metadata_ts,
-        )
-        .context("error marking object as synced"),
-        ModelEvent::IncrementRetryCount(id) => {
-            increment_retry_count(connection, id).context("error incrementing retry count")
-        }
         ModelEvent::DeleteObjects { ids } => {
             delete_objects(connection, ids).context("error deleting objects")
         }
-        ModelEvent::UpdateObjectAfterServerCreation {
-            client_id,
-            server_creation_info,
-        } => update_object_after_server_creation(connection, client_id, server_creation_info)
-            .context("error executing object creation succeeded callback"),
         ModelEvent::UpsertCodebaseIndexMetadata { index_metadata } => {
             save_codebase_index_metadata(connection, *index_metadata)
                 .context("error upserting codebase index metadata")

@@ -47,9 +47,8 @@ use crate::appearance::Appearance;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::model::view::{CloudViewModel, CloudViewModelEvent, UpdateTimestamp};
 use crate::cloud_object::{
-    CloudObject, CloudObjectEventEntrypoint, CloudObjectLocation, CloudObjectSyncStatus,
-    GenericCloudObject, GenericStringObjectFormat, JsonObjectType, NumInFlightRequests, ObjectType,
-    Space,
+    CloudObject, CloudObjectLocation, GenericCloudObject, GenericStringObjectFormat,
+    JsonObjectType, ObjectType, Space,
 };
 use crate::drive::panel::DrivePanelAction;
 use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions};
@@ -58,11 +57,8 @@ use crate::features::FeatureFlag;
 use crate::menu::{Event, Menu, MenuItem, MenuItemFields};
 use crate::network::NetworkStatus;
 use crate::notebooks::CloudNotebookModel;
-use crate::server::cloud_objects::update_manager::{
-    FetchSingleObjectOption, InitiatedBy, UpdateManager,
-};
-use crate::server::ids::{ClientId, ObjectUid, ServerId, SyncId};
-use crate::server::sync_queue::SyncQueue;
+use crate::server::cloud_objects::update_manager::UpdateManager;
+use crate::server::ids::{ClientId, ObjectUid, SyncId};
 use crate::settings::app_installation_detection::{
     UserAppInstallDetectionSettings, UserAppInstallStatus,
 };
@@ -143,7 +139,6 @@ const INDEX_AGENT_MODE_WORKFLOW_LABEL: &str = "New prompt";
 const INDEX_ENV_VAR_COLLECTION_LABEL: &str = "New environment variables";
 
 const IMPORT_LABEL: &str = "Import";
-const REMOVE_LABEL: &str = "Remove";
 const OFFLINE_BANNER_TEXT: &str = "You are offline. Some files will be read only.";
 
 pub const DRIVE_INDEX_VIEW_POSITION_ID: &str = "drive_index_view_id";
@@ -157,8 +152,6 @@ const ZERO_STATE_WORKFLOW_LABEL: &str = "Workflow";
 const ZERO_STATE_NOTEBOOK_LABEL: &str = "Notebook";
 
 const SORTING_BUTTON_TOOLTIP_LABEL: &str = "Sort by";
-
-const RETRY_BUTTON_TOOLTIP_LABEL: &str = "Retry sync";
 
 /// Struct to hold different state-related information on per-space basis.
 /// Currently, we only have 1 space (1 Team), but as we're working on personal space, and add
@@ -235,9 +228,6 @@ pub enum DriveIndexAction {
         cloud_object_type_and_id: CloudObjectTypeAndId,
         new_space: Space,
     },
-    LeaveSharedObject {
-        cloud_object_type_and_id: CloudObjectTypeAndId,
-    },
     OpenCloudObjectNamingDialog {
         space: Space,
         object_type: DriveObjectType,
@@ -288,9 +278,6 @@ pub enum DriveIndexAction {
     UpdateSortingChoice {
         sorting_choice: DriveSortOrder,
     },
-    RetryFailedObject(CloudObjectTypeAndId),
-    RetryAllFailedObjects,
-    RevertFailedObject(ServerId),
     OpenTrashIndex,
     CloseTrashIndex,
     FocusPreviousItem,
@@ -397,7 +384,6 @@ pub enum DriveIndexEvent {
 struct MouseStateHandles {
     warp_drive_initial_load_mouse_state: MouseStateHandle,
     sorting_button_mouse_state: MouseStateHandle,
-    retry_button_mouse_state: MouseStateHandle,
     trash_row_mouse_state: MouseStateHandle,
     exit_trash_button_mouse_state: MouseStateHandle,
     anonymous_sign_up_button_mouse_state: MouseStateHandle,
@@ -462,11 +448,6 @@ pub struct DriveIndex {
     /// We need to keep track of this to make sure we don't do any opening actions on WD
     /// from links before everything has been set up.
     has_initialized_sections: Condition,
-
-    /// The number of objects in Warp Drive that have errored.
-    /// This value is cached so that we can determine whether to render the "retry all"
-    /// objects button in the case of syncing failures.
-    num_errored_objects: usize,
 
     /// Drive item to represent collection of AI facts.
     /// Special-cased to always render at the top of the Personal space section.
@@ -839,7 +820,6 @@ impl DriveIndex {
             sorted_orders_by_location: Default::default(),
             ordered_items: Default::default(),
             has_initialized_sections: Default::default(),
-            num_errored_objects: Default::default(),
             ai_fact_collection,
             ai_fact_collection_item_mouse_states: Default::default(),
             mcp_server_collection,
@@ -847,37 +827,16 @@ impl DriveIndex {
         }
     }
 
-    fn edit_object_enabled(
-        &self,
-        cloud_object_type_and_id: &CloudObjectTypeAndId,
-        app: &AppContext,
-    ) -> bool {
-        self.is_online(app) || !cloud_object_type_and_id.has_server_id()
-    }
-
+    /// Whether the object can be moved, trashed or renamed. Drive is local, so this only needs
+    /// the object to exist.
     fn online_only_operation_allowed(
         &self,
         cloud_object_type_and_id: &CloudObjectTypeAndId,
         app: &AppContext,
     ) -> bool {
-        if let Some(object) = CloudModel::as_ref(app).get_by_uid(&cloud_object_type_and_id.uid()) {
-            // Uncaged (Oss): the Drive is fully local, so move / trash / rename
-            // apply to local (ClientId) objects too — there is no server to be
-            // online with and no server id to require. This is the master gate
-            // behind draggability, the move menu, Trash and folder actions, so
-            // relaxing it here is what makes organizing a local Drive work.
-            if matches!(
-                warp_core::channel::ChannelState::channel(),
-                warp_core::channel::Channel::Oss
-            ) {
-                return !object.metadata().has_pending_online_only_change();
-            }
-            return self.is_online(app)
-                && cloud_object_type_and_id.has_server_id()
-                && !object.metadata().has_pending_online_only_change();
-        }
-
-        false
+        CloudModel::as_ref(app)
+            .get_by_uid(&cloud_object_type_and_id.uid())
+            .is_some()
     }
 
     fn is_online(&self, app: &AppContext) -> bool {
@@ -963,13 +922,8 @@ impl DriveIndex {
         ctx.notify();
     }
 
-    fn on_cloud_model_changed(
-        &mut self,
-        cloud_model: ModelHandle<CloudModel>,
-        ctx: &mut ViewContext<Self>,
-    ) {
+    fn on_cloud_model_changed(&mut self, _: ModelHandle<CloudModel>, ctx: &mut ViewContext<Self>) {
         self.initialize_section_states(ctx);
-        self.num_errored_objects = cloud_model.as_ref(ctx).num_visible_errored_objects();
         ctx.notify();
     }
 
@@ -1625,7 +1579,6 @@ impl DriveIndex {
             false,
             is_selected,
             is_focused,
-            false, /* sync_queue_is_dequeueing */
             tools_panel_menu_direction(app),
             appearance,
         )?;
@@ -1661,7 +1614,6 @@ impl DriveIndex {
             false,
             is_selected,
             is_focused,
-            false, /* sync_queue_is_dequeueing */
             tools_panel_menu_direction(app),
             appearance,
         )?;
@@ -2038,11 +1990,6 @@ impl DriveIndex {
             title_right_side.add_child(self.render_warp_drive_loading_icon(appearance));
         }
 
-        // Only show the global retry button if there are errored objects
-        if self.num_errored_objects > 0 && self.is_online(app) {
-            title_right_side.add_child(self.render_retry_button(appearance));
-        }
-
         // Uncaged: back up the local Drive (+ config) to a private GitHub gist.
         // Reuses the same bundle as the Config panel — drive content is included.
         let gist_sync_button = icon_button(
@@ -2250,7 +2197,6 @@ impl DriveIndex {
             menu_open,
             is_selected,
             is_focused,
-            SyncQueue::as_ref(app).is_dequeueing(),
             tools_panel_menu_direction(app),
             appearance,
         )?;
@@ -2568,28 +2514,6 @@ impl DriveIndex {
         hoverable.finish()
     }
 
-    fn render_retry_button(&self, appearance: &Appearance) -> Box<dyn warpui::Element> {
-        let ui_builder = appearance.ui_builder().clone();
-
-        icon_button(
-            appearance,
-            Icon::Refresh,
-            false,
-            self.mouse_state_handles.retry_button_mouse_state.clone(),
-        )
-        .with_tooltip(move || {
-            ui_builder
-                .tool_tip(RETRY_BUTTON_TOOLTIP_LABEL.to_string())
-                .build()
-                .finish()
-        })
-        .build()
-        .on_click(move |ctx, _, _| {
-            ctx.dispatch_typed_action(DriveIndexAction::RetryAllFailedObjects)
-        })
-        .finish()
-    }
-
     fn render_create_new_button(
         &self,
         appearance: &Appearance,
@@ -2791,24 +2715,6 @@ impl DriveIndex {
         }
 
         self.reset_menus(ctx);
-        self.initialize_section_states(ctx);
-        ctx.notify();
-    }
-
-    fn leave_object(
-        &mut self,
-        cloud_object_type_and_id: &CloudObjectTypeAndId,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let Some(server_id) = cloud_object_type_and_id.server_id() else {
-            return;
-        };
-
-        UpdateManager::handle(ctx).update(ctx, move |update_manager, ctx| {
-            update_manager.leave_object(server_id, ctx);
-        });
-
-        // Reflect the removed objects.
         self.initialize_section_states(ctx);
         ctx.notify();
     }
@@ -3160,52 +3066,6 @@ impl DriveIndex {
         drop_target
     }
 
-    fn retry_failed_object(
-        &mut self,
-        cloud_object_type_and_id: &CloudObjectTypeAndId,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
-            update_manager.resync_object(cloud_object_type_and_id, ctx);
-        });
-    }
-
-    fn retry_all_failed(&mut self, ctx: &mut ViewContext<Self>) {
-        CloudModel::handle(ctx).update(ctx, |cloud_model, ctx| {
-            for object in cloud_model.cloud_objects_mut() {
-                if object.metadata().is_errored() {
-                    let queue_item = object
-                        .create_object_queue_item(
-                            CloudObjectEventEntrypoint::default(),
-                            // When adding the initiated_by parameter to this function call, InitiatedBy::User was set as a default value.
-                            // It can be changed to InitiatedBy::System if this action was automatically kicked off and does not require toasts to notify the user of completion.
-                            InitiatedBy::User,
-                        )
-                        .unwrap_or(object.update_object_queue_item(None));
-                    object.set_pending_content_changes_status(CloudObjectSyncStatus::InFlight(
-                        NumInFlightRequests(1),
-                    ));
-                    SyncQueue::handle(ctx).update(ctx, |sync_queue, ctx| {
-                        sync_queue.enqueue(queue_item, ctx);
-                    });
-                    self.num_errored_objects -= 1;
-                }
-            }
-        });
-    }
-
-    fn revert_failed_object(&mut self, server_id: &ServerId, ctx: &mut ViewContext<Self>) {
-        UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
-            let fetch_cloud_object_rx = update_manager.fetch_single_cloud_object(
-                server_id,
-                FetchSingleObjectOption::ForceOverwrite,
-                ctx,
-            );
-            // Don't need to wait for the fetch to complete, so drop the receiver
-            std::mem::drop(fetch_cloud_object_rx);
-        });
-    }
-
     fn menu_items(
         &self,
         space: &Space,
@@ -3356,71 +3216,32 @@ impl DriveIndex {
                         .with_icon(Icon::ListCollapsed)
                         .into_item(),
                 );
-
-                if let Some(object) = object {
-                    if FeatureFlag::SharedWithMe.is_enabled() && object.can_leave(app) {
-                        menu_items.push(
-                            MenuItemFields::new(REMOVE_LABEL)
-                                .with_on_select_action(DriveIndexAction::LeaveSharedObject {
-                                    cloud_object_type_and_id: *cloud_object_type_and_id,
-                                })
-                                .with_icon(Icon::Minus)
-                                .into_item(),
-                        )
-                    }
-                }
             }
         } else {
             if let Some(object) = object {
-                if self.is_online(app) && object.metadata().is_errored() {
-                    menu_items.push(
-                        MenuItemFields::new("Retry")
-                            .with_on_select_action(DriveIndexAction::RetryFailedObject(
-                                *cloud_object_type_and_id,
-                            ))
-                            .with_icon(Icon::Refresh)
-                            .into_item(),
-                    );
+                let workflow: Option<&CloudWorkflow> = object.into();
+                let env_var_collection: Option<&CloudEnvVarCollection> = object.into();
 
-                    if let Some(server_id) = cloud_object_type_and_id.server_id() {
+                if let Some(notebook) =
+                    <GenericCloudObject<_, CloudNotebookModel> as CloudObject>::as_model_type::<
+                        _,
+                        CloudNotebookModel,
+                    >(object)
+                {
+                    if let Some(ai_document_id) = notebook.model().ai_document_id {
                         menu_items.push(
-                            MenuItemFields::new("Revert to server")
-                                .with_on_select_action(DriveIndexAction::RevertFailedObject(
-                                    server_id,
+                            MenuItemFields::new("Attach to active session")
+                                .with_on_select_action(DriveIndexAction::AttachPlanAsContext(
+                                    ai_document_id,
                                 ))
-                                .with_icon(Icon::ReverseLeft)
+                                .with_icon(Icon::Paperclip)
                                 .into_item(),
                         );
                     }
                 }
-
-                let workflow: Option<&CloudWorkflow> = object.into();
-                let env_var_collection: Option<&CloudEnvVarCollection> = object.into();
-
-                if self.edit_object_enabled(cloud_object_type_and_id, app) {
-                    if let Some(notebook) =
-                        <GenericCloudObject<_, CloudNotebookModel> as CloudObject>::as_model_type::<
-                            _,
-                            CloudNotebookModel,
-                        >(object)
-                    {
-                        if let Some(ai_document_id) = notebook.model().ai_document_id {
-                            menu_items.push(
-                                MenuItemFields::new("Attach to active session")
-                                    .with_on_select_action(DriveIndexAction::AttachPlanAsContext(
-                                        ai_document_id,
-                                    ))
-                                    .with_icon(Icon::Paperclip)
-                                    .into_item(),
-                            );
-                        }
-                    }
-                    if let Some(_workflow) = workflow {
-                        menu_items.push(
-                            Self::pane_menu_item(
-                                editability,
-                                !ContextFlag::RunWorkflow.is_enabled(),
-                            )
+                if let Some(_workflow) = workflow {
+                    menu_items.push(
+                        Self::pane_menu_item(editability, !ContextFlag::RunWorkflow.is_enabled())
                             .with_on_select_action(DriveIndexAction::OpenWorkflowInPane {
                                 cloud_object_type_and_id: object.cloud_object_type_and_id(),
                                 open_mode: if (FeatureFlag::SharedWithMe.is_enabled()
@@ -3433,16 +3254,15 @@ impl DriveIndex {
                                 },
                             })
                             .into_item(),
-                        );
-                    } else if env_var_collection.is_some() {
-                        menu_items.push(
-                            Self::pane_menu_item(editability, false)
-                                .with_on_select_action(DriveIndexAction::OpenObject(
-                                    object.cloud_object_type_and_id(),
-                                ))
-                                .into_item(),
-                        )
-                    }
+                    );
+                } else if env_var_collection.is_some() {
+                    menu_items.push(
+                        Self::pane_menu_item(editability, false)
+                            .with_on_select_action(DriveIndexAction::OpenObject(
+                                object.cloud_object_type_and_id(),
+                            ))
+                            .into_item(),
+                    )
                 }
             }
 
@@ -3598,17 +3418,6 @@ impl DriveIndex {
                             .into_item(),
                     )
                 }
-
-                if FeatureFlag::SharedWithMe.is_enabled() && object.can_leave(app) {
-                    menu_items.push(
-                        MenuItemFields::new(REMOVE_LABEL)
-                            .with_on_select_action(DriveIndexAction::LeaveSharedObject {
-                                cloud_object_type_and_id: *cloud_object_type_and_id,
-                            })
-                            .with_icon(Icon::Minus)
-                            .into_item(),
-                    )
-                }
             }
         }
 
@@ -3675,31 +3484,6 @@ impl DriveIndex {
 
         let access_level =
             CloudViewModel::as_ref(app).access_level(&cloud_object_type_and_id.uid(), app);
-        let cloud_model = CloudModel::as_ref(app);
-        let object = cloud_model.get_by_uid(&cloud_object_type_and_id.uid());
-
-        if let Some(object) = object {
-            if self.is_online(app) && object.metadata().is_errored() {
-                menu_items.push(
-                    MenuItemFields::new("Retry")
-                        .with_on_select_action(DriveIndexAction::RetryFailedObject(
-                            *cloud_object_type_and_id,
-                        ))
-                        .with_icon(Icon::Refresh)
-                        .into_item(),
-                );
-
-                if let Some(server_id) = cloud_object_type_and_id.server_id() {
-                    menu_items.push(
-                        MenuItemFields::new("Revert to server")
-                            .with_on_select_action(DriveIndexAction::RevertFailedObject(server_id))
-                            .with_icon(Icon::ReverseLeft)
-                            .into_item(),
-                    );
-                }
-            }
-        }
-
         if self.online_only_operation_allowed(cloud_object_type_and_id, app) {
             if !FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash() {
                 menu_items.push(
@@ -4161,11 +3945,6 @@ impl TypedActionView for DriveIndex {
 
                 ctx.notify();
             }
-            DriveIndexAction::LeaveSharedObject {
-                cloud_object_type_and_id,
-            } => {
-                self.leave_object(cloud_object_type_and_id, ctx);
-            }
             DriveIndexAction::CloseCloudObjectNamingDialog => {
                 self.cloud_object_naming_dialog.close(ctx);
                 ctx.notify();
@@ -4256,15 +4035,6 @@ impl TypedActionView for DriveIndex {
             }
             DriveIndexAction::UpdateSortingChoice { sorting_choice } => {
                 self.update_sorting_choice(sorting_choice, ctx);
-            }
-            DriveIndexAction::RetryFailedObject(cloud_object_type_and_id) => {
-                self.retry_failed_object(cloud_object_type_and_id, ctx);
-            }
-            DriveIndexAction::RetryAllFailedObjects => {
-                self.retry_all_failed(ctx);
-            }
-            DriveIndexAction::RevertFailedObject(server_id) => {
-                self.revert_failed_object(server_id, ctx);
             }
             DriveIndexAction::OpenTrashIndex => {
                 self.index_variant = DriveIndexVariant::Trash;

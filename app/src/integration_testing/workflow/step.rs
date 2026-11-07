@@ -4,7 +4,7 @@ use warpui::{async_assert, SingletonEntity, WindowId};
 
 use super::open_workflow_count;
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::cloud_object::{CloudObjectEventEntrypoint, Owner, Space};
+use crate::cloud_object::{Owner, Space};
 use crate::drive::OpenWarpDriveObjectSettings;
 use crate::integration_testing::view_getters::workspace_view;
 use crate::server::cloud_objects::update_manager::UpdateManager;
@@ -27,7 +27,6 @@ pub fn create_a_personal_workflow(key: impl Into<String>) -> TestStep {
                     Owner::local_user(),
                     None,
                     client_id,
-                    CloudObjectEventEntrypoint::ManagementUI,
                     true,
                     ctx,
                 );

@@ -25,7 +25,7 @@ use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::appearance::Appearance;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::cloud_object::{CloudObject, CloudObjectEventEntrypoint, Owner};
+use crate::cloud_object::{CloudObject, Owner};
 use crate::drive::folders::CloudFolder;
 use crate::drive::CloudObjectTypeAndId;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
@@ -36,10 +36,8 @@ use crate::notebooks::editor::rich_text_styles;
 use crate::notebooks::file::MarkdownDisplayMode;
 use crate::notebooks::{CloudNotebookModel, NotebookId};
 use crate::persistence::ModelEvent;
-use crate::server::cloud_objects::update_manager::{
-    InitiatedBy, ObjectOperation, OperationSuccessType, UpdateManager, UpdateManagerEvent,
-};
-use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::server::cloud_objects::update_manager::{InitiatedBy, UpdateManager};
+use crate::server::ids::{ClientId, SyncId};
 use crate::settings::FontSettings;
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model::session::Session;
@@ -58,8 +56,6 @@ struct AIDocumentSaveRequest {
 pub enum AIDocumentSaveStatus {
     /// Not being synced with Warp Drive at all
     NotSaved,
-    /// Is being saved to Warp Drive, but has not finished yet
-    Saving,
     /// Has been saved to Warp Drive
     Saved,
 }
@@ -87,14 +83,6 @@ impl AIDocumentUserEditStatus {
 }
 
 const PLAN_FOLDER_NAME: &str = "Plans";
-
-/// Represents a document queued for creation in Warp Drive.
-#[derive(Debug, Clone)]
-struct PendingDocument {
-    id: AIDocumentId,
-    title: String,
-    content: String,
-}
 
 #[derive(Debug, Clone)]
 pub struct AIDocumentEarlierVersion {
@@ -175,9 +163,6 @@ pub struct AIDocumentModel {
     latest_document_id_by_conversation_id: HashMap<AIConversationId, AIDocumentId>,
     content_dirty_flags: HashMap<AIDocumentId, bool>,
     save_tx: async_channel::Sender<AIDocumentSaveRequest>,
-    /// Queue of documents wait to be saved.
-    /// Documents saves are buffered if the Plan folder is still being created.
-    pending_document_queue: Vec<PendingDocument>,
     /// Mapping from (conversation_id, action_id, document_index) for streaming CreateDocuments
     /// tool calls to the corresponding AI document ID.
     streaming_create_documents: HashMap<(AIConversationId, AIAgentActionId, usize), AIDocumentId>,
@@ -188,9 +173,6 @@ pub struct AIDocumentModel {
 
 impl AIDocumentModel {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        ctx.subscribe_to_model(&UpdateManager::handle(ctx), |me, _, event, ctx| {
-            me.handle_update_manager_event(event, ctx);
-        });
         ctx.subscribe_to_model(&CloudModel::handle(ctx), |me, _, event, ctx| {
             me.handle_cloud_model_event(event, ctx);
         });
@@ -219,7 +201,6 @@ impl AIDocumentModel {
             latest_document_id_by_conversation_id: HashMap::new(),
             content_dirty_flags: HashMap::new(),
             save_tx,
-            pending_document_queue: Vec::new(),
             streaming_create_documents: HashMap::new(),
             dirty_orchestration_events: HashMap::new(),
         }
@@ -234,17 +215,15 @@ impl AIDocumentModel {
             latest_document_id_by_conversation_id: HashMap::new(),
             content_dirty_flags: HashMap::new(),
             save_tx,
-            pending_document_queue: Vec::new(),
             streaming_create_documents: HashMap::new(),
             dirty_orchestration_events: HashMap::new(),
         }
     }
 
-    /// Sends a request to create a new cloud notebook with the document's contents.
-    /// Returns true if the create document request was sent successfully (or if there was already a notebook entry).
-    /// Actually creating the notebook is done asynchronously in the background.
+    /// Saves the document's contents as a notebook in the Plans folder of Warp Drive.
+    /// Returns true if the document is saved (or already had a notebook).
     pub fn sync_to_warp_drive(&mut self, id: AIDocumentId, ctx: &mut ModelContext<Self>) -> bool {
-        if self.reconcile_document_server_backing(&id, ctx) {
+        if self.reconcile_document_backing(&id, ctx) {
             return true;
         }
         let Some(document) = self.documents.get(&id) else {
@@ -261,32 +240,15 @@ impl AIDocumentModel {
         // Plans go to the local user's personal drive.
         let owner = Owner::local_user();
 
-        let Some(plan_folder_id) = self.get_or_create_plan_folder(owner, ctx).into_server() else {
-            // Plan folder is still being created (has ClientId only).
-            // If we save using the ClientId as the parent folder, the document
-            // will end up in a broken state once the folder is saved.
-            // Queue the document for creation until the folder gets a ServerId.
-            self.pending_document_queue
-                .push(PendingDocument { id, title, content });
-
-            if let Some(document) = self.documents.get_mut(&id) {
-                let client_id = ClientId::new();
-                document.sync_id = Some(SyncId::ClientId(client_id));
-            }
-            return true;
-        };
-
+        let plan_folder_id = self.get_or_create_plan_folder(owner, ctx);
         self.create_notebook_in_plan_folder(id, &title, &content, owner, plan_folder_id, ctx);
         ctx.emit(AIDocumentModelEvent::DocumentSaveStatusUpdated(id));
         true
     }
 
     pub fn get_document_save_status(&self, id: &AIDocumentId) -> AIDocumentSaveStatus {
-        let sync_id = self.documents.get(id).and_then(|doc| doc.sync_id);
-        if sync_id.and_then(|id| id.into_server()).is_some() {
+        if self.documents.get(id).and_then(|doc| doc.sync_id).is_some() {
             AIDocumentSaveStatus::Saved
-        } else if sync_id.and_then(|id| id.into_client()).is_some() {
-            AIDocumentSaveStatus::Saving
         } else {
             AIDocumentSaveStatus::NotSaved
         }
@@ -298,7 +260,7 @@ impl AIDocumentModel {
         conversation_id: AIConversationId,
         ctx: &mut ModelContext<Self>,
     ) -> Vec<AIDocumentId> {
-        self.reconcile_all_document_server_backing(ctx);
+        self.reconcile_all_document_backing(ctx);
         let document_ids = self
             .documents
             .iter()
@@ -306,16 +268,12 @@ impl AIDocumentModel {
                 (document.conversation_id == conversation_id).then_some(*document_id)
             })
             .collect::<Vec<_>>();
-        let mut awaiting_server_backing = Vec::new();
+        let mut awaiting_backing = Vec::new();
 
         for document_id in document_ids {
             match self.get_document_save_status(&document_id) {
                 AIDocumentSaveStatus::Saved => {
                     self.maybe_update_cloud_notebook_data(&document_id, ctx);
-                }
-                AIDocumentSaveStatus::Saving => {
-                    self.refresh_saving_document_content(&document_id, ctx);
-                    awaiting_server_backing.push(document_id);
                 }
                 AIDocumentSaveStatus::NotSaved => {
                     if !self.sync_to_warp_drive(document_id, ctx) {
@@ -323,74 +281,44 @@ impl AIDocumentModel {
                             "Failed to publish plan document {document_id} to Warp Drive before child-agent launch."
                         );
                     } else if !self.get_document_save_status(&document_id).is_saved() {
-                        awaiting_server_backing.push(document_id);
+                        awaiting_backing.push(document_id);
                     }
                 }
             }
         }
 
-        awaiting_server_backing
+        awaiting_backing
     }
 
-    /// Reconciles a document with an existing server-backed Warp Drive notebook.
-    fn reconcile_document_server_backing(
+    /// Reconciles a document with an existing Warp Drive notebook.
+    fn reconcile_document_backing(
         &mut self,
         document_id: &AIDocumentId,
         ctx: &mut ModelContext<Self>,
     ) -> bool {
-        let server_sync_id = CloudModel::as_ref(ctx)
+        let sync_id = CloudModel::as_ref(ctx)
             .get_all_active_notebooks()
-            .find(|notebook| {
-                notebook.id.into_server().is_some()
-                    && notebook.model().ai_document_id.as_ref() == Some(document_id)
-            })
+            .find(|notebook| notebook.model().ai_document_id.as_ref() == Some(document_id))
             .map(|notebook| notebook.id);
-        let Some(server_sync_id) = server_sync_id else {
+        let Some(sync_id) = sync_id else {
             return false;
         };
-        self.set_document_server_backing(*document_id, server_sync_id, ctx);
+        self.set_document_backing(*document_id, sync_id, ctx);
         true
     }
 
-    /// Reconciles all loaded documents with server-backed Warp Drive notebooks.
-    fn reconcile_all_document_server_backing(&mut self, ctx: &mut ModelContext<Self>) {
+    /// Reconciles all loaded documents with Warp Drive notebooks.
+    fn reconcile_all_document_backing(&mut self, ctx: &mut ModelContext<Self>) {
         let document_ids = self.documents.keys().copied().collect::<Vec<_>>();
         for document_id in document_ids {
-            self.reconcile_document_server_backing(&document_id, ctx);
-        }
-    }
-
-    /// Refreshes the latest content for a plan whose Warp Drive creation is in progress.
-    fn refresh_saving_document_content(
-        &mut self,
-        document_id: &AIDocumentId,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let Some(document) = self.documents.get(document_id) else {
-            return;
-        };
-        let title = document.title.clone();
-        let content = document.editor.as_ref(ctx).markdown(ctx);
-        let sync_id = document.sync_id;
-
-        for pending in self
-            .pending_document_queue
-            .iter_mut()
-            .filter(|pending| pending.id == *document_id)
-        {
-            pending.title.clone_from(&title);
-            pending.content.clone_from(&content);
-        }
-
-        if sync_id.is_some_and(|sync_id| CloudModel::as_ref(ctx).get_notebook(&sync_id).is_some()) {
-            self.maybe_update_cloud_notebook_data(document_id, ctx);
+            self.reconcile_document_backing(&document_id, ctx);
         }
     }
 
     fn handle_cloud_model_event(&mut self, event: &CloudModelEvent, ctx: &mut ModelContext<Self>) {
         match event {
             CloudModelEvent::ObjectSynced { server_id, .. } => {
-                self.reconcile_server_backed_notebook(SyncId::ServerId(*server_id), ctx);
+                self.reconcile_notebook(SyncId::ServerId(*server_id), ctx);
             }
             CloudModelEvent::ObjectCreated {
                 type_and_id: CloudObjectTypeAndId::Notebook(sync_id),
@@ -399,10 +327,10 @@ impl AIDocumentModel {
                 type_and_id: CloudObjectTypeAndId::Notebook(sync_id),
                 ..
             } => {
-                self.reconcile_server_backed_notebook(*sync_id, ctx);
+                self.reconcile_notebook(*sync_id, ctx);
             }
             CloudModelEvent::InitialLoadCompleted => {
-                self.reconcile_all_document_server_backing(ctx);
+                self.reconcile_all_document_backing(ctx);
             }
             CloudModelEvent::ObjectMoved { .. }
             | CloudModelEvent::ObjectUpdated { .. }
@@ -415,21 +343,18 @@ impl AIDocumentModel {
             | CloudModelEvent::NotebookEditorChangedFromServer { .. } => {}
         }
     }
-    /// Reconciles one server-backed notebook with its loaded AI document.
-    fn reconcile_server_backed_notebook(&mut self, sync_id: SyncId, ctx: &mut ModelContext<Self>) {
-        if sync_id.into_server().is_none() {
-            return;
-        }
+    /// Reconciles one notebook with its loaded AI document.
+    fn reconcile_notebook(&mut self, sync_id: SyncId, ctx: &mut ModelContext<Self>) {
         let document_id = CloudModel::as_ref(ctx)
             .get_notebook(&sync_id)
             .and_then(|notebook| notebook.model().ai_document_id);
         if let Some(document_id) = document_id {
-            self.set_document_server_backing(document_id, sync_id, ctx);
+            self.set_document_backing(document_id, sync_id, ctx);
         }
     }
 
-    /// Updates a document and its conversation artifact with server backing.
-    fn set_document_server_backing(
+    /// Updates a document and its conversation artifact with the notebook backing it.
+    fn set_document_backing(
         &mut self,
         document_id: AIDocumentId,
         sync_id: SyncId,
@@ -445,6 +370,8 @@ impl AIDocumentModel {
         let conversation_id = document.conversation_id;
         ctx.emit(AIDocumentModelEvent::DocumentSaveStatusUpdated(document_id));
 
+        // The conversation's plan artifact records a notebook by its server id, so only notebooks
+        // synced before the fork are recorded there.
         let Some(server_id) = sync_id.into_server() else {
             return;
         };
@@ -460,48 +387,6 @@ impl AIDocumentModel {
                 );
             }
         });
-    }
-
-    fn handle_update_manager_event(
-        &mut self,
-        event: &UpdateManagerEvent,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let UpdateManagerEvent::ObjectOperationComplete { result } = event else {
-            return;
-        };
-        if !matches!(result.operation, ObjectOperation::Create { .. })
-            || result.success_type != OperationSuccessType::Success
-        {
-            return;
-        }
-        if result.server_id.is_none() {
-            return;
-        };
-
-        // If we're waiting on a Plans folder to complete creation, ensure the Plans folder exists
-        // (creating it if needed) and if it has a ServerId, process the pending document queue.
-        //
-        // NOTE: this handler runs for *all* Warp Drive object creations, so we must only create the
-        // Plans folder when we actually have a plan notebook waiting to be created.
-        if !self.pending_document_queue.is_empty() {
-            let owner = Owner::local_user();
-            if let Some(folder_id) = self.get_or_create_plan_folder(owner, ctx).into_server() {
-                let queue = std::mem::take(&mut self.pending_document_queue);
-
-                for pending in queue {
-                    self.create_notebook_in_plan_folder(
-                        pending.id,
-                        &pending.title,
-                        &pending.content,
-                        owner,
-                        folder_id,
-                        ctx,
-                    );
-                    ctx.emit(AIDocumentModelEvent::DocumentSaveStatusUpdated(pending.id));
-                }
-            }
-        }
     }
 
     /// Create a new document with default title/content and return its ID.
@@ -578,11 +463,6 @@ impl AIDocumentModel {
                 format!("Plan document {ai_document_id} was not found in Warp Drive.")
             })?;
         let (sync_id, title, content) = notebook;
-        if sync_id.into_server().is_none() {
-            return Err(format!(
-                "Plan document {ai_document_id} is not backed by a saved Warp Drive notebook."
-            ));
-        }
 
         self.latest_document_id_by_conversation_id
             .insert(conversation_id, ai_document_id);
@@ -1110,7 +990,7 @@ impl AIDocumentModel {
             ctx,
         );
 
-        self.reconcile_document_server_backing(&id, ctx);
+        self.reconcile_document_backing(&id, ctx);
     }
 
     /// This is used for restoring EditDocuments results where we already have the final content.
@@ -1305,7 +1185,7 @@ impl AIDocumentModel {
         title: &str,
         content: &str,
         owner: Owner,
-        plan_folder_id: ServerId,
+        plan_folder_id: SyncId,
         ctx: &mut ModelContext<Self>,
     ) {
         let client_id = ClientId::new();
@@ -1328,9 +1208,8 @@ impl AIDocumentModel {
             update_manager.create_notebook(
                 client_id,
                 owner,
-                Some(SyncId::ServerId(plan_folder_id)),
+                Some(plan_folder_id),
                 notebook_model,
-                CloudObjectEventEntrypoint::Unknown,
                 true,
                 ctx,
             );

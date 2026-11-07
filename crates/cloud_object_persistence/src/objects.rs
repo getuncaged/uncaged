@@ -3,12 +3,14 @@ use std::collections::HashMap;
 use cloud_objects::UserUid;
 use cloud_objects::cloud_object::{
     CloudObjectMetadata, CloudObjectPermissions, CloudObjectStatuses, CloudObjectSyncStatus,
-    GENERIC_STRING_OBJECT_PREFIX, GenericStringObjectFormat, NumInFlightRequests, ObjectIdType,
-    ObjectType, Owner, Revision, RevisionAndLastEditor, ServerCreationInfo,
+    GENERIC_STRING_OBJECT_PREFIX, GenericStringObjectFormat, ObjectIdType, ObjectType, Owner,
+    Revision,
 };
 use cloud_objects::ids::{ClientId, FolderId, HashableId, SyncId, ToServerId};
 use diesel::result::Error;
-use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
+use diesel::{
+    Connection, ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl, SqliteConnection,
+};
 use persistence::model::{
     GenericStringObject as PersistedGenericStringObject, NewGenericStringObject, NewObjectMetadata,
     NewObjectPermissions, ObjectMetadata, ObjectPermissions,
@@ -337,7 +339,8 @@ pub fn upsert_cloud_object(
 }
 
 /// Helper function to delete a cloud object identified by `sync_id`. If a valid object metadata row
-/// for the object is found, `delete_object_fn` is called to delete the actual object.
+/// for the object is found, `delete_object_fn` is called to delete the actual object; if there is
+/// none, nothing is deleted.
 pub fn delete_cloud_object(
     conn: &mut SqliteConnection,
     sync_id: SyncId,
@@ -355,7 +358,11 @@ pub fn delete_cloud_object(
         .filter(client_id.eq(Some(hashed_sync_id.as_str())))
         .or_filter(server_id.eq(Some(hashed_sync_id.as_str())));
 
-    let metadata: ObjectMetadata = metadata_filter.first(conn)?;
+    // A row that is already gone (e.g. a folder's child deleted along with it) is skipped rather
+    // than failing the rest of the deletes in the batch.
+    let Some(metadata) = metadata_filter.first::<ObjectMetadata>(conn).optional()? else {
+        return Ok(());
+    };
     let object_id = metadata.shareable_object_id;
     diesel::delete(object_metadata.filter(id.eq(metadata.id))).execute(conn)?;
     diesel::delete(
@@ -438,83 +445,8 @@ pub fn delete_generic_string_object(
     Ok(())
 }
 
-/// Mark a shareable object as no longer having pending changes.
-pub fn mark_object_as_synced(
-    conn: &mut SqliteConnection,
-    hashed_sqlite_id: String,
-    new_revision_and_editor: RevisionAndLastEditor,
-    new_metadata_ts: Option<ServerTimestamp>,
-) -> Result<(), Error> {
-    use schema::object_metadata::dsl::*;
-    conn.transaction::<(), Error, _>(|conn| {
-        diesel::update(object_metadata.filter(server_id.eq(Some(hashed_sqlite_id.as_str()))))
-            .set(is_pending.eq(false))
-            .execute(conn)?;
-        diesel::update(object_metadata.filter(server_id.eq(Some(hashed_sqlite_id.clone()))))
-            .set((
-                revision_ts.eq(new_revision_and_editor.revision.timestamp_micros()),
-                last_editor_uid.eq(new_revision_and_editor.last_editor_uid),
-            ))
-            .execute(conn)?;
-
-        if let Some(metadata_ts) = new_metadata_ts {
-            diesel::update(object_metadata.filter(server_id.eq(Some(hashed_sqlite_id))))
-                .set((metadata_last_updated_ts.eq(metadata_ts.timestamp_micros()),))
-                .execute(conn)?;
-        }
-        Ok(())
-    })
-}
-
-pub fn increment_retry_count(
-    conn: &mut SqliteConnection,
-    server_id_string: String,
-) -> Result<(), Error> {
-    use schema::object_metadata::dsl::*;
-    conn.transaction::<(), Error, _>(|conn| {
-        diesel::update(object_metadata.filter(server_id.eq(Some(server_id_string))))
-            .set(retry_count.eq(retry_count + 1))
-            .execute(conn)?;
-        Ok(())
-    })
-}
-
-pub fn update_object_after_server_creation(
-    conn: &mut SqliteConnection,
-    client_id_string: String,
-    server_creation_info: ServerCreationInfo,
-) -> Result<(), Error> {
-    use schema::commands::dsl::*;
-    use schema::object_metadata::dsl::*;
-
-    conn.transaction::<(), Error, _>(|conn| {
-        diesel::update(object_metadata.filter(client_id.eq(Some(client_id_string.clone()))))
-            .set((
-                server_id.eq(Some(
-                    server_creation_info
-                        .server_id_and_type
-                        .sqlite_type_and_uid_hash(),
-                )),
-                creator_uid.eq(server_creation_info.creator_uid),
-            ))
-            .execute(conn)?;
-
-        diesel::update(commands.filter(cloud_workflow_id.eq(Some(client_id_string))))
-            .set(
-                cloud_workflow_id.eq(Some(
-                    server_creation_info
-                        .server_id_and_type
-                        .sqlite_type_and_uid_hash(),
-                )),
-            )
-            .execute(conn)?;
-
-        Ok(())
-    })
-}
-
-/// SQLite endpoint for the ObjectMetadataUpdated RTC message that updates the metadata ts and other
-/// metadata like current team_id of the object.
+/// Writes an object's metadata (metadata ts, trash state, folder and current editor) to its row,
+/// whether the row is keyed by a client id or a server id.
 pub fn update_object_metadata(
     conn: &mut SqliteConnection,
     hashed_id: String,
@@ -531,14 +463,18 @@ pub fn update_object_metadata(
         .map(|folder_sync_id| folder_sync_id.sqlite_uid_hash(ObjectIdType::Folder));
 
     conn.transaction::<(), Error, _>(|conn| {
-        diesel::update(object_metadata.filter(server_id.eq(Some(hashed_id.as_str()))))
-            .set((
-                metadata_last_updated_ts.eq(metadata_last_updated_at),
-                trashed_ts.eq(trashed_timestamp),
-                folder_id.eq(folder_id_str),
-                current_editor.eq(metadata.current_editor_uid),
-            ))
-            .execute(conn)?;
+        diesel::update(
+            object_metadata
+                .filter(client_id.eq(Some(hashed_id.as_str())))
+                .or_filter(server_id.eq(Some(hashed_id.as_str()))),
+        )
+        .set((
+            metadata_last_updated_ts.eq(metadata_last_updated_at),
+            trashed_ts.eq(trashed_timestamp),
+            folder_id.eq(folder_id_str),
+            current_editor.eq(metadata.current_editor_uid),
+        ))
+        .execute(conn)?;
 
         Ok(())
     })
@@ -565,11 +501,10 @@ pub fn to_cloud_object_metadata(metadata: &ObjectMetadata) -> CloudObjectMetadat
             .and_then(|epoch| Revision::from_unix_timestamp_micros(epoch).ok()),
         pending_changes_statuses: CloudObjectStatuses {
             pending_delete: false,
-            content_sync_status: if metadata.is_pending {
-                CloudObjectSyncStatus::InFlight(NumInFlightRequests(1))
-            } else {
-                CloudObjectSyncStatus::NoLocalChanges
-            },
+            // Rows written while Drive still synced with Warp's server may be marked pending.
+            // Their content is complete locally and there is nowhere left to send it, so they
+            // load like any other object; the next write stores them as not pending.
+            content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
             has_pending_metadata_change: false,
             has_pending_permissions_change: false,
             pending_untrash: false,

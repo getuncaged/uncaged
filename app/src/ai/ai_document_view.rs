@@ -662,31 +662,6 @@ impl AIDocumentView {
                 })
                 .finish()
             }
-            AIDocumentSaveStatus::Saving => {
-                let appearance = Appearance::as_ref(app);
-                let theme = appearance.theme();
-                let color = theme.nonactive_ui_detail().into_solid();
-                Container::new(
-                    ConstrainedBox::new(
-                        Container::new(
-                            ConstrainedBox::new(
-                                Icon::RefreshCw04
-                                    .to_warpui_icon(ThemeFill::Solid(color))
-                                    .finish(),
-                            )
-                            .with_width(16.)
-                            .with_height(16.)
-                            .finish(),
-                        )
-                        .with_uniform_padding(4.)
-                        .finish(),
-                    )
-                    .with_width(24.)
-                    .with_height(24.)
-                    .finish(),
-                )
-                .finish()
-            }
             AIDocumentSaveStatus::Saved => {
                 let appearance = Appearance::as_ref(app);
                 let theme = appearance.theme();

@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use chrono::Utc;
-use cloud_object_client::MockObjectClient;
 use settings::manager::SettingsManager;
 use warpui::{App, SingletonEntity};
 
@@ -24,7 +21,6 @@ use crate::settings::AISettings;
 use crate::system::SystemStats;
 use crate::workflows::workflow::Workflow;
 use crate::workflows::{CloudWorkflowModel, WorkflowId};
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::UserProfiles;
 
 fn mock_server_metadata() -> ServerMetadata {
@@ -77,10 +73,9 @@ fn initialize_app(app: &mut App) {
     // Add the necessary singleton models to the App
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
-    app.add_singleton_model(TeamTesterStatus::new);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
-    app.add_singleton_model(|ctx| UpdateManager::new(None, Arc::new(MockObjectClient::new()), ctx));
+    app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
     app.add_singleton_model(CloudViewModel::new);
     app.add_singleton_model(NotebookManager::mock);

@@ -138,54 +138,49 @@ fn cloud_model_sync_event_reconciles_stale_document_client_id() {
 }
 
 #[test]
-fn publish_refreshes_pending_saving_document_content() {
+fn publish_saves_plan_as_local_notebook() {
     App::test((), |mut app| async move {
         initialize_app_for_ai_document_tests(&mut app);
+        app.add_singleton_model(|_| UpdateManager::new(None));
         let model_handle = app.add_model(|_ctx| AIDocumentModel::new_for_test());
         let conversation_id = AIConversationId::new();
         let document_id = model_handle.update(&mut app, |model, ctx| {
-            let document_id =
-                model.create_document("Plan", "# Initial", conversation_id, None, ctx);
-            let editor = model
-                .documents
-                .get(&document_id)
-                .expect("document should exist")
-                .editor
-                .clone();
-            model
-                .documents
-                .get_mut(&document_id)
-                .expect("document should exist")
-                .sync_id = Some(SyncId::ClientId(ClientId::new()));
-            model.pending_document_queue.push(PendingDocument {
-                id: document_id,
-                title: "Plan".to_string(),
-                content: "# Initial".to_string(),
-            });
-            editor.update(ctx, |editor, ctx| {
-                editor.reset_with_markdown("# Latest", ctx);
-            });
-            document_id
+            model.create_document("Plan", "# Plan", conversation_id, None, ctx)
         });
 
-        model_handle.update(&mut app, |model, ctx| {
-            let latest_content = model
-                .documents
-                .get(&document_id)
+        // Nothing is left waiting: the plan is saved as soon as it is published.
+        let awaiting = model_handle.update(&mut app, |model, ctx| {
+            model.publish_documents_for_conversation(conversation_id, ctx)
+        });
+        assert!(awaiting.is_empty());
+
+        let sync_id = model_handle.read(&app, |model, _| {
+            assert!(model.get_document_save_status(&document_id).is_saved());
+            model
+                .get_current_document(&document_id)
                 .expect("document should exist")
-                .editor
-                .as_ref(ctx)
-                .markdown(ctx);
+                .sync_id
+                .expect("document should be backed by a notebook")
+        });
+        assert!(matches!(sync_id, SyncId::ClientId(_)));
+        CloudModel::handle(&app).read(&app, |cloud_model, _| {
+            let notebook = cloud_model
+                .get_notebook(&sync_id)
+                .expect("plan notebook should exist");
+            assert_eq!(notebook.model().ai_document_id, Some(document_id));
+            assert_eq!(notebook.model().data.trim(), "# Plan");
+            let folder_id = notebook
+                .metadata
+                .folder_id
+                .expect("plan should be in a folder");
             assert_eq!(
-                model.publish_documents_for_conversation(conversation_id, ctx),
-                vec![document_id]
+                cloud_model
+                    .get_folder(&folder_id)
+                    .expect("plans folder should exist")
+                    .model()
+                    .name,
+                PLAN_FOLDER_NAME
             );
-            let pending = model
-                .pending_document_queue
-                .iter()
-                .find(|pending| pending.id == document_id)
-                .expect("pending document should exist");
-            assert_eq!(pending.content, latest_content);
         });
     });
 }

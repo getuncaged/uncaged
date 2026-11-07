@@ -51,7 +51,6 @@ impl WarpDriveItem for WarpDriveSpace {
 
     fn sync_status_icon(
         &self,
-        _sync_queue_is_dequeueing: bool,
         _hover_state: MouseStateHandle,
         _appearance: &Appearance,
     ) -> Option<Box<dyn Element>> {

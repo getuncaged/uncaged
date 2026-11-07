@@ -46,7 +46,7 @@ use crate::appearance::Appearance;
 use crate::cloud_object::grab_edit_access_modal::{GrabEditAccessModal, GrabEditAccessModalEvent};
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent, UpdateSource};
 use crate::cloud_object::model::view::{Editor, EditorState};
-use crate::cloud_object::{CloudObject, CloudObjectEventEntrypoint, ObjectType, Owner, Space};
+use crate::cloud_object::{CloudObject, ObjectType, Owner, Space};
 use crate::drive::export::ExportManager;
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::{CloudObjectTypeAndId, OpenWarpDriveObjectSettings};
@@ -63,8 +63,8 @@ use crate::notebooks::CloudNotebook;
 use crate::pane_group::focus_state::{PaneFocusHandle, PaneGroupFocusEvent};
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
-use crate::server::cloud_objects::update_manager::{FetchSingleObjectOption, UpdateManager};
-use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::server::cloud_objects::update_manager::UpdateManager;
+use crate::server::ids::{ClientId, SyncId};
 use crate::settings::app_installation_detection::{
     UserAppInstallDetectionSettings, UserAppInstallStatus,
 };
@@ -527,7 +527,7 @@ impl NotebookView {
             ActiveNotebookDataEvent::BreadcrumbsChanged => {
                 self.update_breadcrumbs(ctx);
             }
-            ActiveNotebookDataEvent::CreatedOnServer => {
+            ActiveNotebookDataEvent::Created => {
                 ctx.emit(NotebookEvent::Pane(PaneEvent::AppStateChanged));
             }
             ActiveNotebookDataEvent::TrashStatusChanged | ActiveNotebookDataEvent::MovedToSpace => {
@@ -680,7 +680,7 @@ impl NotebookView {
                     .trash_status(ctx)
                     .is_editable()
                 {
-                    self.give_up_edit_access_and_start_viewing(ctx)
+                    self.switch_to_view(ctx)
                 }
             }
             CloudModelEvent::ObjectUntrashed { .. } => {
@@ -768,7 +768,6 @@ impl NotebookView {
                                 ai_document_id: notebook.model().ai_document_id,
                                 conversation_id: notebook.model().conversation_id.clone(),
                             },
-                            CloudObjectEventEntrypoint::Unknown,
                             true,
                             ctx,
                         );
@@ -782,23 +781,6 @@ impl NotebookView {
             }
             ActiveNotebook::None => log::error!("Tried to save notebook, but none were active"),
         }
-    }
-
-    /// Checks if the user is the current known editor of the notebook, if they
-    /// are, then sets the current editor to be None both locally and on the server
-    fn try_give_up_edit_access(&self, ctx: &mut ViewContext<Self>) {
-        let id = self.active_notebook_data.as_ref(ctx).id();
-        UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
-            if let Some(id) = id {
-                update_manager.give_up_notebook_edit_access(id, ctx);
-            }
-        });
-        ctx.notify();
-    }
-
-    fn give_up_edit_access_and_start_viewing(&mut self, ctx: &mut ViewContext<Self>) {
-        self.try_give_up_edit_access(ctx);
-        self.switch_to_view(ctx);
     }
 
     /// Save any changes to the notebook.
@@ -1108,7 +1090,6 @@ impl NotebookView {
                     ai_document_id,
                     conversation_id: None,
                 },
-                CloudObjectEventEntrypoint::Unknown,
                 true,
                 ctx,
             );
@@ -1268,19 +1249,7 @@ impl NotebookView {
         let settings = settings.clone();
         ctx.spawn(initial_load_complete, move |me, _, ctx| {
             let notebook = CloudModel::as_ref(ctx).get_notebook(&notebook_id).cloned();
-            let fetch_needed = notebook.is_none()
-                || settings
-                    .focused_folder_id
-                    .map(SyncId::ServerId)
-                    .map(|folder_id| CloudModel::as_ref(ctx).get_folder(&folder_id).is_none())
-                    .unwrap_or(false);
-            if fetch_needed {
-                if let Some(server_id) = notebook_id.into_server() {
-                    me.fetch_and_load_notebook(server_id, &settings, window_id, ctx);
-                } else {
-                    log::warn!("Tried to load notebook without server id {notebook_id:?}");
-                }
-            } else if let Some(notebook) = notebook {
+            if let Some(notebook) = notebook {
                 me.load(notebook, &settings, ctx);
             } else {
                 ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
@@ -1291,43 +1260,6 @@ impl NotebookView {
                     );
                 });
                 log::warn!("Tried to open unknown notebook {notebook_id:?}");
-            }
-        });
-    }
-
-    fn fetch_and_load_notebook(
-        &mut self,
-        notebook_id: ServerId,
-        settings: &OpenWarpDriveObjectSettings,
-        window_id: WindowId,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        // If we have a parent folder we are trying to load as a part of this notebook, fetch that instead
-        let id_to_fetch = settings.focused_folder_id.unwrap_or(notebook_id);
-        let fetch_cloud_object_rx =
-            UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
-                update_manager.fetch_single_cloud_object(
-                    &id_to_fetch,
-                    FetchSingleObjectOption::None,
-                    ctx,
-                )
-            });
-        let settings = settings.clone();
-        ctx.spawn(fetch_cloud_object_rx, move |me, _, ctx| {
-            if let Some(notebook) = CloudModel::as_ref(ctx)
-                .get_notebook(&SyncId::ServerId(notebook_id))
-                .cloned()
-            {
-                me.load(notebook, &settings, ctx);
-            } else {
-                ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    toast_stack.add_ephemeral_toast_by_type(
-                        ToastType::CloudObjectNotFound,
-                        window_id,
-                        ctx,
-                    );
-                });
-                log::warn!("Tried to open unknown notebook {notebook_id:?} after fetching");
             }
         });
     }
@@ -1497,7 +1429,6 @@ impl NotebookView {
                                 ai_document_id: notebook.model().ai_document_id,
                                 conversation_id: notebook.model().conversation_id.clone(),
                             },
-                            CloudObjectEventEntrypoint::Unknown,
                             true,
                             ctx,
                         );
@@ -1519,20 +1450,17 @@ impl NotebookView {
         ctx.notify();
     }
 
-    /// Save this notebook and give up edit access before detaching it from a pane.
+    /// Save this notebook before detaching it from a pane.
     pub fn on_detach(&mut self, ctx: &mut ViewContext<Self>) {
         // If there are un-saved edits, persist them now, since the asynchronous update callback
         // is unlikely to run again.
         self.handle_save(NotebookUpdateRequestDebounceArg {}, ctx);
-
-        // Give up notebook edit access on quitting.
-        self.try_give_up_edit_access(ctx);
     }
 
     pub fn toggle_mode(&mut self, ctx: &mut ViewContext<Self>) {
         match self.mode(ctx) {
             Mode::Editing => {
-                self.give_up_edit_access_and_start_viewing(ctx);
+                self.switch_to_view(ctx);
             }
             Mode::View => self.grab_edit_access_or_display_access_dialog(ctx),
         }

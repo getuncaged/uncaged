@@ -1,6 +1,6 @@
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
-use super::{CloudNotebookModel, NotebookId};
+use super::CloudNotebookModel;
 use crate::ai::document::ai_document_model::AIDocumentId;
 use crate::cloud_object::breadcrumbs::ContainingObject;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
@@ -108,91 +108,49 @@ impl ActiveNotebookData {
         event: &UpdateManagerEvent,
         ctx: &mut ModelContext<Self>,
     ) {
-        let UpdateManagerEvent::ObjectOperationComplete { result } = event else {
+        let UpdateManagerEvent::ObjectOperationComplete { result } = event;
+
+        if result.id.is_none() || self.id() != result.id {
             return;
-        };
+        }
 
         match (&result.operation, &result.success_type) {
             (ObjectOperation::Create { .. }, OperationSuccessType::Success) => {
-                if let Some(current_id) = self.id() {
-                    if current_id.into_client() == result.client_id {
-                        let server_id = result.server_id.expect("Expect server id on success");
-                        let notebook_id: NotebookId = server_id.into();
-                        self.feature_not_available = false;
-                        self.saving_status = SavingStatus::Saved;
-                        self.active_notebook =
-                            ActiveNotebook::CommittedNotebook(SyncId::ServerId(notebook_id.into()));
-                        ctx.emit(ActiveNotebookDataEvent::BreadcrumbsChanged);
-                        ctx.emit(ActiveNotebookDataEvent::CreatedOnServer);
-                        ctx.notify();
-                    }
+                if let Some(notebook_id) = result.id {
+                    self.feature_not_available = false;
+                    self.saving_status = SavingStatus::Saved;
+                    self.active_notebook = ActiveNotebook::CommittedNotebook(notebook_id);
+                    ctx.emit(ActiveNotebookDataEvent::BreadcrumbsChanged);
+                    ctx.emit(ActiveNotebookDataEvent::Created);
+                    ctx.notify();
                 }
             }
             (ObjectOperation::Update, OperationSuccessType::Success) => {
-                if let Some(current_id) = self.id() {
-                    let server_id = result.server_id.expect("Expect server id on success");
-                    if current_id.into_server() == Some(server_id) {
-                        self.feature_not_available = false;
-                        self.saving_status = SavingStatus::Saved;
-                        ctx.notify();
-                    }
-                }
+                self.feature_not_available = false;
+                self.saving_status = SavingStatus::Saved;
+                ctx.notify();
             }
             (ObjectOperation::Update, OperationSuccessType::Rejection) => {
-                let current_id = self.id();
-                if let Some(id) = current_id {
-                    let server_id = result
-                        .server_id
-                        .expect("Expect server id on update rejection");
-                    if id.into_server() == Some(server_id) {
-                        self.feature_not_available = false;
-                        ctx.emit(ActiveNotebookDataEvent::EditRejected);
-                        ctx.notify();
-                    }
-                }
+                self.feature_not_available = false;
+                ctx.emit(ActiveNotebookDataEvent::EditRejected);
+                ctx.notify();
             }
             (ObjectOperation::Update, OperationSuccessType::FeatureNotAvailable) => {
-                let current_id = self.id();
-                if let Some(id) = current_id {
-                    let server_id = result
-                        .server_id
-                        .expect("Expect server id on update failure");
-                    if id.into_server() == Some(server_id) {
-                        self.feature_not_available = true;
-                        ctx.emit(ActiveNotebookDataEvent::EditRejected);
-                        ctx.notify();
-                    }
-                }
+                self.feature_not_available = true;
+                ctx.emit(ActiveNotebookDataEvent::EditRejected);
+                ctx.notify();
             }
             (ObjectOperation::TakeEditAccess, OperationSuccessType::Success) => {
-                let current_id = self.id();
-                let server_id = result.server_id.expect("Expect server id on success");
-                if let Some(id) = current_id {
-                    if id.into_server() == Some(server_id) {
-                        self.feature_not_available = false;
-                        self.mode = Mode::Editing;
-                        ctx.emit(ActiveNotebookDataEvent::SwitchedToEditMode);
-                    }
-                }
+                self.feature_not_available = false;
+                self.mode = Mode::Editing;
+                ctx.emit(ActiveNotebookDataEvent::SwitchedToEditMode);
             }
             (ObjectOperation::Trash, OperationSuccessType::Success)
             | (ObjectOperation::Untrash, OperationSuccessType::Success) => {
-                let current_id = self.id();
-                let server_id = result.server_id.expect("Expect server id on success");
-                if let Some(id) = current_id {
-                    if id.into_server() == Some(server_id) {
-                        ctx.emit(ActiveNotebookDataEvent::TrashStatusChanged);
-                    }
-                }
+                ctx.emit(ActiveNotebookDataEvent::TrashStatusChanged);
             }
             (ObjectOperation::MoveToDrive, OperationSuccessType::Success) => {
-                let current_id = self.id();
-                let server_id = result.server_id.expect("Expect server id on success");
-                if let Some(id) = current_id {
-                    if id.into_server() == Some(server_id) {
-                        ctx.emit(ActiveNotebookDataEvent::MovedToSpace);
-                    }
-                }
+                ctx.emit(ActiveNotebookDataEvent::MovedToSpace);
             }
             _ => {}
         }
@@ -378,8 +336,8 @@ pub enum ActiveNotebookDataEvent {
     EditRejected,
     /// The notebook's breadcrumbs were updated.
     BreadcrumbsChanged,
-    /// This notebook was created on the server.
-    CreatedOnServer,
+    /// This notebook was saved to Warp Drive for the first time.
+    Created,
     /// This notebook was trashed or untrashed (used for refreshing pane overflow items)
     TrashStatusChanged,
     // This notebook was moved to a shared space.

@@ -15324,16 +15324,11 @@ impl Workspace {
         event: &UpdateManagerEvent,
         ctx: &mut ViewContext<Self>,
     ) {
-        let UpdateManagerEvent::ObjectOperationComplete { result } = event else {
-            return;
-        };
+        let UpdateManagerEvent::ObjectOperationComplete { result } = event;
 
         let cloud_model = CloudModel::as_ref(ctx);
 
-        let object_id = result
-            .server_id
-            .map(|server_id| server_id.uid())
-            .or_else(|| result.client_id.map(|client_id| client_id.to_string()));
+        let object_id = result.id.map(|id| id.uid());
 
         if let Some(object_id) = object_id {
             if let Some(object) = cloud_model.get_by_uid(&object_id) {
@@ -15540,8 +15535,7 @@ impl Workspace {
             && result.operation == ObjectOperation::Update
         {
             let cloud_model = CloudModel::as_ref(ctx);
-            let updated_object = cloud_model
-                .get_by_uid(&result.server_id.expect("Expect server id on success").uid());
+            let updated_object = result.id.and_then(|id| cloud_model.get_by_uid(&id.uid()));
             if let Some(CloudObjectTypeAndId::Workflow(workflow_id)) =
                 updated_object.map(|o| o.cloud_object_type_and_id())
             {

@@ -7,7 +7,7 @@ use warpui::windowing::WindowManager;
 use warpui::{async_assert, App, SingletonEntity, ViewHandle, WindowId};
 
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::cloud_object::{CloudObjectEventEntrypoint, Owner, Space};
+use crate::cloud_object::{Owner, Space};
 use crate::drive::OpenWarpDriveObjectSettings;
 use crate::integration_testing::view_getters::{notebook_view, workspace_view};
 use crate::notebooks::manager::NotebookSource;
@@ -38,7 +38,6 @@ pub fn create_a_personal_notebook(key: impl Into<String>, title: impl Into<Strin
                     Owner::local_user(),
                     None,
                     Default::default(),
-                    CloudObjectEventEntrypoint::ManagementUI,
                     true,
                     ctx,
                 );

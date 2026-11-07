@@ -70,7 +70,6 @@ use crate::window_settings::WindowSettings;
 use crate::workspace::hoa_onboarding::mark_hoa_onboarding_completed;
 use crate::workspace::view::OnboardingTutorial;
 use crate::workspace::{PaneViewLocator, Workspace, WorkspaceAction, WorkspaceRegistry};
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::{
     report_if_error, ChannelState, GlobalResourceHandles, GlobalResourceHandlesProvider,
     UpdateQuakeModeEventArg,
@@ -2047,11 +2046,6 @@ impl RootView {
         } else {
             log::error!("Auth not complete before trying to open warp drive");
         }
-
-        // Use the team tester model to notify relevant subscribers to refresh their data.
-        TeamTesterStatus::handle(ctx).update(ctx, |model, ctx| {
-            model.initiate_data_pollers(true, ctx);
-        });
         true
     }
 

@@ -18,7 +18,6 @@ use crate::server::ids::{ServerId, SyncId};
 use crate::server::sync_queue::SyncQueue;
 use crate::settings::{apply_onboarding_settings, AISettings, PrivacySettings};
 use crate::test_util::settings::initialize_settings_for_tests;
-use crate::workspaces::team_tester::TeamTesterStatus;
 
 fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
     ServerMetadata {
@@ -55,8 +54,7 @@ fn apply_onboarding_settings_preserves_existing_cloud_profile_on_existing_user_l
         initialize_settings_for_tests(&mut app);
         app.add_singleton_model(SyncQueue::mock);
         app.add_singleton_model(|_| NetworkStatus::new());
-        app.add_singleton_model(TeamTesterStatus::mock);
-        app.add_singleton_model(UpdateManager::mock);
+        app.add_singleton_model(|_| UpdateManager::new(None));
         app.add_singleton_model(CloudModel::mock);
         app.add_singleton_model(|_| TemplatableMCPServerManager::default());
         app.add_singleton_model(PrivacySettings::mock);
@@ -176,8 +174,7 @@ fn apply_onboarding_settings_enables_ai_for_agent_intent_with_account() {
         initialize_settings_for_tests(&mut app);
         app.add_singleton_model(SyncQueue::mock);
         app.add_singleton_model(|_| NetworkStatus::new());
-        app.add_singleton_model(TeamTesterStatus::mock);
-        app.add_singleton_model(UpdateManager::mock);
+        app.add_singleton_model(|_| UpdateManager::new(None));
         app.add_singleton_model(CloudModel::mock);
         app.add_singleton_model(|_| TemplatableMCPServerManager::default());
         app.add_singleton_model(PrivacySettings::mock);

@@ -20,7 +20,6 @@ use crate::server::ids::{ServerId, SyncId};
 use crate::server::sync_queue::SyncQueue;
 use crate::settings::PrivacySettings;
 use crate::test_util::settings::initialize_settings_for_tests;
-use crate::workspaces::team_tester::TeamTesterStatus;
 
 fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
     ServerMetadata {
@@ -77,8 +76,7 @@ fn install_singletons(app: &mut App) {
     initialize_settings_for_tests(app);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_| NetworkStatus::new());
-    app.add_singleton_model(TeamTesterStatus::mock);
-    app.add_singleton_model(UpdateManager::mock);
+    app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| TemplatableMCPServerManager::default());
     app.add_singleton_model(PrivacySettings::mock);

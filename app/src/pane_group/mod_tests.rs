@@ -59,7 +59,6 @@ use crate::notebooks::manager::NotebookManager;
 use crate::notebooks::notebook::NotebookView;
 use crate::resource_center::TipsCompleted;
 use crate::search::files::model::FileSearchModel;
-use crate::server::cloud_objects::listener::Listener;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::ServerId;
 use crate::server::server_api::ServerApiProvider;
@@ -81,7 +80,6 @@ use crate::warp_managed_paths_watcher::WarpManagedPathsWatcher;
 use crate::workflows::local_workflows::LocalWorkflows;
 use crate::workspace::sync_inputs::SyncedInputState;
 use crate::workspace::{ActiveSession, OneTimeModalModel, WorkspaceRegistry};
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::{AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider};
 
@@ -104,9 +102,7 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
-    app.add_singleton_model(TeamTesterStatus::mock);
-    app.add_singleton_model(Listener::mock);
-    app.add_singleton_model(UpdateManager::mock);
+    app.add_singleton_model(|_| UpdateManager::new(None));
 
     // Initialize file-based MCP dependencies.
     app.add_singleton_model(|_| DetectedRepositories::default());

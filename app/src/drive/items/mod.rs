@@ -32,7 +32,6 @@ pub trait WarpDriveItem {
     fn warp_drive_id(&self) -> WarpDriveItemId;
     fn sync_status_icon(
         &self,
-        sync_queue_is_dequeueing: bool,
         hover_state: MouseStateHandle,
         appearance: &Appearance,
     ) -> Option<Box<dyn Element>>;

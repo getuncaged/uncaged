@@ -29,7 +29,6 @@ use crate::server::sync_queue::SyncQueue;
 use crate::settings::PrivacySettings;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::test_util::settings::initialize_settings_for_tests_with_mode;
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::{AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 struct RunAgentsTestState {
@@ -170,8 +169,7 @@ fn initialize_run_agents_test(app: &mut App, mode: ExecutionMode) -> RunAgentsTe
     let terminal_view_id = EntityId::new();
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_| NetworkStatus::new());
-    app.add_singleton_model(TeamTesterStatus::mock);
-    app.add_singleton_model(UpdateManager::mock);
+    app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(|_| Appearance::mock());
     app.add_singleton_model(|_| AIDocumentModel::new_for_test());
@@ -499,11 +497,11 @@ fn execute_publishes_every_parent_owned_plan_before_dispatch() {
         AIDocumentModel::handle(&app).read(&app, |model, _ctx| {
             assert!(matches!(
                 model.get_document_save_status(&first_plan_id),
-                AIDocumentSaveStatus::Saving
+                AIDocumentSaveStatus::Saved
             ));
             assert!(matches!(
                 model.get_document_save_status(&second_plan_id),
-                AIDocumentSaveStatus::Saving
+                AIDocumentSaveStatus::Saved
             ));
             assert!(matches!(
                 model.get_document_save_status(&unrelated_plan_id),

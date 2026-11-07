@@ -1068,32 +1068,6 @@ impl CloudModel {
         ctx.notify();
     }
 
-    /// Number of cloud objects that have not synced to the cloud
-    pub fn num_unsaved_objects(&self) -> usize {
-        self.objects_by_id
-            .values()
-            .filter(|object| object.metadata().has_pending_content_changes())
-            .count()
-    }
-
-    /// Number of cloud objects that have not synced to the cloud and require a user warning before quitting
-    pub fn num_unsaved_objects_to_warn_about_before_quitting(&self) -> usize {
-        self.objects_by_id
-            .values()
-            .filter(|object| {
-                object.warn_if_unsaved_at_quit() && object.metadata().has_pending_content_changes()
-            })
-            .count()
-    }
-
-    /// Number of cloud objects that have errored in some way and are visible in the Warp Drive index
-    pub fn num_visible_errored_objects(&self) -> usize {
-        self.objects_by_id
-            .values()
-            .filter(|object| object.renders_in_warp_drive() && object.metadata().is_errored())
-            .count()
-    }
-
     pub fn has_objects(&self) -> bool {
         !self.objects_by_id.is_empty()
     }

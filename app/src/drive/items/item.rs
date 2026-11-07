@@ -145,7 +145,6 @@ impl<'a> WarpDriveRow<'a> {
         menu_open: bool,
         is_selected: bool,
         is_focused: bool,
-        sync_queue_is_dequeueing: bool,
         menu_direction: MenuDirection,
         appearance: &'a Appearance,
     ) -> Option<Self> {
@@ -204,11 +203,8 @@ impl<'a> WarpDriveRow<'a> {
             false => Empty::new().finish(),
         };
 
-        let sync_icon = item.sync_status_icon(
-            sync_queue_is_dequeueing,
-            item_states.item_sync_icon_hover_state.clone(),
-            appearance,
-        );
+        let sync_icon =
+            item.sync_status_icon(item_states.item_sync_icon_hover_state.clone(), appearance);
 
         Some(Self {
             item,
@@ -239,7 +235,6 @@ impl<'a> WarpDriveRow<'a> {
         menu_open: bool,
         is_selected: bool,
         is_focused: bool,
-        sync_queue_is_dequeueing: bool,
         menu_direction: MenuDirection,
         appearance: &'a Appearance,
     ) -> Option<Self> {
@@ -255,7 +250,6 @@ impl<'a> WarpDriveRow<'a> {
             menu_open,
             is_selected,
             is_focused,
-            sync_queue_is_dequeueing,
             menu_direction,
             appearance,
         )

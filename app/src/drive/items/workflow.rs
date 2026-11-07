@@ -111,15 +111,13 @@ impl WarpDriveItem for WarpDriveWorkflow {
 
     fn sync_status_icon(
         &self,
-        sync_queue_is_dequeueing: bool,
         hover_state: MouseStateHandle,
         appearance: &Appearance,
     ) -> Option<Box<dyn Element>> {
-        self.workflow.metadata.pending_changes_statuses.render_icon(
-            sync_queue_is_dequeueing,
-            hover_state,
-            appearance,
-        )
+        self.workflow
+            .metadata
+            .pending_changes_statuses
+            .render_icon(hover_state, appearance)
     }
 
     fn action_summary(&self, app: &AppContext) -> Option<String> {

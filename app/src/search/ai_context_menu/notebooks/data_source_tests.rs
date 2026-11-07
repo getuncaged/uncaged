@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use chrono::{Duration, Utc};
-use cloud_object_client::MockObjectClient;
 use settings::manager::SettingsManager;
 use warpui::{App, SingletonEntity};
 
@@ -19,7 +16,6 @@ use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
 use crate::settings::AISettings;
 use crate::system::SystemStats;
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::NetworkStatus;
 
@@ -55,10 +51,9 @@ fn mock_server_notebook_with_revision(id: i64, title: &str, revision: Revision) 
 fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
-    app.add_singleton_model(TeamTesterStatus::new);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
-    app.add_singleton_model(|ctx| UpdateManager::new(None, Arc::new(MockObjectClient::new()), ctx));
+    app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
     app.add_singleton_model(CloudViewModel::new);
     app.add_singleton_model(NotebookManager::mock);

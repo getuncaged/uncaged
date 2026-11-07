@@ -260,28 +260,23 @@ impl SuggestionChipView {
         event: &UpdateManagerEvent,
         ctx: &mut ViewContext<Self>,
     ) {
-        let UpdateManagerEvent::ObjectOperationComplete { result } = event else {
-            return;
-        };
+        let UpdateManagerEvent::ObjectOperationComplete { result } = event;
 
         if let (ObjectOperation::Create { .. }, OperationSuccessType::Success) =
             (&result.operation, &result.success_type)
         {
-            if self.sync_id.into_client() == result.client_id {
-                if let Some(server_id) = result.server_id {
-                    self.sync_id = SyncId::ServerId(server_id);
-                    // Reload the rule from the cloud model.
-                    match &mut self.suggestion {
-                        Suggestion::Rule { .. } => {
-                            self.load_suggestion(ctx);
-                        }
-                        Suggestion::AgentModeWorkflow { .. } => {
-                            // Loading agent mode workflows is not supported
-                            // as there is no editing flow for them.
-                        }
+            if result.id == Some(self.sync_id) {
+                // Reload the rule from the cloud model.
+                match &mut self.suggestion {
+                    Suggestion::Rule { .. } => {
+                        self.load_suggestion(ctx);
                     }
-                    self.on_add_suggestion(ctx);
+                    Suggestion::AgentModeWorkflow { .. } => {
+                        // Loading agent mode workflows is not supported
+                        // as there is no editing flow for them.
+                    }
                 }
+                self.on_add_suggestion(ctx);
             }
         }
     }

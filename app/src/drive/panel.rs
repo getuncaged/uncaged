@@ -15,7 +15,7 @@ use super::{CloudObjectTypeAndId, DriveObjectType};
 use crate::ai::document::ai_document_model::AIDocumentId;
 use crate::ai::facts::CloudAIFactModel;
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::cloud_object::{CloudObjectEventEntrypoint, Owner, Space};
+use crate::cloud_object::{Owner, Space};
 use crate::env_vars::manager::EnvVarCollectionSource;
 use crate::env_vars::CloudEnvVarCollection;
 use crate::notebooks::manager::NotebookSource;
@@ -312,7 +312,6 @@ impl DrivePanel {
                             CloudAIFactModel::new(fact.clone()),
                             owner,
                             client_id,
-                            CloudObjectEventEntrypoint::Blocklist,
                             true,
                             *initial_folder_id,
                             // When adding the initiated_by parameter to this function call, InitiatedBy::User was set as a default value.

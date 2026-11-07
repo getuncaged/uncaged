@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use cloud_object_client::MockObjectClient;
 use cloud_objects::UserUid;
 use settings::{RespectUserSyncSetting, SyncToCloud};
 use warpui::{App, ModelHandle};
@@ -20,15 +19,12 @@ use crate::drive::folders::{CloudFolderModel, FolderId};
 use crate::drive::DriveIndexVariant;
 use crate::features::FeatureFlag;
 use crate::notebooks::{CloudNotebookModel, NotebookId};
-use crate::server::cloud_objects::listener::ObjectUpdateMessage;
 use crate::server::ids::{ServerId, ServerIdAndType};
-use crate::server::server_api::object::ObjectClient;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
 use crate::settings::{init_and_register_user_preferences, Preference};
 use crate::system::SystemStats;
 use crate::workflows::CloudWorkflowModel;
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::{NetworkStatus, UpdateManager};
 
@@ -41,28 +37,17 @@ fn create_cloud_model(
     app.add_singleton_model(|_ctx| CloudModel::new(None, objects, None))
 }
 
-fn initialize_app(
-    app: &mut App,
-    cached_objects: Vec<Box<dyn CloudObject>>,
-    cloud_object_server_api_mock: Arc<impl ObjectClient>,
-) {
+fn initialize_app(app: &mut App, cached_objects: Vec<Box<dyn CloudObject>>) {
     // Add the necessary singleton models to the App
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
-    app.add_singleton_model(TeamTesterStatus::new);
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_ctx| CloudModel::new(None, cached_objects, None));
-    app.add_singleton_model(|ctx| UpdateManager::new(None, cloud_object_server_api_mock, ctx));
+    app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
     app.add_singleton_model(CloudViewModel::new);
     app.add_singleton_model(|_| ObjectActions::new(Vec::new()));
-
-    // The start of polling is normally triggered by authentication completion, but
-    // we need to do it manually for tests.
-    TeamTesterStatus::handle(app).update(app, |team_tester, ctx| {
-        team_tester.initiate_data_pollers(false, ctx);
-    });
 }
 
 fn mock_server_metadata() -> ServerMetadata {
@@ -238,47 +223,24 @@ fn folder_from_cloud_model(model: &CloudModel, id: SyncId) -> &CloudFolder {
     model.get_folder_by_uid(&id.uid()).expect("is a folder")
 }
 
-/// Mock receiving an RTC update. These tests update objects by mocking RTC messages so that they
-/// don't need to mock the server API for updates. The unit tests for [`UpdateManager`] ensure that
-/// updates from both RTC and client actions emit the same events.
-fn receive_rtc_update(message: ObjectUpdateMessage, app: &mut App) {
-    UpdateManager::handle(app).update(app, |update_manager, ctx| {
-        update_manager.received_message_from_server(message, ctx)
-    });
+fn notebook_revision(id: ServerId, app: &App) -> DateTime<Utc> {
+    CloudModel::handle(app).read(app, |cloud_model, _| {
+        cloud_model
+            .get_by_uid(&id.uid())
+            .and_then(|object| object.metadata().revision.clone())
+            .expect("object should have a revision")
+            .utc()
+    })
 }
 
-fn move_object(id: ServerId, folder_id: Option<FolderId>, app: &mut App) {
-    let message = CloudModel::handle(app).read(app, |cloud_model, _| {
-        let object = cloud_model
-            .get_by_uid(&id.uid())
-            .expect("Expected object to exist in cloud model");
-
-        let metadata = ServerMetadata {
-            uid: id,
-            revision: object
-                .metadata()
-                .revision
-                .clone()
-                .expect("Revision is required"),
-            current_editor_uid: object.metadata().current_editor_uid.clone(),
-            metadata_last_updated_ts: (object
-                .metadata()
-                .metadata_last_updated_ts
-                .expect("Metadata TS is required")
-                .utc()
-                + chrono::Duration::seconds(1))
-            .into(),
-            trashed_ts: object.metadata().trashed_ts,
-            folder_id,
-            is_welcome_object: object.metadata().is_welcome_object,
-            creator_uid: object.metadata().creator_uid.clone(),
-            last_editor_uid: object.metadata().last_editor_uid.clone(),
-        };
-
-        ObjectUpdateMessage::ObjectMetadataChanged { metadata }
+fn move_object(id: ServerId, location: CloudObjectLocation, app: &mut App) {
+    UpdateManager::handle(app).update(app, |update_manager, ctx| {
+        update_manager.move_object_to_location(
+            CloudObjectTypeAndId::Notebook(id.into()),
+            location,
+            ctx,
+        )
     });
-
-    receive_rtc_update(message, app);
 }
 
 #[test]
@@ -563,10 +525,6 @@ fn test_update_object_server_id_for_folder() {
     })
 }
 
-fn base_mock_cloud_object_server_api() -> MockObjectClient {
-    MockObjectClient::new()
-}
-
 #[test]
 fn test_collapse_all_in_location() {
     /*
@@ -755,8 +713,7 @@ fn test_collapse_all_in_trash() {
 fn test_object_editor_timeout() {
     App::test((), |mut app| async move {
         // Setup the app and APIs
-        let cloud_object_server_api_mock = base_mock_cloud_object_server_api();
-        initialize_app(&mut app, Vec::new(), Arc::new(cloud_object_server_api_mock));
+        initialize_app(&mut app, Vec::new());
         let notebook_id: SyncId = SyncId::ServerId(1.into());
         let cloud_notebook = mock_cloud_notebook(notebook_id, "test1".into(), None);
 
@@ -819,12 +776,7 @@ fn test_breadcrumbs() {
     .collect::<Vec<_>>();
 
     App::test((), |mut app| async move {
-        let cloud_object_server_api_mock = base_mock_cloud_object_server_api();
-        initialize_app(
-            &mut app,
-            folders.clone(),
-            Arc::new(cloud_object_server_api_mock),
-        );
+        initialize_app(&mut app, folders.clone());
 
         CloudModel::handle(&app).read(&app, |_, ctx| {
             assert_eq!("Personal".to_string(), folders[0].breadcrumbs(ctx));
@@ -858,11 +810,7 @@ fn assert_sorting_timestamp(id: ServerId, expected_ts: impl Into<ServerTimestamp
 #[test]
 fn test_update_folder_timestamp_from_child_update() {
     App::test((), |mut app| async move {
-        initialize_app(
-            &mut app,
-            Vec::new(),
-            Arc::new(base_mock_cloud_object_server_api()),
-        );
+        initialize_app(&mut app, Vec::new());
 
         let folder_id: ServerId = 123.into();
         let parent_folder_id: ServerId = 456.into();
@@ -899,34 +847,15 @@ fn test_update_folder_timestamp_from_child_update() {
         assert_sorting_timestamp(notebook_id, initial_ts, &app);
 
         // After updating the notebook, all 3 timestamps should change.
-        let new_ts = initial_ts + chrono::Duration::seconds(5);
-        receive_rtc_update(
-            ObjectUpdateMessage::ObjectContentChanged {
-                server_object: Box::new(ServerCloudObject::Notebook(ServerNotebook::new(
-                    SyncId::ServerId(notebook_id),
-                    CloudNotebookModel {
-                        title: "Test Notebook".to_string(),
-                        data: "test2".into(),
-                        ai_document_id: None,
-                        conversation_id: None,
-                    },
-                    ServerMetadata {
-                        uid: notebook_id,
-                        revision: new_ts.into(),
-                        metadata_last_updated_ts: new_ts.into(),
-                        trashed_ts: None,
-                        folder_id: Some(folder_id.into()),
-                        is_welcome_object: false,
-                        creator_uid: None,
-                        last_editor_uid: None,
-                        current_editor_uid: None,
-                    },
-                    mock_server_permissions(Owner::mock_current_user()),
-                ))),
-                last_editor: None,
-            },
-            &mut app,
-        );
+        UpdateManager::handle(&app).update(&mut app, |update_manager, ctx| {
+            update_manager.update_notebook_data(
+                Arc::new("test2".to_string()),
+                notebook_id.into(),
+                ctx,
+            );
+        });
+        let new_ts = notebook_revision(notebook_id, &app);
+        assert!(new_ts >= initial_ts);
 
         assert_sorting_timestamp(folder_id, new_ts, &app);
         assert_sorting_timestamp(parent_folder_id, new_ts, &app);
@@ -941,17 +870,13 @@ fn test_update_folder_timestamp_from_child_update() {
 #[test]
 fn test_update_folder_timestamp_from_object_move() {
     App::test((), |mut app| async move {
-        initialize_app(
-            &mut app,
-            Vec::new(),
-            Arc::new(base_mock_cloud_object_server_api()),
-        );
+        initialize_app(&mut app, Vec::new());
 
         let folder_a_id: ServerId = 123.into();
         let folder_b_id: ServerId = 456.into();
         let notebook_id: ServerId = 789.into();
 
-        let t1 = Utc::now();
+        let t1 = Utc::now() - chrono::Duration::seconds(10);
         let t2 = t1 + chrono::Duration::seconds(5);
         CloudModel::handle(&app).update(&mut app, |cloud_model, _ctx| {
             let mut folder_a = mock_cloud_folder(folder_a_id.into(), "Folder A".to_string(), None);
@@ -980,13 +905,21 @@ fn test_update_folder_timestamp_from_object_move() {
         assert_sorting_timestamp(notebook_id, t2, &app);
 
         // Move the workflow to folder B, so it now has the newer sort timestamp.
-        move_object(notebook_id, Some(folder_b_id.into()), &mut app);
+        move_object(
+            notebook_id,
+            CloudObjectLocation::Folder(folder_b_id.into()),
+            &mut app,
+        );
 
         assert_sorting_timestamp(folder_a_id, t1, &app);
         assert_sorting_timestamp(folder_b_id, t2, &app);
 
         // Move the workflow into the root, so both folders have the older sort timestamp.
-        move_object(notebook_id, None, &mut app);
+        move_object(
+            notebook_id,
+            CloudObjectLocation::Space(Space::Personal),
+            &mut app,
+        );
         assert_sorting_timestamp(folder_a_id, t1, &app);
         assert_sorting_timestamp(folder_b_id, t1, &app);
     });
@@ -998,17 +931,11 @@ fn test_update_folder_timestamp_from_object_move() {
 #[test]
 fn test_update_folder_timestamp_from_new_child() {
     App::test((), |mut app| async move {
-        initialize_app(
-            &mut app,
-            Vec::new(),
-            Arc::new(base_mock_cloud_object_server_api()),
-        );
+        initialize_app(&mut app, Vec::new());
 
         let folder_id: ServerId = 123.into();
         let parent_folder_id: ServerId = 456.into();
-        let notebook_id: ServerId = 789.into();
-        let t1 = Utc::now();
-        let t2 = t1 + chrono::Duration::seconds(5);
+        let t1 = Utc::now() - chrono::Duration::seconds(10);
 
         CloudModel::handle(&app).update(&mut app, |cloud_model, _ctx| {
             let mut folder = mock_cloud_folder(
@@ -1031,33 +958,30 @@ fn test_update_folder_timestamp_from_new_child() {
         assert_sorting_timestamp(parent_folder_id, t1, &app);
 
         // Create a notebook inside the folder.
-        receive_rtc_update(
-            ObjectUpdateMessage::ObjectContentChanged {
-                server_object: Box::new(ServerCloudObject::Notebook(ServerNotebook::new(
-                    SyncId::ServerId(notebook_id),
-                    CloudNotebookModel {
-                        title: "Test Notebook".to_string(),
-                        data: "test".to_string(),
-                        ai_document_id: None,
-                        conversation_id: None,
-                    },
-                    ServerMetadata {
-                        uid: notebook_id,
-                        revision: t2.into(),
-                        metadata_last_updated_ts: t2.into(),
-                        trashed_ts: None,
-                        folder_id: Some(folder_id.into()),
-                        is_welcome_object: false,
-                        creator_uid: None,
-                        last_editor_uid: None,
-                        current_editor_uid: None,
-                    },
-                    mock_server_permissions(Owner::mock_current_user()),
-                ))),
-                last_editor: None,
-            },
-            &mut app,
-        );
+        let notebook_id = ClientId::new();
+        UpdateManager::handle(&app).update(&mut app, |update_manager, ctx| {
+            update_manager.create_notebook(
+                notebook_id,
+                Owner::mock_current_user(),
+                Some(folder_id.into()),
+                CloudNotebookModel {
+                    title: "Test Notebook".to_string(),
+                    data: "test".to_string(),
+                    ai_document_id: None,
+                    conversation_id: None,
+                },
+                false,
+                ctx,
+            );
+        });
+        let t2 = CloudModel::handle(&app).read(&app, |cloud_model, _| {
+            cloud_model
+                .get_notebook(&SyncId::ClientId(notebook_id))
+                .and_then(|notebook| notebook.metadata.revision.clone())
+                .expect("new notebook should have a revision")
+                .utc()
+        });
+        assert!(t2 > t1);
 
         // The notebook timestamp is now the sort timestamp for the folders.
         assert_sorting_timestamp(folder_id, t2, &app);
@@ -1071,19 +995,13 @@ fn test_update_folder_timestamp_from_new_child() {
 #[test]
 fn test_update_folder_timestamp_from_child_trash() {
     App::test((), |mut app| async move {
-        initialize_app(
-            &mut app,
-            Vec::new(),
-            Arc::new(base_mock_cloud_object_server_api()),
-        );
+        initialize_app(&mut app, Vec::new());
 
         let notebook_id: ServerId = 123.into();
         let folder_id: ServerId = 456.into();
 
-        let t1 = Utc::now();
+        let t1 = Utc::now() - chrono::Duration::seconds(10);
         let t2 = t1 + chrono::Duration::seconds(1);
-        let t3 = t2 + chrono::Duration::seconds(1);
-        let t4 = t3 + chrono::Duration::seconds(1);
 
         CloudModel::handle(&app).update(&mut app, |cloud_model, _ctx| {
             let mut folder = mock_cloud_folder(folder_id.into(), "Folder".to_string(), None);
@@ -1104,42 +1022,17 @@ fn test_update_folder_timestamp_from_child_trash() {
         assert_sorting_timestamp(folder_id, t2, &app);
 
         // Trash the notebook so that it no longer counts towards the folder's sort timestamp.
-        receive_rtc_update(
-            ObjectUpdateMessage::ObjectMetadataChanged {
-                metadata: ServerMetadata {
-                    uid: notebook_id,
-                    revision: t2.into(),
-                    metadata_last_updated_ts: t3.into(),
-                    trashed_ts: Some(t3.into()),
-                    folder_id: Some(folder_id.into()),
-                    is_welcome_object: false,
-                    creator_uid: None,
-                    last_editor_uid: None,
-                    current_editor_uid: None,
-                },
-            },
-            &mut app,
-        );
+        let notebook = CloudObjectTypeAndId::Notebook(notebook_id.into());
+        UpdateManager::handle(&app).update(&mut app, |update_manager, ctx| {
+            update_manager.trash_object(notebook, ctx);
+        });
 
         assert_sorting_timestamp(folder_id, t1, &app);
 
         // Untrash the notebook, updating the folder timestamp.
-        receive_rtc_update(
-            ObjectUpdateMessage::ObjectMetadataChanged {
-                metadata: ServerMetadata {
-                    uid: notebook_id,
-                    revision: t2.into(),
-                    metadata_last_updated_ts: t4.into(),
-                    trashed_ts: None,
-                    folder_id: Some(folder_id.into()),
-                    is_welcome_object: false,
-                    creator_uid: None,
-                    last_editor_uid: None,
-                    current_editor_uid: None,
-                },
-            },
-            &mut app,
-        );
+        UpdateManager::handle(&app).update(&mut app, |update_manager, ctx| {
+            update_manager.untrash_object(notebook, ctx);
+        });
 
         assert_sorting_timestamp(folder_id, t2, &app);
     });
@@ -1149,11 +1042,7 @@ fn test_update_folder_timestamp_from_child_trash() {
 fn test_shared_personal_object() {
     let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
     App::test((), |mut app| async move {
-        initialize_app(
-            &mut app,
-            Vec::new(),
-            Arc::new(base_mock_cloud_object_server_api()),
-        );
+        initialize_app(&mut app, Vec::new());
 
         let other_user = UserUid::new("other_user");
         let shared_notebook_id = SyncId::ServerId(123.into());
@@ -1192,11 +1081,7 @@ fn test_shared_personal_object() {
 fn test_unshared_personal_object() {
     let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
     App::test((), |mut app| async move {
-        initialize_app(
-            &mut app,
-            Vec::new(),
-            Arc::new(base_mock_cloud_object_server_api()),
-        );
+        initialize_app(&mut app, Vec::new());
 
         let shared_notebook_id = SyncId::ServerId(123.into());
         let shared_notebook = CloudNotebook::new(
@@ -1234,11 +1119,7 @@ fn test_unshared_personal_object() {
 fn test_shared_team_object() {
     let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
     App::test((), |mut app| async move {
-        initialize_app(
-            &mut app,
-            Vec::new(),
-            Arc::new(base_mock_cloud_object_server_api()),
-        );
+        initialize_app(&mut app, Vec::new());
 
         // The user is not on this team.
         let team_uid = ServerId::from(456);
@@ -1278,11 +1159,7 @@ fn test_shared_object_in_unshared_folder() {
     let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
     App::test((), |mut app| async move {
         app.update(init_and_register_user_preferences);
-        initialize_app(
-            &mut app,
-            Vec::new(),
-            Arc::new(base_mock_cloud_object_server_api()),
-        );
+        initialize_app(&mut app, Vec::new());
 
         let other_user = UserUid::new("other_user");
         let unshared_folder_id = SyncId::ServerId(567.into());

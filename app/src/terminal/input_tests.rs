@@ -51,7 +51,6 @@ use crate::editor::{DisplayPoint, EditorAction, Point, TextStyleOperation};
 use crate::input_suggestions::{HistoryOrder, Item};
 use crate::network::NetworkStatus;
 use crate::search::files::model::FileSearchModel;
-use crate::server::cloud_objects::listener::Listener;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
@@ -97,7 +96,6 @@ use crate::test_util::settings::initialize_settings_for_tests;
 use crate::themes::theme::AnsiColorIdentifier;
 use crate::warp_managed_paths_watcher::WarpManagedPathsWatcher;
 use crate::workspace::{ActiveSession, OneTimeModalModel, ToastStack, WorkspaceRegistry};
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::{AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 #[test]
@@ -221,10 +219,8 @@ pub fn initialize_app(app: &mut App) {
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
     app.add_singleton_model(ImportedConfigModel::new);
-    app.add_singleton_model(TeamTesterStatus::mock);
-    app.add_singleton_model(UpdateManager::mock);
-    app.add_singleton_model(MCPGalleryManager::new);
-    app.add_singleton_model(Listener::mock);
+    app.add_singleton_model(|_| UpdateManager::new(None));
+    app.add_singleton_model(|_| MCPGalleryManager::default());
     app.add_singleton_model(|_| Appearance::mock());
     app.add_singleton_model(PrivacySettings::mock);
     app.add_singleton_model(|_ctx| SyncedInputState::mock());

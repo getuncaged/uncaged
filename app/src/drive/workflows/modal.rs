@@ -33,7 +33,7 @@ use super::workflow_arg_type_helpers::{self, ArgumentEditorRowIndex};
 use crate::appearance::Appearance;
 use crate::cloud_object::breadcrumbs::{ContainingObject, ContainingObjectKind};
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::cloud_object::{CloudObject, CloudObjectEventEntrypoint, ObjectType, Owner, Revision};
+use crate::cloud_object::{CloudObject, ObjectType, Owner, Revision};
 use crate::drive::cloud_object_styling::warp_drive_icon_color;
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::{CloudObjectTypeAndId, DriveObjectType};
@@ -730,7 +730,7 @@ impl WorkflowModal {
         match (self.workflow_id, self.owner) {
             (Some(workflow_id), None) => {
                 UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
-                    update_manager.update_workflow(workflow, workflow_id, self.revision_ts.clone(), ctx);
+                    update_manager.update_workflow(workflow, workflow_id, ctx);
                 });
                 ctx.emit(WorkflowModalEvent::UpdatedWorkflow(workflow_id));
             }
@@ -741,7 +741,6 @@ impl WorkflowModal {
                         owner,
                         self.initial_folder_id,
                         ClientId::default(),
-                        CloudObjectEventEntrypoint::Unknown,
                         true,
                         ctx,
                     );

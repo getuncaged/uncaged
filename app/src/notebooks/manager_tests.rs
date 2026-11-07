@@ -18,13 +18,11 @@ use crate::persistence::ModelEvent;
 use crate::search::files::model::FileSearchModel;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::ServerApiProvider;
-use crate::server::sync_queue::SyncQueue;
 use crate::settings::PrivacySettings;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::terminal::keys::TerminalKeybindings;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspace::ActiveSession;
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::{GlobalResourceHandles, GlobalResourceHandlesProvider};
 
@@ -72,7 +70,6 @@ fn initialize_app(app: &mut App) -> TestState {
     app.add_singleton_model(|_| NetworkStatus::new());
     app.add_singleton_model(|_| Appearance::mock());
     app.add_singleton_model(PrivacySettings::mock);
-    app.add_singleton_model(TeamTesterStatus::mock);
     app.add_singleton_model(|_| UserProfiles::new(vec![]));
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());
     app.add_singleton_model(|_| ActiveSession::default());
@@ -87,11 +84,7 @@ fn initialize_app(app: &mut App) -> TestState {
     app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
 
     let (sender, receiver) = mpsc::sync_channel(10);
-    let objects_client = ServerApiProvider::new_for_test().get_cloud_objects_client();
-    let sync_queue = app
-        .add_singleton_model(|ctx| SyncQueue::new(Default::default(), objects_client.clone(), ctx));
-    app.add_singleton_model(|ctx| UpdateManager::new(Some(sender), objects_client.clone(), ctx));
-    sync_queue.update(app, |queue, ctx| queue.start_dequeueing(ctx));
+    app.add_singleton_model(|_| UpdateManager::new(Some(sender)));
 
     app.add_singleton_model(CloudViewModel::mock);
     let manager = app.add_singleton_model(NotebookManager::mock);

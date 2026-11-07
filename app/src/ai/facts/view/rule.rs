@@ -20,13 +20,11 @@ use warpui::{
     ViewHandle,
 };
 
-use super::{is_edit_allowed, is_syncing, style, AIFact, CloudAIFact, CloudAIFactModel};
+use super::{style, AIFact, CloudAIFact, CloudAIFactModel};
 use crate::ai::facts::AIMemory;
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
-use crate::cloud_object::{
-    CloudObject, GenericStringObjectFormat, JsonObjectType, Owner, Revision,
-};
+use crate::cloud_object::{CloudObject, GenericStringObjectFormat, JsonObjectType, Owner};
 use crate::drive::CloudObjectTypeAndId;
 use crate::editor::{
     EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys, SingleLineEditorOptions,
@@ -36,7 +34,6 @@ use crate::network::NetworkStatus;
 use crate::search_bar::SearchBar;
 use crate::server::cloud_objects::update_manager::{UpdateManager, UpdateManagerEvent};
 use crate::server::ids::{ClientId, SyncId};
-use crate::server::sync_queue::SyncQueue;
 use crate::settings::{AISettings, AISettingsChangedEvent};
 use crate::ui_components::icons::Icon;
 use crate::util::path::display_path_with_host;
@@ -320,9 +317,8 @@ impl RuleView {
         event: &UpdateManagerEvent,
         ctx: &mut ViewContext<Self>,
     ) {
-        if let UpdateManagerEvent::ObjectOperationComplete { .. } = event {
-            self.fetch_ai_rules(ctx);
-        }
+        let UpdateManagerEvent::ObjectOperationComplete { .. } = event;
+        self.fetch_ai_rules(ctx);
     }
 
     fn handle_cloud_model_event(&mut self, event: &CloudModelEvent, ctx: &mut ViewContext<Self>) {
@@ -413,7 +409,6 @@ impl RuleView {
         name: Option<String>,
         content: String,
         sync_id: SyncId,
-        revision_ts: Option<Revision>,
         ctx: &mut ViewContext<Self>,
     ) {
         let update_manager = UpdateManager::handle(ctx);
@@ -435,7 +430,7 @@ impl RuleView {
                 content,
                 suggested_logging_id,
             });
-            update_manager.update_ai_fact(ai_fact, sync_id, revision_ts, ctx);
+            update_manager.update_ai_fact(ai_fact, sync_id, ctx);
         });
     }
 
@@ -668,19 +663,10 @@ impl RuleView {
         &self,
         ai_row: CloudRuleRow,
         appearance: &Appearance,
-        app: &AppContext,
     ) -> Option<Box<dyn Element>> {
-        // Don't show icon if the syncing is in progress.
-        if is_syncing(ai_row.fact.clone(), app) {
-            return None;
-        }
-
         let item = ai_row.fact.to_warp_drive_item(appearance)?;
-        let icon = item.sync_status_icon(
-            SyncQueue::as_ref(app).is_dequeueing(),
-            ai_row.mouse_states.sync_status_icon.clone(),
-            appearance,
-        )?;
+        let icon =
+            item.sync_status_icon(ai_row.mouse_states.sync_status_icon.clone(), appearance)?;
 
         Some(
             Hoverable::new(ai_row.mouse_states.sync_status_hover.clone(), |state| {
@@ -758,7 +744,6 @@ impl RuleView {
         &self,
         ai_row: CloudRuleRow,
         appearance: &Appearance,
-        app: &AppContext,
     ) -> Box<dyn Element> {
         let AIFact::Memory(AIMemory { name, content, .. }) =
             ai_row.fact.model().string_model.clone();
@@ -807,15 +792,13 @@ impl RuleView {
             .with_main_axis_size(MainAxisSize::Max)
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween);
 
-        if let Some(sync_status_icon) =
-            self.render_sync_status_icon(ai_row.clone(), appearance, app)
-        {
+        if let Some(sync_status_icon) = self.render_sync_status_icon(ai_row.clone(), appearance) {
             row.add_child(sync_status_icon);
         }
 
         row.add_child(Expanded::new(1., fact_text).finish());
 
-        let mut hoverable = Hoverable::new(ai_row.mouse_states.hover.clone(), |state| {
+        let hoverable = Hoverable::new(ai_row.mouse_states.hover.clone(), |state| {
             let mut bg_color = internal_colors::neutral_1(appearance.theme());
             if state.is_hovered() {
                 bg_color = internal_colors::neutral_4(appearance.theme());
@@ -836,15 +819,12 @@ impl RuleView {
                 .finish()
         });
 
-        if is_edit_allowed(ai_row.fact.clone(), app) {
-            hoverable = hoverable
-                .with_cursor(Cursor::PointingHand)
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(RuleViewAction::Edit(ai_row.fact.sync_id()));
-                });
-        }
-
-        hoverable.finish()
+        hoverable
+            .with_cursor(Cursor::PointingHand)
+            .on_click(move |ctx, _, _| {
+                ctx.dispatch_typed_action(RuleViewAction::Edit(ai_row.fact.sync_id()));
+            })
+            .finish()
     }
 
     fn render_items(
@@ -870,7 +850,7 @@ impl RuleView {
         for row in filtered_rules {
             let row = match row {
                 RuleRow::Global(global_row) => {
-                    Some(self.render_global_rule_row(*global_row, appearance, app))
+                    Some(self.render_global_rule_row(*global_row, appearance))
                 }
                 RuleRow::FileBacked(file_row) => self.render_file_backed_row(file_row, appearance),
             };

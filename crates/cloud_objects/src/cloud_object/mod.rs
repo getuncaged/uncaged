@@ -281,7 +281,7 @@ impl Revision {
         self.0
     }
 
-    #[cfg(any(test, feature = "test-util"))]
+    /// A revision for an edit made now.
     pub fn now() -> Self {
         Self(ServerTimestamp::new(Utc::now()))
     }
@@ -444,7 +444,6 @@ pub enum CloudObjectSyncStatus {
 
 const SYNC_ICON_DIMENSIONS: f32 = 16.;
 
-const SYNC_STATUS_TOOLTIP_LOCAL_ONLY: &str = "Saved locally";
 const SYNC_STATUS_TOOLTIP_INFLIGHT: &str = "Saving";
 const SYNC_STATUS_TOOLTIP_ERROR: &str = "Failed to save";
 
@@ -715,7 +714,6 @@ impl CloudObjectStatuses {
 
     pub fn render_icon(
         &self,
-        sync_queue_is_dequeueing: bool,
         hover_state: MouseStateHandle,
         appearance: &Appearance,
     ) -> Option<Box<dyn Element>> {
@@ -725,7 +723,6 @@ impl CloudObjectStatuses {
             _ => false,
         };
 
-        let should_show_local_only_indicator = has_in_flight_requests && !sync_queue_is_dequeueing;
         let should_show_syncing_indicator = has_in_flight_requests
             || self.has_pending_metadata_change
             || self.has_pending_permissions_change
@@ -735,12 +732,7 @@ impl CloudObjectStatuses {
             CloudObjectSyncStatus::Errored | CloudObjectSyncStatus::InConflict
         );
 
-        let icon_and_tooltip_text = if should_show_local_only_indicator {
-            Some((
-                Icon::Laptop.to_warpui_icon(theme.main_text_color(theme.surface_1())),
-                SYNC_STATUS_TOOLTIP_LOCAL_ONLY,
-            ))
-        } else if should_show_syncing_indicator {
+        let icon_and_tooltip_text = if should_show_syncing_indicator {
             Some((
                 Icon::Refresh.to_warpui_icon(theme.sub_text_color(theme.surface_2())),
                 SYNC_STATUS_TOOLTIP_INFLIGHT,

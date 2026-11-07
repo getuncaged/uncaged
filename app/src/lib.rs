@@ -248,7 +248,6 @@ use crate::projects::ProjectManagementModel;
 use crate::root_view::{
     quake_mode_window_id, quake_mode_window_is_open, OpenFromRestoredArg, OpenPath,
 };
-use crate::server::cloud_objects::listener::Listener;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::sync_queue::{QueueItem, SyncQueue};
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
@@ -273,7 +272,6 @@ use crate::workflows::local_workflows::LocalWorkflows;
 use crate::workspace::{
     ActiveSession, OneTimeModalModel, PaneViewLocator, ToastStack, Workspace, WorkspaceAction,
 };
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_profiles::UserProfiles;
 
 /// Our embedded application assets.
@@ -1251,16 +1249,7 @@ pub(crate) fn initialize_app(
 
     ctx.add_singleton_model(|_| AudibleBell::new());
 
-    // This model has to be registered before the UpdateManager models because they rely on it.
-    ctx.add_singleton_model(TeamTesterStatus::new);
-
-    ctx.add_singleton_model(|ctx| {
-        UpdateManager::new(
-            persistence_writer.sender(),
-            server_api_provider.as_ref(ctx).get_cloud_objects_client(),
-            ctx,
-        )
-    });
+    ctx.add_singleton_model(|_| UpdateManager::new(persistence_writer.sender()));
 
     // LogManager must be registered before any subsystem (e.g. MCP, LSP) that creates file-based loggers.
     ctx.add_singleton_model(|_| simple_logger::manager::LogManager::new());
@@ -1287,19 +1276,15 @@ pub(crate) fn initialize_app(
 
     // MCPGalleryManager subscribes to UpdateManager so that it can be notified when gallery items are updated.
     // The registration of this singleton must be after UpdateManager is registered.
-    ctx.add_singleton_model(MCPGalleryManager::new);
+    ctx.add_singleton_model(|_| MCPGalleryManager::default());
 
     // SkillManager is used to cache SKILL.md files for all active terminal views and their working directories
     ctx.add_singleton_model(SkillManager::new);
 
-    // CloudViewModel subscribes to UpdateManager so that it can be notified when objects are
-    // created on the server.
     ctx.add_singleton_model(CloudViewModel::new);
 
-    // AIDocumentModel subscribes to UpdateManager so that it can be notified when notebooks are created on the server.
     ctx.add_singleton_model(AIDocumentModel::new);
 
-    // AgentConversationsModel subscribes to UpdateManager for RTC task updates.
     ctx.add_singleton_model(AgentConversationsModel::new);
 
     ctx.add_singleton_model(ExportManager::new);
@@ -1309,12 +1294,6 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(NotebookKeybindings::new);
     ctx.add_singleton_model(TerminalKeybindings::new);
     ctx.add_singleton_model(|_| ActiveSession::default());
-    ctx.add_singleton_model(|ctx| {
-        Listener::new(
-            server_api_provider.as_ref(ctx).get_cloud_objects_client(),
-            ctx,
-        )
-    });
 
     #[cfg(all(not(target_family = "wasm"), feature = "local_tty"))]
     {
@@ -1375,8 +1354,8 @@ pub(crate) fn initialize_app(
     // Add a singleton model for resizable modals whose size should be persisted through restarts.
     ctx.add_singleton_model(|_| ResizableData::default());
 
-    ctx.add_singleton_model(EnvVarCollectionManager::new);
-    ctx.add_singleton_model(WorkflowManager::new);
+    ctx.add_singleton_model(|_| EnvVarCollectionManager::default());
+    ctx.add_singleton_model(|_| WorkflowManager::default());
 
     AutoupdateState::register(ctx, server_api.clone());
 

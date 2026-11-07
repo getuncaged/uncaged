@@ -162,7 +162,6 @@ impl ImportedNode {
         appearance: &Appearance,
         indent_level: usize,
         allow_click_to_open_target: bool,
-        sync_queue_dequeueing: bool,
         folder_id_to_node: &HashMap<FolderId, FolderNode>,
         file_id_to_node: &HashMap<FileId, FileNode>,
     ) -> Box<dyn Element> {
@@ -171,7 +170,6 @@ impl ImportedNode {
                 let file_node = file_id_to_node.get(file_id).expect("Should exist");
                 file_node.render(
                     indent_level,
-                    sync_queue_dequeueing,
                     allow_click_to_open_target,
                     *file_id,
                     appearance,
@@ -180,7 +178,6 @@ impl ImportedNode {
             ImportedNode::Folder(folder_id) => {
                 let folder_node = folder_id_to_node.get(folder_id).expect("Should exist");
                 folder_node.render(
-                    sync_queue_dequeueing,
                     appearance,
                     indent_level,
                     allow_click_to_open_target,
@@ -257,23 +254,6 @@ impl FolderNode {
         format!("{}({})", self.name.clone(), children_string)
     }
 
-    fn are_children_saved_locally(
-        &self,
-        folder_id_to_node: &HashMap<FolderId, FolderNode>,
-        file_id_to_node: &HashMap<FileId, FileNode>,
-    ) -> bool {
-        self.children.iter().all(|node| match node {
-            ImportedNode::File(file_id) => file_id_to_node
-                .get(file_id)
-                .map(|file_node| file_node.status.is_saved_locally())
-                .unwrap_or(true),
-            ImportedNode::Folder(folder_id) => folder_id_to_node
-                .get(folder_id)
-                .map(|folder_node| folder_node.status.is_loaded())
-                .unwrap_or(true),
-        })
-    }
-
     // Check if the folder is loaded. This is true if all of its children are loaded.
     fn are_children_loaded(
         &self,
@@ -310,7 +290,6 @@ impl FolderNode {
 
     fn render(
         &self,
-        sync_queue_dequeueing: bool,
         appearance: &Appearance,
         indent_level: usize,
         allow_click_to_open_target: bool,
@@ -318,9 +297,7 @@ impl FolderNode {
         file_id_to_node: &HashMap<FileId, FileNode>,
     ) -> Box<dyn Element> {
         let override_color = self.status.override_text_color(appearance);
-        let status_icon = self
-            .status
-            .render_status_icon(sync_queue_dequeueing, appearance);
+        let status_icon = self.status.render_status_icon(appearance);
 
         let icon_color =
             override_color.unwrap_or(warp_drive_icon_color(appearance, DriveObjectType::Folder));
@@ -377,7 +354,6 @@ impl FolderNode {
                 appearance,
                 indent_level + 1,
                 allow_click_to_open_target,
-                sync_queue_dequeueing,
                 folder_id_to_node,
                 file_id_to_node,
             ));
@@ -421,17 +397,12 @@ impl TryFrom<&Path> for FileType {
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum UploadStatus {
     Loading,
-    SavedLocally,
     Loaded(String),
     Error(String),
 }
 
 impl UploadStatus {
     pub(super) fn is_loaded(&self) -> bool {
-        !matches!(&self, Self::Loading | Self::SavedLocally)
-    }
-
-    pub(super) fn is_saved_locally(&self) -> bool {
         !matches!(&self, Self::Loading)
     }
 
@@ -447,20 +418,9 @@ impl UploadStatus {
         }
     }
 
-    fn render_status_icon(
-        &self,
-        sync_queue_dequeueing: bool,
-        appearance: &Appearance,
-    ) -> Box<dyn Element> {
+    fn render_status_icon(&self, appearance: &Appearance) -> Box<dyn Element> {
         let status_icon_element = match &self {
-            UploadStatus::SavedLocally if !sync_queue_dequeueing => Icon::Laptop
-                .to_warpui_icon(
-                    appearance
-                        .theme()
-                        .sub_text_color(appearance.theme().surface_1()),
-                )
-                .finish(),
-            UploadStatus::Loading | UploadStatus::SavedLocally => Icon::Refresh
+            UploadStatus::Loading => Icon::Refresh
                 .to_warpui_icon(
                     appearance
                         .theme()
@@ -526,23 +486,14 @@ impl FileNode {
         self.file_type
     }
 
-    pub(super) fn saved_locally(&mut self) {
-        if !self.status.is_loaded() {
-            self.status = UploadStatus::SavedLocally;
-        }
-    }
-
     fn render(
         &self,
         indent_level: usize,
-        sync_queue_dequeueing: bool,
         allow_click_to_open_target: bool,
         file_id: FileId,
         appearance: &Appearance,
     ) -> Box<dyn Element> {
-        let status_icon = self
-            .status
-            .render_status_icon(sync_queue_dequeueing, appearance);
+        let status_icon = self.status.render_status_icon(appearance);
 
         let override_color = self.status.override_text_color(appearance);
 
@@ -795,13 +746,6 @@ impl FileUploadState {
             .expect("Root node should exist")
             .status
             .is_loaded()
-    }
-
-    pub(super) fn all_files_saved_locally(&self) -> bool {
-        self.folder_id_to_node
-            .get(&FolderId::root_id())
-            .expect("Root node should exist")
-            .are_children_saved_locally(&self.folder_id_to_node, &self.file_id_to_node)
     }
 
     /// This recursively updates the upstream folder to be loading.

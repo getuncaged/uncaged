@@ -14,16 +14,11 @@ use warpui::{
 };
 
 use super::{AIFact, CloudAIFact, CloudAIFactModel};
-use crate::cloud_object::{
-    CloudObject, CloudObjectSyncStatus, GenericStringObjectFormat, JsonObjectType,
-};
-use crate::drive::CloudObjectTypeAndId;
 use crate::network::NetworkStatus;
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::server::ids::SyncId;
-use crate::server::sync_queue::SyncQueue;
 use crate::ui_components::icons::Icon;
 
 pub mod rule;
@@ -155,16 +150,9 @@ impl AIFactView {
                 name,
                 content,
                 sync_id,
-                revision_ts,
             } => {
                 self.rule_view.update(ctx, |rule_view, ctx| {
-                    rule_view.edit_ai_rule(
-                        name.clone(),
-                        content.clone(),
-                        *sync_id,
-                        revision_ts.clone(),
-                        ctx,
-                    );
+                    rule_view.edit_ai_rule(name.clone(), content.clone(), *sync_id, ctx);
                 });
             }
             RuleEditorViewEvent::Delete { sync_id } => {
@@ -336,35 +324,4 @@ impl BackingView for AIFactView {
 
 pub fn is_online(app: &AppContext) -> bool {
     NetworkStatus::as_ref(app).is_online()
-}
-
-pub fn is_delete_allowed(ai_fact: CloudAIFact, app: &AppContext) -> bool {
-    let cloud_object_type_and_id = CloudObjectTypeAndId::GenericStringObject {
-        object_type: GenericStringObjectFormat::Json(JsonObjectType::AIFact),
-        id: ai_fact.sync_id(),
-    };
-    is_online(app)
-        && cloud_object_type_and_id.has_server_id()
-        && !ai_fact.metadata().has_pending_online_only_change()
-}
-
-pub fn is_edit_allowed(ai_fact: CloudAIFact, app: &AppContext) -> bool {
-    let cloud_object_type_and_id = CloudObjectTypeAndId::GenericStringObject {
-        object_type: GenericStringObjectFormat::Json(JsonObjectType::AIFact),
-        id: ai_fact.sync_id(),
-    };
-    is_online(app) || !cloud_object_type_and_id.has_server_id()
-}
-
-pub fn is_syncing(ai_fact: CloudAIFact, app: &AppContext) -> bool {
-    let sync_queue_is_dequeueing = SyncQueue::as_ref(app).is_dequeueing();
-    let sync_status = &ai_fact.metadata().pending_changes_statuses;
-    let has_in_flight_requests = matches!(
-        &sync_status.content_sync_status,
-        CloudObjectSyncStatus::InFlight(reqs) if reqs.0 > 0
-    );
-    (has_in_flight_requests && sync_queue_is_dequeueing)
-        || sync_status.has_pending_metadata_change
-        || sync_status.has_pending_permissions_change
-        || sync_status.pending_untrash
 }

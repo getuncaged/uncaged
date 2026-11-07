@@ -22,7 +22,6 @@ use super::queue::{ImportQueue, ImportQueueArgs, ImportQueueEvent, ParentId, Req
 use crate::appearance::Appearance;
 use crate::cloud_object::Owner;
 use crate::server::ids::{ClientId, SyncId};
-use crate::server::sync_queue::SyncQueue;
 use crate::ui_components::icons::Icon;
 use crate::view_components::DismissibleToast;
 use crate::workspace::ToastStack;
@@ -74,7 +73,6 @@ pub enum ImportModalBodyAction {
 pub enum ImportModalBodyEvent {
     OpenFilePicker,
     UploadCompleted,
-    AllFileSavedLocally,
     UploadSelected,
     OpenTargetWithHashedId(String),
 }
@@ -95,7 +93,7 @@ pub struct ImportModalBody {
 
 impl ImportModalBody {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
-        let import_queue = ctx.add_model(ImportQueue::new);
+        let import_queue = ctx.add_model(|_| ImportQueue::default());
         ctx.subscribe_to_model(&import_queue, |me, _, event, ctx| {
             me.handle_import_queue_event(event, ctx)
         });
@@ -115,47 +113,22 @@ impl ImportModalBody {
         // Only handle event when path is expanded.
         if let ImportState::PathExpanded(state) = &mut self.state {
             match event {
-                ImportQueueEvent::FileCompleted { file_id, server_id } => {
-                    let result = match server_id {
-                        Some(id) => UploadResult::Success(id.clone()),
-                        None => UploadResult::Error("Failed to upload file to server".to_string()),
-                    };
-
+                ImportQueueEvent::FileCompleted { file_id, uid } => {
                     // Update the upstream folder status with the upload success state.
-                    if state.update_tree_with_file_upload_result(result, *file_id) {
+                    if state.update_tree_with_file_upload_result(
+                        UploadResult::Success(uid.clone()),
+                        *file_id,
+                    ) {
                         ctx.notify();
                     }
                 }
-                ImportQueueEvent::FolderCompleted {
-                    folder_id,
-                    server_id,
-                } => {
-                    let result = match server_id {
-                        Some(id) => UploadResult::Success(id.clone()),
-                        None => {
-                            UploadResult::Error("Failed to upload folder to server".to_string())
-                        }
-                    };
-
-                    state.mark_folder_synced(result, *folder_id);
-                    ctx.notify();
-                }
-                ImportQueueEvent::FileSavedLocally(file_id) => {
-                    let file_node = state
-                        .file_id_to_node
-                        .get_mut(file_id)
-                        .expect("File node should exist");
-
-                    file_node.saved_locally();
+                ImportQueueEvent::FolderCompleted { folder_id, uid } => {
+                    state.mark_folder_synced(UploadResult::Success(uid.clone()), *folder_id);
                     ctx.notify();
                 }
             }
 
-            let sync_queue_dequeueing = SyncQueue::as_ref(ctx).is_dequeueing();
-
-            if !sync_queue_dequeueing && state.all_files_saved_locally() {
-                ctx.emit(ImportModalBodyEvent::AllFileSavedLocally);
-            } else if state.is_complete() {
+            if state.is_complete() {
                 ctx.emit(ImportModalBodyEvent::UploadCompleted);
             }
         }
@@ -175,16 +148,9 @@ impl ImportModalBody {
 
     // Whether there is an active upload in progress (If all uploads are completed,
     // we don't consider the import modal upload to be in progress).
-    pub fn upload_in_progress(&self, app: &AppContext) -> bool {
-        let sync_queue_dequeueing = SyncQueue::as_ref(app).is_dequeueing();
-
+    pub fn upload_in_progress(&self) -> bool {
         match &self.state {
             ImportState::Upload => false,
-            ImportState::PathExpanded(state)
-                if !sync_queue_dequeueing && state.all_files_saved_locally() =>
-            {
-                false
-            }
             ImportState::PathExpanded(state) if state.is_complete() => false,
             _ => true,
         }
@@ -457,7 +423,6 @@ impl ImportModalBody {
     fn render_loaded_state(
         &self,
         file_upload_state: &FileUploadState,
-        sync_queue_dequeueing: bool,
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         let mut column = Flex::column();
@@ -473,7 +438,6 @@ impl ImportModalBody {
                 appearance,
                 0,
                 file_upload_state.is_complete(),
-                sync_queue_dequeueing,
                 folder_id_to_node,
                 file_id_to_node,
             ));
@@ -497,16 +461,13 @@ impl View for ImportModalBody {
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
-        let sync_queue_dequeueing = SyncQueue::as_ref(app).is_dequeueing();
         let appearance = Appearance::as_ref(app);
 
         match &self.state {
             ImportState::Upload | ImportState::Loading | ImportState::PathLoaded => {
                 self.render_upload_state(appearance)
             }
-            ImportState::PathExpanded(paths) => {
-                self.render_loaded_state(paths, sync_queue_dequeueing, appearance)
-            }
+            ImportState::PathExpanded(paths) => self.render_loaded_state(paths, appearance),
         }
     }
 }

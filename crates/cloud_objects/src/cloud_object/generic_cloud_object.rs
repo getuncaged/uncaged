@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::{
     CloudObjectMetadata, CloudObjectPermissions, CloudObjectStatuses, CloudObjectSyncStatus,
-    ConflictStatus, GenericServerObject, NumInFlightRequests, ObjectType, Owner,
+    ConflictStatus, GenericServerObject, ObjectType, Owner, Revision,
 };
 use crate::ids::{ClientId, SyncId};
 
@@ -93,7 +93,8 @@ impl<K, M> GenericCloudObject<K, M> {
     }
 
     /// Creates a new GenericCloudObject with the given model, owner, and initial folder id.
-    /// This is for the local creation flow, as opposed to creating from a server update.
+    /// This is for the local creation flow, as opposed to creating from a server update. The
+    /// object is complete as created: it has no changes waiting to be saved anywhere else.
     pub fn new_local(
         model: M,
         owner: Owner,
@@ -105,14 +106,14 @@ impl<K, M> GenericCloudObject<K, M> {
             model: model.into(),
             metadata: CloudObjectMetadata {
                 pending_changes_statuses: CloudObjectStatuses {
-                    content_sync_status: CloudObjectSyncStatus::InFlight(NumInFlightRequests(1)),
+                    content_sync_status: CloudObjectSyncStatus::NoLocalChanges,
                     has_pending_metadata_change: false,
                     has_pending_permissions_change: false,
                     pending_untrash: false,
                     pending_delete: false,
                 },
                 folder_id: initial_folder_id,
-                revision: Default::default(),
+                revision: Some(Revision::now()),
                 metadata_last_updated_ts: Default::default(),
                 current_editor_uid: Default::default(),
                 trashed_ts: Default::default(),

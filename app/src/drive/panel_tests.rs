@@ -15,7 +15,6 @@ use crate::server::sync_queue::SyncQueue;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::terminal::resizable_data::ResizableData;
 use crate::test_util::settings::initialize_settings_for_tests;
-use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::{ObjectActions, ASSETS};
 
 fn initialize_app(app: &mut App) {
@@ -26,8 +25,7 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| Appearance::mock());
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(|_| ResizableData::default());
-    app.add_singleton_model(TeamTesterStatus::mock);
-    app.add_singleton_model(UpdateManager::mock);
+    app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(CloudViewModel::mock);
     app.add_singleton_model(|_| ObjectActions::new(Vec::new()));
     app.add_singleton_model(|_| ServerApiProvider::new_for_test());

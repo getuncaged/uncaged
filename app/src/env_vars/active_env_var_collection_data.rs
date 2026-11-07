@@ -10,7 +10,7 @@ use crate::env_vars::CloudEnvVarCollection;
 use crate::server::cloud_objects::update_manager::{
     ObjectOperation, OperationSuccessType, UpdateManagerEvent,
 };
-use crate::server::ids::{ClientId, ServerId, SyncId};
+use crate::server::ids::{ClientId, SyncId};
 use crate::{AppContext, CloudModel, UpdateManager};
 
 #[derive(Default, Clone)]
@@ -76,75 +76,44 @@ impl ActiveEnvVarCollectionData {
     ) {
         let cloud_model = CloudModel::as_ref(ctx);
 
-        let UpdateManagerEvent::ObjectOperationComplete { result } = event else {
+        let UpdateManagerEvent::ObjectOperationComplete { result } = event;
+
+        if result.success_type != OperationSuccessType::Success
+            || result.id.is_none()
+            || self.id() != result.id
+        {
             return;
-        };
+        }
 
-        match (&result.operation, &result.success_type) {
-            (ObjectOperation::Create { .. }, OperationSuccessType::Success) => {
-                if let Some(current_id) = self.id() {
-                    if current_id.into_client() == result.client_id {
-                        let server_id = result.server_id.expect("Expect server id on success");
-                        let env_var_collection_id = SyncId::ServerId(server_id);
-
-                        if let Some(env_var_collection) =
-                            cloud_model.get_env_var_collection(&env_var_collection_id)
-                        {
-                            self.saving_status = SavingStatus::Saved;
-                            self.active_env_var_collection =
-                                ActiveEnvVarCollection::CommittedEnvVarCollection(
-                                    env_var_collection_id,
-                                );
-                            self.revision_ts
-                                .clone_from(&env_var_collection.metadata.revision);
-                            ctx.emit(ActiveEnvVarCollectionDataEvent::CreatedOnServer(server_id));
-                            ctx.notify();
-                        }
+        match &result.operation {
+            ObjectOperation::Create { .. } | ObjectOperation::Update => {
+                let Some(env_var_collection_id) = result.id else {
+                    return;
+                };
+                if let Some(env_var_collection) =
+                    cloud_model.get_env_var_collection(&env_var_collection_id)
+                {
+                    self.saving_status = SavingStatus::Saved;
+                    self.active_env_var_collection =
+                        ActiveEnvVarCollection::CommittedEnvVarCollection(env_var_collection_id);
+                    self.revision_ts
+                        .clone_from(&env_var_collection.metadata.revision);
+                    if matches!(result.operation, ObjectOperation::Create { .. }) {
+                        ctx.emit(ActiveEnvVarCollectionDataEvent::Created);
                     }
+                    ctx.notify();
                 }
             }
-            (ObjectOperation::Update, OperationSuccessType::Success) => {
-                if let Some(current_id) = self.id() {
-                    // If we match on a non-None client id or a non-None server id then
-                    // update the data
-                    if (current_id.into_client().is_some()
-                        && current_id.into_client() == result.client_id)
-                        || (current_id.into_server().is_some()
-                            && current_id.into_server() == result.server_id)
-                    {
-                        let server_id = result.server_id.expect("Expect server id on success");
-                        let env_var_collection_id = SyncId::ServerId(server_id);
-                        if let Some(env_var_collection) =
-                            cloud_model.get_env_var_collection(&env_var_collection_id)
-                        {
-                            self.saving_status = SavingStatus::Saved;
-                            self.active_env_var_collection =
-                                ActiveEnvVarCollection::CommittedEnvVarCollection(
-                                    env_var_collection_id,
-                                );
-
-                            self.revision_ts
-                                .clone_from(&env_var_collection.metadata.revision);
-
-                            ctx.notify();
-                        }
-                    }
-                }
+            ObjectOperation::Trash | ObjectOperation::Untrash => {
+                ctx.emit(ActiveEnvVarCollectionDataEvent::TrashStatusChanged);
             }
-            (ObjectOperation::Trash, OperationSuccessType::Success)
-            | (ObjectOperation::Untrash, OperationSuccessType::Success) => {
-                let server_id = result.server_id.expect("Expect server id on success");
-                if let Some(current_id) = self.id() {
-                    if current_id.into_client() == result.client_id
-                        && cloud_model
-                            .get_env_var_collection(&SyncId::ServerId(server_id))
-                            .is_some()
-                    {
-                        ctx.emit(ActiveEnvVarCollectionDataEvent::TrashStatusChanged);
-                    }
-                }
-            }
-            _ => {}
+            ObjectOperation::MoveToFolder
+            | ObjectOperation::MoveToDrive
+            | ObjectOperation::TakeEditAccess
+            | ObjectOperation::Delete { .. }
+            | ObjectOperation::EmptyTrash
+            | ObjectOperation::UpdatePermissions
+            | ObjectOperation::Leave => {}
         }
     }
 
@@ -295,8 +264,8 @@ pub enum TrashStatus {
 pub enum ActiveEnvVarCollectionDataEvent {
     /// The EVC's breadcrumbs were updated.
     BreadcrumbsChanged,
-    /// The EVC was synced to the server for the first time.
-    CreatedOnServer(ServerId),
+    /// The EVC was saved to Warp Drive for the first time.
+    Created,
     /// The EVC was trashed or untrashed
     /// (used for refreshing the pane overflow items)
     TrashStatusChanged,

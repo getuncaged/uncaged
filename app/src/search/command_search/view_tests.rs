@@ -4,14 +4,12 @@ use warpui::App;
 use super::*;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::network::NetworkStatus;
-use crate::server::cloud_objects::listener::Listener;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::system::SystemStats;
 use crate::test_util::settings::initialize_settings_for_tests;
-use crate::workspaces::team_tester::TeamTesterStatus;
 
 fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);
@@ -21,9 +19,7 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| SystemStats::new());
     app.add_singleton_model(SyncQueue::mock);
     app.add_singleton_model(CloudModel::mock);
-    app.add_singleton_model(TeamTesterStatus::mock);
-    app.add_singleton_model(Listener::mock);
-    app.add_singleton_model(UpdateManager::mock);
+    app.add_singleton_model(|_| UpdateManager::new(None));
     app.add_singleton_model(|_| Appearance::mock());
     app.add_singleton_model(|_| ResizableData::default());
     app.add_singleton_model(|_| KeybindingChangedNotifier::mock());

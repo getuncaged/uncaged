@@ -75,15 +75,13 @@ impl WarpDriveItem for WarpDriveFolder {
 
     fn sync_status_icon(
         &self,
-        sync_queue_is_dequeueing: bool,
         hover_state: MouseStateHandle,
         appearance: &Appearance,
     ) -> Option<Box<dyn Element>> {
-        self.folder.metadata.pending_changes_statuses.render_icon(
-            sync_queue_is_dequeueing,
-            hover_state,
-            appearance,
-        )
+        self.folder
+            .metadata
+            .pending_changes_statuses
+            .render_icon(hover_state, appearance)
     }
 
     fn action_summary(&self, _app: &AppContext) -> Option<String> {
