@@ -40,20 +40,6 @@ use crate::terminal::view::RichContentSecretTooltipInfo;
 use crate::ui_sources::PaletteSource;
 use crate::workflows::workflow::Workflow;
 
-/// Version of the agent onboarding flow (non-legacy).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AgentOnboardingVersion {
-    AgentModality {
-        has_project: bool,
-        intention: OnboardingIntention,
-    },
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum OnboardingVersion {
-    Agent(AgentOnboardingVersion),
-}
-
 /// This represents whether entering a subshell for a particular command should become automatic in
 /// the future, or to ask again.
 #[derive(Clone, Debug)]
@@ -280,7 +266,6 @@ pub enum TerminalAction {
     AliasExpansionBanner(AliasExpansionBannerAction),
     OpenInWarpBanner(OpenInWarpBannerAction),
     OpenBlockFilterEditor(BlockIndex),
-    OnboardingFlow(OnboardingVersion),
     ImportSettings,
     ToggleBlockFilterOnSelectedOrLastBlock,
     VimModeBanner(VimModeBannerAction),
@@ -567,7 +552,6 @@ impl fmt::Debug for TerminalAction {
             OpenBlockFilterEditor(block_index) => {
                 write!(f, "OpenBlockFilterEditor({block_index:?})")
             }
-            OnboardingFlow(version) => write!(f, "OnboardingFlow({version:?})"),
             ImportSettings => write!(f, "ImportSettings"),
             ToggleBlockFilterOnSelectedOrLastBlock => {
                 f.write_str("ToggleBlockFilterOnSelectedOrLastBlock")

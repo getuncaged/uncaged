@@ -1,7 +1,6 @@
 // Onboarding library crate
 
 mod agent_onboarding_view;
-pub mod callout;
 mod model;
 pub mod slides;
 
@@ -11,8 +10,6 @@ pub enum OnboardingIntention {
     Terminal,
     AgentDrivenDevelopment,
 }
-
-pub use callout::{OnboardingCalloutView, OnboardingKeybindings};
 
 /// User-facing descriptions of the AI features enabled when the agent intention is selected.
 /// Shared by the intention slide's agent card checklist and the login slide's
@@ -51,5 +48,4 @@ pub use slides::{
 
 pub fn init(app: &mut warpui_core::AppContext) {
     agent_onboarding_view::init(app);
-    callout::init(app);
 }

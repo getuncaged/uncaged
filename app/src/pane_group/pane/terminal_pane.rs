@@ -890,9 +890,6 @@ fn handle_terminal_view_event(
             Event::TerminalViewStateChanged => {
                 ctx.emit(pane_group::Event::TerminalViewStateChanged);
             }
-            Event::OnboardingTutorialCompleted => {
-                ctx.emit(pane_group::Event::OnboardingTutorialCompleted);
-            }
             Event::OpenWorkflowModalWithCommand(command) => {
                 ctx.emit(pane_group::Event::OpenWorkflowModalWithCommand(
                     command.clone(),

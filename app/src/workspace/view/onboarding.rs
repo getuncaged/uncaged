@@ -7,12 +7,9 @@ use warp_core::execution_mode::AppExecutionMode;
 use warpui::{SingletonEntity as _, ViewContext};
 
 use crate::pane_group::{NewTerminalOptions, PanesLayout};
-use crate::settings::AISettings;
-use crate::terminal::view::{
-    AgentOnboardingVersion, OnboardingIntention, OnboardingVersion, TerminalAction,
-};
+use crate::terminal::view::OnboardingIntention;
 use crate::workspace::Workspace;
-use crate::{terminal, FeatureFlag};
+use crate::FeatureFlag;
 
 /// Configuration for starting the agent onboarding tutorial.
 #[derive(Debug, Clone)]
@@ -78,12 +75,13 @@ impl From<SelectedSettings> for OnboardingTutorial {
 }
 
 impl Workspace {
-    /// Start the agent onboarding tutorial.
+    /// Opens the project picked during onboarding. The guided tutorial that used to follow never
+    /// ran in Uncaged, so only the project is opened.
     ///
     /// Depending on the variant of `tutorial`, this will either:
-    /// - `NoProject`: Start the tutorial immediately without any project context
-    /// - `Project`: Change to the project directory and start the tutorial
-    /// - `InitProject`: Open the repository, wait for init to complete, then start the tutorial
+    /// - `NoProject`: Do nothing
+    /// - `Project`: Open a terminal in the project directory
+    /// - `InitProject`: Open the repository, which creates a new terminal and runs init
     pub(crate) fn start_agent_onboarding_tutorial(
         &mut self,
         tutorial: OnboardingTutorial,
@@ -96,39 +94,18 @@ impl Workspace {
         }
 
         match tutorial {
-            OnboardingTutorial::InitProject {
-                ref path,
-                intention,
-            } => {
-                // Open the repository - this will create a new terminal and trigger init
+            OnboardingTutorial::InitProject { ref path, .. } => {
                 let Some(path_str) = path.to_str() else {
                     log::error!("Failed to convert path to string: {path:?}");
                     return;
                 };
                 self.handle_open_repository(path_str, ctx);
-
-                // Subscribe to the terminal view to wait for init completion
-                if let Some(terminal_view_handle) = self.active_session_view(ctx) {
-                    ctx.subscribe_to_view(
-                        &terminal_view_handle,
-                        move |me, terminal_view, event, ctx| {
-                            if let terminal::Event::OnboardingInitCompleted = event {
-                                // Init flow is complete, now start the tutorial
-                                me.dispatch_agent_onboarding_tutorial(true, intention, ctx);
-                                ctx.unsubscribe_to_view(&terminal_view);
-                            }
-                        },
-                    );
-                }
             }
-            OnboardingTutorial::Project {
-                ref path,
-                intention,
-            } => {
+            OnboardingTutorial::Project { path, .. } => {
                 // Create a new terminal in the project directory
                 self.add_tab_with_pane_layout(
                     PanesLayout::SingleTerminal(Box::new(NewTerminalOptions {
-                        initial_directory: Some(path.clone()),
+                        initial_directory: Some(path),
                         hide_homepage: true,
                         ..Default::default()
                     })),
@@ -136,114 +113,8 @@ impl Workspace {
                     None,
                     ctx,
                 );
-                self.dispatch_tutorial_when_bootstrapped(true, intention, ctx);
             }
-            OnboardingTutorial::NoProject { intention } => {
-                self.dispatch_tutorial_when_bootstrapped(false, intention, ctx);
-            }
+            OnboardingTutorial::NoProject { .. } => {}
         }
-    }
-
-    /// Dispatch the onboarding tutorial after the terminal has finished bootstrapping.
-    pub(crate) fn dispatch_tutorial_when_bootstrapped(
-        &mut self,
-        has_project: bool,
-        intention: OnboardingIntention,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        // Onboarding requires a real user to interact with it; skip when running
-        // in a headless mode like the SDK/CLI.
-        if !AppExecutionMode::as_ref(ctx).can_show_onboarding() {
-            return;
-        }
-
-        // With new onboarding, skip the guided tour when AI is not enabled
-        // (e.g. terminal-intent users or users who disabled AI).
-        if FeatureFlag::OpenWarpNewSettingsModes.is_enabled()
-            && !*AISettings::as_ref(ctx).is_any_ai_enabled
-        {
-            return;
-        }
-
-        let Some(terminal_view_handle) = self.active_session_view(ctx) else {
-            log::warn!("No active terminal view for onboarding tutorial");
-            return;
-        };
-
-        let is_bootstrapped =
-            terminal_view_handle.read(ctx, |view, _| view.is_login_shell_bootstrapped());
-
-        if is_bootstrapped {
-            // Terminal is already bootstrapped, dispatch immediately
-            self.dispatch_agent_onboarding_tutorial(has_project, intention, ctx);
-        } else {
-            // Wait for bootstrapping to complete
-            ctx.subscribe_to_view(
-                &terminal_view_handle,
-                move |me, terminal_view, event, ctx| {
-                    if let terminal::Event::SessionBootstrapped = event {
-                        me.dispatch_agent_onboarding_tutorial(has_project, intention, ctx);
-                        ctx.unsubscribe_to_view(&terminal_view);
-                    }
-                },
-            );
-        }
-    }
-
-    /// Dispatch the agent onboarding tutorial flow to the active terminal.
-    fn dispatch_agent_onboarding_tutorial(
-        &self,
-        has_project: bool,
-        intention: OnboardingIntention,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let version = OnboardingVersion::Agent(AgentOnboardingVersion::AgentModality {
-            has_project,
-            intention,
-        });
-        self.dispatch_onboarding(TerminalAction::OnboardingFlow(version), ctx);
-    }
-
-    /// Dispatch the onboarding tutorial after a pending command (e.g. worktree
-    /// setup) finishes in the active terminal. Subscribes to
-    /// `Event::PendingCommandCompleted` on the active terminal view.
-    pub(crate) fn dispatch_tutorial_after_setup_commands(
-        &mut self,
-        intention: OnboardingIntention,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let Some(terminal_view_handle) = self.active_session_view(ctx) else {
-            log::warn!("No active terminal view for post-setup onboarding tutorial");
-            return;
-        };
-
-        // Suppress deferred agent view entry so setup commands run in
-        // terminal mode and the tutorial starts in terminal mode.
-        terminal_view_handle.update(ctx, |view, _| {
-            view.clear_enter_agent_view_after_pending_commands();
-        });
-        let has_pending_command = terminal_view_handle.read(ctx, |view, ctx| {
-            view.has_pending_command_or_awaiting_completion(ctx)
-        });
-        if !has_pending_command {
-            self.dispatch_tutorial_when_bootstrapped(true, intention, ctx);
-            return;
-        }
-
-        ctx.subscribe_to_view(
-            &terminal_view_handle,
-            move |me, terminal_view, event, ctx| {
-                if let terminal::Event::PendingCommandCompleted = event {
-                    // Start the onboarding tutorial now that setup is done.
-                    // TODO(roland): We do have a directory in this case so we could consider passing has_project = true
-                    // which has an optional /init flow. But the behavior of /init needs to be revisited:
-                    // 1. Sends /init as a query which differs in behavior from /init slash command
-                    // 2. Sends /init even if not in a git repo - unclear if this should happen (depends on desired behavior from 1)
-                    // 3. With no free AI, /init will not work.
-                    me.dispatch_agent_onboarding_tutorial(false, intention, ctx);
-                    ctx.unsubscribe_to_view(&terminal_view);
-                }
-            },
-        );
     }
 }

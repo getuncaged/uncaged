@@ -818,15 +818,6 @@ struct ModalWithTab<V> {
 struct PendingSessionConfigReplacement {
     old_pane_group_id: EntityId,
 }
-enum PendingSessionConfigTabConfigChipTutorial {
-    WhenBootstrapped {
-        has_project: bool,
-        intention: OnboardingIntention,
-    },
-    AfterSetupCommands {
-        intention: OnboardingIntention,
-    },
-}
 
 fn query_for_rewind_prefill(inputs: &[AIAgentInput]) -> Option<String> {
     inputs.iter().find_map(AIAgentInput::display_query)
@@ -925,13 +916,11 @@ pub struct Workspace {
     tab_config_params_modal: ModalViewState<Modal<TabConfigParamsModal>>,
     session_config_modal: ModalViewState<Modal<SessionConfigModal>>,
     pending_session_config_replacement: Option<PendingSessionConfigReplacement>,
-    /// When set, the guided onboarding tutorial will start after the session
-    /// config modal is closed (submitted or dismissed).
+    /// Set while the session config modal was opened from onboarding; the
+    /// tab-config chip is shown once the resulting tab is ready.
     pending_onboarding_intention: Option<OnboardingIntention>,
     pending_session_config_tab_config_chip: bool,
     show_session_config_tab_config_chip: bool,
-    pending_session_config_tab_config_chip_tutorial:
-        Option<PendingSessionConfigTabConfigChipTutorial>,
     new_worktree_modal: ModalViewState<Modal<NewWorktreeModal>>,
     rewind_confirmation_dialog: ViewHandle<RewindConfirmationDialog>,
     delete_conversation_confirmation_dialog: ViewHandle<DeleteConversationConfirmationDialog>,
@@ -1932,30 +1921,10 @@ impl Workspace {
                     if has_worktree && has_params {
                         // Worktree with params modal: the tab hasn't been
                         // created yet. Keep the intention so the params modal
-                        // handler can queue the tutorial after it closes.
+                        // handler sees it after it closes.
                         self.pending_onboarding_intention = Some(intention);
                     } else if has_worktree {
-                        self.queue_onboarding_tutorial_after_session_config_tab_config_chip(
-                            PendingSessionConfigTabConfigChipTutorial::AfterSetupCommands {
-                                intention,
-                            },
-                            ctx,
-                        );
-                    } else {
-                        // No worktree: tab is ready. Start the tutorial after
-                        // the tab-config chip is dismissed.
-                        // TODO(roland): We do have a directory in this case so we could consider passing has_project = true
-                        // which has an optional /init flow. But the behavior of /init needs to be revisited:
-                        // 1. Sends /init as a query which differs in behavior from /init slash command
-                        // 2. Sends /init even if not in a git repo - unclear if this should happen (depends on desired behavior from 1)
-                        // 3. With no free AI, /init will not work.
-                        self.queue_onboarding_tutorial_after_session_config_tab_config_chip(
-                            PendingSessionConfigTabConfigChipTutorial::WhenBootstrapped {
-                                has_project: false,
-                                intention,
-                            },
-                            ctx,
-                        );
+                        self.keep_terminal_mode_after_setup_commands(ctx);
                     }
                 }
 
@@ -1965,16 +1934,11 @@ impl Workspace {
                 }
             }
             SessionConfigModalEvent::Dismissed => {
-                let pending_intention = self.pending_onboarding_intention.take();
+                self.pending_onboarding_intention = None;
 
                 // No tab config was created, so don't show the chip.
                 self.pending_session_config_tab_config_chip = false;
                 self.close_session_config_modal(ctx);
-
-                // Start the onboarding tutorial without project context.
-                if let Some(intention) = pending_intention {
-                    self.dispatch_tutorial_when_bootstrapped(false, intention, ctx);
-                }
             }
         }
     }
@@ -2157,41 +2121,19 @@ impl Workspace {
             && !self.current_workspace_state.is_tab_config_params_modal_open
     }
 
-    fn queue_onboarding_tutorial_after_session_config_tab_config_chip(
-        &mut self,
-        pending_tutorial: PendingSessionConfigTabConfigChipTutorial,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if matches!(
-            pending_tutorial,
-            PendingSessionConfigTabConfigChipTutorial::AfterSetupCommands { .. }
-        ) {
-            if let Some(terminal_view) = self.active_session_view(ctx) {
-                terminal_view.update(ctx, |view, _| {
-                    view.clear_enter_agent_view_after_pending_commands();
-                });
-            }
+    /// Onboarding tabs with setup commands (worktree creation) run those commands in terminal
+    /// mode instead of entering the agent view once they finish.
+    fn keep_terminal_mode_after_setup_commands(&mut self, ctx: &mut ViewContext<Self>) {
+        if let Some(terminal_view) = self.active_session_view(ctx) {
+            terminal_view.update(ctx, |view, _| {
+                view.clear_enter_agent_view_after_pending_commands();
+            });
         }
-        self.pending_session_config_tab_config_chip_tutorial = Some(pending_tutorial);
     }
 
     fn dismiss_session_config_tab_config_chip(&mut self, ctx: &mut ViewContext<Self>) {
         self.pending_session_config_tab_config_chip = false;
         self.show_session_config_tab_config_chip = false;
-        if let Some(pending_tutorial) = self.pending_session_config_tab_config_chip_tutorial.take()
-        {
-            match pending_tutorial {
-                PendingSessionConfigTabConfigChipTutorial::WhenBootstrapped {
-                    has_project,
-                    intention,
-                } => {
-                    self.dispatch_tutorial_when_bootstrapped(has_project, intention, ctx);
-                }
-                PendingSessionConfigTabConfigChipTutorial::AfterSetupCommands { intention } => {
-                    self.dispatch_tutorial_after_setup_commands(intention, ctx);
-                }
-            }
-        }
         ctx.notify();
     }
 
@@ -2915,7 +2857,6 @@ impl Workspace {
             pending_onboarding_intention: None,
             pending_session_config_tab_config_chip: false,
             show_session_config_tab_config_chip: false,
-            pending_session_config_tab_config_chip_tutorial: None,
             new_worktree_modal,
             rewind_confirmation_dialog,
             delete_conversation_confirmation_dialog,
@@ -6790,21 +6731,6 @@ impl Workspace {
             })
     }
 
-    fn dispatch_onboarding(&self, action: TerminalAction, ctx: &mut ViewContext<Self>) {
-        if let Some(pane_group_handle) = self.get_pane_group_view(self.active_tab_index) {
-            pane_group_handle.update(ctx, |pane_group, ctx| {
-                if let Some(terminal_view_handle) = pane_group.active_session_view(ctx) {
-                    let window_id = ctx.window_id();
-                    ctx.dispatch_typed_action_for_view(
-                        window_id,
-                        terminal_view_handle.id(),
-                        &action,
-                    );
-                }
-            });
-        }
-    }
-
     fn open_suggested_agent_mode_workflow_modal(
         &mut self,
         workflow_and_id: &SuggestedAgentModeWorkflowAndId,
@@ -8993,14 +8919,10 @@ impl Workspace {
     /// Cleans up pending state and closes the tab-config params modal without
     /// creating a tab config. Used when the modal is dismissed or cancelled.
     fn cancel_tab_config_params_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        let pending_intention = self.pending_onboarding_intention.take();
+        self.pending_onboarding_intention = None;
         self.pending_session_config_replacement = None;
         self.pending_session_config_tab_config_chip = false;
         self.close_tab_config_params_modal(ctx);
-
-        if let Some(intention) = pending_intention {
-            self.dispatch_tutorial_when_bootstrapped(false, intention, ctx);
-        }
     }
 
     fn handle_tab_config_params_modal_body_event(
@@ -9021,14 +8943,9 @@ impl Workspace {
                 self.close_tab_config_params_modal(ctx);
                 self.complete_pending_session_config_replacement(ctx);
 
-                // The new tab has setup commands (worktree creation); wait for
-                // them to finish before starting the onboarding tutorial, but
-                // only after the tab-config chip is dismissed.
-                if let Some(intention) = pending_intention {
-                    self.queue_onboarding_tutorial_after_session_config_tab_config_chip(
-                        PendingSessionConfigTabConfigChipTutorial::AfterSetupCommands { intention },
-                        ctx,
-                    );
+                // The new tab has setup commands (worktree creation).
+                if pending_intention.is_some() {
+                    self.keep_terminal_mode_after_setup_commands(ctx);
                 }
 
                 // Params modal is now closed; show the chip if it was pending.
@@ -13252,12 +13169,6 @@ impl Workspace {
             }
             pane_group::Event::TerminalViewStateChanged => {
                 self.update_active_session(ctx);
-                ctx.notify();
-            }
-            pane_group::Event::OnboardingTutorialCompleted => {
-                self.pending_session_config_tab_config_chip = false;
-                self.show_session_config_tab_config_chip = false;
-                self.pending_session_config_tab_config_chip_tutorial = None;
                 ctx.notify();
             }
             pane_group::Event::InvalidatedActiveConversation => {
