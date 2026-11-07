@@ -148,7 +148,6 @@ fn test_loading_all_spaces_after_switching_from_offline() {
                     metadata: WorkspacesMetadataResponse {
                         workspaces: vec![],
                         joinable_teams: vec![],
-                        experiments: None,
                         feature_model_choices: None,
                     },
                     pricing_info: None,
@@ -165,7 +164,6 @@ fn test_loading_all_spaces_after_switching_from_offline() {
                     metadata: WorkspacesMetadataResponse {
                         workspaces: vec![workspace.clone()],
                         joinable_teams: vec![],
-                        experiments: None,
                         feature_model_choices: None,
                     },
                     pricing_info: None,

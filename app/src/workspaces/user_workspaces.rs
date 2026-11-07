@@ -21,7 +21,6 @@ use crate::channel::ChannelState;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{CloudObjectEventEntrypoint, ObjectType, Owner, Space};
 use crate::report_error;
-use crate::server::experiments::ServerExperiment;
 use crate::server::ids::ServerId;
 use crate::server::server_api::team::TeamClient;
 use crate::server::server_api::workspace::WorkspaceClient;
@@ -99,8 +98,6 @@ pub struct WorkspacesMetadataResponse {
     pub workspaces: Vec<Workspace>,
     /// The list of discoverable teams that the user can join.
     pub joinable_teams: Vec<DiscoverableTeam>,
-    /// The list of experiments applicable to the user.
-    pub experiments: Option<Vec<ServerExperiment>>,
     /// TODO(Tyler): Post-workspaces, move this into the workspace object.
     /// Feature model choices may change from user to user and while the app is open, so we need to periodically update this list.
     /// It makes most sense to fetch this in workspaces which is queried every 10 minutes.

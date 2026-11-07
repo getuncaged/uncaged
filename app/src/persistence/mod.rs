@@ -50,7 +50,6 @@ use crate::cloud_object::{
 };
 use crate::drive::folders::CloudFolder;
 use crate::notebooks::CloudNotebook;
-use crate::server::experiments::ServerExperiment;
 use crate::server::ids::SyncId;
 use crate::suggestions::ignored_suggestions_model::SuggestionType;
 use crate::terminal::history::PersistedCommand;
@@ -192,7 +191,6 @@ pub struct PersistedData {
     pub user_profiles: Vec<UserProfileWithUID>,
     pub time_of_next_force_object_refresh: Option<DateTime<Utc>>,
     pub object_actions: Vec<ObjectAction>,
-    pub experiments: Vec<ServerExperiment>,
     pub ai_queries: Vec<PersistedAIInput>,
     pub codebase_indices: Vec<CodeWorkspaceMetadata>,
     pub workspace_language_servers: HashMap<PathBuf, HashMap<LSPServerType, EnablementState>>,
@@ -298,9 +296,6 @@ pub enum ModelEvent {
     ClearUserProfiles,
     RecordTimeOfNextRefresh {
         timestamp: DateTime<Utc>,
-    },
-    SaveExperiments {
-        experiments: Vec<ServerExperiment>,
     },
     // `PauseAndRemoveDatabase` and `ReconstructAndResume` are used to pause and resume the writer thread.
     // These are employed as part of Logout v0 to ensure that the writer thread

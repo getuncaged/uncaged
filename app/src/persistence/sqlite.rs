@@ -53,7 +53,7 @@ use super::block_list::{
 };
 use super::model::{
     self, ActiveMCPServer, CurrentUserInformation, MCPEnvironmentVariables, NewActiveMCPServer,
-    NewApp, NewCommand, NewServerExperiment, NewTab, NewTabGroup, NewTeam, NewWindow, NewWorkspace,
+    NewApp, NewCommand, NewTab, NewTabGroup, NewTeam, NewWindow, NewWorkspace,
     NewWorkspaceMetadata, NewWorkspaceTeam, Project, Tab, TabGroup, Window,
     WorkspaceMetadata as WorkspaceMetadataModel, AI_DOCUMENT_PANE_KIND, AI_FACT_PANE_KIND,
     CODE_PANE_KIND, ENV_VAR_COLLECTION_PANE_KIND, EXECUTION_PROFILE_EDITOR_PANE_KIND,
@@ -95,7 +95,6 @@ use crate::persistence::model::{
     NewPersistedObjectAction, NewTeamSettings, ProjectRules, UserProfile, CODE_REVIEW_PANE_KIND,
     GET_STARTED_PANE_KIND,
 };
-use crate::server::experiments::ServerExperiment;
 use crate::server::ids::{ClientId, HashableId, ServerId, SyncId};
 use crate::settings_view::SettingsSection;
 use crate::suggestions::ignored_suggestions_model::SuggestionType;
@@ -592,9 +591,6 @@ fn handle_model_event(event: ModelEvent, connection: &mut SqliteConnection) -> a
             actions_to_sync: objects_to_sync,
         } => {
             sync_object_actions(connection, objects_to_sync).context("error syncing object actions")
-        }
-        ModelEvent::SaveExperiments { experiments } => {
-            save_experiments(connection, experiments).context("error saving experiments")
         }
         ModelEvent::UpsertAgentTurn {
             pane_uuid,
@@ -2659,14 +2655,6 @@ fn read_sqlite_data(
         .filter_map(|action| object_action_from_persisted(action).ok())
         .collect();
 
-    let server_experiments = schema::server_experiments::dsl::server_experiments
-        .load_iter::<model::ServerExperiment, DefaultLoadingMode>(conn)?
-        .filter_map(|server_experiment| server_experiment.ok())
-        .filter_map(|server_experiment| {
-            ServerExperiment::from_string(server_experiment.experiment).ok()
-        })
-        .collect();
-
     // Uncaged one-history: the turn_index-driven read, with the legacy
     // heuristic byte-identical behind the kill-switch.
     let restored_blocks = if warp_core::features::FeatureFlag::OneHistory.is_enabled() {
@@ -2707,7 +2695,6 @@ fn read_sqlite_data(
         user_profiles,
         time_of_next_force_object_refresh,
         object_actions,
-        experiments: server_experiments,
         ai_queries,
         codebase_indices,
         workspace_language_servers,
@@ -2822,27 +2809,6 @@ fn upsert_user_profiles(
                 .values(new_user_profile)
                 .execute(conn)?;
         }
-        Ok(())
-    })
-}
-
-fn save_experiments(
-    conn: &mut SqliteConnection,
-    experiments: Vec<ServerExperiment>,
-) -> Result<(), Error> {
-    conn.transaction::<(), Error, _>(|conn| {
-        diesel::delete(schema::server_experiments::dsl::server_experiments).execute(conn)?;
-
-        let new_experiments = experiments
-            .into_iter()
-            .map(|experiment| NewServerExperiment {
-                experiment: experiment.to_string(),
-            })
-            .collect_vec();
-
-        diesel::insert_into(schema::server_experiments::dsl::server_experiments)
-            .values(new_experiments)
-            .execute(conn)?;
         Ok(())
     })
 }

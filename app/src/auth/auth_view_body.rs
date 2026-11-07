@@ -31,7 +31,6 @@ use crate::auth::auth_view_shared_helpers::render_offline_contents;
 use crate::editor::{
     EditorView, InteractionState, SingleLineEditorOptions, TextColors, TextOptions,
 };
-use crate::experiments::{AuthFlowInstructions, Experiment};
 use crate::modal::MODAL_CORNER_RADIUS;
 use crate::network::NetworkStatus;
 use crate::report_error;
@@ -45,7 +44,6 @@ const COMMON_BODY_UI_FONT_SIZE: f32 = 12.;
 const AUTH_MODAL_GAP: f32 = 16.;
 
 const AUTH_TOKEN_INPUT_PLACEHOLDER_TEXT: &str = "Auth Token";
-const AUTH_TOKEN_INPUT_PLACEHOLDER_TEXT_EXPERIMENTAL: &str = "Browser auth token";
 
 const AUTH_TOKEN_INPUT_BORDER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
 
@@ -137,7 +135,6 @@ pub enum AuthViewBodyAction {
 
 impl AuthViewBody {
     pub fn new(variant: AuthViewVariant, ctx: &mut ViewContext<Self>) -> Self {
-        let experiment_group = AuthFlowInstructions::get_group(ctx);
         let auth_token_input = ctx.add_typed_action_view(|ctx| {
             let appearance = Appearance::as_ref(ctx);
             let mut editor = EditorView::single_line(
@@ -158,14 +155,9 @@ impl AuthViewBody {
                 ctx,
             );
 
-            let placeholder_text =
-                if matches!(experiment_group, Some(AuthFlowInstructions::Experiment)) {
-                    AUTH_TOKEN_INPUT_PLACEHOLDER_TEXT_EXPERIMENTAL
-                } else {
-                    AUTH_TOKEN_INPUT_PLACEHOLDER_TEXT
-                };
-
-            editor.set_placeholder_text(placeholder_text, ctx);
+            // Pinned to the AuthFlowInstructions client experiment's control arm, the text most
+            // installs got.
+            editor.set_placeholder_text(AUTH_TOKEN_INPUT_PLACEHOLDER_TEXT, ctx);
             editor
         });
 

@@ -102,9 +102,7 @@ use crate::workspace::{ActiveSession, OneTimeModalModel, ToastStack, WorkspaceRe
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{
-    experiments, AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider,
-};
+use crate::{AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 #[test]
 fn renders_git_checkout_prompt_chip_command_as_single_shell_argument() {
@@ -311,7 +309,6 @@ pub fn initialize_app(app: &mut App) {
         app.add_singleton_model(SystemInfo::new);
     }
 
-    app.update(experiments::init);
     AltScreenReporting::register(app);
     app.add_singleton_model(|_| RestoredAgentConversations::new(vec![]));
     app.add_singleton_model(OneTimeModalModel::new);

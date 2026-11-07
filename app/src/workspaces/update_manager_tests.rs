@@ -12,6 +12,7 @@ use crate::server::cloud_objects::update_manager::InitialLoadResponse;
 use crate::server::ids::SyncId;
 use crate::server::server_api::team::MockTeamClient;
 use crate::server::server_api::workspace::{MockWorkspaceClient, WorkspaceClient};
+use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::SyncQueue;
 use crate::settings::PrivacySettings;
 use crate::system::SystemStats;
@@ -92,7 +93,6 @@ fn test_leaving_team_removes_objects() {
                 metadata: WorkspacesMetadataResponse {
                     workspaces: vec![],
                     joinable_teams: vec![],
-                    experiments: None,
                     feature_model_choices: None,
                 },
                 pricing_info: None,
@@ -161,7 +161,6 @@ fn test_leaving_team_removes_objects() {
                     metadata: WorkspacesMetadataResponse {
                         workspaces: vec![],
                         joinable_teams: vec![],
-                        experiments: None,
                         feature_model_choices: None,
                     },
                     pricing_info: None,

@@ -57,7 +57,6 @@ use crate::cloud_object::{GenericStringObjectFormat, JsonObjectType, ObjectType}
 use crate::drive::export::ExportManager;
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::{CloudObjectTypeAndId, OpenWarpDriveObjectArgs, OpenWarpDriveObjectSettings};
-use crate::experiments::{BlockOnboarding, Experiment};
 use crate::features::FeatureFlag;
 use crate::interval_timer::IntervalTimer;
 use crate::launch_configs::launch_config;
@@ -2698,11 +2697,9 @@ impl RootView {
                     self.auth_onboarding_state.complete_web_import(ctx);
                 }
 
-                // Skip onboarding survey if in Variant One.
-                if let Some(BlockOnboarding::VariantOne) = BlockOnboarding::get_group(ctx) {
-                    self.auth_onboarding_state
-                        .complete_auth_and_create_workspace(ctx);
-                }
+                // The BlockOnboarding client experiment skipped the onboarding survey here for
+                // its VariantOne bucket; it is pinned to VariantTwo (keep the survey). This branch
+                // only runs after a login, which Uncaged never completes.
 
                 self.start_autoupdate_polling(ctx);
                 self.focus(ctx);

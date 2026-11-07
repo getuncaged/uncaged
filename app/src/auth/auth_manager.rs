@@ -33,7 +33,7 @@ use crate::server::server_api::auth::{
     AnonymousUserCreationError, AuthClient, FetchUserResult, MintCustomTokenError,
     UserAuthenticationError,
 };
-use crate::server::server_api::{ServerApi, ServerApiProvider};
+use crate::server::server_api::ServerApi;
 use crate::settings::cloud_preferences_syncer::CloudPreferencesSyncer;
 use crate::settings::initializer::SettingsInitializer;
 use crate::settings::PrivacySettings;
@@ -346,19 +346,11 @@ impl AuthManager {
                     credentials,
                     from_refresh,
                 } = fetch_user_result;
-                let UserProperties {
-                    user,
-                    server_experiments,
-                    llms,
-                } = user_output.into();
+                let UserProperties { user, llms } = user_output.into();
 
                 self.set_and_persist(Some(user.clone()), Some(credentials), ctx);
 
                 self.set_needs_reauth(false, ctx);
-
-                ServerApiProvider::handle(ctx).update(ctx, |provider, ctx| {
-                    provider.handle_experiments_fetched(server_experiments, ctx);
-                });
 
                 SettingsInitializer::handle(ctx).update(ctx, |initializer, ctx| {
                     initializer.handle_user_fetched(self.auth_state.clone(), ctx);

@@ -87,9 +87,7 @@ use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_profiles::UserProfiles;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{
-    experiments, AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider,
-};
+use crate::{AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 fn initialize_app(app: &mut App) {
     initialize_settings_for_tests(app);
@@ -173,7 +171,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| crate::code_review::git_repo_model::GitRepoModels::new());
     app.add_singleton_model(RepoOutlines::new_for_test);
     crate::terminal::available_shells::register(app);
-    app.update(experiments::init);
     AltScreenReporting::register(app);
     app.add_singleton_model(|ctx| {
         CodebaseIndexManager::new_for_test(std::sync::Arc::new(LocalStoreClient::new()), ctx)
