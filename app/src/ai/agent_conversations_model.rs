@@ -33,13 +33,6 @@ use crate::ai::conversation_navigation::ConversationNavigationData;
 use crate::ui_components::icons::Icon;
 use crate::workspace::{RestoreConversationLayout, WorkspaceAction};
 
-/// Protected eviction: we'll always keep at least 200 personal tasks in the model.
-/// This is so that whenever we evict stale tasks, we do not evict relevant, recent personal tasks
-/// (e.g. if I load in 500 team Slack tasks from today, we should _not_ evict my personal conversation
-/// from yesterday).
-const MAX_PERSONAL_TASKS: usize = 200;
-const MAX_TEAM_TASKS: usize = 300;
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum SessionStatus {
     Available,
@@ -927,31 +920,6 @@ impl AgentConversationsModel {
         creators.dedup_by(|a, b| a.0 == b.0);
 
         creators
-    }
-
-    /// Enforces cap on tasks stored in the model so it doesn't grow without bound.
-    /// We always keep at least 200 personal tasks around so an influx of team tasks
-    /// doesn't result in evicting personal task data.
-    fn enforce_task_cap(&mut self, current_user_uid: &str) {
-        let total_cap = MAX_PERSONAL_TASKS + MAX_TEAM_TASKS;
-        if self.tasks.len() <= total_cap {
-            return;
-        }
-
-        let (mut personal, mut team): (Vec<_>, Vec<_>) =
-            self.tasks.drain().partition(|(_, task)| {
-                task.creator
-                    .as_ref()
-                    .is_some_and(|c| c.uid == current_user_uid)
-            });
-
-        // Sort each by updated_at (newest first), truncate
-        personal.sort_by(|a, b| b.1.updated_at.cmp(&a.1.updated_at));
-        team.sort_by(|a, b| b.1.updated_at.cmp(&a.1.updated_at));
-        personal.truncate(MAX_PERSONAL_TASKS);
-        team.truncate(MAX_TEAM_TASKS);
-
-        self.tasks = personal.into_iter().chain(team).collect();
     }
 }
 

@@ -23,7 +23,7 @@ use warpui::{
 };
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use {
-    crate::settings::ForceX11, crate::settings::LinuxAppConfiguration,
+    crate::settings::LinuxAppConfiguration,
     warpui::platform::linux::windowing_system_is_customizable,
 };
 
