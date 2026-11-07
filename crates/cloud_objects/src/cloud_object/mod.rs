@@ -187,9 +187,6 @@ pub enum JsonObjectType {
     MCPServer,
     AIExecutionProfile,
     TemplatableMCPServer,
-    CloudEnvironment,
-    ScheduledAmbientAgent,
-    CloudAgentConfig,
 }
 
 impl JsonObjectType {
@@ -202,9 +199,6 @@ impl JsonObjectType {
             JsonObjectType::MCPServer => "MCPSERVER",
             JsonObjectType::AIExecutionProfile => "AIEXECUTIONPROFILE",
             JsonObjectType::TemplatableMCPServer => "TEMPLATABLEMCPSERVER",
-            JsonObjectType::CloudEnvironment => "CLOUDENVIRONMENT",
-            JsonObjectType::ScheduledAmbientAgent => "SCHEDULEDAMBIENTAGENT",
-            JsonObjectType::CloudAgentConfig => "CLOUDAGENTCONFIG",
         }
     }
 }
@@ -221,9 +215,6 @@ impl TryFrom<&str> for JsonObjectType {
             "MCPSERVER" => Ok(JsonObjectType::MCPServer),
             "AIEXECUTIONPROFILE" => Ok(JsonObjectType::AIExecutionProfile),
             "TEMPLATABLEMCPSERVER" => Ok(JsonObjectType::TemplatableMCPServer),
-            "CLOUDENVIRONMENT" => Ok(JsonObjectType::CloudEnvironment),
-            "SCHEDULEDAMBIENTAGENT" => Ok(JsonObjectType::ScheduledAmbientAgent),
-            "CLOUDAGENTCONFIG" => Ok(JsonObjectType::CloudAgentConfig),
             _ => Err(anyhow!("could not convert unknown json object type")),
         }
     }
@@ -867,15 +858,6 @@ impl From<GenericStringObjectFormat>
             }
             GenericStringObjectFormat::Json(JsonObjectType::TemplatableMCPServer) => {
                 GraphQLFormat::JsonTemplatableMCPServer
-            }
-            GenericStringObjectFormat::Json(JsonObjectType::CloudEnvironment) => {
-                GraphQLFormat::JsonCloudEnvironment
-            }
-            GenericStringObjectFormat::Json(JsonObjectType::ScheduledAmbientAgent) => {
-                GraphQLFormat::JsonScheduledAmbientAgent
-            }
-            GenericStringObjectFormat::Json(JsonObjectType::CloudAgentConfig) => {
-                unreachable!("JsonCloudAgentConfig is no longer present in GraphQL schema")
             }
         }
     }

@@ -2,22 +2,7 @@ use std::ffi::OsStr;
 
 use clap::builder::PossibleValue;
 use clap::error::ErrorKind;
-use clap::{Arg, Command, Subcommand};
-
-/// MCP-related subcommands.
-#[derive(Debug, Clone, Subcommand)]
-pub enum MCPCommand {
-    /// List MCP servers.
-    List,
-}
-
-impl MCPCommand {
-    pub(crate) fn as_str_for_tracing(&self) -> &'static str {
-        match self {
-            MCPCommand::List => "mcp list",
-        }
-    }
-}
+use clap::{Arg, Command};
 
 /// Represents an MCP server specification from CLI input.
 ///

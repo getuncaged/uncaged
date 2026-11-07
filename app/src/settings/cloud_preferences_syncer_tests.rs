@@ -1227,17 +1227,16 @@ fn test_ensure_no_duplicate_cloud_prefs() {
         .await;
 
         // After the initial operations complete, expect 3 delete operations for duplicates
-        // plus 1 for the timestamps fetch = 4 total on UpdateManager
         UpdateManager::handle(&app).read(&app, |update_manager, _ctx| {
             assert_eq!(
-                4,
+                3,
                 update_manager.spawned_futures().len(),
-                "expect three delete operations for duplicate preferences plus timestamps fetch"
+                "expect three delete operations for duplicate preferences"
             );
         });
 
-        for i in 0..4 {
-            // Complete the delete operations and timestamps fetch
+        for i in 0..3 {
+            // Complete the delete operations
             UpdateManager::handle(&app)
                 .update(&mut app, |update_manager, ctx| {
                     ctx.await_spawned_future(update_manager.spawned_futures()[i])

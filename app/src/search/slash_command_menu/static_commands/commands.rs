@@ -20,15 +20,6 @@ pub static AGENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     argument: Some(Argument::optional().with_execute_on_selection()),
 });
 
-pub static CLOUD_AGENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
-    name: "/cloud-agent",
-    description: "Start a new cloud agent conversation",
-    icon_path: BRAND_MARK_SVG,
-    availability: Availability::AI_ENABLED.union(Availability::NOT_CLOUD_AGENT),
-    auto_enter_ai_mode: false,
-    argument: Some(Argument::optional().with_execute_on_selection()),
-});
-
 pub const ADD_MCP: StaticCommand = StaticCommand {
     name: "/add-mcp",
     description: "Add a new MCP server via the MCP settings page",
@@ -46,23 +37,6 @@ pub const PR_COMMENTS: StaticCommand = StaticCommand {
     auto_enter_ai_mode: true,
     argument: None,
 };
-
-// Uncaged: guided Oz environment setup needs Warp's cloud. The `cloud_environments`
-// cargo feature is off, but this command list never consulted it, so the menu kept
-// offering a flow that cannot complete. Availability::NEVER keeps the definition (other
-// code references it by name for highlighting) while removing it from every menu.
-pub static CREATE_ENVIRONMENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
-    name: "/create-environment",
-    description: "Create a cloud environment (unavailable in Uncaged)",
-    icon_path: "bundled/svg/dataflow.svg",
-    availability: Availability::NEVER,
-    auto_enter_ai_mode: false,
-    argument: Some(
-        Argument::optional()
-            .with_hint_text("<optional repo paths or GitHub URLs>")
-            .with_execute_on_selection(),
-    ),
-});
 
 pub const CREATE_DOCKER_SANDBOX: StaticCommand = StaticCommand {
     name: "/docker-sandbox",
@@ -185,22 +159,6 @@ pub static FORK: LazyLock<StaticCommand> = LazyLock::new(|| {
         auto_enter_ai_mode: true,
         argument: Some(Argument::optional().with_hint_text(hint_text)),
     }
-});
-
-pub static MOVE_TO_CLOUD: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
-    name: "/handoff",
-    description: "Hand off this conversation to a cloud agent",
-    icon_path: "bundled/svg/upload-cloud-01.svg",
-    availability: Availability::AGENT_VIEW
-        | Availability::ACTIVE_CONVERSATION
-        | Availability::AI_ENABLED
-        | Availability::NOT_CLOUD_AGENT,
-    auto_enter_ai_mode: false,
-    argument: Some(
-        Argument::optional()
-            .with_hint_text("<optional follow-up prompt>")
-            .with_execute_on_selection(),
-    ),
 });
 
 pub const OPEN_CODE_REVIEW: StaticCommand = StaticCommand {
@@ -430,21 +388,6 @@ pub const FORK_FROM: StaticCommand = StaticCommand {
     argument: None,
 };
 
-pub static CONTINUE_LOCALLY: LazyLock<StaticCommand> = LazyLock::new(|| {
-    let hint_text = "<optional prompt to send in local conversation>";
-    StaticCommand {
-        name: "/continue-locally",
-        description: "Continue this cloud conversation locally",
-        icon_path: "bundled/svg/arrow-split.svg",
-        availability: Availability::AGENT_VIEW
-            | Availability::ACTIVE_CONVERSATION
-            | Availability::AI_ENABLED
-            | Availability::CLOUD_AGENT,
-        auto_enter_ai_mode: true,
-        argument: Some(Argument::optional().with_hint_text(hint_text)),
-    }
-});
-
 pub const USAGE: StaticCommand = StaticCommand {
     name: "/usage",
     description: "Open billing and usage settings",
@@ -623,10 +566,6 @@ fn all_commands() -> Vec<StaticCommand> {
 
     commands.push(OPEN_CODE_REVIEW);
 
-    if FeatureFlag::CreateEnvironmentSlashCommand.is_enabled() {
-        commands.push(CREATE_ENVIRONMENT.clone());
-    }
-
     if FeatureFlag::CreateProjectFlow.is_enabled() {
         commands.push(CREATE_NEW_PROJECT.clone());
     }
@@ -641,11 +580,7 @@ fn all_commands() -> Vec<StaticCommand> {
     }
 
     if !cfg!(target_family = "wasm") {
-        commands.extend([
-            FORK.clone(),
-            FORK_AND_COMPACT.clone(),
-            CONTINUE_LOCALLY.clone(),
-        ]);
+        commands.extend([FORK.clone(), FORK_AND_COMPACT.clone()]);
 
         if FeatureFlag::ForkFromCommand.is_enabled() {
             commands.push(FORK_FROM);
@@ -665,17 +600,6 @@ fn all_commands() -> Vec<StaticCommand> {
         && !FeatureFlag::PRCommentsSkill.is_enabled()
     {
         commands.push(PR_COMMENTS);
-    }
-
-    if FeatureFlag::CloudMode.is_enabled() && FeatureFlag::CloudModeFromLocalSession.is_enabled() {
-        commands.push(CLOUD_AGENT.clone());
-    }
-
-    if FeatureFlag::OzHandoff.is_enabled()
-        && FeatureFlag::HandoffLocalCloud.is_enabled()
-        && cfg!(all(feature = "local_fs", not(target_family = "wasm")))
-    {
-        commands.push(MOVE_TO_CLOUD.clone());
     }
 
     if FeatureFlag::InlineProfileSelector.is_enabled() {

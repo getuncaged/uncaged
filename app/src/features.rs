@@ -323,10 +323,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::InteractiveConversationManagementView,
         #[cfg(feature = "agent_tips")]
         FeatureFlag::AgentTips,
-        #[cfg(feature = "agent_mode_computer_use")]
-        FeatureFlag::AgentModeComputerUse,
-        #[cfg(feature = "local_computer_use")]
-        FeatureFlag::LocalComputerUse,
         #[cfg(feature = "local_claude_codex_child_harnesses")]
         FeatureFlag::LocalClaudeCodexChildHarnesses,
         #[cfg(feature = "team_api_keys")]
@@ -431,8 +427,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::GroupedTabs,
         #[cfg(feature = "pinned_tabs")]
         FeatureFlag::PinnedTabs,
-        #[cfg(feature = "warp_control_cli")]
-        FeatureFlag::WarpControlCli,
         #[cfg(feature = "agent_harness")]
         FeatureFlag::AgentHarness,
         #[cfg(feature = "oz_handoff")]

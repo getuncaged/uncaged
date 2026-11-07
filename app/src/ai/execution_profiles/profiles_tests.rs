@@ -23,7 +23,6 @@ use crate::settings::PrivacySettings;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::LaunchMode;
 
 fn mock_server_metadata(uid: ServerId) -> ServerMetadata {
     ServerMetadata {
@@ -100,9 +99,7 @@ fn install_singletons(app: &mut App, auth_state: AuthStateProvider) {
 fn edits_persist_on_unsynced_default_profile_when_logged_out() {
     App::test((), |mut app| async move {
         install_singletons(&mut app, AuthStateProvider::new_logged_out_for_test());
-        let profile_model = app.add_singleton_model(|ctx| {
-            AIExecutionProfilesModel::new(&LaunchMode::new_for_unit_test(), ctx)
-        });
+        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         let default_profile_id = profile_model.read(&app, |model, _ctx| model.default_profile_id());
 
@@ -153,9 +150,7 @@ fn edits_persist_on_unsynced_default_profile_when_logged_out() {
 fn reconciles_unsynced_default_profile_with_cloud_after_initial_load() {
     App::test((), |mut app| async move {
         install_singletons(&mut app, AuthStateProvider::new_for_test());
-        let profile_model = app.add_singleton_model(|ctx| {
-            AIExecutionProfilesModel::new(&LaunchMode::new_for_unit_test(), ctx)
-        });
+        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         // Baseline: CloudModel is empty, so the model starts Unsynced and
         // `sync_id` is `None`.
@@ -240,9 +235,7 @@ fn ignores_shared_default_profile_created_from_cloud() {
 
     App::test((), |mut app| async move {
         install_singletons(&mut app, AuthStateProvider::new_for_test());
-        let profile_model = app.add_singleton_model(|ctx| {
-            AIExecutionProfilesModel::new(&LaunchMode::new_for_unit_test(), ctx)
-        });
+        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         profile_model.read(&app, |model, ctx| {
             let default_profile = model.default_profile(ctx);
@@ -282,9 +275,7 @@ fn ignores_shared_default_profile_after_initial_load() {
 
     App::test((), |mut app| async move {
         install_singletons(&mut app, AuthStateProvider::new_for_test());
-        let profile_model = app.add_singleton_model(|ctx| {
-            AIExecutionProfilesModel::new(&LaunchMode::new_for_unit_test(), ctx)
-        });
+        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         let attacker_sync_id = SyncId::ServerId(ServerId::from(31338));
         let attacker_profile = attacker_owned_shared_default_profile(ServerId::from(31338));
@@ -317,9 +308,7 @@ fn filters_non_owned_non_default_profile_from_list() {
 
     App::test((), |mut app| async move {
         install_singletons(&mut app, AuthStateProvider::new_for_test());
-        let profile_model = app.add_singleton_model(|ctx| {
-            AIExecutionProfilesModel::new(&LaunchMode::new_for_unit_test(), ctx)
-        });
+        let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
 
         // Create a non-default profile owned by an attacker, shared with victim
         let attacker_owner = Owner::User {

@@ -53,7 +53,6 @@ pub const CAN_FORK_FROM_LAST_KNOWN_GOOD_STATE_KEY: &str = "CanForkFromLastKnownG
 pub const INPUT_BOX_VISIBLE_KEY: &str = "InputVisible";
 pub const KEYBOARD_PROTOCOL_ENABLED_KEY: &str = "KeyboardProtocolEnabled";
 pub const CLI_AGENT_SESSION_ACTIVE_KEY: &str = "CLIAgentSessionActive";
-pub const ROOT_CLOUD_MODE_PANE_KEY: &str = "RootCloudModePane";
 pub const CAN_SHOW_CONVERSATION_DETAILS_KEY: &str = "CanShowConversationDetails";
 
 /// Some keybindings will do different things in different contexts. We break
@@ -1000,36 +999,6 @@ pub fn init(app: &mut AppContext) {
         .with_mac_key_binding("ctrl-alt-[")
         .with_linux_or_windows_key_binding("ctrl-alt-["),
     ]);
-
-    // Register bindings for starting a new cloud agent conversation.
-    {
-        app.register_fixed_bindings([FixedBinding::new_per_platform(
-            PerPlatformKeystroke {
-                mac: "cmd-alt-enter",
-                linux_and_windows: "ctrl-alt-enter",
-            },
-            TerminalAction::EnterCloudAgentView,
-            id!("Terminal") & id!(flags::IS_ANY_AI_ENABLED),
-        )
-        .with_enabled(|| {
-            FeatureFlag::AgentView.is_enabled()
-                && FeatureFlag::CloudMode.is_enabled()
-                && FeatureFlag::CloudModeFromLocalSession.is_enabled()
-        })
-        .with_group(bindings::BindingGroup::WarpAi.as_str())]);
-        if cfg!(target_os = "macos") {
-            // On MacOS, if the user has the 'Option as meta' setting enabled, the cmd-alt-enter
-            // binding above will not match.
-            //
-            // TODO(zachbai): Consider if, for the purposes of fixed bindings, alt/meta should work
-            // fungibly regardless of underlying setting.
-            app.register_fixed_bindings([FixedBinding::new(
-                "cmd-meta-enter",
-                TerminalAction::EnterCloudAgentView,
-                id!("Terminal") & id!(flags::IS_ANY_AI_ENABLED),
-            )]);
-        }
-    }
 }
 
 /// Registers bindings related to input modes.
@@ -1077,7 +1046,6 @@ fn register_input_mode_bindings(app: &mut AppContext) {
     let agent_conversation_predicate = base_context.clone()
         & id!("Terminal")
         & !id!("Input")
-        & !id!(ROOT_CLOUD_MODE_PANE_KEY)
         & !id!(flags::HAS_PENDING_PROMPT_SUGGESTION);
 
     app.register_fixed_bindings([

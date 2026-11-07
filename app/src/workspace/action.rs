@@ -17,8 +17,6 @@ use super::tab_settings::{
 };
 use super::view::{OnboardingTutorial, WorkspaceBanner};
 use crate::ai::agent::api::ServerConversationToken;
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::agent::conversation::AIAgentHarness;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
@@ -111,12 +109,6 @@ impl VerticalTabsPaneContextMenuTarget {
             Self::ClickedPane(locator) | Self::ActivePane(locator) => locator,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AutoCloudHandoffTrigger {
-    MacOsSleep,
-    Uri,
 }
 
 #[derive(Debug, Clone)]
@@ -275,7 +267,6 @@ pub enum WorkspaceAction {
         source: AddTabWithShellSource,
     },
     AddGetStartedTab,
-    AddAmbientAgentTab,
     /// Add a new tab that immediately enters agent view with a new conversation.
     AddAgentTab,
     /// Add a new tab running a local Docker sandbox via `sbx`.
@@ -507,7 +498,6 @@ pub enum WorkspaceAction {
         /// The type of zero state prompt suggestion to start with (optional).
         zero_state_prompt_suggestion_type: Option<ZeroStatePromptSuggestionType>,
     },
-    OpenCloudAgentSetupGuide,
     AttemptLoginGatedAIUpgrade,
     /// Open the modal explaining Prompt Suggestions aren't available on the Free plan.
     OpenPromptSuggestionsUnavailableModal,
@@ -522,8 +512,6 @@ pub enum WorkspaceAction {
     },
     OpenAIFactCollection,
     OpenMCPServerCollection,
-    /// Open the Environment Management pane in Create mode.
-    OpenEnvironmentManagementPane,
     ToggleAIDocumentPane {
         document_id: AIDocumentId,
         document_version: AIDocumentVersion,
@@ -601,63 +589,14 @@ pub enum WorkspaceAction {
     ContinueConversationLocally {
         conversation_id: AIConversationId,
     },
-    /// Continue a completed third-party cloud harness run in a local split pane.
-    #[cfg(not(target_family = "wasm"))]
-    ContinueThirdPartyConversationLocally {
-        task_id: AmbientAgentTaskId,
-        harness: AIAgentHarness,
-    },
     /// Insert the /fork slash command into the active terminal's input.
     InsertForkSlashCommand,
-    /// Open a local-to-cloud handoff pane next to the active conversation
-    /// (REMOTE-1486). Triggered by the `/move-to-cloud` slash command
-    /// and the footer chip of the same name. The dispatch site reads the
-    /// active conversation's `server_conversation_token` and gates on
-    /// `FeatureFlag::OzHandoff && FeatureFlag::HandoffLocalCloud`.
-    /// Falls through to splitting a fresh cloud-mode pane when the active
-    /// conversation isn't handoff-able (no synced server token, empty, or no
-    /// active conversation at all).
-    OpenLocalToCloudHandoffPane {
-        #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
-        launch: Option<crate::ai::blocklist::handoff::PendingCloudLaunch>,
-        #[cfg(not(all(feature = "local_fs", not(target_family = "wasm"))))]
-        launch: Option<()>,
-        environment_id: Option<crate::server::ids::SyncId>,
-        entry_point: crate::ai::ambient_agents::telemetry::HandoffEntryPoint,
-    },
-    /// Automatically hand off the active running local agent conversation in the
-    /// given terminal view to Cloud Mode.
-    AutoHandoffActiveAgentToCloud {
-        terminal_view_id: EntityId,
-        conversation_id: AIConversationId,
-        trigger: AutoCloudHandoffTrigger,
-    },
-    /// Show the environment creation modal during `&` handoff compose when no
-    /// environments exist.
-    ShowHandoffEnvironmentCreationModal,
-    /// Open the workspace modal for creating a new managed auth secret.
-    /// Dispatched by orchestration card pickers' "New API key…" item.
-    OpenCreateAuthSecretModal {
-        harness: warp_cli::agent::Harness,
-    },
     /// Summarize the active AI conversation in the focused pane.
     SummarizeAIConversation {
         prompt: Option<String>,
         /// Optional prompt to send after summarization completes successfully.
         initial_prompt: Option<String>,
     },
-    /// Install the Uncaged CLI command to /usr/local/bin
-    #[cfg(target_os = "macos")]
-    InstallOz,
-    /// Uninstall the Uncaged CLI command from /usr/local/bin
-    #[cfg(target_os = "macos")]
-    UninstallOz,
-    /// Install the Warp Control CLI command to /usr/local/bin
-    #[cfg(target_os = "macos")]
-    InstallWarpctrl,
-    /// Uninstall the Warp Control CLI command from /usr/local/bin
-    #[cfg(target_os = "macos")]
-    UninstallWarpctrl,
     UndoRevertInCodeReviewPane {
         window_id: WindowId,
         view_id: EntityId,
@@ -722,16 +661,6 @@ pub enum WorkspaceAction {
     /// Reset the orchestration launch modal dismissed state (for debugging)
     #[cfg(debug_assertions)]
     ResetOrchestrationLaunchModalState,
-    /// Open the auto-handoff sleep modal (for debugging)
-    #[cfg(debug_assertions)]
-    OpenAutoHandoffSleepModal,
-    /// Reset the auto-handoff sleep modal shown state (for debugging)
-    #[cfg(debug_assertions)]
-    ResetAutoHandoffSleepModalState,
-    /// Trigger the auto-handoff-to-cloud flow in-process, as if the machine
-    /// were about to sleep (for debugging)
-    #[cfg(debug_assertions)]
-    TriggerAutoHandoffToCloud,
     /// Open the Free AI Removal Modal (for debugging)
     #[cfg(debug_assertions)]
     OpenFreeAiRemovalModal,
@@ -751,9 +680,6 @@ pub enum WorkspaceAction {
         select_first: bool,
     },
     ToggleAgentManagementView,
-    ViewAgentRunsForEnvironment {
-        environment_id: String,
-    },
     /// Show the rewind confirmation dialog before rewinding an AI conversation
     ShowRewindConfirmationDialog {
         ai_block_view_id: EntityId,
@@ -908,8 +834,6 @@ impl WorkspaceAction {
         match self {
             #[cfg(not(target_family = "wasm"))]
             ContinueConversationLocally { .. } => true,
-            #[cfg(not(target_family = "wasm"))]
-            ContinueThirdPartyConversationLocally { .. } => true,
             ActivateTab(_)
             | ActivateTabByNumber(_)
             | ActivatePrevTab
@@ -975,7 +899,6 @@ impl WorkspaceAction {
             | AddTabWithShell { .. }
             | AddGetStartedTab
             | AddAgentTab
-            | AddAmbientAgentTab
             | AddDockerSandboxTab
             | AddWindow
             | AddWindowWithShell { .. }
@@ -1044,7 +967,6 @@ impl WorkspaceAction {
             | DispatchToSettingsTab { .. }
             | ToggleResourceCenter
             | ToggleUserMenu
-            | OpenCloudAgentSetupGuide
             | OpenPromptSuggestionsUnavailableModal
             | ToggleKeybindingsPage
             | ShowCommandSearch(_)
@@ -1152,7 +1074,6 @@ impl WorkspaceAction {
             | ToggleNotificationMailbox { .. }
             | ToggleAgentManagementView
             | OpenAgentManagementView
-            | ViewAgentRunsForEnvironment { .. }
             | ToggleAIDocumentPane { .. }
             | HideAIDocumentPanes
             | OpenAIDocumentPane { .. }
@@ -1182,10 +1103,6 @@ impl WorkspaceAction {
             | LaunchCliAgent { .. }
             | OpenConfigFile { .. }
             | FixSettingsWithOz { .. }
-            | OpenLocalToCloudHandoffPane { .. }
-            | AutoHandoffActiveAgentToCloud { .. }
-            | ShowHandoffEnvironmentCreationModal
-            | OpenCreateAuthSecretModal { .. }
             | OpenNetworkLogPane => false,
             #[cfg(debug_assertions)]
             ShowHoaOnboardingFlow => false,
@@ -1200,9 +1117,6 @@ impl WorkspaceAction {
             | ResetOpenWarpLaunchModalState
             | OpenOrchestrationLaunchModal
             | ResetOrchestrationLaunchModalState
-            | OpenAutoHandoffSleepModal
-            | ResetAutoHandoffSleepModalState
-            | TriggerAutoHandoffToCloud
             | OpenFreeAiRemovalModal
             | ResetFreeAiRemovalModalState
             | InstallOpenCodeWarpPlugin
@@ -1211,15 +1125,10 @@ impl WorkspaceAction {
             ViewLogs => false,
             #[cfg(target_os = "macos")]
             SampleProcess => false,
-            #[cfg(target_os = "macos")]
-            InstallOz | UninstallOz => false,
-            #[cfg(target_os = "macos")]
-            InstallWarpctrl | UninstallWarpctrl => false,
             #[cfg(feature = "local_fs")]
             FileRenamed { .. } => false, // File rename doesn't change workspace state
             #[cfg(feature = "local_fs")]
             FileDeleted { .. } => false, // File deletion doesn't change workspace state
-            OpenEnvironmentManagementPane => false,
             #[cfg(target_os = "linux")]
             DismissWaylandCrashRecoveryBannerAndOpenLink => false,
             #[cfg(target_family = "wasm")]

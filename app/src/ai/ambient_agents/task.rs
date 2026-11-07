@@ -2,9 +2,6 @@
 
 use anyhow::anyhow;
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
-#[cfg(not(target_family = "wasm"))]
-pub use cloud_object_models::HarnessModelConfig;
-pub use cloud_object_models::{AgentConfigSnapshot, HarnessAuthSecretsConfig, HarnessConfig};
 use iso8601_duration::Duration as Iso8601Duration;
 use serde::{Deserialize, Serialize};
 use session_sharing_protocol::common::SessionId;
@@ -14,6 +11,7 @@ use warp_core::ui::theme::WarpTheme;
 use warpui::color::ColorU;
 use warpui::{SingletonEntity, View, ViewContext};
 
+pub use super::agent_config::AgentConfigSnapshot;
 use super::AmbientAgentTaskId;
 use crate::ai::artifacts::{deserialize_artifacts, Artifact};
 use crate::server::server_api::ServerApiProvider;

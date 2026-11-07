@@ -5,7 +5,6 @@ pub mod block;
 pub mod code_block;
 mod context_model;
 mod controller;
-pub(crate) mod handoff;
 
 pub(crate) mod local_agent_task_sync_model;
 pub(crate) mod orchestration_event_streamer;

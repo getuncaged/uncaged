@@ -173,18 +173,7 @@ impl PaneGroup {
         let child_id = child_conversation.id();
 
         if child_conversation.is_remote_child() {
-            let Some(task_id) = child_conversation.task_id() else {
-                log::warn!(
-                    "Cannot restore remote child conversation {child_id:?} without a task ID"
-                );
-                return;
-            };
-            self.hydrate_task_backed_hidden_child_pane(
-                child_conversation,
-                parent_pane_id,
-                task_id,
-                ctx,
-            );
+            log::warn!("Skipping restore of remote cloud child conversation {child_id:?}");
             return;
         }
         let child_task_context =

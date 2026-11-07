@@ -24,7 +24,6 @@ use crate::server::sync_queue::SyncQueue;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::LaunchMode;
 fn configurable_model(provider: LLMProvider) -> LLMInfo {
     LLMInfo {
         display_name: "test model".to_string(),
@@ -73,9 +72,7 @@ fn assert_context_window_limit_for_request(
         app.add_singleton_model(SyncQueue::mock);
         app.add_singleton_model(UpdateManager::mock);
         app.add_singleton_model(|_| TemplatableMCPServerManager::default());
-        app.add_singleton_model(|ctx| {
-            AIExecutionProfilesModel::new(&LaunchMode::new_for_unit_test(), ctx)
-        });
+        app.add_singleton_model(AIExecutionProfilesModel::new);
         let llm_preferences = app.add_singleton_model(LLMPreferences::new);
 
         let profile_model_id = model.id.clone();

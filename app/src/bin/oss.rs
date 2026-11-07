@@ -3,7 +3,7 @@
 #![cfg_attr(feature = "release_bundle", windows_subsystem = "windows")]
 
 use anyhow::Result;
-use warp_core::channel::{Channel, ChannelConfig, ChannelState, OzConfig, WarpServerConfig};
+use warp_core::channel::{Channel, ChannelConfig, ChannelState, WarpServerConfig};
 use warp_core::AppId;
 
 // Simple wrapper around warp::run() for Warp OSS builds.
@@ -20,7 +20,6 @@ fn main() -> Result<()> {
             // drives Agent Mode from the local uncaged_engine and needs none of
             // these hosts. See WarpServerConfig::uncaged_sentinel.
             server_config: WarpServerConfig::uncaged_sentinel(),
-            oz_config: OzConfig::uncaged_sentinel(),
             telemetry_config: None,
             autoupdate_config: None,
             mcp_static_config: None,

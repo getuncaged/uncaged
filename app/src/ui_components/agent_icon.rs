@@ -41,7 +41,7 @@ pub(crate) fn terminal_view_agent_icon_variant(
     // Resolve the ambient task id from [`TerminalView::ambient_agent_task_id_for_details_panel`],
     // falling back to the selected conversation's server metadata for restored cloud transcripts.
     let ambient_task_id = terminal_view
-        .ambient_agent_task_id_for_details_panel(app)
+        .ambient_agent_task_id_for_details_panel()
         .or_else(|| {
             terminal_view
                 .selected_conversation_server_metadata(app)
@@ -68,8 +68,7 @@ pub(crate) fn terminal_view_agent_icon_variant(
         }
     }
 
-    let is_ambient = terminal_view.is_ambient_agent_session(app)
-        || (ambient_task_id.is_some() && !is_local_child);
+    let is_ambient = ambient_task_id.is_some() && !is_local_child;
     let inputs = TerminalIconInputs {
         is_ambient,
         cli_session: cli_agent_session.map(|session| CLISessionInputs {
@@ -78,9 +77,8 @@ pub(crate) fn terminal_view_agent_icon_variant(
             status: session.status.to_conversation_status(),
             supports_rich_status: session.supports_rich_status(),
         }),
-        selected_third_party_cli_agent: terminal_view
-            .ambient_agent_view_model()
-            .and_then(|model| model.as_ref(app).selected_third_party_cli_agent()),
+        // Only a live cloud run's view model knew the pre-dispatch harness; Uncaged has none.
+        selected_third_party_cli_agent: None,
         selected_conversation_status: terminal_view.selected_conversation_status_for_display(app),
         has_selected_conversation: terminal_view
             .selected_conversation_display_title(app)

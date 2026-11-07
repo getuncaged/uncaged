@@ -28,7 +28,6 @@ publish = false
 [workspace.dependencies]
 # Local workspace crates. This lets us reference them in other crates without specifying a path.
 ai = { path = "crates/ai" }
-app-installation-detection = { path = "crates/app-installation-detection" }
 uncaged_engine = { path = "crates/uncaged_engine" }
 asset_cache = { path = "crates/asset_cache" }
 asset_macro = { path = "crates/asset_macro" }
@@ -39,20 +38,17 @@ cloud_objects = { path = "crates/cloud_objects" }
 cloud_object_client = { path = "crates/cloud_object_client" }
 cloud_object_persistence = { path = "crates/cloud_object_persistence" }
 cloud_object_models = { path = "crates/cloud_object_models" }
-computer_use = { path = "crates/computer_use" }
 field_mask = { path = "crates/field_mask" }
 firebase = { path = "crates/firebase" }
 fuzzy_match = { path = "crates/fuzzy_match" }
 handlebars = { path = "crates/handlebars" }
 http_client = { path = "crates/http_client" }
-http_server = { path = "crates/http_server" }
 input_classifier = { path = "crates/input_classifier" }
 integration = { path = "crates/integration" }
 ipc = { path = "crates/ipc" }
 ipynb_parser = { path = "crates/ipynb_parser" }
 jsonrpc = { path = "crates/jsonrpc" }
 languages = { path = "crates/languages" }
-local_control = { path = "crates/local_control" }
 lsp = { path = "crates/lsp" }
 markdown_parser = { path = "crates/markdown_parser" }
 mcp = { path = "crates/mcp" }
@@ -419,7 +415,6 @@ pprof.opt-level = 3
 # Ensure jemalloc is optimized for performance.
 tikv-jemallocator.opt-level = 3
 tikv-jemalloc-sys.opt-level = 3
-jemalloc_pprof.opt-level = 3
 pprof_util.opt-level = 3
 # Vastly improve runtime performance of some font and text layout logic
 # at the cost of a small increase in compile time for this crate.

@@ -13,7 +13,6 @@ use crate::server::sync_queue::SyncQueue;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::LaunchMode;
 
 // -- DisableReason::should_clear_preference tests --
 
@@ -377,9 +376,7 @@ fn reconcile_preserves_custom_models_saved_on_execution_profile() {
         app.add_singleton_model(UpdateManager::mock);
         app.add_singleton_model(|_| TemplatableMCPServerManager::default());
 
-        let profiles_model = app.add_singleton_model(|ctx| {
-            AIExecutionProfilesModel::new(&LaunchMode::new_for_unit_test(), ctx)
-        });
+        let profiles_model = app.add_singleton_model(AIExecutionProfilesModel::new);
         let llm_preferences = app.add_singleton_model(LLMPreferences::new);
 
         let custom_model_id = LLMId::from("custom-model-config-key");

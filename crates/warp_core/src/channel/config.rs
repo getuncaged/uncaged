@@ -15,7 +15,6 @@ pub struct ChannelConfig {
     /// Configuration for talking to Warp's servers.
     pub server_config: WarpServerConfig,
     /// Configuration for Oz/ambient agents.
-    pub oz_config: OzConfig,
     /// Configuration for telemetry sending, or [`None`] if telemetry should be
     /// disabled for this build.
     pub telemetry_config: Option<TelemetryConfig>,
@@ -74,37 +73,6 @@ impl WarpServerConfig {
             rtc_server_url: "ws://192.0.2.0:9".into(),
             firebase_auth_api_key: "".into(),
             iap_config: None,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct OzConfig {
-    /// Root URL for the Oz (ambient agent management) dashboard.
-    pub oz_root_url: Cow<'static, str>,
-
-    /// URL to use as the audience when issuing workload identity tokens. If [`None`], falls back
-    /// to [`WarpServerConfig::server_root_url`]. This exists so the audience is not overridden
-    /// when a custom server root URL is provided (e.g. an ngrok URL for local development).
-    pub workload_audience_url: Option<Cow<'static, str>>,
-}
-
-impl OzConfig {
-    pub fn production() -> Self {
-        Self {
-            oz_root_url: "https://oz.warp.dev".into(),
-            workload_audience_url: None,
-        }
-    }
-
-    /// Uncaged: fail-closed Oz config for the Oss channel. Oz (Warp's cloud
-    /// ambient-agent platform) does not exist in Uncaged; point its dashboard URL
-    /// at the unroutable sentinel so nothing can reach `oz.warp.dev`. See
-    /// [`WarpServerConfig::uncaged_sentinel`].
-    pub fn uncaged_sentinel() -> Self {
-        Self {
-            oz_root_url: "http://192.0.2.0:9".into(),
-            workload_audience_url: None,
         }
     }
 }

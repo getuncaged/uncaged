@@ -8,7 +8,6 @@ use warpui::{AppContext, ModelHandle, SingletonEntity, ViewHandle, WindowId};
 use super::event_listener::ChannelEventListener;
 use super::model::session::Sessions;
 use super::model_events::ModelEventDispatcher;
-use super::shell::{ShellName, ShellType};
 use super::{ShellLaunchState, TerminalManager, TerminalModel, TerminalView};
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::blocklist::SerializedBlockListItem;
@@ -35,53 +34,6 @@ impl MockTerminalManager {
         window_id: WindowId,
         ctx: &mut AppContext,
     ) -> MockTerminalManagerInit {
-        Self::create_model_internal(
-            shell_state,
-            resources,
-            restored_blocks,
-            conversation_restoration,
-            initial_size,
-            window_id,
-            false,
-            ctx,
-        )
-    }
-
-    /// Creates a cloud mode terminal: a dummy session with no local shell process, used to
-    /// compose ambient agent prompts.
-    pub fn create_cloud_mode_model(
-        resources: TerminalViewResources,
-        initial_size: Vector2F,
-        window_id: WindowId,
-        ctx: &mut AppContext,
-    ) -> MockTerminalManagerInit {
-        Self::create_model_internal(
-            ShellLaunchState::ShellSpawned {
-                available_shell: None,
-                display_name: ShellName::blank(),
-                shell_type: ShellType::Zsh,
-            },
-            resources,
-            None,
-            None,
-            initial_size,
-            window_id,
-            true,
-            ctx,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn create_model_internal(
-        shell_state: ShellLaunchState,
-        resources: TerminalViewResources,
-        restored_blocks: Option<&Vec<SerializedBlockListItem>>,
-        conversation_restoration: Option<ConversationRestorationInNewPaneType>,
-        initial_size: Vector2F,
-        window_id: WindowId,
-        is_cloud_mode: bool,
-        ctx: &mut AppContext,
-    ) -> MockTerminalManagerInit {
         // Create all the necessary channels we need for communication.
         let (wakeups_tx, wakeups_rx) = async_channel::unbounded();
         let (events_tx, events_rx) = async_channel::unbounded();
@@ -90,7 +42,7 @@ impl MockTerminalManager {
 
         let channel_event_proxy = ChannelEventListener::new(wakeups_tx, events_tx, pty_reads_tx);
 
-        let mut model = super::terminal_manager::create_terminal_model(
+        let model = super::terminal_manager::create_terminal_model(
             None,
             restored_blocks,
             initial_size,
@@ -98,7 +50,6 @@ impl MockTerminalManager {
             shell_state,
             ctx,
         );
-        model.set_is_dummy_cloud_mode_session(is_cloud_mode);
         let colors = model.colors();
         let model = Arc::new(FairMutex::new(model));
 
@@ -126,7 +77,6 @@ impl MockTerminalManager {
                 // into the web view.
                 conversation_restoration,
                 None, // inactive_pty_reads_rx
-                is_cloud_mode,
                 ctx,
             )
         });
@@ -141,20 +91,6 @@ impl MockTerminalManager {
                 std::mem::drop(model_events_dispatcher);
             });
         });
-
-        if is_cloud_mode {
-            let terminal_view_id = view.id();
-            let agent_view_controller = view.as_ref(ctx).agent_view_controller().clone();
-            let active_session = view.as_ref(ctx).active_session().clone();
-            ActiveAgentViewsModel::handle(ctx).update(ctx, |model, ctx| {
-                model.register_agent_view_controller(
-                    &agent_view_controller,
-                    &active_session,
-                    terminal_view_id,
-                    ctx,
-                );
-            });
-        }
 
         let terminal_view = view.clone();
         let terminal_manager = Self { model, view };
@@ -204,6 +140,7 @@ mod testing {
 
     use super::*;
     use crate::server::server_api::ServerApiProvider;
+    use crate::terminal::shell::{ShellName, ShellType};
 
     struct TerminalRootView {
         terminal_view: ViewHandle<TerminalView>,

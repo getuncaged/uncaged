@@ -1,6 +1,5 @@
 use pathfinder_color::ColorU;
-use warpui::elements::{Container, Element, Flex, MainAxisSize, ParentElement};
-use warpui::presenter::ChildView;
+use warpui::elements::Element;
 use warpui::{AppContext, SingletonEntity as _};
 
 use super::Input;
@@ -8,10 +7,7 @@ use crate::ai::blocklist::agent_view::shortcuts::{
     render_agent_shortcuts_view, AgentShortcutsViewContext,
 };
 use crate::ai::blocklist::agent_view::AgentViewState;
-use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::appearance::Appearance;
-use crate::context_chips::spacing;
-use crate::features::FeatureFlag;
 use crate::BlocklistAIHistoryModel;
 
 impl Input {
@@ -24,47 +20,13 @@ impl Input {
         self.render_composer(/*is_agent_view=*/ true, app)
     }
 
-    /// The composer box's border: magenta while composing a cloud handoff, neutral otherwise.
+    /// The composer box's border.
     ///
     /// Uncaged: the border no longer follows the input mode. A mode-coloured ring around the
     /// whole input made switching modes look like switching surfaces; the mode toggle already
     /// says which mode the input is in.
     pub(super) fn composer_border_color(&self, app: &AppContext) -> ColorU {
-        let theme = Appearance::as_ref(app).theme();
-        if self.handoff_compose_state.as_ref(app).is_active() {
-            theme.ansi_fg_magenta()
-        } else {
-            styles::default_border_color(theme)
-        }
-    }
-
-    /// The cloud-mode harness selector, shown above the editor while configuring a cloud agent.
-    pub(super) fn render_harness_row(&self, app: &AppContext) -> Option<Box<dyn Element>> {
-        let show_harness_row = FeatureFlag::CloudMode.is_enabled()
-            && HarnessAvailabilityModel::as_ref(app).should_show_harness_selector()
-            && self
-                .ambient_agent_view_model()
-                .is_some_and(|ambient_agent_model| {
-                    ambient_agent_model
-                        .as_ref(app)
-                        .is_configuring_ambient_agent()
-                });
-        if !show_harness_row {
-            return None;
-        }
-        let harness_selector = self.harness_selector()?;
-        // Temporarily render the harness selector in the cloud mode UDI until we fully
-        // implement the new designs.
-        let harness_row = Flex::row()
-            .with_main_axis_size(MainAxisSize::Min)
-            .with_child(ChildView::new(harness_selector).finish())
-            .finish();
-        Some(
-            Container::new(harness_row)
-                .with_padding_top(spacing::UDI_CHIP_MARGIN)
-                .with_padding_bottom(4.)
-                .finish(),
-        )
+        styles::default_border_color(Appearance::as_ref(app).theme())
     }
 
     pub(super) fn render_agent_shortcuts(&self, app: &AppContext) -> Option<Box<dyn Element>> {

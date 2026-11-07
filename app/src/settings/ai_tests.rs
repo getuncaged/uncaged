@@ -1,4 +1,5 @@
 use chrono::Utc;
+use settings_value::SettingsValue as _;
 use warp_graphql::scalars::time::ServerTimestamp;
 use warpui::{App, SingletonEntity};
 
@@ -758,4 +759,19 @@ fn test_mark_quota_banner_as_dismissed() {
             assert!(!cycle_history[2].banner_state.dismissed);
         });
     });
+}
+
+#[test]
+fn removed_cloud_agent_session_mode_falls_back_to_default() {
+    // Older builds could persist `cloud_agent`; it no longer parses, so the setting keeps its
+    // default (Terminal) instead of failing to load.
+    assert_eq!(
+        DefaultSessionMode::from_file_value(&serde_json::json!("cloud_agent")),
+        None
+    );
+    assert_eq!(
+        DefaultSessionMode::from_file_value(&serde_json::json!("agent")),
+        Some(DefaultSessionMode::Agent)
+    );
+    assert_eq!(DefaultSessionMode::default(), DefaultSessionMode::Terminal);
 }

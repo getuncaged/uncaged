@@ -8,7 +8,6 @@ use appearance_page::{AppearancePageAction, AppearanceSettingsPageView};
 use billing_and_usage_dispatch::BillingAndUsageDispatchView;
 use billing_and_usage_page::BillingAndUsagePageEvent;
 use code_page::{CodeSettingsPageAction, CodeSettingsPageEvent, CodeSubpage};
-use environments_page::EnvironmentsPageView;
 use features_page::{FeaturesPageView, FeaturesSettingsPageEvent};
 use itertools::Itertools as _;
 use keybindings::KeybindingsView;
@@ -18,7 +17,6 @@ use nav::{SettingsNavItem, SettingsUmbrella};
 use pathfinder_geometry::vector::Vector2F;
 use privacy_page::{PrivacyPageView, PrivacyPageViewEvent};
 use referrals_page::{ReferralsPageEvent, ReferralsPageView};
-use scripting_page::ScriptingSettingsPageView;
 use settings_file_footer::{render_footer, SettingsFooterKind, SettingsFooterMouseStates};
 use settings_page::{
     render_page_title, settings_card, settings_description_color, MatchData, SettingsPage,
@@ -50,7 +48,6 @@ use warpui::{
     UpdateView as _, View, ViewContext, ViewHandle,
 };
 
-use self::telemetry::SettingsTelemetryEvent;
 use crate::ai::custom_model_routers::CustomModelRouter;
 use crate::ai::execution_profiles::profiles::ClientProfileId;
 use crate::appearance::Appearance;
@@ -76,7 +73,6 @@ use crate::{GlobalResourceHandlesProvider, TelemetryEvent};
 
 mod about_page;
 mod admin_actions;
-mod agent_assisted_environment_modal;
 mod ai_page;
 mod appearance_page;
 mod billing_and_usage;
@@ -87,13 +83,10 @@ mod code_page;
 pub(crate) mod custom_inference_modal;
 mod custom_router_view;
 mod customize_ui_page;
-mod delete_environment_confirmation_dialog;
 mod directory_color_add_picker;
-pub(crate) mod environments_page;
 mod execution_profile_view;
 mod features;
 mod features_page;
-pub(crate) mod handoff_environment_creation_modal;
 pub mod keybindings;
 mod main_page;
 pub mod mcp_servers;
@@ -106,18 +99,15 @@ mod privacy;
 mod privacy_page;
 mod referrals_page;
 mod remove_custom_endpoint_confirmation_dialog;
-mod scripting_page;
 mod set_default_model_modal;
 mod settings_file_footer;
 pub(crate) mod settings_page;
 mod show_blocks_view;
 mod tab_menu;
 mod teams_page;
-mod telemetry;
 mod theme_creator_page;
 mod theme_gallery_page;
 mod transfer_ownership_confirmation_modal;
-pub mod update_environment_form;
 mod warp_drive_page;
 mod warpify_page;
 
@@ -259,7 +249,6 @@ pub enum SettingsSection {
     Keybindings,
     Privacy,
     Referrals,
-    Scripting,
     SharedBlocks,
     Teams,
     WarpDrive,
@@ -291,7 +280,6 @@ pub enum SettingsSection {
     CodeIndexing,
     EditorAndCodeReview,
     // ── Cloud platform umbrella subpages ──
-    CloudEnvironments,
     OzCloudAPIKeys,
 }
 
@@ -306,7 +294,6 @@ impl Display for SettingsSection {
             SettingsSection::Keybindings => write!(f, "Keyboard shortcuts"),
             SettingsSection::SharedBlocks => write!(f, "Shared blocks"),
             SettingsSection::MCPServers => write!(f, "MCP Servers"),
-            SettingsSection::Scripting => write!(f, "Scripting"),
             SettingsSection::WarpDrive => write!(f, "Warp Drive"),
             SettingsSection::CustomizeUi => write!(f, "Interface"),
             SettingsSection::ThemeCreator => write!(f, "Theme creator"),
@@ -318,7 +305,6 @@ impl Display for SettingsSection {
             SettingsSection::ThirdPartyCLIAgents => write!(f, "CLI agents"),
             SettingsSection::CodeIndexing => write!(f, "Indexing and projects"),
             SettingsSection::EditorAndCodeReview => write!(f, "Editor and code review"),
-            SettingsSection::CloudEnvironments => write!(f, "Environments"),
             SettingsSection::OzCloudAPIKeys => write!(f, "Oz Cloud API Keys"),
             _ => write!(f, "{self:?}"),
         }
@@ -350,7 +336,7 @@ impl SettingsSection {
 
     /// Returns true if this section is a subpage under the "Cloud platform" umbrella.
     pub fn is_cloud_platform_subpage(&self) -> bool {
-        matches!(self, Self::CloudEnvironments | Self::OzCloudAPIKeys)
+        matches!(self, Self::OzCloudAPIKeys)
     }
 
     /// Maps subpage sections back to their parent page section for page lookup.
@@ -363,8 +349,8 @@ impl SettingsSection {
             s if s.is_ai_subpage() => Self::AI,
             // Code subpages render within the Code page.
             s if s.is_code_subpage() => Self::Code,
-            // CloudEnvironments and OzCloudAPIKeys ARE their own backing pages
-            // (1:1 mapping), so they return themselves.
+            // OzCloudAPIKeys IS its own backing page
+            // (1:1 mapping), so it returns itself.
             other => *other,
         }
     }
@@ -387,7 +373,7 @@ impl SettingsSection {
 
     /// The ordered list of Cloud platform subpage sections.
     pub fn cloud_platform_subpages() -> &'static [Self] {
-        &[Self::CloudEnvironments, Self::OzCloudAPIKeys]
+        &[Self::OzCloudAPIKeys]
     }
 }
 
@@ -407,7 +393,6 @@ impl FromStr for SettingsSection {
             "Keyboard shortcuts" => Ok(Self::Keybindings),
             "Privacy" => Ok(Self::Privacy),
             "Referrals" => Ok(Self::Referrals),
-            "Scripting" => Ok(Self::Scripting),
             "Shared blocks" => Ok(Self::SharedBlocks),
             "Teams" => Ok(Self::Teams),
             "Warpify" => Ok(Self::Warpify),
@@ -424,7 +409,6 @@ impl FromStr for SettingsSection {
             "Editor and code review" | "Editor and Code Review" | "EditorAndCodeReview" => {
                 Ok(Self::EditorAndCodeReview)
             }
-            "CloudEnvironments" => Ok(Self::CloudEnvironments),
             "Oz Cloud API Keys" | "OzCloudAPIKeys" => Ok(Self::OzCloudAPIKeys),
             _ => Err(()),
         }
@@ -997,7 +981,7 @@ enum NavStop {
 /// The space above the settings page's title.
 const PAGE_TITLE_TOP_PADDING: f32 = 24.;
 
-/// The label of the sidebar group that holds app-wide pages (and Scripting, when enabled).
+/// The label of the sidebar group that holds app-wide pages.
 const APP_GROUP_LABEL: &str = "App";
 
 /// The Uncaged settings sidebar, in order — the single source of truth for
@@ -1141,9 +1125,7 @@ macro_rules! update_page {
             SettingsPageViewHandle::OzCloudAPIKeys(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Privacy(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Referrals(handle) => $ctx.update_view(handle, $update),
-            SettingsPageViewHandle::Scripting(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::AI(handle) => $ctx.update_view(handle, $update),
-            SettingsPageViewHandle::CloudEnvironments(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::About(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::Code(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::BillingAndUsage(handle) => $ctx.update_view(handle, $update),
@@ -1166,7 +1148,6 @@ pub struct SettingsView {
     clipped_scroll_state: ClippedScrollStateHandle,
     context_menu: ViewHandle<Menu<SettingsAction>>,
     context_menu_state: Option<Vector2F>,
-    environments_page_handle: ViewHandle<EnvironmentsPageView>,
     /// Sidebar navigation items (pages + umbrellas).
     nav_items: Vec<SettingsNavItem>,
     /// Handle to the AI settings page, used to switch subpage modes.
@@ -1239,12 +1220,6 @@ impl SettingsView {
             me.handle_ai_page_event(event, ctx);
         });
 
-        // Environments page
-        let environments_page_handle = ctx.add_typed_action_view(EnvironmentsPageView::new);
-        ctx.subscribe_to_view(&environments_page_handle, |me, _, event, ctx| {
-            me.handle_environments_page_event(event, ctx);
-        });
-
         // Billing & Usage page (internally, this routes to the v1 or v2 version. Depending on FFs and current plan).
         let billing_and_usage_handle = ctx.add_view(BillingAndUsageDispatchView::new);
         ctx.subscribe_to_view(&billing_and_usage_handle, |me, _, event, ctx| {
@@ -1293,11 +1268,6 @@ impl SettingsView {
         ctx.subscribe_to_view(&referrals_page_handle, |me, _, event, ctx| {
             me.handle_referrals_page_event(event, ctx);
         });
-        let scripting_page_handle = if FeatureFlag::WarpControlCli.is_enabled() {
-            Some(ctx.add_typed_action_view(ScriptingSettingsPageView::new))
-        } else {
-            None
-        };
 
         // Warp Drive page
         let warp_drive_page_handle =
@@ -1374,13 +1344,8 @@ impl SettingsView {
             SettingsPage::new(theme_creator_page_handle),
         ];
 
-        if let Some(scripting_page_handle) = scripting_page_handle {
-            settings_pages.push(SettingsPage::new(scripting_page_handle));
-        }
-
         settings_pages.extend(vec![
             SettingsPage::new(mcp_servers_page_handle),
-            SettingsPage::new(environments_page_handle.clone()),
             SettingsPage::new(privacy_page_handle),
             SettingsPage::new(about_page_handle),
         ]);
@@ -1390,27 +1355,11 @@ impl SettingsView {
         //
         // Uncaged is a free, local, account-free, BYO-model terminal, so the sidebar
         // lists only the sections that apply. The cloud/account-era pages — Account,
-        // Billing and usage, Cloud platform (Environments + Cloud API Keys), Teams,
+        // Billing and usage, Cloud platform (Cloud API Keys), Teams,
         // Referrals, Shared blocks, Warp Drive, Warpify, and Privacy — are dropped from
         // the nav. Their page handles remain constructed (so nothing else breaks); they
         // are simply not navigable.
         let mut nav_items = base_nav_items();
-
-        if FeatureFlag::WarpControlCli.is_enabled() {
-            // Scripting sits in the App group, just above About.
-            for item in &mut nav_items {
-                if let SettingsNavItem::Umbrella(group) = item {
-                    if group.label == APP_GROUP_LABEL {
-                        let about_index = group
-                            .subpages
-                            .iter()
-                            .position(|section| *section == SettingsSection::About)
-                            .unwrap_or(group.subpages.len());
-                        group.insert_subpage(about_index, SettingsSection::Scripting);
-                    }
-                }
-            }
-        }
 
         // Resolve the initial page: map internal backing-page sections to their default subpage.
         // Uncaged has no Account page in the nav, so anything that used to fall
@@ -1418,9 +1367,6 @@ impl SettingsView {
         let initial_page = match page {
             Some(SettingsSection::AI) => SettingsSection::WarpAgent,
             Some(SettingsSection::Code) => SettingsSection::CodeIndexing,
-            Some(SettingsSection::Scripting) if !FeatureFlag::WarpControlCli.is_enabled() => {
-                SettingsSection::WarpAgent
-            }
             Some(SettingsSection::Account) | None => SettingsSection::WarpAgent,
             Some(section) if section.is_subpage() => section,
             Some(other) => other,
@@ -1450,7 +1396,6 @@ impl SettingsView {
             clipped_scroll_state: Default::default(),
             context_menu,
             context_menu_state: Default::default(),
-            environments_page_handle,
             nav_items,
             ai_page_handle: ai_page_handle_for_nav,
             code_page_handle: code_page_handle_for_nav,
@@ -1826,29 +1771,9 @@ impl SettingsView {
     ) {
         match event {
             SettingsPageEvent::FocusModal => ctx.focus(&self.search_editor),
-            SettingsPageEvent::Pane(_)
-            | SettingsPageEvent::EnvironmentSetupModeSelectorToggled { .. }
-            | SettingsPageEvent::AgentAssistedEnvironmentModalToggled { .. } => {
+            SettingsPageEvent::Pane(_) => {
                 // These events are not handled in standalone settings - only used
                 // when the view is hosted inside a pane.
-            }
-        }
-    }
-
-    fn handle_environments_page_event(
-        &mut self,
-        event: &SettingsPageEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            SettingsPageEvent::FocusModal => ctx.focus(&self.search_editor),
-            SettingsPageEvent::EnvironmentSetupModeSelectorToggled { .. }
-            | SettingsPageEvent::AgentAssistedEnvironmentModalToggled { .. } => {
-                // Re-render so the modal overlay is shown/hidden.
-                ctx.notify();
-            }
-            SettingsPageEvent::Pane(_) => {
-                // Not applicable in standalone settings view.
             }
         }
     }
@@ -1873,9 +1798,7 @@ impl SettingsView {
     ) {
         match event {
             SettingsPageEvent::FocusModal => ctx.focus(&self.search_editor),
-            SettingsPageEvent::Pane(_)
-            | SettingsPageEvent::EnvironmentSetupModeSelectorToggled { .. }
-            | SettingsPageEvent::AgentAssistedEnvironmentModalToggled { .. } => {
+            SettingsPageEvent::Pane(_) => {
                 // These events are not handled in standalone settings - only used
                 // when the view is hosted inside a pane.
             }
@@ -2107,9 +2030,6 @@ impl SettingsView {
             self.set_theme_gallery_picking(None, ctx);
         }
         self.current_settings_page = section;
-        if previous_section != section && section == SettingsSection::CloudEnvironments {
-            send_telemetry_from_ctx!(SettingsTelemetryEvent::EnvironmentsPageOpened, ctx);
-        }
 
         // When navigating to a subpage, update the backing page's active subpage mode
         // and auto-expand the umbrella containing it.
@@ -2181,9 +2101,7 @@ impl SettingsView {
             SettingsPageViewHandle::Privacy(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Warpify(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Referrals(v) => v.as_ref(app).should_render(app),
-            SettingsPageViewHandle::Scripting(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::AI(v) => v.as_ref(app).should_render(app),
-            SettingsPageViewHandle::CloudEnvironments(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::MCPServers(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Code(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::WarpDrive(v) => v.as_ref(app).should_render(app),
@@ -2778,24 +2696,6 @@ impl View for SettingsView {
                     ChildAnchor::Center,
                 ),
             );
-        }
-
-        // Render environment setup mode selector overlay when open.
-        if let Some(selector_handle) = self
-            .environments_page_handle
-            .as_ref(app)
-            .environment_setup_mode_selector_handle()
-        {
-            stack.add_child(ChildView::new(selector_handle).finish());
-        }
-
-        // Render agent-assisted environment modal overlay when open.
-        if let Some(modal_handle) = self
-            .environments_page_handle
-            .as_ref(app)
-            .agent_assisted_environment_modal_handle(app)
-        {
-            stack.add_child(ChildView::new(modal_handle).finish());
         }
 
         SavePosition::new(stack.finish(), POSITION_ID).finish()

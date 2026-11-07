@@ -7,8 +7,7 @@ use url::{Origin, ParseError, Url};
 
 use super::Channel;
 use crate::channel::config::{
-    ChannelConfig, IapConfig, McpOAuthProviderConfig, OzConfig, RudderStackDestination,
-    WarpServerConfig,
+    ChannelConfig, IapConfig, McpOAuthProviderConfig, RudderStackDestination, WarpServerConfig,
 };
 use crate::features::FeatureFlag;
 use crate::AppId;
@@ -49,7 +48,6 @@ impl ChannelState {
                 // a code path we missed — defense-in-depth behind the per-site
                 // gates. telemetry/autoupdate are already None.
                 server_config: WarpServerConfig::uncaged_sentinel(),
-                oz_config: OzConfig::uncaged_sentinel(),
                 telemetry_config: None,
                 autoupdate_config: None,
                 mcp_static_config: None,
@@ -239,10 +237,6 @@ impl ChannelState {
         }
     }
 
-    pub fn oz_root_url() -> Cow<'static, str> {
-        CHANNEL_STATE.lock().config.oz_config.oz_root_url.clone()
-    }
-
     pub fn server_root_url() -> Cow<'static, str> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "test-util")] {
@@ -253,15 +247,10 @@ impl ChannelState {
         }
     }
 
+    /// The audience for workload identity tokens. Uncaged has no Oz config, so this is
+    /// always the server root URL.
     pub fn workload_audience_url() -> Cow<'static, str> {
-        let state = CHANNEL_STATE.lock();
-        match &state.config.oz_config.workload_audience_url {
-            Some(url) => url.clone(),
-            None => {
-                drop(state);
-                Self::server_root_url()
-            }
-        }
+        Self::server_root_url()
     }
 
     // Returns the origin url, with scheme, domain, and ports (if any)

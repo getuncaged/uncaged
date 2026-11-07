@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use itertools::Itertools as _;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::channel::ChannelState;
 use warp_core::ui::appearance::Appearance;
 use warpui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow,
@@ -12,7 +11,6 @@ use warpui::elements::{
     Text,
 };
 use warpui::platform::Cursor;
-use warpui::ui_components::components::UiComponent;
 use warpui::{AppContext, Element, EventContext, SingletonEntity};
 
 use crate::ai::AIRequestUsageModel;
@@ -472,37 +470,13 @@ fn render_row_card(
         row.subject_type,
         AiCreditsUsageAndCostSubjectType::ServiceAccount
     );
-    // Service accounts with a known UID deep-link to their Oz agent page,
-    // mirroring the web admin panel's `getOzAgentHref` behavior.
-    let agent_href = if is_service_account {
-        row.subject_uid.as_deref().map(|uid| {
-            format!(
-                "{}/agents/{}",
-                ChannelState::oz_root_url(),
-                urlencoding::encode(uid)
-            )
-        })
-    } else {
-        None
-    };
-
-    let display_name_element: Box<dyn Element> = if let Some(href) = agent_href {
-        let link_state =
-            mouse_states.tooltip_mouse_state(&format!("{}__agent_link", row.subject_key));
-        appearance
-            .ui_builder()
-            .link(row.display_name.clone(), Some(href), None, link_state)
-            .build()
-            .finish()
-    } else {
-        Text::new_inline(
-            row.display_name.clone(),
-            appearance.ui_font_family(),
-            appearance.ui_font_size(),
-        )
-        .with_color(main)
-        .finish()
-    };
+    let display_name_element = Text::new_inline(
+        row.display_name.clone(),
+        appearance.ui_font_family(),
+        appearance.ui_font_size(),
+    )
+    .with_color(main)
+    .finish();
 
     let mut name_row = Flex::row()
         .with_cross_axis_alignment(CrossAxisAlignment::Center)

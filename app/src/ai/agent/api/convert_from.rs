@@ -765,11 +765,10 @@ impl ConvertAPIToolCallToAIAgentAction for api::message::ToolCall {
             api::message::tool_call::Tool::TransferShellCommandControlToUser(
                 transfer_shell_command_control_to_user,
             ) => create_standard_action(transfer_shell_command_control_to_user.into()),
-            api::message::tool_call::Tool::UseComputer(use_computer) => {
-                create_standard_action(use_computer.try_into()?)
-            }
-            api::message::tool_call::Tool::RequestComputerUse(request_computer_use) => {
-                create_standard_action(request_computer_use.into())
+            // Uncaged has no computer-use executor; these tool calls have no client representation.
+            api::message::tool_call::Tool::UseComputer(_)
+            | api::message::tool_call::Tool::RequestComputerUse(_) => {
+                Ok(MaybeAIAgentAction::NoClientRepresentation)
             }
             api::message::tool_call::Tool::Subagent(subagent) => {
                 use api::message::tool_call::subagent::conversation_search_metadata::Target;

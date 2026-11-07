@@ -12,7 +12,7 @@ fn make_conversation_notification(
         "test".to_owned(),
         "msg".to_owned(),
         NotificationCategory::Complete,
-        NotificationSourceAgent::Oz { is_ambient: false },
+        NotificationSourceAgent::Oz,
         NotificationOrigin::Conversation(conversation_id),
         false,
         terminal_view_id,
@@ -28,7 +28,6 @@ fn make_cli_session_notification(terminal_view_id: EntityId) -> NotificationItem
         NotificationCategory::Complete,
         NotificationSourceAgent::CLI {
             agent: CLIAgent::Claude,
-            is_ambient: false,
         },
         NotificationOrigin::CLISession(terminal_view_id),
         false,

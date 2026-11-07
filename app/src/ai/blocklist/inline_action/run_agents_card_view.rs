@@ -13,9 +13,8 @@ use ai::skills::SkillReference;
 use pathfinder_geometry::vector::vec2f;
 use warp_core::send_telemetry_from_ctx;
 use warpui::elements::{
-    Border, ChildAnchor, ChildView, Container, CornerRadius, CrossAxisAlignment, Empty, Flex,
-    MainAxisSize, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
-    Stack, Text,
+    Border, ChildView, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, MainAxisSize,
+    OffsetPositioning, ParentElement, Radius, Stack, Text,
 };
 use warpui::keymap::FixedBinding;
 use warpui::{
@@ -33,9 +32,6 @@ use crate::ai::blocklist::agent_view::orchestration_pill_bar::render_static_agen
 use crate::ai::blocklist::block::model::AIBlockModel;
 use crate::ai::blocklist::block::view_impl::WithContentItemSpacing;
 use crate::ai::blocklist::block::AIBlock;
-use crate::ai::blocklist::inline_action::create_environment_modal::{
-    CreateEnvironmentModal, CreateEnvironmentModalEvent,
-};
 use crate::ai::blocklist::inline_action::host_picker::{HostPicker, HostPickerEvent};
 use crate::ai::blocklist::inline_action::inline_action_header::{HeaderConfig, InteractionMode};
 use crate::ai::blocklist::inline_action::inline_action_icons;
@@ -51,12 +47,7 @@ use crate::ai::blocklist::telemetry::{
     OrchestrationExecutionModeKind, OrchestrationHarnessKind, RunAgentsCardDecision,
     RunAgentsCardDecisionEvent,
 };
-use crate::ai::connected_self_hosted_workers::{
-    ConnectedSelfHostedWorkersEvent, ConnectedSelfHostedWorkersModel,
-};
-use crate::ai::harness_availability::{
-    AuthSecretFetchState, HarnessAvailabilityEvent, HarnessAvailabilityModel,
-};
+use crate::ai::harness_availability::{HarnessAvailabilityEvent, HarnessAvailabilityModel};
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
 use crate::appearance::Appearance;
 use crate::menu::{Event as MenuEvent, Menu, MenuItemFields, MenuVariant};
@@ -161,14 +152,8 @@ impl OrchestrationControlAction for RunAgentsCardViewAction {
     fn environment_changed(environment_id: String) -> Self {
         Self::EnvironmentChanged { environment_id }
     }
-    fn create_environment_requested() -> Self {
-        Self::CreateEnvironmentRequested
-    }
     fn auth_secret_changed(auth_secret_name: Option<String>) -> Self {
         Self::AuthSecretChanged { auth_secret_name }
-    }
-    fn create_new_auth_secret_requested() -> Self {
-        Self::CreateNewAuthSecretRequested
     }
 }
 
@@ -186,27 +171,12 @@ pub enum RunAgentsCardViewAction {
     AcceptWithoutOrchestration,
     ToggleAcceptMenu,
     Reject,
-    ExecutionModeToggled {
-        is_remote: bool,
-    },
-    ModelChanged {
-        model_id: String,
-    },
-    HarnessChanged {
-        harness_type: String,
-    },
-    EnvironmentChanged {
-        environment_id: String,
-    },
-    CreateEnvironmentRequested,
-    WorkerHostChanged {
-        worker_host: String,
-    },
-    AuthSecretChanged {
-        auth_secret_name: Option<String>,
-    },
-    /// User picked the "New API key…" item; opens the workspace create modal.
-    CreateNewAuthSecretRequested,
+    ExecutionModeToggled { is_remote: bool },
+    ModelChanged { model_id: String },
+    HarnessChanged { harness_type: String },
+    EnvironmentChanged { environment_id: String },
+    WorkerHostChanged { worker_host: String },
+    AuthSecretChanged { auth_secret_name: Option<String> },
 }
 
 #[derive(Clone, Debug)]
@@ -233,7 +203,6 @@ pub struct RunAgentsCardView {
     /// UI-only per-harness model memory so switching harnesses preserves
     /// the user's previous model selection for each harness.
     saved_model_per_harness: HashMap<String, String>,
-    create_environment_modal: ViewHandle<CreateEnvironmentModal>,
     /// Snapshot of the latest raw `RunAgentsRequest` from the LLM
     /// stream. Used at decision time to diff the run-wide config
     /// fields the user changed before accepting.
@@ -242,9 +211,6 @@ pub struct RunAgentsCardView {
     entered_event_emitted: bool,
     /// Guards the terminal decision event against double-fires.
     decision_event_emitted: bool,
-    /// One-shot guard: cancelling the auto-popped modal must not re-pop.
-    /// Reset on harness / execution-mode change.
-    has_auto_opened_create_modal: bool,
 }
 
 /// Resolves UI-only interactive defaults on edit state that has
@@ -269,15 +235,8 @@ fn resolve_interactive_defaults(
             }
         }
     }
-    if let RunAgentsExecutionMode::Remote {
-        environment_id,
-        worker_host,
-        ..
-    } = &state.orch.execution_mode
-    {
-        let needs_host = worker_host.is_empty();
-        let needs_env = environment_id.is_empty();
-        if needs_host {
+    if let RunAgentsExecutionMode::Remote { worker_host, .. } = &state.orch.execution_mode {
+        if worker_host.is_empty() {
             // Prefer the workspace default (or the dev env-var override)
             // over the bare "warp" fallback so self-hosted teams see
             // their default pre-selected. Mirrors the Oz webapp's
@@ -285,11 +244,6 @@ fn resolve_interactive_defaults(
             let default_host = oc::resolve_default_host_slug(ctx)
                 .unwrap_or_else(|| oc::ORCHESTRATION_WARP_WORKER_HOST.to_string());
             state.orch.set_worker_host(default_host);
-        }
-        if needs_env {
-            if let Some(default_env) = oc::resolve_default_environment_id(ctx) {
-                state.orch.set_environment_id(default_env);
-            }
         }
     }
 }
@@ -387,7 +341,6 @@ impl RunAgentsCardView {
                 resolve_interactive_defaults(&mut me.state, &*me.block_model, ctx);
                 oc::repopulate_all_pickers(&mut me.state.orch, &me.handles.pickers, ctx);
                 me.refresh_accept_button_state(ctx);
-                me.maybe_auto_open_create_modal(ctx);
                 if let Some(conversation_id) = me.block_model.conversation_id(ctx) {
                     me.emit_orchestration_entered_once(conversation_id, ctx);
                 }
@@ -421,51 +374,19 @@ impl RunAgentsCardView {
         ctx.subscribe_to_model(
             &HarnessAvailabilityModel::handle(ctx),
             |me, _, event, ctx| match event {
-                HarnessAvailabilityEvent::AuthSecretCreated { harness, name } => {
-                    // Adopt the new secret before repopulating the picker.
-                    oc::apply_created_auth_secret_if_matches(
-                        &mut me.state.orch,
-                        *harness,
-                        name,
-                        ctx,
-                    );
-                    oc::repopulate_all_pickers(&mut me.state.orch, &me.handles.pickers, ctx);
-                    me.refresh_accept_button_state(ctx);
-                    ctx.notify();
-                }
-                HarnessAvailabilityEvent::Changed
+                HarnessAvailabilityEvent::AuthSecretCreated { .. }
+                | HarnessAvailabilityEvent::Changed
                 | HarnessAvailabilityEvent::AuthSecretsLoaded
                 | HarnessAvailabilityEvent::AuthSecretsFetchFailed => {
                     // Repopulate even on fetch failure to replace "Loading…".
                     oc::repopulate_all_pickers(&mut me.state.orch, &me.handles.pickers, ctx);
                     me.refresh_accept_button_state(ctx);
-                    me.maybe_auto_open_create_modal(ctx);
                     ctx.notify();
                 }
                 HarnessAvailabilityEvent::AuthSecretCreationFailed { .. } => {}
             },
         );
 
-        let create_environment_modal = ctx.add_typed_action_view(CreateEnvironmentModal::new);
-        ctx.subscribe_to_view(&create_environment_modal, |me, _, event, ctx| match event {
-            CreateEnvironmentModalEvent::Created { environment_id } => {
-                me.select_created_environment(environment_id.clone(), ctx);
-            }
-            CreateEnvironmentModalEvent::Cancelled => {
-                ctx.notify();
-            }
-        });
-
-        ctx.subscribe_to_model(
-            &ConnectedSelfHostedWorkersModel::handle(ctx),
-            |me, _, event, ctx| match event {
-                ConnectedSelfHostedWorkersEvent::Changed => {
-                    oc::repopulate_all_pickers(&mut me.state.orch, &me.handles.pickers, ctx);
-                    me.refresh_accept_button_state(ctx);
-                    ctx.notify();
-                }
-            },
-        );
         // When auto_launched is true, execution is deferred to the
         // ActionBlockedOnUserConfirmation subscription above — the action
         // hasn't been queued in pending_actions yet at construction time.
@@ -485,18 +406,15 @@ impl RunAgentsCardView {
             action_model,
             block_model,
             saved_model_per_harness: HashMap::new(),
-            create_environment_modal,
             original_tool_call_request,
             entered_event_emitted: false,
             decision_event_emitted: false,
-            has_auto_opened_create_modal: false,
         };
 
         view.ensure_pickers(ctx);
         view.refresh_accept_button_state(ctx);
         // No-ops if secrets are still in flight; the `AuthSecretsLoaded`
         // subscription will retry once they resolve.
-        view.maybe_auto_open_create_modal(ctx);
 
         view
     }
@@ -541,13 +459,10 @@ impl RunAgentsCardView {
                 || self.state.orch.execution_mode != new_state.orch.execution_mode;
             self.state = new_state;
             if harness_or_model_changed {
-                // Repopulate pickers and re-arm auto-open for the newly-
-                // streamed harness.
+                // Repopulate pickers for the newly-streamed harness.
                 oc::repopulate_all_pickers(&mut self.state.orch, &self.handles.pickers, ctx);
-                self.has_auto_opened_create_modal = false;
             }
             self.refresh_accept_button_state(ctx);
-            self.maybe_auto_open_create_modal(ctx);
             ctx.notify();
         }
     }
@@ -645,59 +560,6 @@ impl RunAgentsCardView {
         );
     }
 
-    /// Auto-pops the create-key modal once per card per harness/mode
-    /// change when the harness has no loaded secrets and selection is
-    /// `Unset`. Cancelling leaves the picker on "+ New API key…"; the
-    /// user can reopen the modal by clicking that item.
-    fn maybe_auto_open_create_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        if self.has_auto_opened_create_modal {
-            return;
-        }
-        // Skip non-interactive card states (render short-circuits to a
-        // status-only card; the user can't act on a popped modal).
-        if self.spawning.is_some() {
-            return;
-        }
-        if self.block_model.is_restored() {
-            return;
-        }
-        if matches!(
-            self.action_model
-                .as_ref(ctx)
-                .get_action_status(&self.action_id),
-            Some(AIActionStatus::Finished(_)) | Some(AIActionStatus::RunningAsync)
-        ) {
-            return;
-        }
-        if !oc::should_show_auth_secret_picker(&self.state.orch) {
-            return;
-        }
-        if !matches!(
-            self.state.orch.auth_secret_selection,
-            AuthSecretSelection::Unset
-        ) {
-            return;
-        }
-        let Some(harness) =
-            warp_cli::agent::Harness::parse_orchestration_harness(&self.state.orch.harness_type)
-        else {
-            return;
-        };
-        // Only auto-open on `Loaded([])`. Other fetch states are
-        // ambiguous; the `AuthSecretsLoaded` subscription will retry.
-        let has_zero_loaded = matches!(
-            HarnessAvailabilityModel::as_ref(ctx).auth_secrets_for(harness),
-            AuthSecretFetchState::Loaded(secrets) if secrets.is_empty()
-        );
-        if !has_zero_loaded {
-            return;
-        }
-        self.has_auto_opened_create_modal = true;
-        ctx.dispatch_typed_action(
-            &crate::workspace::WorkspaceAction::OpenCreateAuthSecretModal { harness },
-        );
-    }
-
     /// Re-derives the Accept button's `disabled` + tooltip from the gate.
     /// Call after every code path that mutates `self.state.orch`.
     fn refresh_accept_button_state(&mut self, ctx: &mut ViewContext<Self>) {
@@ -790,11 +652,7 @@ impl RunAgentsCardView {
             });
             oc::populate_host_picker(&handle, initial_host, ctx);
             ctx.subscribe_to_view(&handle, |me, _, event, ctx| match event {
-                HostPickerEvent::Opened => {
-                    ConnectedSelfHostedWorkersModel::handle(ctx).update(ctx, |model, ctx| {
-                        model.refresh(ctx);
-                    });
-                }
+                HostPickerEvent::Opened => {}
                 HostPickerEvent::HostChanged { slug } => {
                     ctx.dispatch_typed_action(&RunAgentsCardViewAction::WorkerHostChanged {
                         worker_host: slug.clone(),
@@ -895,24 +753,6 @@ impl RunAgentsCardView {
 
     fn sync_picker_selections(&mut self, ctx: &mut ViewContext<Self>) {
         oc::sync_picker_selections(&self.state.orch, &self.handles.pickers, ctx);
-    }
-
-    fn open_create_environment_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(environment_picker) = &self.handles.pickers.environment_picker {
-            environment_picker.update(ctx, |dropdown, ctx| dropdown.close(ctx));
-        }
-        self.create_environment_modal.update(ctx, |modal, ctx| {
-            modal.show(ctx);
-        });
-        ctx.notify();
-    }
-
-    fn select_created_environment(&mut self, environment_id: String, ctx: &mut ViewContext<Self>) {
-        self.state.orch.set_environment_id(environment_id.clone());
-        if let Some(environment_picker) = &self.handles.pickers.environment_picker {
-            oc::populate_environment_picker(environment_picker, &environment_id, ctx);
-        }
-        ctx.notify();
     }
 
     fn toggle_accept_menu(&mut self, ctx: &mut ViewContext<Self>) {
@@ -1018,18 +858,6 @@ impl View for RunAgentsCardView {
             );
         }
 
-        if self.create_environment_modal.as_ref(app).is_visible() {
-            root_stack.add_positioned_overlay_child(
-                ChildView::new(&self.create_environment_modal).finish(),
-                OffsetPositioning::offset_from_parent(
-                    vec2f(0., 0.),
-                    ParentOffsetBounds::WindowByPosition,
-                    ParentAnchor::Center,
-                    ChildAnchor::Center,
-                ),
-            );
-        }
-
         root_stack.finish()
     }
 }
@@ -1065,11 +893,7 @@ impl TypedActionView for RunAgentsCardView {
                     |ctx| block_model.base_model(ctx).map(|id| id.to_string()),
                     ctx,
                 );
-                // Mode change can newly reveal the auth picker (Local
-                // → Cloud) — give the user a fresh auto-open prompt.
-                self.has_auto_opened_create_modal = false;
                 self.refresh_accept_button_state(ctx);
-                self.maybe_auto_open_create_modal(ctx);
                 ctx.notify();
             }
             RunAgentsCardViewAction::ModelChanged { model_id } => {
@@ -1087,21 +911,13 @@ impl TypedActionView for RunAgentsCardView {
                     |ctx| block_model.base_model(ctx).map(|id| id.to_string()),
                     ctx,
                 );
-                // Harness change resets per-harness selection state, so
-                // give the new harness a fresh auto-open prompt.
-                self.has_auto_opened_create_modal = false;
                 self.refresh_accept_button_state(ctx);
-                self.maybe_auto_open_create_modal(ctx);
                 ctx.notify();
             }
             RunAgentsCardViewAction::EnvironmentChanged { environment_id } => {
                 self.state.orch.set_environment_id(environment_id.clone());
-                oc::persist_environment_selection(environment_id, ctx);
                 self.refresh_accept_button_state(ctx);
                 ctx.notify();
-            }
-            RunAgentsCardViewAction::CreateEnvironmentRequested => {
-                self.open_create_environment_modal(ctx);
             }
             RunAgentsCardViewAction::WorkerHostChanged { worker_host } => {
                 self.state.orch.set_worker_host(worker_host.clone());
@@ -1116,18 +932,6 @@ impl TypedActionView for RunAgentsCardView {
                     auth_secret_name.clone(),
                     ctx,
                 );
-                self.refresh_accept_button_state(ctx);
-                ctx.notify();
-            }
-            RunAgentsCardViewAction::CreateNewAuthSecretRequested => {
-                oc::apply_create_new_auth_secret_requested(&mut self.state.orch, ctx);
-                if let Some(harness) = warp_cli::agent::Harness::parse_orchestration_harness(
-                    &self.state.orch.harness_type,
-                ) {
-                    ctx.dispatch_typed_action(
-                        &crate::workspace::WorkspaceAction::OpenCreateAuthSecretModal { harness },
-                    );
-                }
                 self.refresh_accept_button_state(ctx);
                 ctx.notify();
             }
@@ -1502,14 +1306,6 @@ fn render_editor(
         column.add_child(oc::render_validation_error(
             reason,
             theme.ui_error_color(),
-            appearance,
-        ));
-    } else if let Some(message) =
-        oc::empty_env_recommendation_message(&state.orch.execution_mode, app)
-    {
-        column.add_child(oc::render_validation_error(
-            message,
-            theme.ui_warning_color(),
             appearance,
         ));
     }

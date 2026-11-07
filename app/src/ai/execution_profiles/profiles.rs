@@ -23,7 +23,7 @@ use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ClientId, SyncId};
 use crate::settings::AgentModeCommandExecutionPredicate;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{send_telemetry_from_ctx, CloudModel, LaunchMode, TelemetryEvent};
+use crate::{send_telemetry_from_ctx, CloudModel, TelemetryEvent};
 
 /// ExecutionProfileId is the identifier that users of the AIExecutionProfilesModel use
 /// to refer back to a specific profile. These are unique across the lifespan of the app.
@@ -79,13 +79,6 @@ pub enum DefaultProfileState {
     Synced {
         id: ClientProfileId,
     },
-    /// Currently, the behavior of the CLI default is that it
-    /// cannot be updated and will never be synced.
-    #[allow(dead_code)]
-    Cli {
-        id: ClientProfileId,
-        profile: AIExecutionProfile,
-    },
 }
 
 impl std::fmt::Display for DefaultProfileState {
@@ -93,7 +86,6 @@ impl std::fmt::Display for DefaultProfileState {
         match self {
             DefaultProfileState::Unsynced { .. } => write!(f, "Unsynced"),
             DefaultProfileState::Synced { .. } => write!(f, "Synced"),
-            DefaultProfileState::Cli { .. } => write!(f, "CLI"),
         }
     }
 }
@@ -103,21 +95,19 @@ impl DefaultProfileState {
         match self {
             DefaultProfileState::Unsynced { id, .. } => *id,
             DefaultProfileState::Synced { id } => *id,
-            DefaultProfileState::Cli { id, .. } => *id,
         }
     }
 }
 
 pub struct AIExecutionProfilesModel {
-    /// The default profile can be in one of three states:
+    /// The default profile can be in one of two states:
     /// - Unsynced: No cloud object backing the profile. It's purely local read-only data.
     /// - Synced: A cloud object backs the profile, created either when edited locally or received from cloud.
-    /// - CLI: When running in CLI mode, a more permissive default profile that doesn't sync to cloud.
     ///
     /// Note that the default_profile_state becomes synced either (1) when an edit happens on
     /// this client or (2) when a default profile is received from the cloud model (say, it was
     /// created for the user on another client). Once the profile is synced, it's never unsynced
-    /// again. CLI profiles are currently never synced.
+    /// again.
     default_profile_state: DefaultProfileState,
     profile_id_to_sync_id: HashMap<ClientProfileId, SyncId>,
     /// Only contains entries for non-default profiles.
@@ -125,8 +115,7 @@ pub struct AIExecutionProfilesModel {
 }
 
 impl AIExecutionProfilesModel {
-    #[allow(unused_variables)]
-    pub fn new(launch_mode: &LaunchMode, ctx: &mut ModelContext<Self>) -> Self {
+    pub fn new(ctx: &mut ModelContext<Self>) -> Self {
         cfg_if::cfg_if! {
             if #[cfg(feature = "agent_mode_evals")] {
                 let default_profile_state = DefaultProfileState::Unsynced {
@@ -156,31 +145,18 @@ impl AIExecutionProfilesModel {
                     profile_id_to_sync_id.insert(profile_id, cloud_profile.id);
                 }
 
-                let default_profile_state = match launch_mode {
-                    // The TUI front-end is an app-style client, so it shares the
-                    // GUI app's cloud-synced default execution profile.
-                    LaunchMode::App { .. } | LaunchMode::Test { .. } | LaunchMode::Tui => {
-                        match default_profile_from_cloud {
-                            Some(p) => {
-                                let execution_profile_id = ClientProfileId::new();
-                                profile_id_to_sync_id.insert(execution_profile_id, p.id);
-                                DefaultProfileState::Synced {
-                                    id: execution_profile_id,
-                                }
-                            }
-                            None => DefaultProfileState::Unsynced {
-                                id: ClientProfileId::new(),
-                                profile: super::create_default_from_legacy_settings(ctx),
-                            },
+                let default_profile_state = match default_profile_from_cloud {
+                    Some(p) => {
+                        let execution_profile_id = ClientProfileId::new();
+                        profile_id_to_sync_id.insert(execution_profile_id, p.id);
+                        DefaultProfileState::Synced {
+                            id: execution_profile_id,
                         }
                     }
-                    // When running as a CLI, we ignore the GUI default and use a more permissive default.
-                    LaunchMode::CommandLine { is_sandboxed, computer_use_override, .. } => {
-                        DefaultProfileState::Cli {
-                            profile: AIExecutionProfile::create_default_cli_profile(*is_sandboxed, *computer_use_override),
-                            id: ClientProfileId::new()
-                        }
-                    }
+                    None => DefaultProfileState::Unsynced {
+                        id: ClientProfileId::new(),
+                        profile: super::create_default_from_legacy_settings(ctx),
+                    },
                 };
             }
         }
@@ -400,11 +376,6 @@ impl AIExecutionProfilesModel {
                     data,
                 }
             }
-            DefaultProfileState::Cli { id, profile } => AIExecutionProfileInfo {
-                id: *id,
-                sync_id: None,
-                data: profile.clone(),
-            },
         }
     }
 
@@ -427,10 +398,9 @@ impl AIExecutionProfilesModel {
         profile_id: ClientProfileId,
         ctx: &AppContext,
     ) -> Option<AIExecutionProfileInfo> {
-        // Handle an unsynced default profile (including CLI)
+        // Handle an unsynced default profile
         match &self.default_profile_state {
-            DefaultProfileState::Unsynced { id, profile }
-            | DefaultProfileState::Cli { id, profile } => {
+            DefaultProfileState::Unsynced { id, profile } => {
                 if profile_id == *id {
                     return Some(AIExecutionProfileInfo {
                         id: *id,
@@ -1246,14 +1216,6 @@ impl AIExecutionProfilesModel {
         edit_fn: impl FnOnce(&mut AIExecutionProfile) -> bool,
         ctx: &mut ModelContext<Self>,
     ) -> bool {
-        // We don't yet support editing the default profile for the CLI.
-        if let DefaultProfileState::Cli { id, .. } = &self.default_profile_state {
-            if *id == profile_id {
-                log::warn!("Attempted to edit CLI default profile, which is not yet supported.");
-                return false;
-            }
-        }
-
         // Case: this might be an edit to a not-yet-created default profile object. If so, we need to create
         // a cloud object to back the default profile.
         if let DefaultProfileState::Unsynced { id, profile } = &self.default_profile_state {
@@ -1484,12 +1446,6 @@ impl AIExecutionProfilesModel {
 
         // Check if this is the default profile
         if object.model().string_model.is_default_profile {
-            // Don't add the cloud default profile if we're in CLI mode
-            if matches!(self.default_profile_state, DefaultProfileState::Cli { .. }) {
-                log::info!("Ignoring cloud default profile in CLI mode: {sync_id:?}");
-                return;
-            }
-
             // If we're in an unsynced state, transition to synced
             if let DefaultProfileState::Unsynced { id, .. } = self.default_profile_state {
                 self.default_profile_state = DefaultProfileState::Synced { id };

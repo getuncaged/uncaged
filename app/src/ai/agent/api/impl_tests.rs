@@ -39,7 +39,6 @@ fn request_params_with_ask_user_question_enabled(ask_user_question_enabled: bool
         autonomy_level: api::AutonomyLevel::Supervised,
         isolation_level: api::IsolationLevel::None,
         web_search_enabled: false,
-        computer_use_enabled: false,
         ask_user_question_enabled,
         research_agent_enabled: false,
         orchestration_enabled: false,

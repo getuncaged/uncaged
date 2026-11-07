@@ -903,3 +903,20 @@ directory = "~/a"
         panic!("Expected fallback PaneTemplate");
     }
 }
+
+#[test]
+fn test_legacy_cloud_pane_type_parses_as_agent() {
+    // Tab configs saved before cloud-agent panes were removed keep loading; their
+    // `type = "cloud"` panes open as local agent panes.
+    let config: TabConfig = toml::from_str(
+        r#"
+name = "Legacy cloud pane"
+
+[[panes]]
+id = "main"
+type = "cloud"
+"#,
+    )
+    .expect("legacy cloud pane type should still parse");
+    assert_eq!(config.panes[0].pane_type, Some(TabConfigPaneType::Agent));
+}

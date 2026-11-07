@@ -936,7 +936,7 @@ impl BillingAndUsagePageV2View {
                 })
                 .build()
                 .on_click(|ctx, _, _| {
-                    ctx.dispatch_typed_action(WorkspaceAction::AddAmbientAgentTab);
+                    ctx.dispatch_typed_action(WorkspaceAction::AddAgentTab);
                 })
                 .finish();
             right_side.add_child(

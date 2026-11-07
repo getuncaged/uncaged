@@ -84,9 +84,7 @@ pub fn is_in_cloud_context(
                 AgentViewEntryOrigin::CloudAgent | AgentViewEntryOrigin::ThirdPartyCloudAgent
             )
     );
-    origin_is_cloud
-        || terminal_model.is_conversation_transcript_viewer()
-        || terminal_model.is_dummy_cloud_mode_session()
+    origin_is_cloud || terminal_model.is_conversation_transcript_viewer()
 }
 
 pub fn agent_view_bg_fill(app: &AppContext) -> Fill {

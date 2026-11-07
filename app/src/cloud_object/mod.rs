@@ -981,10 +981,9 @@ pub use cloud_object_client::{
     ObjectDeleteResult, ObjectMetadataUpdateResult, ObjectPermissionsUpdateData,
 };
 pub use cloud_object_models::{
-    ServerAIExecutionProfile, ServerAIFact, ServerAmbientAgentEnvironment, ServerCloudAgentConfig,
-    ServerCloudObject, ServerEnvVarCollection, ServerFolder, ServerMCPServer, ServerNotebook,
-    ServerPreference, ServerScheduledAmbientAgent, ServerTemplatableMCPServer, ServerWorkflow,
-    ServerWorkflowEnum, TryFromGql,
+    ServerAIExecutionProfile, ServerAIFact, ServerCloudObject, ServerEnvVarCollection,
+    ServerFolder, ServerMCPServer, ServerNotebook, ServerPreference, ServerTemplatableMCPServer,
+    ServerWorkflow, ServerWorkflowEnum, TryFromGql,
 };
 
 #[derive(Default, Clone, Copy, Debug, Eq, Derivative)]

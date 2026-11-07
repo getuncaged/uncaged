@@ -12,28 +12,16 @@ use warpui::SingletonEntity;
 use warpui::{Entity, EntityId, ModelContext, ModelHandle};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
-use crate::terminal::model::session::active_session::ActiveSession;
 #[cfg(not(target_family = "wasm"))]
-use crate::{
-    ai::{
-        agent::{AIAgentAction, AIAgentActionResultType, AIAgentActionType, UploadArtifactResult},
-        agent_sdk::artifact_upload::{FileArtifactUploadRequest, FileArtifactUploader},
-        blocklist::{BlocklistAIHistoryModel, BlocklistAIPermissions},
-        paths::host_native_absolute_path,
-    },
-    server::server_api::ServerApiProvider,
+use crate::ai::{
+    agent::{AIAgentAction, AIAgentActionResultType, AIAgentActionType, UploadArtifactResult},
+    blocklist::BlocklistAIPermissions,
+    paths::host_native_absolute_path,
 };
+use crate::terminal::model::session::active_session::ActiveSession;
 
 #[cfg(not(target_family = "wasm"))]
-fn format_upload_artifact_error(err: &anyhow::Error) -> String {
-    let error_chain = format!("{err:#}");
-
-    if error_chain != err.to_string() {
-        format!("Artifact upload failed: {error_chain}")
-    } else {
-        error_chain
-    }
-}
+const UPLOAD_ARTIFACT_UNSUPPORTED_MESSAGE: &str = "Uploading artifacts is not supported in Uncaged";
 
 pub struct UploadArtifactExecutor {
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
@@ -88,11 +76,7 @@ impl UploadArtifactExecutor {
     }
 
     #[cfg_attr(target_family = "wasm", allow(unused_variables), allow(dead_code))]
-    pub(super) fn execute(
-        &mut self,
-        input: ExecuteActionInput,
-        ctx: &mut ModelContext<Self>,
-    ) -> AnyActionExecution {
+    pub(super) fn execute(&self, input: ExecuteActionInput) -> AnyActionExecution {
         #[cfg(target_family = "wasm")]
         {
             ActionExecution::<()>::InvalidAction.into()
@@ -100,69 +84,19 @@ impl UploadArtifactExecutor {
 
         #[cfg(not(target_family = "wasm"))]
         {
-            let ExecuteActionInput {
-                action,
-                conversation_id,
-                ..
-            } = input;
+            let ExecuteActionInput { action, .. } = input;
             let AIAgentAction {
-                action: AIAgentActionType::UploadArtifact(request),
+                action: AIAgentActionType::UploadArtifact(_),
                 ..
             } = action
             else {
                 return ActionExecution::<()>::InvalidAction.into();
             };
 
-            let resolved_path = self.resolve_path(&request.file_path, ctx);
-            let server_conversation_token = BlocklistAIHistoryModel::as_ref(ctx)
-                .conversation(&conversation_id)
-                .and_then(|conversation| conversation.server_conversation_token())
-                .cloned();
-
-            let Some(server_conversation_token) = server_conversation_token else {
-                return ActionExecution::<()>::Sync(AIAgentActionResultType::UploadArtifact(
-                    UploadArtifactResult::Error(
-                        "Current conversation has not been synced to the server yet".to_string(),
-                    ),
-                ))
-                .into();
-            };
-
-            BlocklistAIPermissions::handle(ctx).update(ctx, |model, _ctx| {
-                model.add_temporary_file_read_permissions(conversation_id, [resolved_path.clone()]);
-            });
-
-            let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client();
-            let server_api = ServerApiProvider::as_ref(ctx).get();
-            let description = request.description.clone();
-
-            ActionExecution::new_async(
-                async move {
-                    let uploader = FileArtifactUploader::new(ai_client, server_api);
-                    let request = FileArtifactUploadRequest {
-                        path: resolved_path,
-                        run_id: None,
-                        conversation_id: Some(server_conversation_token),
-                        description,
-                    };
-                    let association = uploader.resolve_upload_association(&request).await?;
-                    uploader.upload_with_association(request, association).await
-                },
-                |result, _ctx| match result {
-                    Ok(upload) => {
-                        AIAgentActionResultType::UploadArtifact(UploadArtifactResult::Success {
-                            artifact_uid: upload.artifact.artifact_uid,
-                            filepath: Some(upload.artifact.filepath),
-                            mime_type: upload.artifact.mime_type,
-                            description: upload.artifact.description,
-                            size_bytes: upload.size_bytes,
-                        })
-                    }
-                    Err(err) => AIAgentActionResultType::UploadArtifact(
-                        UploadArtifactResult::Error(format_upload_artifact_error(&err)),
-                    ),
-                },
-            )
+            // Artifacts were uploaded to Warp's servers; Uncaged has none.
+            ActionExecution::<()>::Sync(AIAgentActionResultType::UploadArtifact(
+                UploadArtifactResult::Error(UPLOAD_ARTIFACT_UNSUPPORTED_MESSAGE.to_string()),
+            ))
             .into()
         }
     }

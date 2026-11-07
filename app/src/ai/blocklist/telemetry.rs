@@ -246,7 +246,6 @@ pub(crate) enum PillBarActionKind {
     Kill,
     TogglePinOn,
     TogglePinOff,
-    ViewInOz,
     OpenMenu,
 }
 

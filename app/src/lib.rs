@@ -46,8 +46,6 @@ mod interval_timer;
 /// Bridge to the local Uncaged engine (see `uncaged.rs`).
 mod launch_splash;
 mod linear;
-#[cfg(feature = "local_fs")]
-mod local_control;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod login_item;
 mod menu;
@@ -85,8 +83,6 @@ mod test_util;
 mod throttle;
 mod tips;
 mod tracing;
-#[cfg(feature = "tui")]
-mod tui;
 mod ui_components;
 mod uncaged;
 mod undo_close;
@@ -145,7 +141,6 @@ pub use ai::agent::todos::AIAgentTodoList;
 pub use ai::agent::{AIAgentActionResultType, FileEdit, TodoOperation};
 use ai::agent_conversations_model::AgentConversationsModel;
 use ai::agent_management::AgentNotificationsModel;
-use ai::ambient_agents::scheduled::ScheduledAgentManager;
 use ai::blocklist::{BlocklistAIHistoryModel, BlocklistAIPermissions};
 use ai::execution_profiles::editor::ExecutionProfileEditorManager;
 use ai::execution_profiles::profiles::AIExecutionProfilesModel;
@@ -174,8 +169,6 @@ use terminal::keys_settings::KeysSettings;
 use terminal::local_shell::LocalShellState;
 pub use util::bindings::cmd_or_ctrl_shift;
 use voice::transcriber::VoiceTranscriber;
-use warp_cli::agent::AgentCommand;
-use warp_cli::{CliCommand, GlobalOptions};
 #[cfg(feature = "local_fs")]
 use watcher::HomeDirectoryWatcher;
 
@@ -222,7 +215,6 @@ pub use warp_core::send_telemetry_from_ctx;
 pub use warp_core::{safe_debug, safe_error, safe_info, safe_warn};
 #[cfg(feature = "local_fs")]
 use warp_files::FileModel;
-use warp_logging::LogDestination;
 use warp_managed_secrets::ManagedSecretManager;
 use warp_server_client::iap::{IapManager, IapManagerEvent, IapState};
 use warp_server_client::network_logging::NetworkLogModel;
@@ -238,8 +230,6 @@ use workspace::sync_inputs::SyncedInputState;
 
 use self::features::FeatureFlag;
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::ambient_agents::github_auth_notifier::GitHubAuthNotifier;
-use crate::ai::connected_self_hosted_workers::ConnectedSelfHostedWorkersModel;
 use crate::ai::document::ai_document_model::AIDocumentModel;
 use crate::ai::facts::manager::AIFactManager;
 use crate::ai::harness_availability::HarnessAvailabilityModel;
@@ -317,26 +307,6 @@ use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 /// Our embedded application assets.
 pub static ASSETS: warp_assets::Assets = warp_assets::Assets;
 
-fn determine_agent_source(
-    launch_mode: &LaunchMode,
-) -> Option<crate::ai::ambient_agents::AgentSource> {
-    match launch_mode {
-        LaunchMode::CommandLine { .. } => {
-            if std::env::var("GITHUB_ACTIONS").ok().as_deref() == Some("true") {
-                Some(crate::ai::ambient_agents::AgentSource::GitHubAction)
-            } else {
-                Some(crate::ai::ambient_agents::AgentSource::Cli)
-            }
-        }
-        LaunchMode::App { .. } | LaunchMode::Test { .. } => {
-            Some(crate::ai::ambient_agents::AgentSource::CloudMode)
-        }
-        // TODO: the TUI front-end has no agent harness wired up yet; give it an
-        // appropriate `AgentSource` once that lands.
-        LaunchMode::Tui => None,
-    }
-}
-
 /// Launch mode for how to start up Warp.
 #[allow(clippy::large_enum_variant)]
 pub enum LaunchMode {
@@ -348,35 +318,18 @@ pub enum LaunchMode {
         api_key: Option<String>,
     },
 
-    /// Run the Warp command-line SDK.
-    CommandLine {
-        command: warp_cli::CliCommand,
-        global_options: GlobalOptions,
-        debug: bool,
-        /// Whether this CLI invocation is running in a sandboxed environment.
-        is_sandboxed: bool,
-        /// Override for computer use permission from CLI flags. If None, uses default behavior.
-        computer_use_override: Option<bool>,
-    },
     /// Run a test - this may be an integration test or an eval.
     Test {
         driver: Box<Option<TestDriver>>,
         is_integration_test: bool,
     },
-
-    /// Run the headless TUI front-end (the `warp-tui` binary in the `warp_tui`
-    /// crate). Boots the real headless app so auth/agent state can be reused,
-    /// but prints to stdout instead of opening a GUI window.
-    Tui,
 }
 
 impl LaunchMode {
     fn args(&self) -> Cow<'_, warp_cli::AppArgs> {
         match self {
             LaunchMode::App { args, .. } => Cow::Borrowed(args),
-            LaunchMode::CommandLine { .. } | LaunchMode::Test { .. } | LaunchMode::Tui => {
-                Cow::Owned(warp_cli::AppArgs::default())
-            }
+            LaunchMode::Test { .. } => Cow::Owned(warp_cli::AppArgs::default()),
         }
     }
 
@@ -387,14 +340,14 @@ impl LaunchMode {
                 is_integration_test,
                 ..
             } => *is_integration_test,
-            LaunchMode::App { .. } | LaunchMode::CommandLine { .. } | LaunchMode::Tui => false,
+            LaunchMode::App { .. } => false,
         }
     }
 
     fn take_test_driver(&mut self) -> Option<TestDriver> {
         match self {
             LaunchMode::Test { driver, .. } => driver.take(),
-            LaunchMode::App { .. } | LaunchMode::CommandLine { .. } | LaunchMode::Tui => None,
+            LaunchMode::App { .. } => None,
         }
     }
 
@@ -406,91 +359,19 @@ impl LaunchMode {
         }
     }
 
-    fn execution_mode(&self) -> ExecutionMode {
-        match self {
-            LaunchMode::App { .. } => ExecutionMode::App,
-            LaunchMode::CommandLine { .. } => ExecutionMode::Sdk,
-            LaunchMode::Test { .. } => ExecutionMode::App,
-            // The TUI front-end is an app-style client, not the SDK.
-            LaunchMode::Tui => ExecutionMode::App,
-        }
-    }
-
-    fn is_sandboxed(&self) -> bool {
-        match self {
-            LaunchMode::CommandLine { is_sandboxed, .. } => *is_sandboxed,
-            LaunchMode::App { .. } | LaunchMode::Test { .. } | LaunchMode::Tui => false,
-        }
-    }
-
-    /// Returns `true` if Warp should run headlessly, without a visible UI.
-    fn is_headless(&self) -> bool {
-        match self {
-            LaunchMode::CommandLine { command, .. } => match command {
-                CliCommand::Agent(AgentCommand::Run(args)) => !args.gui,
-                _ => true,
-            },
-            // The TUI front-end renders to the terminal, with no GUI window.
-            LaunchMode::Tui => true,
-            LaunchMode::App { .. } | LaunchMode::Test { .. } => false,
-        }
-    }
-
-    /// Returns `true` if this process can build and sync codebase indices.
-    fn supports_indexing(&self) -> bool {
-        match self {
-            LaunchMode::CommandLine { command, .. } => {
-                matches!(command, CliCommand::Agent(AgentCommand::Run { .. }))
-            }
-            LaunchMode::App { .. } | LaunchMode::Test { .. } => true,
-            // TODO: no agent harness is wired up for the TUI front-end yet;
-            // enable indexing once it is.
-            LaunchMode::Tui => false,
-        }
-    }
-
     /// Whether or not to start a crash recovery process (on platforms that support it).
     #[cfg(enable_crash_recovery)]
     pub(crate) fn crash_recovery_enabled(&self) -> bool {
         match self {
             LaunchMode::App { .. } => true,
-            LaunchMode::CommandLine { .. } | LaunchMode::Test { .. } | LaunchMode::Tui => false,
-        }
-    }
-
-    /// Whether profiling and tracing should be initialized.
-    pub(crate) fn needs_profiling(&self) -> bool {
-        match self {
-            LaunchMode::App { .. }
-            | LaunchMode::CommandLine { .. }
-            | LaunchMode::Test { .. }
-            | LaunchMode::Tui => true,
-        }
-    }
-
-    /// Log destination for this mode.
-    fn log_destination(&self) -> Option<LogDestination> {
-        match self {
-            LaunchMode::CommandLine { debug, .. } => {
-                if *debug {
-                    Some(LogDestination::Stderr)
-                } else {
-                    Some(LogDestination::File)
-                }
-            }
-            // A TUI owns the terminal, so logs go to a file; stdout/stderr would
-            // corrupt the rendered output and the device-code prompt.
-            LaunchMode::Tui => Some(LogDestination::File),
-            LaunchMode::App { .. } | LaunchMode::Test { .. } => None,
+            LaunchMode::Test { .. } => false,
         }
     }
 
     fn as_str_for_tracing(&self) -> &'static str {
         match self {
             LaunchMode::App { .. } => "app",
-            LaunchMode::CommandLine { command, .. } => command.as_str_for_tracing(),
             LaunchMode::Test { .. } => "test",
-            LaunchMode::Tui => "tui",
         }
     }
 
@@ -536,11 +417,7 @@ fn apply_scroll_multiplier(event: &mut Event, app: &AppContext) {
     }
 }
 
-/// Runs the shared Warp executable as the app or as one of its command-line modes.
-///
-/// The bundled Warp Control wrapper injects `--warpctrl`, which is dispatched
-/// before the normal Warp/Oz parser. Oz subcommands are part of that normal
-/// parser and therefore do not require a separate mode flag.
+/// Runs the Uncaged executable as the app or as one of its worker subcommands.
 #[::tracing::instrument(skip_all, fields(tags.cloud_agent = true))]
 pub fn run() -> Result<()> {
     // Perform any necessary platform-specific initialization.
@@ -548,11 +425,6 @@ pub fn run() -> Result<()> {
 
     // Ensure feature flags are initialized before parsing command-line arguments.
     features::init_feature_flags();
-    if let Some(args) = warp_cli::local_control::ControlArgs::from_control_mode_env() {
-        #[cfg(windows)]
-        warp_util::windows::attach_to_parent_console();
-        warp_cli::local_control::run_and_exit(args);
-    }
 
     // Parse command-line arguments.
     let args = warp_cli::Args::from_env();
@@ -630,26 +502,6 @@ pub fn run() -> Result<()> {
             warp_cli::Command::Completions { shell } => {
                 return warp_cli::completions::generate_to_stdout(*shell);
             }
-            warp_cli::Command::CommandLine(cmd) => {
-                let (is_sandboxed, computer_use_override) = match cmd.as_ref() {
-                    warp_cli::CliCommand::Agent(warp_cli::agent::AgentCommand::Run(run_args)) => (
-                        run_args.sandboxed,
-                        run_args.computer_use.computer_use_override(),
-                    ),
-                    _ => (false, None),
-                };
-
-                return run_internal(LaunchMode::CommandLine {
-                    command: cmd.as_ref().clone(),
-                    global_options: GlobalOptions {
-                        output_format: args.output_format(),
-                        api_key: args.api_key().cloned(),
-                    },
-                    debug: args.debug(),
-                    is_sandboxed,
-                    computer_use_override,
-                });
-            }
             warp_cli::Command::DumpDebugInfo => {
                 return debug_dump::run();
             }
@@ -658,16 +510,6 @@ pub fn run() -> Result<()> {
                 return TelemetryEvent::print_telemetry_events_json();
             }
         }
-    }
-
-    // If running as a standalone CLI binary or invoked as "oz", print help
-    // instead of launching the GUI app.
-    let is_cli_binary = cfg!(feature = "standalone")
-        || warp_cli::binary_name().is_some_and(|name| name.starts_with("oz"))
-        || std::env::var_os("WARP_CLI_MODE").is_some();
-    if is_cli_binary {
-        warp_cli::Args::clap_command().print_help()?;
-        return Ok(());
     }
 
     let api_key = args.api_key().cloned();
@@ -687,14 +529,7 @@ pub fn run_integration_test(driver: TestDriver) -> Result<()> {
     run_internal(launch)
 }
 
-/// Runs the headless TUI front-end (the `warp-tui` binary in the `warp_tui`
-/// crate). Bootstraps the real (headless) app and runs the step-1 auth flow.
-#[cfg(feature = "tui")]
-pub fn run_tui() -> Result<()> {
-    run_internal(LaunchMode::Tui)
-}
-
-/// Runs the app (or CLI / daemon).
+/// Runs the app.
 fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     let mut timer = IntervalTimer::new();
 
@@ -705,17 +540,13 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     #[cfg(windows)]
     dynamic_libraries::configure_library_loading();
 
-    if launch_mode.needs_profiling() {
-        profiling::init();
-    }
+    profiling::init();
 
     // The `run` function already initializes feature flags, but ensure they're initialized here
     // for other entrypoints.
     features::init_feature_flags();
 
-    if launch_mode.needs_profiling() {
-        tracing::init()?;
-    }
+    tracing::init()?;
 
     // Start the `run_internal` span here - we can't do it before this point
     // because we need the tracing initialization to be complete first.
@@ -726,26 +557,15 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     );
     let _enter = span.enter();
 
-    let log_destination = launch_mode.log_destination();
-    let is_cli = log_destination.is_some();
-
     cfg_if::cfg_if! {
         if #[cfg(enable_crash_recovery)] {
             if crash_recovery::is_crash_recovery_process(launch_mode.args().as_ref()) {
                 warp_logging::init_for_crash_recovery_process()?;
             } else {
-                warp_logging::init(warp_logging::LogConfig {
-                    is_cli,
-                    log_destination,
-                    ..Default::default()
-                })?;
+                warp_logging::init(warp_logging::LogConfig::default())?;
             }
         } else {
-            warp_logging::init(warp_logging::LogConfig {
-                is_cli,
-                log_destination,
-                ..Default::default()
-            })?;
+            warp_logging::init(warp_logging::LogConfig::default())?;
         }
     }
 
@@ -853,42 +673,15 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     // ensure that the process is in the cleanest possible state (minimal opened
     // files, modified signal handlers, etc.) to avoid unexpected effects on
     // spawned ptys.
-    //
-    // The TUI front-end has no PTYs, so it skips this entirely. This is also
-    // load-bearing: the terminal server is spawned by re-exec'ing the current
-    // binary, but the `warp-tui` binary always runs the TUI (it doesn't dispatch
-    // worker subcommands), so spawning a server here would recursively launch
-    // more TUIs — a fork bomb.
     #[cfg(feature = "local_tty")]
-    let pty_spawner = if matches!(launch_mode, LaunchMode::Tui) {
-        None
-    } else {
-        Some(
-            terminal::local_tty::spawner::PtySpawner::new()
-                .context("Failed to create pty spawner")?,
-        )
-    };
+    let pty_spawner =
+        terminal::local_tty::spawner::PtySpawner::new().context("Failed to create pty spawner")?;
 
-    // The TUI front-end skips the GUI lifecycle callbacks (which reach for
-    // singletons/windows it never creates), so it uses empty callbacks.
-    let callbacks = if matches!(launch_mode, LaunchMode::Tui) {
-        warpui::platform::AppCallbacks::default()
-    } else {
-        app_callbacks(launch_mode.is_integration_test())
-    };
-    let mut app_builder = if launch_mode.is_headless() {
-        warpui::platform::AppBuilder::new_headless(
-            callbacks,
-            Box::new(ASSETS),
-            launch_mode.take_test_driver(),
-        )
-    } else {
-        warpui::platform::AppBuilder::new(
-            callbacks,
-            Box::new(ASSETS),
-            launch_mode.take_test_driver(),
-        )
-    };
+    let mut app_builder = warpui::platform::AppBuilder::new(
+        app_callbacks(launch_mode.is_integration_test()),
+        Box::new(ASSETS),
+        launch_mode.take_test_driver(),
+    );
 
     #[cfg(target_os = "macos")]
     {
@@ -968,21 +761,11 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
             .spawn(warp_logging::rotate_log_files())
             .detach();
 
-        ctx.add_singleton_model(|ctx| {
-            AppExecutionMode::new(
-                launch_mode.execution_mode(),
-                launch_mode.is_sandboxed(),
-                ctx,
-            )
-        });
+        ctx.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
 
-        // Add the terminal server singleton to the application. The TUI
-        // front-end sets `pty_spawner` to `None` (fork-bomb avoidance), so only
-        // register it when present.
+        // Add the terminal server singleton to the application.
         #[cfg(feature = "local_tty")]
-        if let Some(pty_spawner) = pty_spawner {
-            ctx.add_singleton_model(move |_ctx| pty_spawner);
-        }
+        ctx.add_singleton_model(move |_ctx| pty_spawner);
 
         // Register user preferences.  This must be done before initializing
         // feature flags or experiments, both of which check user preferences for
@@ -1007,15 +790,6 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
 
         if ImprovedPaletteSearch::improved_search_enabled(ctx) {
             FeatureFlag::UseTantivySearch.set_enabled(true);
-        }
-
-        // The TUI front-end reuses the full `initialize_app` bootstrap above (so
-        // auth/`AuthManager` exist), but runs its own init instead of the
-        // GUI/CLI `launch()` path.
-        #[cfg(feature = "tui")]
-        if matches!(launch_mode, LaunchMode::Tui) {
-            crate::tui::init(ctx);
-            return;
         }
 
         launch(ctx, app_state, launch_mode);
@@ -1074,7 +848,6 @@ pub(crate) fn initialize_app(
 
     // Extract API key from command line options, if applicable.
     let api_key = match launch_mode {
-        LaunchMode::CommandLine { global_options, .. } => global_options.api_key.clone(),
         LaunchMode::App { api_key, .. } if ChannelState::channel().is_dogfood() => api_key.clone(),
         _ => None,
     };
@@ -1105,7 +878,7 @@ pub(crate) fn initialize_app(
     let auth_state = Arc::new(AuthState::initialize(ctx, api_key));
     timer.mark_interval_end("AUTH_MANAGER_SET_USER");
 
-    let agent_source = determine_agent_source(launch_mode);
+    let agent_source = Some(crate::ai::ambient_agents::AgentSource::CloudMode);
 
     // NetworkLogModel must be registered before ServerApiProvider so that
     // `NetworkLogModel::install_on_clients` can reach it when forwarding items
@@ -1127,13 +900,6 @@ pub(crate) fn initialize_app(
     });
 
     let server_api = server_api_provider.as_ref(ctx).get();
-    #[cfg(not(target_family = "wasm"))]
-    if let Ok(run_id) = std::env::var(warp_cli::OZ_RUN_ID_ENV) {
-        match run_id.parse() {
-            Ok(task_id) => server_api.set_ambient_agent_task_id(Some(task_id)),
-            Err(err) => log::warn!("Ignoring invalid {}: {err}", warp_cli::OZ_RUN_ID_ENV),
-        }
-    }
     let ai_client = server_api_provider.as_ref(ctx).get_ai_client();
 
     ctx.add_singleton_model(|_ctx| AuthStateProvider::new(auth_state.clone()));
@@ -1154,12 +920,7 @@ pub(crate) fn initialize_app(
 
     // If any part of sqlite initialization fails, we just don't do session restoration (i.e.
     // feature degradation).
-    let persistence_scope = match launch_mode {
-        LaunchMode::App { .. }
-        | LaunchMode::CommandLine { .. }
-        | LaunchMode::Test { .. }
-        | LaunchMode::Tui => persistence::PersistenceScope::App,
-    };
+    let persistence_scope = persistence::PersistenceScope::App;
     // Uncaged one-history (§3): default ON. The runtime feature-flag menu is
     // the kill-switch -- flipping it off reverts to the legacy restore
     // heuristic and destructive Cmd-K (turns cleared while it was on will
@@ -1352,9 +1113,7 @@ pub(crate) fn initialize_app(
     });
 
     #[cfg(target_os = "macos")]
-    if !launch_mode.is_headless() {
-        AppearanceManager::as_ref(ctx).set_app_icon(ctx);
-    }
+    AppearanceManager::as_ref(ctx).set_app_icon(ctx);
 
     #[cfg(feature = "local_tty")]
     terminal::available_shells::register(ctx);
@@ -1409,14 +1168,9 @@ pub(crate) fn initialize_app(
     let user_is_logged_in = auth_state.is_logged_in();
 
     if user_is_logged_in {
-        // Skip refresh_user for CLI mode — the CLI handles auth refresh in
-        // ensure_auth_state so it can detect invalid credentials before running
-        // a command.
-        if !matches!(launch_mode, LaunchMode::CommandLine { .. }) {
-            AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                auth_manager.refresh_user(ctx);
-            });
-        }
+        AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
+            auth_manager.refresh_user(ctx);
+        });
 
         // Set the first frame callback to record the app's startup time.
         // This is only sent for logged-in users so that new users don't skew performance metrics.
@@ -1578,13 +1332,11 @@ pub(crate) fn initialize_app(
     ai::blocklist::init(ctx);
     ai::blocklist::block::status_bar::init(ctx);
     drive::index::init(ctx);
-    settings_view::update_environment_form::init(ctx);
     env_vars::env_var_collection_block::init(ctx);
     context_chips::display_menu::init(ctx);
     context_chips::node_version_popup::init(ctx);
     env_vars::view::env_var_collection::init(ctx);
     ai::agent::todos::popup::init(ctx);
-    terminal::view::init_environment::mode_selector::init(ctx);
     coding_entrypoints::project_buttons::init(ctx);
     if FeatureFlag::CodeReviewSaveChanges.is_enabled() {
         code_review::init(ctx);
@@ -1595,10 +1347,8 @@ pub(crate) fn initialize_app(
 
     ctx.add_singleton_model(|_| RelaunchModel::new());
     ctx.add_singleton_model(|_| ChangelogModel::new(server_api.clone()));
-    ctx.add_singleton_model(|_| GitHubAuthNotifier::new());
     ctx.add_singleton_model(|_| NetworkStatus::new());
     ctx.add_singleton_model(|_| SystemStats::new());
-    workspace::auto_handoff::init(ctx);
     ctx.add_singleton_model(|_| KeybindingChangedNotifier::new());
     ctx.add_singleton_model(|_| search::command_palette::SelectedItems::new());
     ctx.add_singleton_model(search::files::model::FileSearchModel::new);
@@ -1719,11 +1469,7 @@ pub(crate) fn initialize_app(
         ai::blocklist::orchestration_event_streamer::OrchestrationEventStreamer::new,
     );
 
-    if launch_mode.supports_indexing() {
-        ctx.add_singleton_model(RepoOutlines::new);
-    } else {
-        ctx.add_singleton_model(|ctx| RepoOutlines::new_with_indexing_enabled(false, ctx));
-    }
+    ctx.add_singleton_model(RepoOutlines::new);
     ctx.add_singleton_model(|ctx| {
         warp_core::sync_queue::SyncQueue::<SyncTask>::new_with_rate_limit(
             &ctx.background_executor(),
@@ -1882,17 +1628,12 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(EnvVarCollectionManager::new);
     ctx.add_singleton_model(WorkflowManager::new);
 
-    if FeatureFlag::ScheduledAmbientAgents.is_enabled() {
-        ctx.add_singleton_model(ScheduledAgentManager::new);
-    }
-
     AutoupdateState::register(ctx, server_api.clone());
 
     ctx.add_singleton_model(LocalWorkflows::new);
 
     ctx.add_singleton_model(LLMPreferences::new);
     ctx.add_singleton_model(HarnessAvailabilityModel::new);
-    ctx.add_singleton_model(ConnectedSelfHostedWorkersModel::new);
 
     let tip_model_handle = ctx.add_singleton_model(|ctx| {
         ai::agent_tips::AITipModel::<ai::AgentTip>::new_for_agent_tips(ctx)
@@ -1931,13 +1672,12 @@ pub(crate) fn initialize_app(
 
     ctx.add_singleton_model(move |_| timer);
 
-    ctx.add_singleton_model(|ctx| AIExecutionProfilesModel::new(launch_mode, ctx));
+    ctx.add_singleton_model(AIExecutionProfilesModel::new);
 
     ctx.add_singleton_model(DefaultTerminal::new);
 
     ctx.add_singleton_model(|ctx| {
-        let should_restore_indices = launch_mode.supports_indexing()
-            && UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx);
+        let should_restore_indices = UserWorkspaces::as_ref(ctx).is_codebase_context_enabled(ctx);
         let indices_to_restore = if should_restore_indices {
             persisted_workspaces.clone()
         } else {
@@ -1952,16 +1692,14 @@ pub(crate) fn initialize_app(
             codebase_limits.embedding_generation_batch_size,
             // Uncaged: chunks are indexed and searched on this machine, not on Warp's servers.
             Arc::new(LocalStoreClient::new()),
-            launch_mode.supports_indexing(),
+            true,
         );
         CodebaseIndexManager::new_with_config(codebase_index_config, ctx)
     });
 
     // Uncaged: serve the index to CLI agents (Claude Code, Gemini CLI, Codex) as an MCP tool.
     #[cfg(not(target_family = "wasm"))]
-    if launch_mode.supports_indexing() {
-        ctx.add_singleton_model(ai::uncaged_code_search::UncagedCodeSearch::new);
-    }
+    ctx.add_singleton_model(ai::uncaged_code_search::UncagedCodeSearch::new);
 
     ctx.add_singleton_model(|ctx| {
         ProjectContextModel::new_from_persisted(
@@ -1994,25 +1732,6 @@ pub(crate) fn initialize_app(
     WorkflowAliases::handle(ctx).update(ctx, |aliases, ctx| {
         aliases.connect(ctx);
     });
-
-    // When running natively, add the http server singleton to the application.
-    #[cfg(not(target_family = "wasm"))]
-    ctx.add_singleton_model(move |ctx| {
-        let routers = vec![
-            app_installation_detection::make_router(),
-            profiling::make_router(),
-        ];
-        http_server::HttpServer::new(routers, ctx)
-    });
-    #[cfg(feature = "local_fs")]
-    if matches!(
-        launch_mode,
-        LaunchMode::App { .. } | LaunchMode::Test { .. }
-    ) && FeatureFlag::WarpControlCli.is_enabled()
-    {
-        ctx.add_singleton_model(local_control::LocalControlBridge::new);
-        ctx.add_singleton_model(local_control::LocalControlServer::new);
-    }
 
     app_state
 }
@@ -2459,15 +2178,6 @@ fn on_close_window_cancelled(
     }
 }
 
-fn is_cloud_agent_web_home_launch_url(url: &Url) -> bool {
-    url.scheme() == ChannelState::url_scheme()
-        && url.host_str() == Some("action")
-        && url.path() == "/new_cloud_agent_conversation"
-        && url
-            .query_pairs()
-            .any(|(key, value)| key == "source" && value == "web_home")
-}
-
 #[::tracing::instrument(skip_all, fields(tags.cloud_agent = true))]
 fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode: LaunchMode) {
     IntervalTimer::handle(ctx).update(ctx, |timer, _ctx| {
@@ -2484,69 +2194,38 @@ fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode
     #[cfg(target_family = "wasm")]
     ctx.set_fallback_font_fn(font_fallback::fallback_font_fn);
 
-    match launch_mode {
-        // The TUI front-end runs its own init in the run closure and returns
-        // before reaching launch().
-        LaunchMode::Tui => unreachable!("LaunchMode::Tui is handled before launch()"),
-        LaunchMode::App { .. } | LaunchMode::Test { .. } => {
-            let should_skip_restore = launch_mode
-                .args()
-                .urls
-                .iter()
-                .any(is_cloud_agent_web_home_launch_url);
-            let app_state = if should_skip_restore { None } else { app_state };
-            // Attempt to restore windows from the persisted application state.
-            let arg = OpenFromRestoredArg { app_state };
-            ctx.dispatch_global_action("root_view:open_from_restored", &arg);
+    // Attempt to restore windows from the persisted application state.
+    let arg = OpenFromRestoredArg { app_state };
+    ctx.dispatch_global_action("root_view:open_from_restored", &arg);
 
-            // Process any URLs that were provided on the command line (which may be
-            // file:// URLs or ones using our custom URL scheme).
-            for url in launch_mode.args().urls.iter() {
-                uri::handle_incoming_uri(url, ctx);
-            }
+    // Process any URLs that were provided on the command line (which may be
+    // file:// URLs or ones using our custom URL scheme).
+    for url in launch_mode.args().urls.iter() {
+        uri::handle_incoming_uri(url, ctx);
+    }
 
-            // If, after session restoration and command-line argument handling, we
-            // haven't opened any windows, open a new window.
-            if ctx.window_ids().count() == 0 {
-                ctx.dispatch_global_action("root_view:open_new", &());
-            }
+    // If, after session restoration and command-line argument handling, we
+    // haven't opened any windows, open a new window.
+    if ctx.window_ids().count() == 0 {
+        ctx.dispatch_global_action("root_view:open_new", &());
+    }
 
-            IntervalTimer::handle(ctx).update(ctx, |timer, _| {
-                timer.mark_interval_end("WINDOWS_CREATED");
-            });
+    IntervalTimer::handle(ctx).update(ctx, |timer, _| {
+        timer.mark_interval_end("WINDOWS_CREATED");
+    });
 
-            // TODO(ben): We should skip this for LaunchMode::Test.
-            #[cfg(any(target_os = "macos", target_os = "windows"))]
-            {
-                use crate::login_item::maybe_register_app_as_login_item;
-                use crate::terminal::general_settings::GeneralSettingsChangedEvent;
-                // Note that we put this here because it depends on settings already having been initialized.
-                ctx.subscribe_to_model(&GeneralSettings::handle(ctx), |_, event, ctx| {
-                    if matches!(event, GeneralSettingsChangedEvent::LoginItem { .. }) {
-                        maybe_register_app_as_login_item(ctx);
-                    }
-                });
+    // TODO(ben): We should skip this for LaunchMode::Test.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+        use crate::login_item::maybe_register_app_as_login_item;
+        use crate::terminal::general_settings::GeneralSettingsChangedEvent;
+        // Note that we put this here because it depends on settings already having been initialized.
+        ctx.subscribe_to_model(&GeneralSettings::handle(ctx), |_, event, ctx| {
+            if matches!(event, GeneralSettingsChangedEvent::LoginItem { .. }) {
                 maybe_register_app_as_login_item(ctx);
             }
-        }
-        #[cfg_attr(target_family = "wasm", allow(unused_variables))]
-        LaunchMode::CommandLine {
-            command,
-            global_options,
-            ..
-        } => {
-            cfg_if::cfg_if! {
-                if #[cfg(target_family = "wasm")] {
-                    panic!("Cannot execute CLI command {command:?} on the web");
-                } else {
-                    if let Err(err) = crate::ai::agent_sdk::run(ctx, command.clone(), global_options.clone()) {
-                        eprintln!("{err:#}");
-                        report_error!(err);
-                        std::process::exit(1);
-                    }
-                }
-            }
-        }
+        });
+        maybe_register_app_as_login_item(ctx);
     }
 }
 

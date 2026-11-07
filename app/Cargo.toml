@@ -67,7 +67,6 @@ cloud_objects.workspace = true
 command = { workspace = true }
 command-corrections.workspace = true
 command-signatures-v2 = { workspace = true, optional = true }
-computer_use.workspace = true
 crc.workspace = true
 content_inspector = "0.2.4"
 concat-idents.workspace = true
@@ -108,7 +107,6 @@ jaq-all.workspace = true
 # offline against the debug-info file uploaded to Sentry by the release
 # process (matched by build-id). This keeps the shipped binary fully
 # strippable.
-jemalloc_pprof = { version = "0.8.1", optional = true }
 lsp-types = "0.97.0"
 indexmap = { version = "2.0.2", features = ["serde"] }
 input_classifier.workspace = true
@@ -246,7 +244,6 @@ warp_isolation_platform.workspace = true
 warp_ripgrep.workspace = true
 warp_managed_secrets.workspace = true
 warp_multi_agent_client.workspace = true
-local_control.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block.workspace = true
@@ -279,20 +276,15 @@ winit = { workspace = true }
 wgpu.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-app-installation-detection.workspace = true
 uncaged_engine.workspace = true
 async-io.workspace = true
-axum.workspace = true
 cloud_object_persistence.workspace = true
-comfy-table = "7.1.4"
-inquire = "0.9.1"
 diesel = { workspace = true, features = ["sqlite", "chrono"] }
 diesel_migrations = { version = "2.2.0", features = ["sqlite"] }
 env_logger.workspace = true
 git2 = { version = "0.20.4", default-features = false, features = [
     "vendored-libgit2",
 ] }
-http_server.workspace = true
 hyper.workspace = true
 libsqlite3-sys = { version = "0.33.0", features = ["bundled"] }
 mio = { version = "1.1.1", features = ["os-poll", "os-ext"] }
@@ -425,7 +417,6 @@ embed-resource = "3.0"
 
 # Note that we support channel-specific enables for these features
 [features]
-tui = ["warpui_core/tui"]
 ai_resume_button = []
 autoupdate = []
 figma_detection = []
@@ -433,7 +424,6 @@ bundled_skills = []
 supergrok = []
 gemini_enterprise = []
 agent_mode = []
-agent_mode_computer_use = []
 agent_mode_debug = []
 agent_mode_primary_xml = []
 agent_mode_pre_plan_xml = []
@@ -564,7 +554,6 @@ default = [
     # "cloud_mode",
     # "cloud_mode_from_local_session",
     # "cloud_mode_image_context",
-    "agent_mode_computer_use",
     # "oz_platform_skills",  # Uncaged: needs Warp servers
     # "oz_identity_federation",  # Uncaged: needs Warp servers
     # "sync_ambient_plans",  # Uncaged: needs Warp servers
@@ -715,7 +704,6 @@ in_band_generators_ssh = []
 jemalloc = ["dep:tikv-jemallocator", "ai/jemalloc"]
 jemalloc_with_profiling = ["jemalloc", "tikv-jemallocator/profiling"]
 jemalloc_auto_heap_profiling = ["jemalloc_with_profiling"]
-jemalloc_pprof = ["jemalloc_with_profiling", "dep:jemalloc_pprof"]
 run_generators_with_cmd_exe = []
 inline_ssh_banner = []
 kitty_images = []
@@ -728,7 +716,6 @@ list_skills = []
 # support having a local tty/shell session.  It can be used to conditionally
 # include dependencies that should only exist in such environments.
 local_tty = []
-local_computer_use = []
 local_claude_codex_child_harnesses = []
 # This feature is enabled in build.rs when compiling for platforms which
 # have APIs for interacting with a local filesystem.  It can be used to
@@ -942,7 +929,6 @@ vertical_tabs_summary_mode = []
 tab_configs = []
 grouped_tabs = []
 pinned_tabs = []
-warp_control_cli = []
 agent_harness = []
 oz_handoff = []
 handoff_local_cloud = []

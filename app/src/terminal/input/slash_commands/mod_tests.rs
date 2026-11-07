@@ -21,9 +21,6 @@ fn slash_command_is_submitted_as_prompt_only_for_prompt_commands() {
     ));
     assert!(!slash_command_is_submitted_as_prompt(&commands::FORK_FROM));
     assert!(!slash_command_is_submitted_as_prompt(
-        &commands::CONTINUE_LOCALLY
-    ));
-    assert!(!slash_command_is_submitted_as_prompt(
         &commands::COMPACT_AND
     ));
     assert!(!slash_command_is_submitted_as_prompt(&commands::MODEL));

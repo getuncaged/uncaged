@@ -83,25 +83,6 @@ impl TerminalView {
         self.pending_user_query_view_id = Some(view_id);
     }
 
-    /// Inserts a pending user query block for a Cloud Mode run whose real user query has not yet
-    /// arrived in the shared-session transcript.
-    /// The block shows the user's prompt with a "Queued" badge and no buttons: the
-    /// queued state is owned by the run's lifecycle, not by a local `/queue`-style callback, so
-    /// the prompt is not re-submitted when the block is removed.
-    pub(in crate::terminal::view) fn insert_cloud_mode_queued_user_query_block(
-        &mut self,
-        prompt: String,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.insert_pending_user_query_block(
-            prompt,
-            /* show_close_button */ false,
-            /* show_send_now_button */ false,
-            PendingUserQueryKind::CloudMode,
-            ctx,
-        );
-    }
-
     pub(in crate::terminal::view) fn remove_cloud_mode_queue_row(
         &mut self,
         ctx: &mut ViewContext<Self>,

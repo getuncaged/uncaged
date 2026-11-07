@@ -14,12 +14,11 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use settings::Setting;
 use warp_cli::agent::Harness;
-use warp_core::ui::radius;
 use warp_core::ui::theme::Fill;
 use warpui::elements::{
-    Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
-    Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
-    Point, Radius, Text,
+    ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Expanded, Flex,
+    Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Point, Radius,
+    Text,
 };
 use warpui::event::DispatchedEvent;
 use warpui::platform::Cursor;
@@ -33,8 +32,6 @@ use warpui::{
 use crate::ai::auth_secret_types::auth_secret_types_for_harness;
 use crate::ai::blocklist::inline_action::host_picker::HostPicker;
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
-use crate::ai::cloud_environments::CloudAmbientAgentEnvironment;
-use crate::ai::connected_self_hosted_workers::{ConnectedSelfHostedWorkersModel, WARP_WORKER_HOST};
 use crate::ai::execution_profiles::model_menu_items::available_model_menu_items;
 use crate::ai::harness_availability::{AuthSecretFetchState, HarnessAvailabilityModel};
 use crate::ai::harness_display;
@@ -44,10 +41,8 @@ use crate::ai::local_harness_setup::{
     local_harness_setup_state, LocalHarnessSetupState,
 };
 use crate::appearance::Appearance;
-use crate::cloud_object::CloudObjectLookup as _;
 use crate::menu::{MenuItem, MenuItemFields};
 use crate::ui_components::blended_colors;
-use crate::ui_components::icons::Icon;
 use crate::view_components::dropdown::{
     Dropdown, DropdownAction, DropdownItemAction, DropdownStyle,
 };
@@ -61,7 +56,7 @@ const DEFAULT_HOST_ENV_VAR: &str = "WARP_CLOUD_MODE_DEFAULT_HOST";
 
 // ── Shared constants ────────────────────────────────────────────────
 
-pub const ORCHESTRATION_WARP_WORKER_HOST: &str = WARP_WORKER_HOST;
+pub const ORCHESTRATION_WARP_WORKER_HOST: &str = "warp";
 pub const ORCHESTRATION_ENV_NONE_LABEL: &str = "Empty environment";
 
 pub const ORCHESTRATION_PICKER_HEIGHT: f32 = 36.;
@@ -79,7 +74,6 @@ const ORCHESTRATION_SEGMENT_VERTICAL_PADDING: f32 = 4.;
 const AUTH_SECRET_INHERIT_LABEL: &str = "Skip (advanced)";
 /// Label for the auth secret column.
 pub const AUTH_SECRET_COLUMN_LABEL: &str = "API key";
-const AUTH_SECRET_CREATE_NEW_LABEL: &str = "New API key…";
 
 // ── Action trait ────────────────────────────────────────────────────
 
@@ -91,11 +85,8 @@ pub trait OrchestrationControlAction: DropdownItemAction + Clone {
     fn model_changed(model_id: String) -> Self;
     fn harness_changed(harness_type: String) -> Self;
     fn environment_changed(environment_id: String) -> Self;
-    fn create_environment_requested() -> Self;
     /// `None` means Inherit; `Some(name)` means a named managed secret.
     fn auth_secret_changed(name: Option<String>) -> Self;
-    /// User picked the "New API key…" item; opens the workspace create modal.
-    fn create_new_auth_secret_requested() -> Self;
 }
 
 // ── Shared edit state ───────────────────────────────────────────────
@@ -110,9 +101,6 @@ pub enum AuthSecretSelection {
     Inherit,
     /// User picked a managed secret by name.
     Named(String),
-    /// Creating a key (modal open). Blocks Accept and, unlike `Unset`, is
-    /// not re-seeded from persisted settings.
-    CreatingNew,
 }
 
 impl AuthSecretSelection {
@@ -153,16 +141,8 @@ impl OrchestrationEditState {
         }
         match &self.auth_secret_selection {
             AuthSecretSelection::Named(name) => Some(name.as_str()),
-            AuthSecretSelection::Inherit
-            | AuthSecretSelection::Unset
-            | AuthSecretSelection::CreatingNew => None,
+            AuthSecretSelection::Inherit | AuthSecretSelection::Unset => None,
         }
-    }
-
-    /// User picked "New API key…"; mark `CreatingNew` to block Accept until a
-    /// key is created or another option is chosen.
-    pub fn select_create_new_auth_secret(&mut self) {
-        self.auth_secret_selection = AuthSecretSelection::CreatingNew;
     }
 }
 
@@ -763,7 +743,6 @@ pub fn create_environment_picker<A: OrchestrationControlAction, V: View>(
 ) -> ViewHandle<FilterableDropdown<A>> {
     let initial_env = initial_env_id.to_string();
     let styles = *styles;
-    let footer_mouse_state = MouseStateHandle::default();
     let dropdown_handle = ctx.add_typed_action_view(move |ctx_dropdown| {
         let mut dropdown = FilterableDropdown::<A>::new(ctx_dropdown);
         dropdown.set_use_overlay_layer(false, ctx_dropdown);
@@ -776,18 +755,6 @@ pub fn create_environment_picker<A: OrchestrationControlAction, V: View>(
         dropdown
     });
     dropdown_handle.update(ctx, |dropdown, ctx_dropdown| {
-        let footer_mouse_state = footer_mouse_state.clone();
-        dropdown.set_footer(
-            move |app| render_new_environment_footer::<A>(footer_mouse_state.clone(), app),
-            ctx_dropdown,
-        );
-        let all_envs = CloudAmbientAgentEnvironment::get_all(ctx_dropdown);
-        let mut sorted_envs: Vec<(String, String)> = all_envs
-            .iter()
-            .map(|env| (env.id.uid(), env.model().string_model.name.clone()))
-            .collect();
-        sorted_envs.sort_by(|a, b| a.1.cmp(&b.1));
-
         let mut items: Vec<MenuItem<DropdownAction>> = Vec::new();
         let mut selected_name: Option<String> = None;
         items.push(MenuItem::Item(
@@ -797,19 +764,6 @@ pub fn create_environment_picker<A: OrchestrationControlAction, V: View>(
         ));
         if initial_env.is_empty() {
             selected_name = Some(ORCHESTRATION_ENV_NONE_LABEL.to_string());
-        }
-        for (env_id, env_name) in &sorted_envs {
-            if env_id == &initial_env {
-                selected_name = Some(env_name.clone());
-            }
-            let env_id_for_item = env_id.clone();
-            items.push(MenuItem::Item(
-                MenuItemFields::new(env_name).with_on_select_action(
-                    DropdownAction::select_action_and_close(A::environment_changed(
-                        env_id_for_item,
-                    )),
-                ),
-            ));
         }
         dropdown.set_rich_items(items, ctx_dropdown);
         if let Some(name) = selected_name {
@@ -819,105 +773,6 @@ pub fn create_environment_picker<A: OrchestrationControlAction, V: View>(
     dropdown_handle
 }
 
-pub fn populate_environment_picker<A: OrchestrationControlAction, V: View>(
-    dropdown_handle: &ViewHandle<FilterableDropdown<A>>,
-    initial_env_id: &str,
-    ctx: &mut ViewContext<V>,
-) {
-    let initial_env = initial_env_id.to_string();
-    dropdown_handle.update(ctx, |dropdown, ctx_dropdown| {
-        let all_envs = CloudAmbientAgentEnvironment::get_all(ctx_dropdown);
-        let mut sorted_envs: Vec<(String, String)> = all_envs
-            .iter()
-            .map(|env| (env.id.uid(), env.model().string_model.name.clone()))
-            .collect();
-        sorted_envs.sort_by(|a, b| a.1.cmp(&b.1));
-
-        let mut items: Vec<MenuItem<DropdownAction>> = Vec::new();
-        let mut selected_name: Option<String> = None;
-        items.push(MenuItem::Item(
-            MenuItemFields::new(ORCHESTRATION_ENV_NONE_LABEL).with_on_select_action(
-                DropdownAction::select_action_and_close(A::environment_changed(String::new())),
-            ),
-        ));
-        if initial_env.is_empty() {
-            selected_name = Some(ORCHESTRATION_ENV_NONE_LABEL.to_string());
-        }
-        for (env_id, env_name) in &sorted_envs {
-            if env_id == &initial_env {
-                selected_name = Some(env_name.clone());
-            }
-            let env_id_for_item = env_id.clone();
-            items.push(MenuItem::Item(
-                MenuItemFields::new(env_name).with_on_select_action(
-                    DropdownAction::select_action_and_close(A::environment_changed(
-                        env_id_for_item,
-                    )),
-                ),
-            ));
-        }
-        dropdown.set_rich_items(items, ctx_dropdown);
-        if let Some(name) = selected_name {
-            dropdown.set_selected_by_name(&name, ctx_dropdown);
-        }
-    });
-}
-
-fn render_new_environment_footer<A: OrchestrationControlAction>(
-    mouse_state: MouseStateHandle,
-    app: &AppContext,
-) -> Box<dyn Element> {
-    let appearance = Appearance::as_ref(app);
-    let theme = appearance.theme();
-    let is_hovered = mouse_state.lock().unwrap().is_hovered();
-    let bg = if is_hovered {
-        theme.surface_3()
-    } else {
-        theme.surface_2()
-    };
-    let font_family = appearance.ui_font_family();
-    let font_size = appearance.ui_font_size();
-    let text_color = theme.active_ui_text_color();
-    let icon_size = font_size;
-    let mouse_state = mouse_state.clone();
-
-    Hoverable::new(mouse_state, move |_| {
-        // The divider stays full width; the hover highlight is a rounded pill.
-        Container::new(
-            Container::new(
-                Flex::row()
-                    .with_main_axis_size(MainAxisSize::Max)
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_spacing(8.)
-                    .with_child(
-                        ConstrainedBox::new(Icon::Plus.to_warpui_icon(text_color).finish())
-                            .with_width(icon_size)
-                            .with_height(icon_size)
-                            .finish(),
-                    )
-                    .with_child(
-                        Text::new_inline("New environment", font_family, font_size)
-                            .with_color(text_color.into())
-                            .finish(),
-                    )
-                    .finish(),
-            )
-            .with_horizontal_padding(8.)
-            .with_vertical_padding(8.)
-            .with_background(bg)
-            .with_corner_radius(radius::small())
-            .finish(),
-        )
-        .with_uniform_padding(4.)
-        .with_border(Border::top(1.).with_border_fill(theme.outline()))
-        .finish()
-    })
-    .on_click(|ctx, _, _| {
-        ctx.dispatch_typed_action(A::create_environment_requested());
-    })
-    .with_cursor(Cursor::PointingHand)
-    .finish()
-}
 /// Repopulates the host picker with the workspace default (if any) and
 /// the user's last-selected custom host (if any), then sets the current
 /// selection to `initial_host`.
@@ -933,12 +788,8 @@ pub fn populate_host_picker<V: View>(
     } else {
         initial_host.to_string()
     };
-    let mut connected_hosts = ConnectedSelfHostedWorkersModel::as_ref(ctx)
-        .worker_hosts_excluding(default_host.as_deref());
-    connected_hosts.sort();
-    connected_hosts.dedup();
     picker.update(ctx, |picker, picker_ctx| {
-        picker.set_options(default_host, recent_host, connected_hosts, picker_ctx);
+        picker.set_options(default_host, recent_host, Vec::new(), picker_ctx);
         picker.set_selected(&initial, picker_ctx);
     });
 }
@@ -1003,55 +854,6 @@ pub fn harness_save_key(harness_type: &str) -> &str {
 }
 
 // ── Default environment resolution ──────────────────────────────────
-
-/// Resolves a default environment ID using the same logic as the
-/// `/cloud-agent` environment selector: first tries the user's
-/// last-selected environment from settings, then falls back to the
-/// most recently used environment.
-pub fn resolve_default_environment_id(ctx: &AppContext) -> Option<String> {
-    if let Some(env_id) = *CloudAgentSettings::as_ref(ctx)
-        .last_selected_environment_id
-        .value()
-    {
-        if CloudAmbientAgentEnvironment::get_by_id(&env_id, ctx).is_some() {
-            return Some(env_id.uid());
-        }
-    }
-    let mut envs = CloudAmbientAgentEnvironment::get_all(ctx);
-    envs.sort_by(|a, b| {
-        b.metadata
-            .last_task_run_ts
-            .cmp(&a.metadata.last_task_run_ts)
-            .then_with(|| {
-                a.model()
-                    .string_model
-                    .name
-                    .cmp(&b.model().string_model.name)
-            })
-    });
-    envs.first().map(|e| e.id.uid())
-}
-
-/// Persists the user's environment selection to settings so it can
-/// be restored as the default next time. Shared by both the plan
-/// card and confirmation card `EnvironmentChanged` handlers.
-pub fn persist_environment_selection<V: View>(environment_id: &str, ctx: &mut ViewContext<V>) {
-    if environment_id.is_empty() {
-        return;
-    }
-    let all_envs = CloudAmbientAgentEnvironment::get_all(ctx);
-    if let Some(env) = all_envs.iter().find(|e| e.id.uid() == environment_id) {
-        let sync_id = env.id;
-        CloudAgentSettings::handle(ctx).update(ctx, |settings, ctx| {
-            if let Err(e) = settings
-                .last_selected_environment_id
-                .set_value(Some(sync_id), ctx)
-            {
-                log::warn!("Failed to persist environment selection: {e:?}");
-            }
-        });
-    }
-}
 
 // ── Auth secret helpers ────────────────────────────────────────────
 
@@ -1140,10 +942,7 @@ pub fn auth_secret_selection_required(state: &OrchestrationEditState, _ctx: &App
     if !should_show_auth_secret_picker(state) {
         return false;
     }
-    if !matches!(
-        state.auth_secret_selection,
-        AuthSecretSelection::Unset | AuthSecretSelection::CreatingNew
-    ) {
+    if !matches!(state.auth_secret_selection, AuthSecretSelection::Unset) {
         return false;
     }
     let Some(harness) = Harness::parse_orchestration_harness(&state.harness_type) else {
@@ -1183,8 +982,7 @@ pub fn accept_disabled_reason_with_auth(
     None
 }
 
-/// Populates the auth secret picker: Inherit, loaded managed secrets, then
-/// a "+ New API key…" entry for harnesses with managed-secret types. Also
+/// Populates the auth secret picker: Inherit, then the loaded managed secrets. Also
 /// kicks off a lazy fetch so subsequent paints replace "Loading…" with
 /// real entries.
 pub fn populate_auth_secret_picker_for_harness<A: OrchestrationControlAction, V: View>(
@@ -1208,7 +1006,6 @@ pub fn populate_auth_secret_picker_for_harness<A: OrchestrationControlAction, V:
         AuthSecretSelection::Named(name) => Some(name.clone()),
         _ => None,
     };
-    let supports_create_new = !auth_secret_types_for_harness(harness).is_empty();
     let selection = selection.clone();
     dropdown.update(ctx, |dropdown, ctx_dropdown| {
         let availability = HarnessAvailabilityModel::as_ref(ctx_dropdown);
@@ -1249,26 +1046,13 @@ pub fn populate_auth_secret_picker_for_harness<A: OrchestrationControlAction, V:
             }
         }
 
-        if supports_create_new {
-            items.push(MenuItem::Separator);
-            items.push(MenuItem::Item(
-                MenuItemFields::new(AUTH_SECRET_CREATE_NEW_LABEL).with_on_select_action(
-                    DropdownAction::select_action_and_close(A::create_new_auth_secret_requested()),
-                ),
-            ));
-        }
-
-        // Trigger label derives directly from the selection. `Unset` falls
-        // back to "+ New API key…" rather than auto-picking the first
-        // loaded key.
+        // Trigger label derives directly from the selection rather than
+        // auto-picking the first loaded key.
         let final_selection = match &selection {
             AuthSecretSelection::Named(name) => name.clone(),
-            AuthSecretSelection::Inherit => AUTH_SECRET_INHERIT_LABEL.to_string(),
-            AuthSecretSelection::CreatingNew => AUTH_SECRET_CREATE_NEW_LABEL.to_string(),
-            AuthSecretSelection::Unset if supports_create_new => {
-                AUTH_SECRET_CREATE_NEW_LABEL.to_string()
+            AuthSecretSelection::Inherit | AuthSecretSelection::Unset => {
+                AUTH_SECRET_INHERIT_LABEL.to_string()
             }
-            AuthSecretSelection::Unset => AUTH_SECRET_INHERIT_LABEL.to_string(),
         };
         let _ = selected_display_name;
         let _ = &availability;
@@ -1299,41 +1083,10 @@ pub fn apply_auth_secret_change<A: OrchestrationControlAction, V: View>(
     persist_auth_secret_selection(&state.harness_type, &state.auth_secret_selection, ctx);
 }
 
-/// Marks `CreatingNew` (not re-seeded from settings, so a background refresh
-/// can't restore a stale selection mid-create). Used by both card views.
-pub fn apply_create_new_auth_secret_requested<V: View>(
-    state: &mut OrchestrationEditState,
-    _ctx: &mut ViewContext<V>,
-) {
-    state.select_create_new_auth_secret();
-}
-
-/// Adopts a freshly-created secret as the active selection when its
-/// harness matches the card's current harness. Returns `true` on mutation.
-pub fn apply_created_auth_secret_if_matches<V: View>(
-    state: &mut OrchestrationEditState,
-    created_harness: Harness,
-    created_name: &str,
-    ctx: &mut ViewContext<V>,
-) -> bool {
-    let Some(card_harness) = Harness::parse_orchestration_harness(&state.harness_type) else {
-        return false;
-    };
-    if card_harness != created_harness {
-        return false;
-    }
-    if matches!(&state.auth_secret_selection, AuthSecretSelection::Named(n) if n == created_name) {
-        return false;
-    }
-    state.auth_secret_selection = AuthSecretSelection::Named(created_name.to_string());
-    persist_auth_secret_selection(&state.harness_type, &state.auth_secret_selection, ctx);
-    true
-}
-
 /// Persists the user's auth-secret choice for the active harness.
 /// `Named` writes to `last_selected_auth_secret` and clears any prior
 /// `Inherit` flag. `Inherit` clears the named entry and sets the inherit
-/// flag. `Unset`/`CreatingNew` clear both (no recorded choice). No-op for
+/// flag. `Unset` clears both (no recorded choice). No-op for
 /// Oz / unknown.
 fn persist_auth_secret_selection<V: View>(
     harness_type: &str,
@@ -1359,7 +1112,7 @@ fn persist_auth_secret_selection<V: View>(
                 named_map.remove(&key);
                 inherit_map.insert(key, true);
             }
-            AuthSecretSelection::Unset | AuthSecretSelection::CreatingNew => {
+            AuthSecretSelection::Unset => {
                 named_map.remove(&key);
                 inherit_map.remove(&key);
             }
@@ -1454,16 +1207,6 @@ pub fn apply_execution_mode_change<A: OrchestrationControlAction, V: View>(
     let is_local = !state.execution_mode.is_remote();
     if let Some(handle) = &handles.harness_picker {
         populate_harness_picker(handle, &state.harness_type, is_local, ctx);
-    }
-    // Pre-fill environment with the last-selected one when switching to Cloud.
-    if is_remote {
-        if let RunAgentsExecutionMode::Remote { environment_id, .. } = &state.execution_mode {
-            if environment_id.is_empty() {
-                if let Some(default_env) = resolve_default_environment_id(ctx) {
-                    state.set_environment_id(default_env);
-                }
-            }
-        }
     }
     if !is_model_in_filtered_choices(&state.model_id, &state.harness_type, is_local, ctx) {
         let reset_id = fallback_base_model_id(ctx)
@@ -1625,16 +1368,11 @@ pub fn sync_picker_selections<A: OrchestrationControlAction, V: View>(
             RunAgentsExecutionMode::Remote { environment_id, .. } => environment_id.clone(),
             RunAgentsExecutionMode::Local => String::new(),
         };
-        environment_picker.update(ctx, |dropdown, ctx_dropdown| {
-            if env_id.is_empty() {
+        if env_id.is_empty() {
+            environment_picker.update(ctx, |dropdown, ctx_dropdown| {
                 dropdown.set_selected_by_name(ORCHESTRATION_ENV_NONE_LABEL, ctx_dropdown);
-                return;
-            }
-            let all_envs = CloudAmbientAgentEnvironment::get_all(ctx_dropdown);
-            if let Some(env) = all_envs.iter().find(|e| e.id.uid() == env_id) {
-                dropdown.set_selected_by_name(&env.model().string_model.name, ctx_dropdown);
-            }
-        });
+            });
+        }
     }
     if let Some(host_picker) = handles.host_picker.clone() {
         let worker_host = match &state.execution_mode {
@@ -1647,19 +1385,12 @@ pub fn sync_picker_selections<A: OrchestrationControlAction, V: View>(
     }
     if let Some(auth_secret_picker) = handles.auth_secret_picker.clone() {
         let selection = state.auth_secret_selection.clone();
-        let supports_create_new = Harness::parse_orchestration_harness(&state.harness_type)
-            .filter(|h| *h != Harness::Oz)
-            .map(|h| !auth_secret_types_for_harness(h).is_empty())
-            .unwrap_or(false);
         auth_secret_picker.update(ctx, |dropdown, ctx_dropdown| {
             let label = match &selection {
                 AuthSecretSelection::Named(name) => name.clone(),
-                AuthSecretSelection::Inherit => AUTH_SECRET_INHERIT_LABEL.to_string(),
-                AuthSecretSelection::CreatingNew => AUTH_SECRET_CREATE_NEW_LABEL.to_string(),
-                AuthSecretSelection::Unset if supports_create_new => {
-                    AUTH_SECRET_CREATE_NEW_LABEL.to_string()
+                AuthSecretSelection::Inherit | AuthSecretSelection::Unset => {
+                    AUTH_SECRET_INHERIT_LABEL.to_string()
                 }
-                AuthSecretSelection::Unset => AUTH_SECRET_INHERIT_LABEL.to_string(),
             };
             dropdown.set_selected_by_name(&label, ctx_dropdown);
         });
@@ -2106,30 +1837,4 @@ pub fn render_validation_error(
     )
     .with_margin_bottom(8.)
     .finish()
-}
-
-pub fn empty_env_recommendation_message(
-    execution_mode: &RunAgentsExecutionMode,
-    app: &AppContext,
-) -> Option<String> {
-    let RunAgentsExecutionMode::Remote {
-        environment_id,
-        worker_host,
-        ..
-    } = execution_mode
-    else {
-        return None;
-    };
-    if !environment_id.trim().is_empty() {
-        return None;
-    }
-    if !worker_host.eq_ignore_ascii_case(ORCHESTRATION_WARP_WORKER_HOST) {
-        return None;
-    }
-    let env_count = CloudAmbientAgentEnvironment::get_all(app).len();
-    Some(if env_count > 0 {
-        "We recommend selecting an environment for cloud agents.".to_string()
-    } else {
-        "We recommend creating an environment for cloud agents.".to_string()
-    })
 }

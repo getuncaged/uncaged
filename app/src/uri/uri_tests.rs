@@ -261,66 +261,6 @@ fn test_warp_web_link_failure() {
         None
     );
 }
-#[test]
-fn test_app_web_link_rewrites_to_new_cloud_agent_conversation() {
-    let url = Url::parse(&format!("{}/app", ChannelState::server_root_url())).unwrap();
-    let intent = web_intent_parser::maybe_rewrite_web_url_to_intent(&url).unwrap();
-
-    assert_eq!(
-        intent.as_str(),
-        format!(
-            "{}://action/new_cloud_agent_conversation?source=web_home",
-            ChannelState::url_scheme()
-        )
-    );
-}
-
-#[test]
-fn test_action_create_environment_parse() {
-    let url = Url::parse(&format!(
-        "{}://action/create_environment?repo=foo&repo=bar",
-        ChannelState::url_scheme()
-    ))
-    .unwrap();
-
-    let action = Action::parse(&url).unwrap();
-    match action {
-        Action::CreateEnvironment { repos } => {
-            assert_eq!(repos, vec!["foo".to_owned(), "bar".to_owned()]);
-        }
-        _ => panic!("unexpected action: {action:?}"),
-    }
-}
-
-#[test]
-fn test_action_focus_cloud_mode_parse() {
-    let url = Url::parse(&format!(
-        "{}://action/focus_cloud_mode",
-        ChannelState::url_scheme()
-    ))
-    .unwrap();
-
-    let action = Action::parse(&url).unwrap();
-    assert!(matches!(action, Action::FocusCloudMode));
-}
-
-#[test]
-fn test_action_create_environment_parse_no_repos() {
-    let url = Url::parse(&format!(
-        "{}://action/create_environment",
-        ChannelState::url_scheme()
-    ))
-    .unwrap();
-
-    let action = Action::parse(&url).unwrap();
-    match action {
-        Action::CreateEnvironment { repos } => {
-            assert!(repos.is_empty());
-        }
-        _ => panic!("unexpected action: {action:?}"),
-    }
-}
-
 fn open_file_editor_test_path(file_name: &str) -> (String, PathBuf) {
     #[cfg(windows)]
     let path = format!("C:/tmp/{file_name}");
@@ -510,77 +450,17 @@ fn test_action_open_file_editor_parse_rejects_invalid_line_or_column() {
 }
 
 #[test]
-fn test_action_cloud_agent_setup_parse() {
-    let url = Url::parse(&format!(
-        "{}://action/cloud_agent_setup",
-        ChannelState::url_scheme()
-    ))
-    .unwrap();
-
-    let action = Action::parse(&url).unwrap();
-    assert!(matches!(action, Action::CloudAgentSetup));
-}
-#[test]
-fn test_action_auto_handoff_to_cloud_parse_default_trigger() {
-    let url = Url::parse(&format!(
-        "{}://action/auto_handoff_to_cloud",
-        ChannelState::url_scheme()
-    ))
-    .unwrap();
-
-    let action = Action::parse(&url).unwrap();
-    assert!(matches!(
-        action,
-        Action::AutoHandoffToCloud {
-            trigger: AutoCloudHandoffTrigger::Uri,
-        }
-    ));
-}
-
-#[test]
-fn test_action_auto_handoff_to_cloud_parse_alias_path() {
-    let url = Url::parse(&format!(
-        "{}://action/auto-handoff-to-cloud",
-        ChannelState::url_scheme()
-    ))
-    .unwrap();
-
-    let action = Action::parse(&url).unwrap();
-    assert!(matches!(
-        action,
-        Action::AutoHandoffToCloud {
-            trigger: AutoCloudHandoffTrigger::Uri,
-        }
-    ));
-}
-
-#[test]
-fn test_action_auto_handoff_to_cloud_parse_sleep_trigger() {
-    let url = Url::parse(&format!(
-        "{}://action/auto_handoff_to_cloud?trigger=sleep",
-        ChannelState::url_scheme()
-    ))
-    .unwrap();
-
-    let action = Action::parse(&url).unwrap();
-    assert!(matches!(
-        action,
-        Action::AutoHandoffToCloud {
-            trigger: AutoCloudHandoffTrigger::MacOsSleep,
-        }
-    ));
-}
-
-#[test]
-fn test_action_new_cloud_agent_conversation_parse() {
-    let url = Url::parse(&format!(
-        "{}://action/new_cloud_agent_conversation",
-        ChannelState::url_scheme()
-    ))
-    .unwrap();
-
-    let action = Action::parse(&url).unwrap();
-    assert!(matches!(action, Action::NewCloudAgentConversation));
+fn test_removed_cloud_actions_are_rejected() {
+    for path in [
+        "cloud_agent_setup",
+        "new_cloud_agent_conversation",
+        "create_environment",
+        "focus_cloud_mode",
+        "auto_handoff_to_cloud",
+    ] {
+        let url = Url::parse(&format!("{}://action/{path}", ChannelState::url_scheme())).unwrap();
+        assert!(Action::parse(&url).is_err(), "{path} should not parse");
+    }
 }
 
 #[test]

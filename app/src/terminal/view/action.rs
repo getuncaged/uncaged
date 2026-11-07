@@ -363,25 +363,14 @@ pub enum TerminalAction {
     DismissCodeToolbeltTooltip,
     /// Start a Language Server for the current working directory (if supported)
     StartLspServer,
-    /// Start the guided Warp Environment setup flow (inserts the inline setup block).
-    SetupCloudEnvironment(Vec<String>),
-    /// Start the guided Warp Environment setup flow immediately (no inline setup block).
-    SetupCloudEnvironmentAndStart(Vec<String>),
-    /// Show the environment setup mode selector to choose between remote GitHub or local agent flow.
-    TriggerEnvironmentSetupSelection(Vec<String>),
-    /// Open the Environment Management pane.
-    OpenEnvironmentManagementPane,
     ToggleLongRunningCommandControl,
     ToggleHideCliResponses,
     ExitAgentView,
-    EnterCloudAgentView,
     StartNewAgentConversation {
         origin: AgentViewEntryOrigin,
     },
     /// Toggle the cloud mode conversation details panel
     ToggleConversationDetailsPanel,
-    /// Cancel the ambient agent task while it's loading
-    CancelAmbientAgentTask,
     OpenInlineHistoryMenu,
     OpenModelSelector,
     ResolvePromptSuggestion(PromptSuggestionResolution),
@@ -674,22 +663,16 @@ impl fmt::Debug for TerminalAction {
             OpenFilesPalette { .. } => write!(f, "OpenFilesPalette"),
             DismissCodeToolbeltTooltip => write!(f, "DismissCodeToolbeltTooltip"),
             StartLspServer => write!(f, "StartLspServer"),
-            SetupCloudEnvironment(_) => write!(f, "SetupCloudEnvironment"),
-            SetupCloudEnvironmentAndStart(_) => write!(f, "SetupCloudEnvironmentAndStart"),
-            TriggerEnvironmentSetupSelection(_) => write!(f, "TriggerEnvironmentSetupSelection"),
-            OpenEnvironmentManagementPane => write!(f, "OpenEnvironmentManagementPane"),
             SummarizeConversation => write!(f, "SummarizeConversation"),
             ToggleLongRunningCommandControl => {
                 write!(f, "TakeOverLongRunningCommandControlForUser")
             }
             ToggleHideCliResponses => write!(f, "ToggleHideCliResponses"),
             ExitAgentView => write!(f, "ExitAgentView"),
-            EnterCloudAgentView => write!(f, "EnterCloudAgentView"),
             StartNewAgentConversation { origin } => {
                 write!(f, "StartNewAgentConversation {{ origin: {origin:?} }}")
             }
             ToggleConversationDetailsPanel => write!(f, "ToggleConversationDetailsPanel"),
-            CancelAmbientAgentTask => write!(f, "CancelAmbientAgentTask"),
             OpenInlineHistoryMenu => write!(f, "OpenInlineHistoryMenu"),
             OpenModelSelector => write!(f, "OpenModelSelector"),
             ResolvePromptSuggestion(..) => write!(f, "ResolvePromptSuggestion"),

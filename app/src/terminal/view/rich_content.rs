@@ -12,8 +12,6 @@ use crate::terminal::block_list_viewport::ScrollPositionUpdate;
 use crate::terminal::model::blocks::{RemovableBlocklistItem, RichContentItem};
 use crate::terminal::model::rich_content::RichContentType;
 use crate::terminal::model::terminal_model::BlockIndex;
-use crate::terminal::view::ambient_agent::AmbientAgentEntryBlock;
-use crate::terminal::view::init_environment::InitEnvironmentBlock;
 use crate::terminal::view::ssh_tmux_deprecation_banner::SshTmuxDeprecationBanner;
 use crate::terminal::warpify::success_block::WarpifySuccessBlock;
 use crate::terminal::TerminalView;
@@ -212,9 +210,6 @@ pub enum RichContentMetadata {
         step_kind: InitStepKind,
         block_handle: ViewHandle<InitStepBlock>,
     },
-    InitEnvironment {
-        block_handle: ViewHandle<InitEnvironmentBlock>,
-    },
     EnvVarCollectionBlock {
         env_var_collection_block_handle: ViewHandle<EnvVarCollectionBlock>,
     },
@@ -226,9 +221,6 @@ pub enum RichContentMetadata {
     },
     TelemetryBanner {
         telemetry_banner_handle: ViewHandle<TelemetryBanner>,
-    },
-    AmbientAgentBlock {
-        block_handle: ViewHandle<AmbientAgentEntryBlock>,
     },
     InlineAgentViewHeader,
     AgentViewZeroState,

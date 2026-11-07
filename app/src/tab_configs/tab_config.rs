@@ -99,10 +99,10 @@ pub struct TabConfigParam {
 pub enum TabConfigPaneType {
     /// A standard terminal shell session.
     Terminal,
-    /// A terminal that immediately enters Agent Mode.
+    /// A terminal that immediately enters Agent Mode. Tab configs written for the removed
+    /// cloud-agent pane (`type = "cloud"`) open as agent panes.
+    #[serde(alias = "cloud")]
     Agent,
-    /// A cloud-mode (ambient agent) pane with no local shell.
-    Cloud,
 }
 
 /// A single node in the flat `[[panes]]` array.  Distinguished as a split vs.
@@ -365,7 +365,6 @@ fn resolve_pane_node(
         let pane_mode = match pane_type {
             TabConfigPaneType::Terminal => PaneMode::Terminal,
             TabConfigPaneType::Agent => PaneMode::Agent,
-            TabConfigPaneType::Cloud => PaneMode::Cloud,
         };
 
         let cwd = node

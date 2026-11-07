@@ -12,11 +12,9 @@ use diesel::result::Error;
 
 use crate::{
     CloudAIExecutionProfile, CloudAIExecutionProfileModel, CloudAIFact, CloudAIFactModel,
-    CloudAmbientAgentEnvironment, CloudAmbientAgentEnvironmentModel, CloudEnvVarCollection,
-    CloudEnvVarCollectionModel, CloudMCPServer, CloudMCPServerModel, CloudPreference,
-    CloudPreferenceModel, CloudScheduledAmbientAgent, CloudScheduledAmbientAgentModel,
-    CloudTemplatableMCPServer, CloudTemplatableMCPServerModel, CloudWorkflowEnum,
-    CloudWorkflowEnumModel,
+    CloudEnvVarCollection, CloudEnvVarCollectionModel, CloudMCPServer, CloudMCPServerModel,
+    CloudPreference, CloudPreferenceModel, CloudTemplatableMCPServer,
+    CloudTemplatableMCPServerModel, CloudWorkflowEnum, CloudWorkflowEnumModel,
 };
 
 pub enum PersistedGenericStringObject {
@@ -27,8 +25,26 @@ pub enum PersistedGenericStringObject {
     MCPServer(CloudMCPServer),
     TemplatableMCPServer(CloudTemplatableMCPServer),
     AIExecutionProfile(CloudAIExecutionProfile),
-    CloudEnvironment(CloudAmbientAgentEnvironment),
-    ScheduledAmbientAgent(CloudScheduledAmbientAgent),
+}
+
+/// Parses the JSON object type out of an `object_metadata.object_type` column value.
+///
+/// Rows written by older builds for object types this build no longer has (for example the
+/// removed cloud environments, scheduled cloud agents and cloud agent configs) yield `None`, so
+/// the loader skips them instead of failing to load Warp Drive.
+fn json_object_type_from_metadata(object_type: &str) -> Option<JsonObjectType> {
+    let json_object_type = object_type.strip_prefix(&format!(
+        "{GENERIC_STRING_OBJECT_PREFIX}{JSON_OBJECT_PREFIX}"
+    ))?;
+    match JsonObjectType::try_from(json_object_type) {
+        Ok(json_object_type) => Some(json_object_type),
+        Err(_) => {
+            log::debug!(
+                "Skipping persisted object with unknown JSON object type {json_object_type}"
+            );
+            None
+        }
+    }
 }
 
 pub fn read_generic_string_objects(
@@ -46,13 +62,7 @@ pub fn read_generic_string_objects(
             )?;
             let object_id = id_from_metadata::<GenericStringObjectId>(metadata)?;
             let cloud_object_permissions = read_context.permissions_for_metadata(metadata)?;
-            let json_object_type: JsonObjectType = metadata
-                .object_type
-                .strip_prefix(&format!(
-                    "{GENERIC_STRING_OBJECT_PREFIX}{JSON_OBJECT_PREFIX}"
-                ))?
-                .try_into()
-                .ok()?;
+            let json_object_type = json_object_type_from_metadata(&metadata.object_type)?;
             match json_object_type {
                 JsonObjectType::Preference => {
                     let model = CloudPreferenceModel::deserialize_owned(&object.data);
@@ -135,35 +145,11 @@ pub fn read_generic_string_objects(
                         )
                     })
                 }
-                JsonObjectType::CloudEnvironment => {
-                    let model = CloudAmbientAgentEnvironmentModel::deserialize_owned(&object.data);
-                    model.ok().map(|model| {
-                        PersistedGenericStringObject::CloudEnvironment(
-                            CloudAmbientAgentEnvironment::new(
-                                object_id,
-                                model,
-                                to_cloud_object_metadata(metadata),
-                                cloud_object_permissions,
-                            ),
-                        )
-                    })
-                }
-                JsonObjectType::ScheduledAmbientAgent => {
-                    let model = CloudScheduledAmbientAgentModel::deserialize_owned(&object.data);
-                    model.ok().map(|model| {
-                        PersistedGenericStringObject::ScheduledAmbientAgent(
-                            CloudScheduledAmbientAgent::new(
-                                object_id,
-                                model,
-                                to_cloud_object_metadata(metadata),
-                                cloud_object_permissions,
-                            ),
-                        )
-                    })
-                }
-                // TODO: Implement CloudAgentConfig model when full sync support is added
-                JsonObjectType::CloudAgentConfig => None,
             }
         })
         .collect())
 }
+
+#[cfg(test)]
+#[path = "persistence_tests.rs"]
+mod tests;

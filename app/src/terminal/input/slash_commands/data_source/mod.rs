@@ -8,8 +8,6 @@ use ai::skills::SkillProvider;
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
 pub(crate) use saved_prompts::*;
-#[cfg(not(target_family = "wasm"))]
-use warp_cli::agent::Harness;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::Icon as WarpIcon;
@@ -39,7 +37,6 @@ use crate::terminal::cli_agent_sessions::{
 };
 use crate::terminal::model::session::active_session::{ActiveSession, ActiveSessionEvent};
 use crate::terminal::model::session::SessionType;
-use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
 use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
 
 pub struct DataSourceArgs {
@@ -47,16 +44,12 @@ pub struct DataSourceArgs {
     pub agent_view_controller: ModelHandle<AgentViewController>,
     pub cli_subagent_controller: ModelHandle<CLISubagentController>,
     pub terminal_view_id: EntityId,
-    pub ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
 }
 
 /// Context needed to decide which slash commands are enabled.
 struct ActiveCommandsContext {
     session_context: Availability,
     is_orchestration_enabled: bool,
-    is_cloud_handoff_enabled: bool,
-    #[cfg(not(target_family = "wasm"))]
-    active_conversation_is_cloud_oz: bool,
     is_cli_agent_input: bool,
 }
 
@@ -67,7 +60,6 @@ pub struct SlashCommandDataSource {
     terminal_view_id: EntityId,
     active_commands_by_id: HashMap<SlashCommandId, StaticCommand>,
     active_repo_root: Option<PathBuf>,
-    ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
 }
 
 impl SlashCommandDataSource {
@@ -77,7 +69,6 @@ impl SlashCommandDataSource {
             agent_view_controller,
             cli_subagent_controller,
             terminal_view_id,
-            ambient_agent_view_model,
         } = args;
         ctx.subscribe_to_model(&active_session, |me, _, event, ctx| match event {
             ActiveSessionEvent::UpdatedPwd | ActiveSessionEvent::Bootstrapped => {
@@ -182,7 +173,6 @@ impl SlashCommandDataSource {
             terminal_view_id,
             active_commands_by_id: Default::default(),
             active_repo_root: None,
-            ambient_agent_view_model,
         };
         me.recompute_active_commands(ctx);
         me
@@ -192,14 +182,6 @@ impl SlashCommandDataSource {
     /// Add command names here to make them accessible when composing prompts
     /// for a running CLI agent (Claude Code, Codex, etc.).
     const CLI_AGENT_INPUT_ALLOWED_COMMANDS: &[&str] = &["/prompts", "/skills"];
-
-    fn is_cloud_mode(&self, ctx: &AppContext) -> bool {
-        FeatureFlag::CloudMode.is_enabled()
-            && self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|model| model.as_ref(ctx).is_ambient_agent())
-    }
 
     fn recompute_active_commands(&mut self, ctx: &mut ModelContext<Self>) {
         let active_commands_context = self.active_commands_context(ctx);
@@ -281,19 +263,12 @@ impl SlashCommandDataSource {
             session_context |= Availability::AI_ENABLED;
         }
 
-        if self.is_cloud_mode(ctx) {
-            session_context |= Availability::CLOUD_AGENT;
-        } else {
-            session_context |= Availability::NOT_CLOUD_AGENT;
-        }
+        session_context |= Availability::NOT_CLOUD_AGENT;
 
         let ai_settings = AISettings::as_ref(ctx);
         ActiveCommandsContext {
             session_context,
             is_orchestration_enabled: ai_settings.is_orchestration_enabled(ctx),
-            is_cloud_handoff_enabled: ai_settings.is_cloud_handoff_enabled(ctx),
-            #[cfg(not(target_family = "wasm"))]
-            active_conversation_is_cloud_oz: self.active_conversation_is_cloud_oz(ctx),
             is_cli_agent_input,
         }
     }
@@ -307,17 +282,6 @@ impl SlashCommandDataSource {
             return false;
         }
         if command.name == commands::ORCHESTRATE_NAME && !context.is_orchestration_enabled {
-            return false;
-        }
-        if command.name == commands::MOVE_TO_CLOUD.name && !context.is_cloud_handoff_enabled {
-            return false;
-        }
-        // /continue-locally only applies to cloud Oz conversations. Non-Oz cloud runs
-        // (Claude, Gemini) are filtered out so the slash menu doesn't surface a no-op command.
-        #[cfg(not(target_family = "wasm"))]
-        if command.name == commands::CONTINUE_LOCALLY.name
-            && !context.active_conversation_is_cloud_oz
-        {
             return false;
         }
         // When CLI agent input is open, restrict to the explicit allowlist.
@@ -371,53 +335,6 @@ impl SlashCommandDataSource {
             .session(self.terminal_view_id)
             .filter(|s| matches!(s.input_state, CLIAgentInputState::Open { .. }))
             .map(|s| s.agent.supported_skill_providers())
-    }
-
-    /// Returns true when the active conversation is associated with a cloud Oz
-    /// `AmbientAgentTask`. Used to gate `/continue-locally` to runs that can
-    /// actually be forked into a local Warp conversation.
-    ///
-    /// Permissive when the harness is not yet known: we consider an absent task or
-    /// missing `agent_config_snapshot.harness` to be Oz, matching the existing
-    /// tombstone gate (`conversation_ended_tombstone_view::render_action_buttons`).
-    /// Only an explicit non-Oz harness (Claude, Gemini, OpenCode, Unknown) hides the
-    /// command. Conversations without a `task_id` are local and never qualify.
-    #[cfg(not(target_family = "wasm"))]
-    fn active_conversation_is_cloud_oz(&self, ctx: &AppContext) -> bool {
-        let agent_view_state = self.agent_view_controller.as_ref(ctx).agent_view_state();
-        let conversation_id = match agent_view_state.active_conversation_id() {
-            Some(id) => id,
-            None => match BlocklistAIHistoryModel::as_ref(ctx)
-                .active_conversation(self.terminal_view_id)
-            {
-                Some(conv) => conv.id(),
-                None => return false,
-            },
-        };
-
-        let history = BlocklistAIHistoryModel::as_ref(ctx);
-        let Some(conversation) = history.conversation(&conversation_id) else {
-            return false;
-        };
-        let Some(task_id) = conversation.task_id() else {
-            return false;
-        };
-
-        let Some(task) = AgentConversationsModel::as_ref(ctx).get_task_data(&task_id) else {
-            // Task data not yet fetched. Permissive default: assume Oz so the command
-            // is reachable while the fetch is in flight; once the fetch resolves,
-            // `TasksUpdated` triggers a recompute and a non-Oz task hides the command.
-            return true;
-        };
-
-        match task
-            .agent_config_snapshot
-            .as_ref()
-            .and_then(|s| s.harness.as_ref())
-        {
-            Some(config) => config.harness_type == Harness::Oz,
-            None => true,
-        }
     }
 }
 

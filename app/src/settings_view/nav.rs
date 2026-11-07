@@ -97,14 +97,6 @@ impl SettingsUmbrella {
         self.expanded || !self.collapsible
     }
 
-    /// Adds `section` to the group at `index`.
-    pub fn insert_subpage(&mut self, index: usize, section: SettingsSection) {
-        let index = index.min(self.subpages.len());
-        self.subpages.insert(index, section);
-        self.subpage_button_states
-            .insert(index, MouseStateHandle::default());
-    }
-
     /// Render the label above an always-open group's items.
     pub fn render_group_label(&self, appearance: &Appearance) -> Box<dyn Element> {
         let theme = appearance.theme();

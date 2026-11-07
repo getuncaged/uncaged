@@ -134,3 +134,7 @@ where
         "retry loop exhausted without attempting operation (MAX_ATTEMPTS={MAX_ATTEMPTS})"
     ))
 }
+
+#[cfg(test)]
+#[path = "retry_strategies_tests.rs"]
+mod tests;

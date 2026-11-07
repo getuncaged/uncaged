@@ -1,6 +1,5 @@
 pub(super) mod chips;
 pub mod editor;
-mod environment_selector;
 pub mod toolbar_item;
 
 #[cfg(not(target_family = "wasm"))]
@@ -42,11 +41,6 @@ use warpui::{
     ViewHandle,
 };
 
-#[cfg(feature = "local_fs")]
-pub(crate) use self::environment_selector::sort_environments_by_recency;
-pub(crate) use self::environment_selector::{
-    EnvironmentSelector, EnvironmentSelectorEvent, EnvironmentSelectorTarget,
-};
 use crate::ai::blocklist::agent_view::is_in_cloud_context;
 use crate::ai::blocklist::history_model::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::ai::blocklist::prompt::prompt_alert::{PromptAlertEvent, PromptAlertView};
@@ -80,7 +74,7 @@ use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
 use crate::terminal::input::models::InlineModelSelectorTab;
-use crate::terminal::input::{HandoffComposeState, MenuPositioningProvider};
+use crate::terminal::input::MenuPositioningProvider;
 #[cfg(not(target_family = "wasm"))]
 use crate::terminal::local_shell::LocalShellState;
 use crate::terminal::model_events::ModelEvent;
@@ -89,7 +83,6 @@ use crate::terminal::session_settings::{
     SessionSettings, SessionSettingsChangedEvent, ToolbarChipSelection,
 };
 use crate::terminal::universal_developer_input::InputToggleMode;
-use crate::terminal::view::ambient_agent::AmbientAgentViewModel;
 use crate::terminal::view::init::OPEN_CLI_AGENT_RICH_INPUT_KEYBINDING;
 use crate::terminal::view::TerminalAction;
 #[cfg(not(target_family = "wasm"))]
@@ -177,11 +170,7 @@ pub struct AgentInputFooter {
     context_window_button: ViewHandle<ActionButton>,
     model_selector: ViewHandle<ProfileModelSelector>,
     ftu_callout_close_button: ViewHandle<ActionButton>,
-    environment_selector: Option<ViewHandle<EnvironmentSelector>>,
-    handoff_environment_selector: ViewHandle<EnvironmentSelector>,
     prompt_alert: ViewHandle<PromptAlertView>,
-    ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
-    handoff_compose_state: ModelHandle<HandoffComposeState>,
     left_display_chips: Vec<ViewHandle<DisplayChip>>,
     right_display_chips: Vec<ViewHandle<DisplayChip>>,
     // Separate set of display chips for the CLI agent footer.
@@ -210,11 +199,6 @@ pub struct AgentInputFooter {
 
     // Fast-forward (auto-approve) toggle button shown in the agent view footer.
     fast_forward_button: ViewHandle<ActionButton>,
-
-    // "Hand off to cloud" chip. Visibility is gated on native/local handoff
-    // availability. Per-conversation eligibility is enforced by
-    // `Workspace::start_local_to_cloud_handoff`.
-    handoff_to_cloud_button: ViewHandle<ActionButton>,
 
     // CLI agent voice input state (self-contained, bypasses editor voice flow).
     #[cfg(feature = "voice_input")]
@@ -246,8 +230,6 @@ impl AgentInputFooter {
         terminal_view_id: EntityId,
         ai_input_model: ModelHandle<BlocklistAIInputModel>,
         terminal_model: Arc<FairMutex<TerminalModel>>,
-        ambient_agent_view_model: Option<ModelHandle<AmbientAgentViewModel>>,
-        handoff_compose_state: ModelHandle<HandoffComposeState>,
         prompt: ModelHandle<PromptType>,
         display_chip_config: DisplayChipConfig,
         ctx: &mut ViewContext<Self>,
@@ -362,20 +344,6 @@ impl AgentInputFooter {
                 .with_disabled_theme(FastForwardLockedTheme)
                 .on_click(|ctx| {
                     ctx.dispatch_typed_action(TerminalAction::ToggleAutoexecuteMode);
-                })
-        });
-
-        // "Hand off to cloud" chip. On click dispatches the workspace action that
-        // splits a new cloud-mode pane next to the local pane; that pane handles
-        // the rest of the handoff flow when native/local handoff is available.
-        let handoff_to_cloud_button = ctx.add_typed_action_view(|_ctx| {
-            ActionButton::new("", AgentInputButtonTheme)
-                .with_icon(Icon::UploadCloud)
-                .with_tooltip("Hand off to cloud (or type &)")
-                .with_size(button_size)
-                .with_tooltip_alignment(TooltipAlignment::Left)
-                .on_click(|ctx| {
-                    ctx.dispatch_typed_action(AgentInputFooterAction::HandoffChipClicked);
                 })
         });
 
@@ -589,7 +557,6 @@ impl AgentInputFooter {
                 menu_positioning_provider.clone(),
                 terminal_view_id,
                 ai_input_model.clone(),
-                ambient_agent_view_model.clone(),
                 terminal_model.clone(),
                 None,
                 ctx,
@@ -601,75 +568,6 @@ impl AgentInputFooter {
         ctx.subscribe_to_view(&profile_model_selector_full, |me, _, event, ctx| {
             me.handle_profile_model_selector_event(event, ctx);
         });
-
-        let environment_selector =
-            ambient_agent_view_model
-                .as_ref()
-                .map(|ambient_agent_view_model| {
-                    ctx.add_typed_action_view(|ctx| {
-                        EnvironmentSelector::new(
-                            menu_positioning_provider.clone(),
-                            EnvironmentSelectorTarget::CloudPane(ambient_agent_view_model.clone()),
-                            ctx,
-                        )
-                    })
-                });
-
-        let handoff_environment_selector = ctx.add_typed_action_view(|ctx| {
-            EnvironmentSelector::new(
-                menu_positioning_provider.clone(),
-                EnvironmentSelectorTarget::Handoff(handoff_compose_state.clone()),
-                ctx,
-            )
-        });
-
-        if let Some(environment_selector) = environment_selector.as_ref() {
-            ctx.subscribe_to_view(environment_selector, |_, _, event, ctx| match event {
-                EnvironmentSelectorEvent::MenuVisibilityChanged { open } => {
-                    ctx.emit(AgentInputFooterEvent::ToggledChipMenu { open: *open });
-                    if !*open {
-                        ctx.emit(AgentInputFooterEvent::EnvironmentSelectorClosed);
-                    }
-                }
-                EnvironmentSelectorEvent::OpenEnvironmentManagementPane => {
-                    ctx.emit(AgentInputFooterEvent::OpenEnvironmentManagementPane);
-                }
-            });
-        }
-
-        ctx.subscribe_to_view(
-            &handoff_environment_selector,
-            |_, _, event, ctx| match event {
-                EnvironmentSelectorEvent::MenuVisibilityChanged { open } => {
-                    ctx.emit(AgentInputFooterEvent::ToggledChipMenu { open: *open });
-                    if !*open {
-                        ctx.emit(AgentInputFooterEvent::EnvironmentSelectorClosed);
-                    }
-                }
-                EnvironmentSelectorEvent::OpenEnvironmentManagementPane => {
-                    ctx.emit(AgentInputFooterEvent::OpenEnvironmentManagementPane);
-                }
-            },
-        );
-
-        if let Some(ambient_agent_view_model) = ambient_agent_view_model.as_ref() {
-            ctx.subscribe_to_model(ambient_agent_view_model, |_, _, _, ctx| {
-                ctx.notify();
-            });
-        }
-
-        ctx.subscribe_to_model(
-            &handoff_compose_state,
-            |me, handoff_compose_state, _, ctx| {
-                if !handoff_compose_state.as_ref(ctx).is_active() {
-                    me.handoff_environment_selector
-                        .update(ctx, |selector, ctx| {
-                            selector.set_menu_visibility(false, ctx)
-                        });
-                }
-                ctx.notify();
-            },
-        );
 
         let prompt_alert = ctx.add_typed_action_view(PromptAlertView::new);
         ctx.subscribe_to_view(&prompt_alert, |_, _, event, ctx| {
@@ -780,7 +678,6 @@ impl AgentInputFooter {
 
         let mut me = Self {
             terminal_view_id,
-            ambient_agent_view_model,
             nld_button,
             mic_button,
             file_button,
@@ -796,18 +693,14 @@ impl AgentInputFooter {
             plugin_chip_ready: false,
             context_window_button,
             model_selector: profile_model_selector_full,
-            environment_selector,
-            handoff_environment_selector,
             prompt_alert,
             terminal_model,
-            handoff_compose_state,
             render_ftu_callout: false,
             left_display_chips: vec![],
             right_display_chips: vec![],
             cli_display_chips: vec![],
             display_chip_config,
             fast_forward_button,
-            handoff_to_cloud_button,
             #[cfg(feature = "voice_input")]
             cli_voice_input_state: CLIVoiceInputState::default(),
             #[cfg(feature = "voice_input")]
@@ -850,12 +743,6 @@ impl AgentInputFooter {
         // Chips will be rebuilt on the next GitRepoStatusEvent::MetadataChanged.
         // Notify to ensure any existing chips reflect the change.
         ctx.notify();
-    }
-
-    pub fn is_v2_environment_selector_open(&self, app: &AppContext) -> bool {
-        self.environment_selector
-            .as_ref()
-            .is_some_and(|s| s.as_ref(app).is_menu_open())
     }
 
     fn all_display_chips(&self) -> impl Iterator<Item = &ViewHandle<DisplayChip>> {
@@ -1315,8 +1202,7 @@ impl AgentInputFooter {
             AgentToolbarItemKind::ModelSelector
             | AgentToolbarItemKind::NLDToggle
             | AgentToolbarItemKind::ContextWindowUsage
-            | AgentToolbarItemKind::FastForwardToggle
-            | AgentToolbarItemKind::HandoffToCloud => None,
+            | AgentToolbarItemKind::FastForwardToggle => None,
         }
     }
 
@@ -1440,14 +1326,7 @@ impl AgentInputFooter {
             .all_display_chips()
             .any(|chip| chip.as_ref(app).display_chip_kind().has_open_menu());
 
-        let has_open_env_selector = self
-            .environment_selector
-            .as_ref()
-            .is_some_and(|selector| selector.as_ref(app).is_menu_open());
-        let has_open_handoff_env_selector =
-            self.handoff_environment_selector.as_ref(app).is_menu_open();
-
-        has_open_display_chip || has_open_env_selector || has_open_handoff_env_selector
+        has_open_display_chip
     }
 
     pub fn is_model_selector_open(&self, app: &AppContext) -> bool {
@@ -1871,16 +1750,9 @@ impl AgentInputFooter {
     fn render_toolbar_item(
         &self,
         item: &AgentToolbarItemKind,
-        is_cloud_context: bool,
         app: &AppContext,
     ) -> Option<Box<dyn Element>> {
         if !item.available_in().is_available_for_agent_view() {
-            return None;
-        }
-
-        if self.handoff_compose_state.as_ref(app).is_active()
-            && !item.is_available_during_handoff_compose()
-        {
             return None;
         }
 
@@ -1960,13 +1832,6 @@ impl AgentInputFooter {
             AgentToolbarItemKind::FastForwardToggle => FeatureFlag::FastForwardAutoexecuteButton
                 .is_enabled()
                 .then(|| ChildView::new(&self.fast_forward_button).finish()),
-            AgentToolbarItemKind::HandoffToCloud => {
-                if !AISettings::as_ref(app).is_cloud_handoff_enabled(app) || is_cloud_context {
-                    return None;
-                }
-
-                Some(ChildView::new(&self.handoff_to_cloud_button).finish())
-            }
             // Handled by the available_in() guard above; included for exhaustiveness.
             AgentToolbarItemKind::FileExplorer
             | AgentToolbarItemKind::RichInput
@@ -2029,23 +1894,6 @@ impl View for AgentInputFooter {
             .with_run_spacing(4.)
             .with_spacing(4.);
 
-        let is_ambient_agent = FeatureFlag::CloudMode.is_enabled()
-            && self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|ambient_agent_model| {
-                    ambient_agent_model.as_ref(app).is_ambient_agent()
-                });
-        if is_ambient_agent {
-            if let Some(environment_selector) = self.environment_selector.as_ref() {
-                left_buttons =
-                    left_buttons.with_child(ChildView::new(environment_selector).finish());
-            }
-        } else if self.handoff_compose_state.as_ref(app).is_active() {
-            left_buttons = left_buttons
-                .with_child(ChildView::new(&self.handoff_environment_selector).finish());
-        }
-
         // Uncaged: one row for both modes. The switch is always first; Terminal mode shows
         // the switch and nothing else, Agent mode adds the agent tooling after it. Context
         // chips are left out while the switch is here, because the prompt row above the
@@ -2054,7 +1902,6 @@ impl View for AgentInputFooter {
             left_buttons = left_buttons.with_child(ChildView::new(mode_toggle).finish());
         }
         let is_terminal_mode = self.mode_toggle.is_some()
-            && !is_ambient_agent
             && matches!(
                 self.ai_input_model.as_ref(app).input_type(),
                 InputType::Shell
@@ -2072,14 +1919,8 @@ impl View for AgentInputFooter {
             .filter(|item| !is_hidden(item))
             .collect();
 
-        let terminal_model = self.terminal_model.lock();
-        let is_cloud_context = super::is_in_cloud_context(
-            terminal_model.block_list().agent_view_state(),
-            &terminal_model,
-        );
-
         for item in &left_items {
-            if let Some(element) = self.render_toolbar_item(item, is_cloud_context, app) {
+            if let Some(element) = self.render_toolbar_item(item, app) {
                 left_buttons.add_child(element);
             }
         }
@@ -2100,7 +1941,7 @@ impl View for AgentInputFooter {
             );
         } else {
             for item in &right_items {
-                if let Some(element) = self.render_toolbar_item(item, is_cloud_context, app) {
+                if let Some(element) = self.render_toolbar_item(item, app) {
                     right_buttons.add_child(element);
                 }
             }
@@ -2130,7 +1971,9 @@ impl View for AgentInputFooter {
         // (and this is the first time this has happened)
         // we show a little callout explaining the change.
         let showing_ftu_model_picker = FeatureFlag::InlineMenuHeaders.is_enabled()
-            && terminal_model
+            && self
+                .terminal_model
+                .lock()
                 .block_list()
                 .active_block()
                 .is_agent_in_control_or_tagged_in();
@@ -2258,10 +2101,6 @@ pub enum AgentInputFooterAction {
     OpenPluginUpdateInstructionsPane,
     DismissPluginChip,
     OpenCodingAgentSettings,
-    /// User clicked the "Hand off to cloud" footer chip. The terminal `Input`
-    /// subscriber decides whether to dispatch the immediate empty-prompt
-    /// handoff or enter `&` compose mode based on the current input state.
-    HandoffChipClicked,
     ShowContextMenu {
         position: Vector2F,
     },
@@ -2452,18 +2291,6 @@ impl TypedActionView for AgentInputFooter {
                     widget_id: crate::settings_view::cli_agent_settings_widget_id(),
                 });
             }
-            AgentInputFooterAction::HandoffChipClicked => {
-                if FeatureFlag::OzHandoff.is_enabled()
-                    && FeatureFlag::HandoffLocalCloud.is_enabled()
-                    && cfg!(all(feature = "local_fs", not(target_family = "wasm")))
-                {
-                    // The terminal `Input` subscriber decides what to do with
-                    // the chip click — auto-handoff when the input buffer is
-                    // empty and the source conversation has content, or `&`
-                    // compose mode otherwise (preserving any in-flight prompt).
-                    ctx.emit(AgentInputFooterEvent::HandoffChipClicked);
-                }
-            }
             AgentInputFooterAction::ShowContextMenu { position } => {
                 ctx.emit(AgentInputFooterEvent::ShowContextMenu {
                     position: *position,
@@ -2491,7 +2318,6 @@ pub enum AgentInputFooterEvent {
     PromptAlert(PromptAlertEvent),
     ModelSelectorOpened,
     ModelSelectorClosed,
-    EnvironmentSelectorClosed,
     ToggleInlineModelSelector {
         initial_tab: InlineModelSelectorTab,
     },
@@ -2504,15 +2330,9 @@ pub enum AgentInputFooterEvent {
     ShowContextMenu {
         position: Vector2F,
     },
-    OpenEnvironmentManagementPane,
     PluginInstalled(CLIAgent),
     #[cfg(not(target_family = "wasm"))]
     OpenPluginInstructionsPane(CLIAgent, PluginModalKind),
-    /// Local-to-cloud handoff chip clicked. The terminal `Input` subscriber
-    /// either dispatches the immediate empty-prompt handoff (empty buffer +
-    /// source conversation with content) or activates `&` compose mode
-    /// (preserving any in-flight prompt).
-    HandoffChipClicked,
 }
 
 impl Entity for AgentInputFooter {

@@ -6,41 +6,15 @@ use std::{env, fmt};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use url::Url;
 use warp_core::channel::ChannelState;
-use warp_core::features::FeatureFlag;
-
-use crate::agent::OutputFormat;
 
 #[cfg(windows)]
 mod process_handle;
 
-pub mod artifact;
-pub mod scope;
-pub mod skill;
-mod sort_order;
-pub use sort_order::SortOrderArg;
-
 pub mod agent;
-pub mod api_key;
 pub mod completions;
-pub mod config_file;
-mod date_time;
-pub mod environment;
-pub mod federate;
-pub mod harness_support;
-pub mod integration;
-pub mod json_filter;
-pub mod local_control;
 pub mod mcp;
-pub mod model;
-pub mod provider;
-pub mod schedule;
-pub mod secret;
-pub mod share;
-pub mod task;
-pub const OZ_RUN_ID_ENV: &str = "OZ_RUN_ID";
-pub const OZ_PARENT_RUN_ID_ENV: &str = "OZ_PARENT_RUN_ID";
-pub const OZ_CLI_ENV: &str = "OZ_CLI";
-pub const OZ_HARNESS_ENV: &str = "OZ_HARNESS";
+pub mod skill;
+
 pub const SERVER_ROOT_URL_OVERRIDE_ENV: &str = "WARP_SERVER_ROOT_URL";
 pub const WS_SERVER_URL_OVERRIDE_ENV: &str = "WARP_WS_SERVER_URL";
 
@@ -65,50 +39,14 @@ pub struct ParentOpts {
     pub handle: Option<process_handle::ProcessHandle>,
 }
 
-/// Global options that apply to all CLI commands.
-#[derive(Debug, Default, Clone, clap::Args)]
-pub struct GlobalOptions {
-    /// API key for server authentication.
-    #[arg(long = "api-key", global = true, env = "WARP_API_KEY")]
-    pub api_key: Option<String>,
-
-    /// Set the output format.
-    #[arg(
-        long = "output-format",
-        global = true,
-        value_enum,
-        default_value_t = OutputFormat::Pretty,
-        env = "WARP_OUTPUT_FORMAT"
-    )]
-    pub output_format: OutputFormat,
-}
-
-/// Normal argument parser for the shared Warp executable across all channels.
-///
-/// Oz commands are subcommands of this parser, so invoking an `oz` symlink does
-/// not require a mode flag. Warp Control uses its separate [`local_control::ControlArgs`]
-/// parser, selected before this parser sees the arguments.
+/// Argument parser for the Uncaged executable.
 #[derive(Debug, Default, Parser, Clone)]
-#[command(
-    name = "oz",
-    display_name = "Oz",
-    about = r#"The orchestration platform for cloud agents
-
-The Oz CLI is a tool for running, managing, and orchestrating coding agents at scale.
-Use the CLI to:
-* Launch and inspect cloud agents
-* Schedule cloud agents to run in the future
-* Manage the environments that cloud agents run in
-* Upload secrets to Oz's secure storage"#
-)]
+#[command(name = "uncaged", display_name = "Uncaged")]
 #[clap(args_conflicts_with_subcommands = true)]
 pub struct Args {
-    #[clap(flatten)]
-    global_options: GlobalOptions,
-
-    /// Enable debug mode.
-    #[arg(long = "debug", global = true, help = "Enable debug logging")]
-    debug: bool,
+    /// API key for server authentication. Only used on dogfood channels.
+    #[arg(long = "api-key", hide = true, env = "WARP_API_KEY")]
+    api_key: Option<String>,
 
     /// Override the server root URL.
     #[arg(
@@ -168,80 +106,6 @@ impl Args {
             } else {
                 use clap::FromArgMatches as _;
 
-                // Check for disabled commands before parsing to prevent help from showing (e.g.
-                // `warp environment` should not return help text)
-                if !FeatureFlag::CloudEnvironments.is_enabled() {
-                    let args: Vec<String> = env::args().collect();
-                    if args.len() > 1 && args[1] == "environment" {
-                        eprintln!("error: unrecognized subcommand 'environment'\n");
-                        eprintln!("For more information, try '--help'");
-                        std::process::exit(2);
-                    }
-                }
-
-                if !FeatureFlag::ProviderCommand.is_enabled() {
-                    let args: Vec<String> = env::args().collect();
-                    if args.len() > 1 && args[1] == "provider" {
-                        eprintln!("error: unrecognized subcommand 'provider'\n");
-                        eprintln!("For more information, try '--help'");
-                        std::process::exit(2);
-                    }
-                }
-
-                if !FeatureFlag::IntegrationCommand.is_enabled() {
-                    let args: Vec<String> = env::args().collect();
-                    if args.len() > 1 && args[1] == "integration" {
-                        eprintln!("error: unrecognized subcommand 'integration'\n");
-                        eprintln!("For more information, try '--help'");
-                        std::process::exit(2);
-                    }
-                }
-
-                if !FeatureFlag::ScheduledAmbientAgents.is_enabled() {
-                    let args: Vec<String> = env::args().collect();
-                    if args.len() > 1 && args[1] == "schedule" {
-                        eprintln!("error: unrecognized subcommand 'schedule'\n");
-                        eprintln!("For more information, try '--help'");
-                        std::process::exit(2);
-                    }
-                }
-
-                if !FeatureFlag::WarpManagedSecrets.is_enabled() {
-                    let args: Vec<String> = env::args().collect();
-                    if args.len() > 1 && args[1] == "secret" {
-                        eprintln!("error: unrecognized subcommand 'secret'\n");
-                        eprintln!("For more information, try '--help'");
-                        std::process::exit(2);
-                    }
-                }
-
-                if !FeatureFlag::OzIdentityFederation.is_enabled() {
-                    let args: Vec<String> = env::args().collect();
-                    if args.len() > 1 && args[1] == "federate" {
-                        eprintln!("error: unrecognized subcommand 'federate'\n");
-                        eprintln!("For more information, try '--help'");
-                        std::process::exit(2);
-                    }
-                }
-
-                if !FeatureFlag::ArtifactCommand.is_enabled() {
-                    let args: Vec<String> = env::args().collect();
-                    if args.len() > 1 && args[1] == "artifact" {
-                        eprintln!("error: unrecognized subcommand 'artifact'\n");
-                        eprintln!("For more information, try '--help'");
-                        std::process::exit(2);
-                    }
-                }
-
-                if !FeatureFlag::APIKeyManagement.is_enabled() {
-                    let args: Vec<String> = env::args().collect();
-                    if args.len() > 1 && args[1] == "api-key" {
-                        eprintln!("error: unrecognized subcommand 'api-key'\n");
-                        eprintln!("For more information, try '--help'");
-                        std::process::exit(2);
-                    }
-                }
-
                 let command = Self::clap_command();
 
                 command.try_get_matches()
@@ -261,113 +125,9 @@ impl Args {
     ///
     /// IMPORTANT: use this instead of [`CommandFactory::command`], since we customize the command at runtime.
     pub fn clap_command() -> clap::Command {
-        let mut command = <Args as CommandFactory>::command();
-
-        // Hide the environment subcommands and --environment flags from help text
-        if !FeatureFlag::CloudEnvironments.is_enabled() {
-            command = command.mut_subcommand("environment", |c| c.hide(true));
-            command = command.mut_subcommand("agent", |agent_cmd| {
-                agent_cmd
-                    .mut_subcommand("run", |run_cmd| {
-                        run_cmd.mut_arg("environment", |arg| arg.hide(true))
-                    })
-                    .mut_subcommand("run-cloud", |cloud_cmd| {
-                        cloud_cmd.mut_arg("environment", |arg| arg.hide(true))
-                    })
-            });
-        }
-
-        // Hide the --conversation flag from help text
-        if !FeatureFlag::CloudConversations.is_enabled() {
-            command = command.mut_subcommand("agent", |agent_cmd| {
-                agent_cmd
-                    .mut_subcommand("run", |run_cmd| {
-                        run_cmd.mut_arg("conversation", |arg| arg.hide(true))
-                    })
-                    .mut_subcommand("run-cloud", |cloud_cmd| {
-                        cloud_cmd.mut_arg("conversation", |arg| arg.hide(true))
-                    })
-            });
-        }
-
-        if !FeatureFlag::AmbientAgentsCommandLine.is_enabled() {
-            command = command.mut_subcommand("agent", |agent_cmd| {
-                agent_cmd.mut_subcommand("run-cloud", |c| c.hide(true))
-            });
-        }
-
-        // Hide the provider subcommand from help text
-        if !FeatureFlag::ProviderCommand.is_enabled() {
-            command = command.mut_subcommand("provider", |c| c.hide(true));
-        }
-
-        // Hide the integration subcommand from help text
-        if !FeatureFlag::IntegrationCommand.is_enabled() {
-            command = command.mut_subcommand("integration", |c| c.hide(true));
-        }
-
-        // Hide the schedule subcommand from help text.
-        if !FeatureFlag::ScheduledAmbientAgents.is_enabled() {
-            command = command.mut_subcommand("schedule", |c| c.hide(true));
-        }
-
-        // Hide the secret subcommand from help text.
-        if !FeatureFlag::WarpManagedSecrets.is_enabled() {
-            command = command.mut_subcommand("secret", |c| c.hide(true));
-        }
-
-        // Hide the federate subcommand from help text.
-        if !FeatureFlag::OzIdentityFederation.is_enabled() {
-            command = command.mut_subcommand("federate", |c| c.hide(true));
-        }
-
-        // Hide the harness-support subcommand from help text.
-        if !FeatureFlag::AgentHarness.is_enabled() {
-            command = command.mut_subcommand("harness-support", |c| c.hide(true));
-        }
-
-        // Hide the conversation subcommand and --conversation flag from help text.
-        if !FeatureFlag::ConversationApi.is_enabled() {
-            command = command.mut_subcommand("run", |run_cmd| {
-                run_cmd
-                    .mut_subcommand("conversation", |c| c.hide(true))
-                    .mut_subcommand("get", |get_cmd| {
-                        get_cmd.mut_arg("conversation", |arg| arg.hide(true))
-                    })
-            });
-        }
-
-        // Hide the artifact subcommand from help text.
-        if !FeatureFlag::ArtifactCommand.is_enabled() {
-            command = command.mut_subcommand("artifact", |c| c.hide(true));
-        }
-
-        // Hide the api-key subcommand from help text.
-        if !FeatureFlag::APIKeyManagement.is_enabled() {
-            command = command.mut_subcommand("api-key", |c| c.hide(true));
-        }
-
         // Wire up `--version` / `-V` using the same version metadata used elsewhere in the
         // app, so the CLI reports the build's release tag.
-        command = command.version(version_string());
-
-        // Substitute the actual binary name into help output. Ideally clap would do this for us.
-        let bin_name =
-            binary_name().unwrap_or_else(|| ChannelState::channel().cli_command_name().to_string());
-        command = command.after_help(color_print::cformat!(
-            r#"<bold><underline>Examples:</underline></bold>
-
-  <dim>$</dim> <bold>{bin_name} agent run --prompt "Build anything"</bold>
-
-  <dim>$</dim> <bold>{bin_name} mcp list</bold>
-
-<bold><underline>Learn more:</underline></bold>
-* Use <bold>{bin_name} help</bold> to learn more about each command
-* Read the documentation at https://github.com/uncaged-terminal/uncaged
-"#
-        ));
-
-        command
+        <Args as CommandFactory>::command().version(version_string())
     }
 
     /// The requested subcommand, if any.
@@ -385,24 +145,9 @@ impl Args {
         self.args
     }
 
-    /// Returns the global options.
-    pub fn global_options(&self) -> &GlobalOptions {
-        &self.global_options
-    }
-
     /// Returns the API key if provided.
     pub fn api_key(&self) -> Option<&String> {
-        self.global_options.api_key.as_ref()
-    }
-
-    /// Returns the output format.
-    pub fn output_format(&self) -> OutputFormat {
-        self.global_options.output_format
-    }
-
-    /// Returns true if debug logging is enabled.
-    pub fn debug(&self) -> bool {
-        self.debug
+        self.api_key.as_ref()
     }
 
     pub fn server_root_url(&self) -> Option<&str> {
@@ -449,104 +194,11 @@ pub enum WorkerCommand {
     },
 }
 
-/// CLI-related subcommands. The command-line interface to Warp isn't a full SDK (e.g. with language bindings),
-/// but it allows scripting some Warp functionality.
-#[derive(Debug, Clone, Subcommand)]
-pub enum CliCommand {
-    /// Interact with Oz.
-    #[command(subcommand)]
-    Agent(crate::agent::AgentCommand),
-
-    /// Manage cloud environments.
-    #[command(subcommand)]
-    Environment(crate::environment::EnvironmentCommand),
-
-    /// Manage MCP servers.
-    #[command(subcommand)]
-    MCP(crate::mcp::MCPCommand),
-
-    /// Manage runs.
-    #[command(subcommand, alias = "task")]
-    Run(crate::task::TaskCommand),
-
-    /// Manage available models.
-    #[command(subcommand)]
-    Model(crate::model::ModelCommand),
-
-    /// Log in to Warp.
-    Login,
-    /// Log out of Warp.
-    Logout,
-    /// Print information about the logged-in user.
-    Whoami,
-
-    /// Manage providers.
-    #[command(subcommand)]
-    Provider(crate::provider::ProviderCommand),
-
-    /// Manage integrations.
-    #[command(subcommand)]
-    Integration(crate::integration::IntegrationCommand),
-
-    /// Create and manage scheduled Oz agents. Scheduled agents run a user-defined task periodically, according to a cron schedule.
-    ///
-    /// As a shorthand, the `schedule` command behaves identically to `schedule create`.
-    Schedule(crate::schedule::ScheduleCommand),
-
-    /// Manage secrets.
-    #[command(subcommand)]
-    Secret(crate::secret::SecretCommand),
-
-    /// Issue and manage federated identity tokens.
-    #[command(subcommand)]
-    Federate(crate::federate::FederateCommand),
-
-    /// Support commands for agent harnesses to integrate with Oz.
-    #[command(hide = true)]
-    HarnessSupport(crate::harness_support::HarnessSupportArgs),
-
-    /// Manage artifacts.
-    #[command(subcommand)]
-    Artifact(crate::artifact::ArtifactCommand),
-
-    /// Manage API keys.
-    #[command(subcommand)]
-    ApiKey(crate::api_key::ApiKeyCommand),
-}
-
-impl CliCommand {
-    /// Returns the command path used to identify this invocation in tracing.
-    pub fn as_str_for_tracing(&self) -> &'static str {
-        match self {
-            CliCommand::Agent(command) => command.as_str_for_tracing(),
-            CliCommand::Environment(command) => command.as_str_for_tracing(),
-            CliCommand::MCP(command) => command.as_str_for_tracing(),
-            CliCommand::Run(command) => command.as_str_for_tracing(),
-            CliCommand::Model(command) => command.as_str_for_tracing(),
-            CliCommand::Login => "login",
-            CliCommand::Logout => "logout",
-            CliCommand::Whoami => "whoami",
-            CliCommand::Provider(command) => command.as_str_for_tracing(),
-            CliCommand::Integration(command) => command.as_str_for_tracing(),
-            CliCommand::Schedule(command) => command.as_str_for_tracing(),
-            CliCommand::Secret(command) => command.as_str_for_tracing(),
-            CliCommand::Federate(command) => command.as_str_for_tracing(),
-            CliCommand::HarnessSupport(args) => args.command.as_str_for_tracing(),
-            CliCommand::Artifact(command) => command.as_str_for_tracing(),
-            CliCommand::ApiKey(command) => command.as_str_for_tracing(),
-        }
-    }
-}
-
 /// A subcommand of the main Warp application. This includes all [`WorkerCommand`]s as well as app-specific debugging tools.
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
     #[clap(flatten)]
     Worker(WorkerCommand),
-
-    /// Commands that make up the Warp CLI.
-    #[clap(flatten)]
-    CommandLine(Box<CliCommand>),
 
     /// Generate shell completions for your shell to stdout.
     ///
@@ -586,7 +238,7 @@ impl Command {
     pub fn prints_to_stdout(&self) -> bool {
         match self {
             Command::Worker(_) => false,
-            Command::CommandLine(_) | Command::DumpDebugInfo => true,
+            Command::DumpDebugInfo => true,
             Command::Completions { .. } => true,
             #[cfg(not(target_family = "wasm"))]
             Command::PrintTelemetryEvents => true,
@@ -627,15 +279,6 @@ pub fn terminal_server_subcommand() -> String {
     <Args as CommandFactory>::command()
         .find_subcommand("terminal-server")
         .expect("terminal-server subcommand not found")
-        .get_name()
-        .to_string()
-}
-
-/// Returns the subcommand name to use for starting the installation detection server.
-pub fn installation_detection_server_subcommand() -> String {
-    <Args as CommandFactory>::command()
-        .find_subcommand("installation-detection-server")
-        .expect("installation-detection-server subcommand not found")
         .get_name()
         .to_string()
 }

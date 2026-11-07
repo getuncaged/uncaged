@@ -26,7 +26,8 @@ use crate::ai::agent::conversation::{
     AIAgentHarness, AIConversation, AIConversationId, ConversationStatus,
     ServerAIConversationMetadata,
 };
-use crate::ai::ambient_agents::task::{HarnessConfig, TaskPrincipalInfo, TaskStatusMessage};
+use crate::ai::ambient_agents::agent_config::HarnessConfig;
+use crate::ai::ambient_agents::task::{TaskPrincipalInfo, TaskStatusMessage};
 use crate::ai::ambient_agents::{
     AgentConfigSnapshot, AmbientAgentTask, AmbientAgentTaskId, AmbientAgentTaskState,
 };

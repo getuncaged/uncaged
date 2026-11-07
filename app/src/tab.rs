@@ -836,14 +836,12 @@ impl<'a> TabComponent<'a> {
             .as_ref(ctx)
             .active_session_view(ctx)
             .map(|view| {
-                let view = view.as_ref(ctx);
-                view.is_ambient_agent_session(ctx)
-                    || matches!(
-                        view.model.lock().conversation_transcript_viewer_status(),
-                        Some(
-                            crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus::ViewingAmbientConversation(_)
-                        )
+                matches!(
+                    view.as_ref(ctx).model.lock().conversation_transcript_viewer_status(),
+                    Some(
+                        crate::terminal::model::terminal_model::ConversationTranscriptViewerStatus::ViewingAmbientConversation(_)
                     )
+                )
             })
             .unwrap_or(false);
         let active_pane_has_unsaved_code_changes = tab

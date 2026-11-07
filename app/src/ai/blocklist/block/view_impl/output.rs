@@ -9,9 +9,7 @@ use std::path::{Component, Path};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use ai::agent::action::{
-    RequestComputerUseRequest, SuggestPromptRequest, UploadArtifactRequest, UseComputerRequest,
-};
+use ai::agent::action::{SuggestPromptRequest, UploadArtifactRequest};
 use ai::agent::file_locations::group_file_contexts_for_display;
 use ai::skills::{ParsedSkill, SkillReference};
 use indexmap::IndexMap;
@@ -19,7 +17,6 @@ use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use ui_components::{button, Component as _, Options as _};
 use warp_core::channel::ChannelState;
 use warp_core::ui::theme::color::internal_colors;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
@@ -107,8 +104,6 @@ use crate::appearance::Appearance;
 use crate::code::diff_viewer::DisplayMode;
 use crate::code::editor_management::CodeSource;
 use crate::settings_view::SettingsSection;
-#[cfg(not(target_family = "wasm"))]
-use crate::terminal::input::slash_commands::fork_button_action;
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::ShellLaunchData;
 use crate::ui_components::blended_colors;
@@ -131,7 +126,6 @@ pub(crate) struct Props<'a> {
     pub(crate) model: &'a dyn AIBlockModel<View = AIBlock>,
     pub(super) state_handles: &'a AIBlockStateHandles,
     pub(super) action_buttons: &'a HashMap<AIAgentActionId, ActionButtons>,
-    pub(super) view_screenshot_buttons: &'a HashMap<AIAgentActionId, ui_components::button::Button>,
     pub(crate) action_model: &'a ModelHandle<BlocklistAIActionModel>,
     pub(crate) active_session: &'a ModelHandle<ActiveSession>,
     pub(super) editor_views: &'a [EmbeddedCodeEditorView],
@@ -170,8 +164,6 @@ pub(crate) struct Props<'a> {
     pub(super) is_usage_footer_expanded: bool,
     pub(super) terminal_view_id: EntityId,
     pub(super) is_conversation_transcript_viewer: bool,
-    #[cfg(not(target_family = "wasm"))]
-    pub(super) is_cloud_agent_context: bool,
     pub(super) imported_comments: &'a HashMap<AIAgentActionId, ImportedCommentGroup>,
     /// Per-orchestrate-action card view. Each `RunAgentsCardView` owns
     /// its own edit state, button + picker handles, and in-flight
@@ -188,9 +180,6 @@ pub(crate) struct Props<'a> {
     pub(super) thinking_display_mode: crate::settings::ThinkingDisplayMode,
     pub(super) conversation_has_imported_comments: bool,
     pub(super) ask_user_question_view: Option<&'a ViewHandle<AskUserQuestionView>>,
-    /// `true` when this block belongs to a cloud agent pane that is still in its setup phase
-    /// (running environment startup commands before the first agent turn).
-    pub(super) is_cloud_agent_pre_first_exchange: bool,
 }
 
 pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
@@ -255,7 +244,6 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                         && !is_output_for_static_prompt_suggestions
                         && !is_conversation_in_progress
                         && request_type.is_active()
-                        && !props.is_cloud_agent_pre_first_exchange
                         && !status
                             .error()
                             .map(|e| e.is_invalid_api_key())
@@ -729,14 +717,6 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                             }
                         }
                         AIAgentOutputMessageType::Action(AIAgentAction {
-                            action: AIAgentActionType::UseComputer(request),
-                            id,
-                            ..
-                        }) => {
-                            should_render_footer = false;
-                            output_items.add_child(render_use_computer(props, id, request, app));
-                        }
-                        AIAgentOutputMessageType::Action(AIAgentAction {
                             action: AIAgentActionType::ReadSkill(request),
                             id,
                             ..
@@ -756,15 +736,6 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                         }) => {
                             should_render_footer = false;
                             output_items.add_child(render_upload_artifact(props, id, request, app));
-                        }
-                        AIAgentOutputMessageType::Action(AIAgentAction {
-                            action: AIAgentActionType::RequestComputerUse(request),
-                            id,
-                            ..
-                        }) => {
-                            should_render_footer = false;
-                            output_items
-                                .add_child(render_request_computer_use(props, id, request, app));
                         }
                         AIAgentOutputMessageType::Action(AIAgentAction {
                             action:
@@ -2799,106 +2770,6 @@ fn render_upload_artifact(
     renderable_action.render(app).finish()
 }
 
-fn render_use_computer(
-    props: Props,
-    action_id: &AIAgentActionId,
-    request: &UseComputerRequest,
-    app: &AppContext,
-) -> Box<dyn Element> {
-    let appearance = Appearance::handle(app).as_ref(app);
-
-    let mut renderable_action = RenderableAction::new(&request.action_summary, app)
-        .with_icon(action_icon(action_id, props.action_model, props.model, app).finish());
-
-    // Add a "View screenshot" button if the action result contains a screenshot.
-    let has_screenshot = props
-        .action_model
-        .as_ref(app)
-        .get_action_result(action_id)
-        .is_some_and(|result| {
-            matches!(
-                &result.result,
-                AIAgentActionResultType::UseComputer(
-                    crate::ai::agent::UseComputerResult::Success(action_result)
-                ) if action_result.screenshot.is_some()
-            )
-        });
-
-    if has_screenshot {
-        let action_id_clone = action_id.clone();
-        let view_screenshot_button = props.view_screenshot_buttons.get(action_id).map(|btn| {
-            btn.render(
-                appearance,
-                button::Params {
-                    content: button::Content::Label("View screenshot".into()),
-                    theme: &button::themes::Secondary,
-                    options: button::Options {
-                        size: button::Size::Small,
-                        on_click: Some(Box::new(move |ctx, _, _| {
-                            ctx.dispatch_typed_action(AIBlockAction::ViewScreenshot {
-                                action_id: action_id_clone.clone(),
-                            });
-                        })),
-                        ..button::Options::default(appearance)
-                    },
-                },
-            )
-        });
-
-        if let Some(button_element) = view_screenshot_button {
-            renderable_action = renderable_action.with_action_button(button_element);
-        }
-    }
-
-    renderable_action.render(app).finish()
-}
-
-fn render_request_computer_use(
-    props: Props,
-    action_id: &AIAgentActionId,
-    request: &RequestComputerUseRequest,
-    app: &AppContext,
-) -> Box<dyn Element> {
-    let appearance = Appearance::as_ref(app);
-    let status = props.action_model.as_ref(app).get_action_status(action_id);
-
-    let mut renderable_action = RenderableAction::new(&request.task_summary, app);
-
-    if status.as_ref().is_some_and(|status| status.is_blocked()) {
-        let buttons = props
-            .action_buttons
-            .get(action_id)
-            .expect("Button states must exist for each requested action.");
-
-        renderable_action = renderable_action
-            .with_header(blocked_action_header(
-                action_id.clone(),
-                "OK if I use computer control for this task?",
-                buttons.run_button.clone(),
-                buttons.cancel_button.clone(),
-                props.action_model,
-                props.model,
-                app,
-            ))
-            .with_highlighted_border()
-            .with_background_color(appearance.theme().background().into_solid());
-    } else {
-        if (props.model.status(app).is_streaming()
-            && !props.model.is_first_action_in_output(action_id, app))
-            || status.as_ref().is_some_and(|s| s.is_queued())
-        {
-            renderable_action = renderable_action.with_font_color(blended_colors::text_disabled(
-                appearance.theme(),
-                appearance.theme().surface_2(),
-            ));
-        }
-        renderable_action = renderable_action
-            .with_icon(action_icon(action_id, props.action_model, props.model, app).finish());
-    }
-
-    renderable_action.render(app).finish()
-}
-
 /// Renders the collapsible references footer
 /// if there are any citations.
 fn render_references_footer(
@@ -3218,12 +3089,7 @@ fn render_response_footer(props: Props, app: &AppContext) -> Option<Box<dyn Elem
 
     #[cfg(not(target_family = "wasm"))]
     if !props.is_conversation_transcript_viewer {
-        let fork_button_tooltip = fork_button_action(
-            props.model.conversation_id(app),
-            props.is_cloud_agent_context,
-            app,
-        )
-        .tooltip;
+        let fork_button_tooltip = "Fork conversation";
 
         let ui_builder = appearance.ui_builder().clone();
         let fork_button = icon_button(

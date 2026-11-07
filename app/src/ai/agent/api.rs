@@ -108,7 +108,6 @@ pub struct RequestParams {
     pub autonomy_level: warp_multi_agent_api::AutonomyLevel,
     pub isolation_level: warp_multi_agent_api::IsolationLevel,
     pub web_search_enabled: bool,
-    pub computer_use_enabled: bool,
     pub ask_user_question_enabled: bool,
     pub research_agent_enabled: bool,
     pub orchestration_enabled: bool,
@@ -169,7 +168,6 @@ impl RequestParams {
             autonomy_level: Default::default(),
             isolation_level: Default::default(),
             web_search_enabled: false,
-            computer_use_enabled: false,
             ask_user_question_enabled: false,
             research_agent_enabled: false,
             orchestration_enabled: false,
@@ -304,13 +302,6 @@ impl RequestParams {
             .flatten()
             .and_then(|s| s.parse().ok())
             .unwrap_or_default();
-        let is_ambient_agent = conversation.ambient_agent_task_id.is_some();
-        let computer_use_enabled = FeatureFlag::AgentModeComputerUse.is_enabled()
-            && BlocklistAIPermissions::as_ref(app)
-                .get_computer_use_setting(app, terminal_view_id)
-                .is_enabled()
-            && computer_use::is_supported_on_current_platform()
-            && (FeatureFlag::LocalComputerUse.is_enabled() || is_ambient_agent);
         let ask_user_question_enabled = BlocklistAIPermissions::as_ref(app)
             .get_ask_user_question_setting(app, terminal_view_id)
             != crate::ai::execution_profiles::AskUserQuestionPermission::Never;
@@ -361,7 +352,6 @@ impl RequestParams {
             autonomy_level,
             isolation_level,
             web_search_enabled,
-            computer_use_enabled,
             ask_user_question_enabled,
             research_agent_enabled,
             orchestration_enabled,

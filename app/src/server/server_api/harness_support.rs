@@ -8,15 +8,13 @@ use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
 
-#[cfg(feature = "local_fs")]
-pub use super::presigned_upload::FileUploadBody;
 pub use super::presigned_upload::UploadBody;
 use super::ServerApi;
 use crate::ai::agent::conversation::AIConversationId;
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::agent_sdk::retry::with_bounded_retry;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::artifacts::Artifact;
+#[cfg(not(target_family = "wasm"))]
+use crate::server::retry_strategies::with_bounded_retry;
 
 /// A presigned upload target returned by the server.
 #[serde_with::serde_as]

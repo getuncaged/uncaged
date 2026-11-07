@@ -97,12 +97,6 @@ impl Input {
             }
         }
 
-        if is_agent_view {
-            if let Some(harness_row) = self.render_harness_row(app) {
-                column.add_child(harness_row);
-            }
-        }
-
         let terminal_spacing = TerminalSettings::as_ref(app)
             .terminal_input_spacing(appearance.line_height_ratio(), app);
         column.add_child(

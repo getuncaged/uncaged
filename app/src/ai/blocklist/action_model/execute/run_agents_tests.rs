@@ -32,9 +32,7 @@ use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::test_util::settings::initialize_settings_for_tests_with_mode;
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{
-    AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider, LaunchMode,
-};
+use crate::{AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 struct RunAgentsTestState {
     conversation_id: AIConversationId,
@@ -181,9 +179,7 @@ fn initialize_run_agents_test(app: &mut App, mode: ExecutionMode) -> RunAgentsTe
     app.add_singleton_model(|_| Appearance::mock());
     app.add_singleton_model(|_| AIDocumentModel::new_for_test());
     app.add_singleton_model(|_| TemplatableMCPServerManager::default());
-    app.add_singleton_model(|ctx| {
-        AIExecutionProfilesModel::new(&LaunchMode::new_for_unit_test(), ctx)
-    });
+    app.add_singleton_model(AIExecutionProfilesModel::new);
     app.add_singleton_model(PrivacySettings::mock);
     app.add_singleton_model(UserWorkspaces::default_mock);
     let conversation_id = history.update(app, |history_model, ctx| {

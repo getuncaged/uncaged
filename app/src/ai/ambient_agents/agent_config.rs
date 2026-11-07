@@ -1,13 +1,7 @@
-use std::collections::HashMap;
+//! Runtime agent configuration carried by cloud agent tasks.
 
-use cloud_objects::cloud_object::{
-    GenericCloudObject, GenericServerObject, GenericStringModel, JsonObjectType,
-};
-use cloud_objects::ids::GenericStringObjectId;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use warp_cli::agent::Harness;
-
-use crate::{JsonModel, JsonSerializer};
 
 /// Runtime configuration snapshot for agent execution.
 ///
@@ -160,54 +154,3 @@ impl AgentConfigSnapshot {
             && harness_auth_secrets.is_none()
     }
 }
-
-/// A ScheduledAmbientAgent represents configuration for ambient agents that run on a cron schedule.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct ScheduledAmbientAgent {
-    /// Agent name
-    #[serde(default)]
-    pub name: String,
-    /// Cron schedule expression
-    #[serde(default)]
-    pub cron_schedule: String,
-    /// Whether the scheduled agent is enabled
-    #[serde(default)]
-    pub enabled: bool,
-    /// The prompt to use for the scheduled agent
-    #[serde(default)]
-    pub prompt: String,
-    /// The latest failure to execute this scheduled agent.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_spawn_error: Option<String>,
-    /// Configuration for how the ambient agent should run.
-    #[serde(default, skip_serializing_if = "AgentConfigSnapshot::is_empty")]
-    pub agent_config: AgentConfigSnapshot,
-}
-
-impl ScheduledAmbientAgent {
-    pub fn new(name: String, cron_schedule: String, enabled: bool, prompt: String) -> Self {
-        Self {
-            name,
-            cron_schedule,
-            enabled,
-            prompt,
-            last_spawn_error: None,
-            agent_config: Default::default(),
-        }
-    }
-}
-
-impl JsonModel for ScheduledAmbientAgent {
-    fn json_object_type() -> JsonObjectType {
-        JsonObjectType::ScheduledAmbientAgent
-    }
-}
-
-pub type CloudScheduledAmbientAgent =
-    GenericCloudObject<GenericStringObjectId, CloudScheduledAmbientAgentModel>;
-pub type CloudScheduledAmbientAgentModel =
-    GenericStringModel<ScheduledAmbientAgent, JsonSerializer>;
-pub type ServerScheduledAmbientAgent =
-    GenericServerObject<GenericStringObjectId, CloudScheduledAmbientAgentModel>;
-
-pub type AgentConfigMap = HashMap<String, serde_json::Value>;

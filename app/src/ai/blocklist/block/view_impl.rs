@@ -79,7 +79,6 @@ use crate::terminal::model::blocks::{BlockHeightItem, RemovableBlocklistItem, Ri
 use crate::terminal::model::rich_content::RichContentType;
 use crate::terminal::model::ObfuscateSecrets;
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
-use crate::terminal::view::ambient_agent::is_cloud_agent_pre_first_exchange;
 use crate::terminal::view::TerminalAction;
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
@@ -1016,30 +1015,16 @@ impl View for AIBlock {
         }
 
         let has_accepted_edits = self.has_accepted_file_edits_since_last_query(app);
-        let terminal_model = self.terminal_model.lock();
-        let is_conversation_transcript_viewer = terminal_model.is_conversation_transcript_viewer();
-
-        let is_cloud_agent_pre_first_exchange = is_cloud_agent_pre_first_exchange(
-            self.ambient_agent_view_model.as_ref(),
-            &self.agent_view_controller,
-            &terminal_model,
-            app,
-        );
-        drop(terminal_model);
-
-        #[cfg(not(target_family = "wasm"))]
-        let is_cloud_agent_context = FeatureFlag::CloudMode.is_enabled()
-            && self
-                .ambient_agent_view_model
-                .as_ref()
-                .is_some_and(|model| model.as_ref(app).is_ambient_agent());
+        let is_conversation_transcript_viewer = self
+            .terminal_model
+            .lock()
+            .is_conversation_transcript_viewer();
 
         contents.add_child(output::render(
             output::Props {
                 model: self.model.as_ref(),
                 state_handles: &self.state_handles,
                 action_buttons: &self.action_buttons,
-                view_screenshot_buttons: &self.view_screenshot_buttons,
                 action_model: &self.action_model,
                 active_session: &self.active_session,
                 editor_views: &self.code_editor_views,
@@ -1086,8 +1071,6 @@ impl View for AIBlock {
                 is_usage_footer_expanded: self.is_usage_footer_expanded,
                 terminal_view_id: self.terminal_view_id,
                 is_conversation_transcript_viewer,
-                #[cfg(not(target_family = "wasm"))]
-                is_cloud_agent_context,
                 imported_comments: &self.imported_comments,
                 run_agents_card_views: &self.run_agents_card_views,
                 #[cfg(feature = "local_fs")]
@@ -1100,7 +1083,6 @@ impl View for AIBlock {
                     .is_latest_visible_exchange_in_root_task(app)
                     && self.has_imported_comments_in_current_thread(app),
                 ask_user_question_view: self.ask_user_question_view.as_ref(),
-                is_cloud_agent_pre_first_exchange,
             },
             app,
         ));

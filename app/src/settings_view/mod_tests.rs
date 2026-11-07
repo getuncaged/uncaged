@@ -59,7 +59,6 @@ fn code_subpages_are_identified() {
 
 #[test]
 fn cloud_platform_subpages_are_identified() {
-    assert!(SettingsSection::CloudEnvironments.is_cloud_platform_subpage());
     assert!(SettingsSection::OzCloudAPIKeys.is_cloud_platform_subpage());
 
     assert!(!SettingsSection::Account.is_cloud_platform_subpage());
@@ -74,7 +73,6 @@ fn is_subpage_covers_all_umbrella_types() {
     }
     assert!(SettingsSection::CodeIndexing.is_subpage());
     assert!(SettingsSection::EditorAndCodeReview.is_subpage());
-    assert!(SettingsSection::CloudEnvironments.is_subpage());
     assert!(SettingsSection::OzCloudAPIKeys.is_subpage());
 
     // Top-level pages should not be subpages.
@@ -129,10 +127,6 @@ fn code_subpages_map_to_code_backing_page() {
 
 #[test]
 fn cloud_platform_subpages_map_to_their_backing_pages() {
-    assert_eq!(
-        SettingsSection::CloudEnvironments.parent_page_section(),
-        SettingsSection::CloudEnvironments
-    );
     assert_eq!(
         SettingsSection::OzCloudAPIKeys.parent_page_section(),
         SettingsSection::OzCloudAPIKeys
@@ -219,10 +213,6 @@ fn subpage_display_names_are_correct() {
         "Editor and code review"
     );
     assert_eq!(
-        SettingsSection::CloudEnvironments.to_string(),
-        "Environments"
-    );
-    assert_eq!(
         SettingsSection::OzCloudAPIKeys.to_string(),
         "Oz Cloud API Keys"
     );
@@ -262,6 +252,15 @@ fn subpage_from_str_parses_display_names() {
         SettingsSection::from_str("Oz Cloud API Keys"),
         Ok(SettingsSection::OzCloudAPIKeys)
     );
+}
+
+#[test]
+fn removed_sections_do_not_parse() {
+    // Settings panes persist their page by name; a pane saved on a removed page
+    // fails to parse here and the restore falls back to the default section.
+    assert_eq!(SettingsSection::from_str("Scripting"), Err(()));
+    assert_eq!(SettingsSection::from_str("CloudEnvironments"), Err(()));
+    assert_eq!(SettingsSection::from_str("Environments"), Err(()));
 }
 
 // ── Subpage search filter simulation ────────────────────────────────────────
@@ -731,7 +730,7 @@ fn collapsed_umbrella_is_a_single_nav_stop() {
         stops[4],
         NavStop::CollapsedUmbrella {
             nav_index: 4,
-            first_subpage: SettingsSection::CloudEnvironments,
+            first_subpage: SettingsSection::OzCloudAPIKeys,
             last_subpage: SettingsSection::OzCloudAPIKeys,
         }
     ));
@@ -1039,7 +1038,7 @@ fn arrow_down_across_adjacent_collapsed_umbrellas() {
         SettingsSection::CodeIndexing,
         CycleDirection::Down,
     );
-    assert_eq!(next_after_code, SettingsSection::CloudEnvironments);
+    assert_eq!(next_after_code, SettingsSection::OzCloudAPIKeys);
 }
 
 #[test]

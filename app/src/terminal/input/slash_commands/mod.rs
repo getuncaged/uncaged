@@ -8,8 +8,6 @@ use std::path::PathBuf;
 use ai::skills::SkillReference;
 pub use data_source::*;
 pub use view::{CloseReason, InlineSlashCommandView, SlashCommandsEvent};
-#[cfg(not(target_family = "wasm"))]
-use warp_cli::agent::Harness;
 use warp_core::features::FeatureFlag;
 use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::appearance::Appearance;
@@ -19,19 +17,9 @@ use warp_util::path::{CleanPathResult, LineAndColumnArg};
 use warpui::clipboard::ClipboardContent;
 use warpui::{AppContext, SingletonEntity, ViewContext};
 
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::agent::conversation::AIConversationId;
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::agent_conversations_model::AgentConversationsModel;
-#[cfg(not(target_family = "wasm"))]
-use crate::ai::agent_management::telemetry::AgentManagementTelemetryEvent;
-#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
-use crate::ai::ambient_agents::telemetry::HandoffEntryPoint;
 use crate::ai::blocklist::agent_view::{
     AgentViewEntryOrigin, DismissalStrategy, EphemeralMessage, ENTER_OR_EXIT_CONFIRMATION_WINDOW,
 };
-#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
-use crate::ai::blocklist::handoff::PendingCloudLaunch;
 use crate::ai::blocklist::{
     BlocklistAIHistoryModel, InputTypeAutoDetectionSource, PendingAttachment, QueuedQuery,
     QueuedQueryModel, QueuedQueryOrigin, SlashCommandRequest,
@@ -444,20 +432,6 @@ impl Input {
                     origin: AgentViewEntryOrigin::SlashCommand { trigger },
                 });
             }
-            cloud_agent if command.name == commands::CLOUD_AGENT.name => {
-                let prompt = argument.and_then(|argument| {
-                    let trimmed = argument.trim();
-                    if trimmed.is_empty() {
-                        None
-                    } else {
-                        Some(trimmed.to_owned())
-                    }
-                });
-
-                ctx.emit(Event::EnterCloudAgentView {
-                    initial_prompt: prompt,
-                });
-            }
             create_docker_sandbox if command.name == commands::CREATE_DOCKER_SANDBOX.name => {
                 ctx.emit(Event::CreateDockerSandbox);
             }
@@ -543,19 +517,6 @@ impl Input {
                 };
 
                 ctx.dispatch_typed_action(&WorkspaceAction::SetActiveTabColor(color));
-            }
-            create_env if command.name == commands::CREATE_ENVIRONMENT.name => {
-                // If the user included args after the slash command, treat them as repo paths/URLs.
-                let repos = argument
-                    .map(|arg| {
-                        arg.split_whitespace()
-                            .filter(|s| !s.is_empty())
-                            .map(|s| s.to_string())
-                            .collect()
-                    })
-                    .unwrap_or_default();
-
-                ctx.emit(Event::TriggerEnvironmentSetup { repos });
             }
             create_project if command.name == commands::CREATE_NEW_PROJECT.name => {
                 if argument.is_none_or(|args| args.is_empty()) {
@@ -829,52 +790,6 @@ impl Input {
                     ctx.dispatch_typed_action(&TerminalAction::ToggleUsageFooter);
                 }
             }
-            #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
-            move_to_cloud if command.name == commands::MOVE_TO_CLOUD.name => {
-                if !AISettings::as_ref(ctx).is_cloud_handoff_enabled(ctx) {
-                    return false;
-                }
-                let prompt = argument
-                    .map(|argument| argument.trim())
-                    .filter(|argument| !argument.is_empty())
-                    .map(str::to_owned);
-                if let Some(prompt) = prompt {
-                    // `/handoff query` auto-submits, same as `& query`.
-                    let attachments = self.collect_cloud_launch_attachments(ctx);
-                    let launch = PendingCloudLaunch {
-                        prompt,
-                        attachments,
-                    };
-                    ctx.dispatch_typed_action_deferred(
-                        WorkspaceAction::OpenLocalToCloudHandoffPane {
-                            launch: Some(launch),
-                            environment_id: None,
-                            entry_point: HandoffEntryPoint::SlashCommand,
-                        },
-                    );
-                } else if self.source_conversation_has_content(ctx) {
-                    // Empty `/handoff` with a non-empty source conversation:
-                    // dispatch the immediate empty-prompt handoff (continue /
-                    // snapshot rehydration); the workspace synthesizes the
-                    // launch and collects attachments.
-                    ctx.dispatch_typed_action_deferred(
-                        WorkspaceAction::OpenLocalToCloudHandoffPane {
-                            launch: None,
-                            environment_id: None,
-                            entry_point: HandoffEntryPoint::SlashCommand,
-                        },
-                    );
-                } else {
-                    // Empty `/handoff` with no source content — surface a toast
-                    // so the user knows why nothing happened. The chip falls
-                    // back to `&` compose mode here; the slash-command flow
-                    // does not because it has no compose-draft state to seed.
-                    show_error_toast(
-                        "Nothing to hand off — start a conversation first.".to_owned(),
-                        ctx,
-                    );
-                }
-            }
             fork if command.name == commands::FORK.name => {
                 let Some(conversation_id) = self
                     .ai_context_model
@@ -911,57 +826,6 @@ impl Input {
             fork_from if command.name == commands::FORK_FROM.name => {
                 self.open_user_query_menu(UserQueryMenuAction::ForkFrom, ctx);
                 return true;
-            }
-            #[cfg(not(target_family = "wasm"))]
-            continue_locally if command.name == commands::CONTINUE_LOCALLY.name => {
-                let Some(conversation_id) = self
-                    .ai_context_model
-                    .as_ref(ctx)
-                    .selected_conversation_id(ctx)
-                else {
-                    show_error_toast(
-                        "/continue-locally requires an active conversation".to_owned(),
-                        ctx,
-                    );
-                    return true;
-                };
-
-                if !conversation_is_cloud_oz_for_slash_command(conversation_id, ctx) {
-                    show_error_toast(
-                        "/continue-locally is only available for cloud Oz conversations".to_owned(),
-                        ctx,
-                    );
-                    return true;
-                }
-
-                let destination = if trigger.is_cmd_or_ctrl_enter() {
-                    ForkedConversationDestination::NewTab
-                } else {
-                    ForkedConversationDestination::SplitPane
-                };
-
-                send_telemetry_from_ctx!(
-                    AgentManagementTelemetryEvent::SlashCommandContinueLocally,
-                    ctx
-                );
-
-                // Move any pending attachments out of the source input so they travel with the
-                // initial prompt into the continued local pane and no longer linger on the
-                // original input. Only drain them when a non-empty prompt will actually be sent;
-                // the fork drops attachments when there is no initial prompt, which would
-                // silently discard them.
-                let initial_attachments =
-                    self.maybe_take_attachments_for_initial_prompt(argument, ctx);
-
-                ctx.dispatch_typed_action(&WorkspaceAction::ForkAIConversation {
-                    conversation_id,
-                    fork_from_exchange: None,
-                    summarize_after_fork: false,
-                    summarization_prompt: None,
-                    initial_prompt: argument.cloned(),
-                    initial_attachments,
-                    destination,
-                });
             }
             fork_and_compact if command.name == commands::FORK_AND_COMPACT.name => {
                 let Some(conversation_id) = self
@@ -1248,70 +1112,6 @@ pub(crate) fn slash_command_is_submitted_as_prompt(command: &StaticCommand) -> b
     command.name == commands::COMPACT.name
         || command.name == commands::PLAN.name
         || command.name == commands::ORCHESTRATE.name
-}
-
-/// Returns true when the conversation with `conversation_id` is associated with an Oz
-/// `AmbientAgentTask`. Callers deciding between `/fork` and `/continue-locally` should also
-/// check the same `CLOUD_AGENT` context that gates `/continue-locally`.
-#[cfg(not(target_family = "wasm"))]
-pub(crate) fn conversation_is_cloud_oz_for_slash_command(
-    conversation_id: AIConversationId,
-    ctx: &AppContext,
-) -> bool {
-    let history = BlocklistAIHistoryModel::as_ref(ctx);
-    let Some(conversation) = history.conversation(&conversation_id) else {
-        return false;
-    };
-    let Some(task_id) = conversation.task_id() else {
-        return false;
-    };
-
-    let Some(task) = AgentConversationsModel::as_ref(ctx).get_task_data(&task_id) else {
-        // Permissive: not yet fetched. Matches the data-source default so the command isn't
-        // wrongly blocked while the task fetch is in flight.
-        return true;
-    };
-
-    match task
-        .agent_config_snapshot
-        .as_ref()
-        .and_then(|s| s.harness.as_ref())
-    {
-        Some(config) => config.harness_type == Harness::Oz,
-        None => true,
-    }
-}
-
-/// Tooltip and slash command name for the fork button, returned as a unit so
-/// callers rendering the button and callers inserting the command always agree.
-#[cfg(not(target_family = "wasm"))]
-pub(crate) struct ForkButtonAction {
-    pub tooltip: &'static str,
-    pub command_name: &'static str,
-}
-
-/// Returns the tooltip and slash command for the fork button given an optional
-/// conversation ID. Uses `/continue-locally` for Oz conversations when `/fork`
-/// is unavailable in the current cloud-agent context, and `/fork` otherwise.
-#[cfg(not(target_family = "wasm"))]
-pub(crate) fn fork_button_action(
-    conversation_id: Option<AIConversationId>,
-    is_cloud_agent_context: bool,
-    ctx: &AppContext,
-) -> ForkButtonAction {
-    if is_cloud_agent_context
-        && conversation_id.is_some_and(|id| conversation_is_cloud_oz_for_slash_command(id, ctx))
-    {
-        ForkButtonAction {
-            tooltip: "Continue locally",
-            command_name: commands::CONTINUE_LOCALLY.name,
-        }
-    } else {
-        ForkButtonAction {
-            tooltip: "Fork conversation",
-            command_name: commands::FORK.name,
-        }
-    }
 }
 
 #[cfg(test)]
