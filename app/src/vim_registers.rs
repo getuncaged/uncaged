@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use settings::Setting as _;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity};
 use vim::vim::MotionType;
-use warpui::clipboard::ClipboardContent;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::settings::AppEditorSettings;
 

@@ -12,12 +12,12 @@ use futures::future::{Either, Ready};
 #[cfg(not(target_family = "wasm"))]
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::repositories::RepoDetectionSource;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
 #[cfg(not(target_family = "wasm"))]
-use warp_util::remote_path::RemoteNavigationResult;
+use uncaged_ui::SingletonEntity;
+use uncaged_ui::{View, ViewContext};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 #[cfg(not(target_family = "wasm"))]
-use warpui::SingletonEntity;
-use warpui::{View, ViewContext};
+use uncaged_util::remote_path::RemoteNavigationResult;
 
 /// Describes whether the active session is local or remote.
 pub enum RepoDetectionSessionType {

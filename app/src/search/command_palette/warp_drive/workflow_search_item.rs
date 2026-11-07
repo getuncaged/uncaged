@@ -1,7 +1,7 @@
 use ordered_float::OrderedFloat;
-use warpui::elements::{Clipped, Container, Flex, Highlight, ParentElement, Shrinkable, Text};
-use warpui::fonts::{Properties, Weight};
-use warpui::{AppContext, Element, SingletonEntity};
+use uncaged_ui::elements::{Clipped, Container, Flex, Highlight, ParentElement, Shrinkable, Text};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::cloud_object::CloudObject;

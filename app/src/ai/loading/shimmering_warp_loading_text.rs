@@ -1,11 +1,11 @@
 //! Shimmering loading text - renders the Uncaged caret with shimmering text for loading states.
 
-use warp_core::ui::appearance::Appearance;
-use warpui::elements::shimmering_text::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::elements::shimmering_text::{
     ShimmerConfig, ShimmeringTextElement, ShimmeringTextStateHandle,
 };
-use warpui::elements::Element;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_ui::elements::Element;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 /// Uncaged caret glyph (`›`, U+203A) — replaces Warp's private-use logo glyph
 /// (U+E500) that used to render Warp's trademarked mark in loading text. U+203A is

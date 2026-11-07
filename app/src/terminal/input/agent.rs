@@ -1,6 +1,6 @@
 use pathfinder_color::ColorU;
-use warpui::elements::Element;
-use warpui::{AppContext, SingletonEntity as _};
+use uncaged_ui::elements::Element;
+use uncaged_ui::{AppContext, SingletonEntity as _};
 
 use super::Input;
 use crate::ai::blocklist::agent_view::shortcuts::{
@@ -71,7 +71,7 @@ impl Input {
 
 pub mod styles {
     use pathfinder_color::ColorU;
-    use warp_core::ui::theme::WarpTheme;
+    use uncaged_core::ui::theme::WarpTheme;
 
     use crate::ui_components::blended_colors;
 

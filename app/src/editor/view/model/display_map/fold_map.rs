@@ -5,8 +5,8 @@ use std::ops::Range;
 use anyhow::{anyhow, Result};
 use string_offset::CharOffset;
 use sum_tree::{self, Cursor, Dimension, SeekBias, SumTree};
-use warpui::text_layout::TextStyle;
-use warpui::{AppContext, ModelHandle};
+use uncaged_ui::text_layout::TextStyle;
+use uncaged_ui::{AppContext, ModelHandle};
 
 use super::super::buffer::{AnchorRangeExt, TextSummary};
 use super::buffer::StylizedChar;

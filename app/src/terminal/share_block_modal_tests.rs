@@ -1,4 +1,4 @@
-use warpui::browser::escape_html_attribute;
+use uncaged_ui::browser::escape_html_attribute;
 
 #[test]
 fn escape_html_attribute_escapes_attribute_breakout_characters() {

@@ -1,7 +1,7 @@
 use settings::macros::define_settings_group;
 use settings::{Setting, SupportedPlatforms};
-use warpui::keymap::Keystroke;
-use warpui::{AppContext, DisplayIdx, ModelContext};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::{AppContext, DisplayIdx, ModelContext};
 
 use crate::report_if_error;
 use crate::root_view::{update_quake_window_bounds, QuakeModePinPosition};

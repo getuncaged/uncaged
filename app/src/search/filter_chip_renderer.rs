@@ -1,10 +1,10 @@
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable, Icon,
     MouseStateHandle, ParentElement, Radius, Text,
 };
-use warpui::platform::Cursor;
-use warpui::{Element, EventContext};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::{Element, EventContext};
 
 use crate::appearance::Appearance;
 use crate::search::QueryFilter;
@@ -101,7 +101,7 @@ impl FilterChipRenderer for QueryFilter {
                     internal_colors::neutral_3(theme).into()
                 })
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .finish()
         })

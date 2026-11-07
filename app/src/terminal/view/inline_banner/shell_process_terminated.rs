@@ -1,5 +1,5 @@
-use warpui::elements::Text;
-use warpui::Element;
+use uncaged_ui::elements::Text;
+use uncaged_ui::Element;
 
 use super::{
     render_inline_block_list_banner, InlineBannerContent, InlineBannerIcon, InlineBannerStyle,

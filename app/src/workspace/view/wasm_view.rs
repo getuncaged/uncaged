@@ -1,7 +1,7 @@
 //! WASM-only view functions for the Workspace.
 
-use warpui::elements::{ChildView, Element};
-use warpui::{AppContext, SingletonEntity, ViewContext, ViewHandle};
+use uncaged_ui::elements::{ChildView, Element};
+use uncaged_ui::{AppContext, SingletonEntity, ViewContext, ViewHandle};
 
 use super::PanelPosition;
 use crate::ai::agent_conversations_model::AgentConversationsModel;

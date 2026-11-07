@@ -116,7 +116,7 @@ and gpt-oss-20b are strong alternatives.
 # one-time: full Xcode (App Store), then
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 sudo xcodebuild -license accept
-xcodebuild -downloadComponent MetalToolchain     # Metal compiler for warpui
+xcodebuild -downloadComponent MetalToolchain     # Metal compiler for uncaged_ui
 
 cargo run                                         # builds & launches Uncaged
 ./script/uncaged-setup                               # point it at your model
@@ -128,7 +128,7 @@ need `./script/bootstrap` (it installs Docker/gcloud/PowerShell you won't need).
 ## Licensing, trademark & attribution
 
 - **AGPL-3.0.** Uncaged stays under the same license as the upstream client (see
-  [`LICENSE-AGPL`](LICENSE-AGPL); `warpui`/`warpui_core` remain [MIT](LICENSE-MIT)).
+  [`LICENSE-AGPL`](LICENSE-AGPL); `uncaged_ui`/`uncaged_ui_core` remain [MIT](LICENSE-MIT)).
   If you distribute Uncaged or run a modified version others use over a network,
   AGPL §13 requires you to offer them your complete corresponding source. Keep it open.
 - **Trademark.** "Warp" and its logo are Warp's trademarks, which AGPL does not

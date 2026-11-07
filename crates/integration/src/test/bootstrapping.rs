@@ -1,30 +1,30 @@
 //! Integration tests for bootstrapping logic.
 
 use settings::Setting as _;
-use version_compare::Cmp;
-use warp::cmd_or_ctrl_shift;
-use warp::integration_testing::input::{
+use uncaged::cmd_or_ctrl_shift;
+use uncaged::integration_testing::input::{
     input_contains_string, input_editor_is_focused, input_editor_is_not_focused, input_is_empty,
 };
-use warp::integration_testing::step::new_step_with_default_assertions;
-use warp::integration_testing::tab::tab_title_step;
-use warp::integration_testing::terminal::util::{
+use uncaged::integration_testing::step::new_step_with_default_assertions;
+use uncaged::integration_testing::tab::tab_title_step;
+use uncaged::integration_testing::terminal::util::{
     current_shell_starter_and_version, ExpectedExitStatus,
 };
-use warp::integration_testing::terminal::{
+use uncaged::integration_testing::terminal::{
     assert_active_block_command_for_single_terminal_in_tab,
     assert_long_running_block_executing_for_single_terminal_in_tab,
     execute_command_for_single_terminal_in_tab, wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::integration_testing::view_getters::{
+use uncaged::integration_testing::view_getters::{
     single_input_view_for_tab, single_terminal_view_for_tab,
 };
-use warp::terminal::session_settings::HonorPS1;
-use warp::terminal::shell::{self, ShellType};
-use warp::workspace::Workspace;
-use warpui_core::clipboard::ClipboardContent;
-use warpui_core::integration::TestStep;
-use warpui_core::{async_assert, async_assert_eq, ViewHandle};
+use uncaged::terminal::session_settings::HonorPS1;
+use uncaged::terminal::shell::{self, ShellType};
+use uncaged::workspace::Workspace;
+use uncaged_ui_core::clipboard::ClipboardContent;
+use uncaged_ui_core::integration::TestStep;
+use uncaged_ui_core::{async_assert, async_assert_eq, ViewHandle};
+use version_compare::Cmp;
 
 use super::{new_builder, Builder};
 use crate::util::{write_all_rc_files_for_test, write_rc_files_for_test, ShellRcType};

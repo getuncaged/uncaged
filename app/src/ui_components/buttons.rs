@@ -1,6 +1,6 @@
-use warpui::elements::{CornerRadius, MouseStateHandle, Radius};
-use warpui::ui_components::button::Button;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::elements::{CornerRadius, MouseStateHandle, Radius};
+use uncaged_ui::ui_components::button::Button;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use super::icons::{Icon, ICON_DIMENSIONS};
 use super::{blended_colors, BORDER_RADIUS};

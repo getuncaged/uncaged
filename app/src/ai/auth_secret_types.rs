@@ -1,4 +1,4 @@
-use warp_cli::agent::Harness;
+use uncaged_cli::agent::Harness;
 
 pub struct AuthSecretTypeField {
     pub label: &'static str,

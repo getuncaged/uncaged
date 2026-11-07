@@ -2,11 +2,13 @@
 use std::collections::HashSet;
 
 use pathfinder_color::ColorU;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill;
-use warpui::elements::ChildView;
-use warpui::{AppContext, Element, Entity, EntityId, ModelHandle, View, ViewContext, ViewHandle};
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::ChildView;
+use uncaged_ui::{
+    AppContext, Element, Entity, EntityId, ModelHandle, View, ViewContext, ViewHandle,
+};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::agent_view::{AgentViewController, AgentViewControllerEvent};
@@ -541,7 +543,7 @@ impl View for InlineHistoryMenuView {
         "InlineHistoryMenuView"
     }
 
-    fn render(&self, _app: &warpui::AppContext) -> Box<dyn Element> {
+    fn render(&self, _app: &uncaged_ui::AppContext) -> Box<dyn Element> {
         ChildView::new(&self.menu_view).finish()
     }
 }

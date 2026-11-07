@@ -1,11 +1,11 @@
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Hoverable, Icon,
     MouseState, MouseStateHandle, ParentElement, Shrinkable,
 };
-use warpui::fonts::Weight;
-use warpui::platform::Cursor;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
     Action, AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, WindowId,
 };

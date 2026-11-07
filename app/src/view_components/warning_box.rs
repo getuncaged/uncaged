@@ -1,14 +1,14 @@
 //! A reusable warning callout component with optional action button.
 use markdown_parser::{FormattedText, FormattedTextInline, FormattedTextLine};
-use warp_core::ui::color::blend::Blend;
-use warpui::color::ColorU;
-use warpui::elements::{
+use uncaged_core::ui::color::blend::Blend;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Element, Expanded, Flex,
     FormattedTextElement, Hoverable, HyperlinkLens, MainAxisSize, MouseStateHandle, ParentElement,
     Radius, Text,
 };
-use warpui::platform::Cursor;
-use warpui::EventContext;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::EventContext;
 
 use crate::appearance::Appearance;
 use crate::themes::theme::Fill as ThemeFill;

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use warpui::App;
+use uncaged_ui::App;
 
 use super::*;
 

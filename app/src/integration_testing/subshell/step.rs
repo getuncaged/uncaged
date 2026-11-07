@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use regex::Regex;
-use warpui::integration::{AssertionOutcome, TestStep};
-use warpui::{async_assert, async_assert_eq};
+use uncaged_ui::integration::{AssertionOutcome, TestStep};
+use uncaged_ui::{async_assert, async_assert_eq};
 
 use super::util::{ssh_command, user_host};
 use crate::integration_testing::step::assert_no_pending_model_events;

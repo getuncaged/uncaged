@@ -3,8 +3,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use settings::macros::{maybe_define_setting, register_settings_events};
 use settings::{ChangeEventReason, Setting, SupportedPlatforms};
-use warp_util::path::ShellFamily;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity};
+use uncaged_util::path::ShellFamily;
 
 use crate::terminal::ssh::util::{parse_interactive_ssh_command, SshWarpifyCommand};
 

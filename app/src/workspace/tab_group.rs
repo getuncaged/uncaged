@@ -1,7 +1,7 @@
 //! Tab group data model. Gated at runtime by `FeatureFlag::GroupedTabs`.
 
+use uncaged_ui::elements::DraggableState;
 use uuid::Uuid;
-use warpui::elements::DraggableState;
 
 use crate::tab::SelectedTabColor;
 

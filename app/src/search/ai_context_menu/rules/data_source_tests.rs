@@ -1,6 +1,6 @@
 use chrono::{Duration, Utc};
 use settings::manager::SettingsManager;
-use warpui::{App, SingletonEntity};
+use uncaged_ui::{App, SingletonEntity};
 
 use crate::ai::facts::{AIFact, AIMemory, CloudAIFactModel};
 use crate::cloud_object::model::generic_string_model::GenericStringModel;

@@ -6,21 +6,21 @@ use itertools::Itertools;
 use regex::Regex;
 use settings::{Setting, ToggleableSetting};
 use strum::IntoEnumIterator;
-use warp_core::context_flag::ContextFlag;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill as ThemeFill;
-use warpui::elements::{
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill as ThemeFill;
+use uncaged_ui::elements::{
     Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Empty,
     Fill, Flex, FormattedTextElement, HighlightedHyperlink, HyperlinkLens, HyperlinkUrl,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::{ContextPredicate, Keystroke};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::slider::SliderStateHandle;
-use warpui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::{ContextPredicate, Keystroke};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::slider::SliderStateHandle;
+use uncaged_ui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
+use uncaged_ui::{
     id, Action, AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -250,7 +250,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         app,
     );
     {
-        use warpui::keymap::FixedBinding;
+        use uncaged_ui::keymap::FixedBinding;
 
         use crate::settings::ThinkingDisplayMode;
 
@@ -277,7 +277,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         app.register_fixed_bindings(mode_bindings);
     }
     {
-        use warpui::keymap::FixedBinding;
+        use uncaged_ui::keymap::FixedBinding;
 
         let ai_context = context.clone() & id!(flags::IS_ANY_AI_ENABLED);
         let mode_bindings: Vec<FixedBinding> = OrchestrationMessageDisplayMode::iter()
@@ -306,7 +306,7 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         app.register_fixed_bindings(mode_bindings);
     }
     if FeatureFlag::QueueSlashCommand.is_enabled() {
-        use warpui::keymap::FixedBinding;
+        use uncaged_ui::keymap::FixedBinding;
 
         let ai_context = context.clone() & id!(flags::IS_ANY_AI_ENABLED);
         let mode_bindings: Vec<FixedBinding> = PromptSubmissionMode::iter()
@@ -1487,7 +1487,7 @@ impl AISettingsPageView {
         });
         #[cfg(feature = "local_fs")]
         {
-            let is_enabled = warp_core::features::FeatureFlag::CustomModelRouters.is_enabled()
+            let is_enabled = uncaged_core::features::FeatureFlag::CustomModelRouters.is_enabled()
                 && is_any_ai_enabled;
             add_router_button.update(ctx, |button, ctx| {
                 button.set_disabled(!is_enabled, ctx);
@@ -2003,7 +2003,7 @@ impl AISettingsPageView {
     /// other completion is ignored once the view-owned attempt state is cleared.
     #[cfg(not(target_family = "wasm"))]
     fn start_grok_oauth(&mut self, ctx: &mut ViewContext<Self>) {
-        use warp_core::safe_error;
+        use uncaged_core::safe_error;
 
         use crate::view_components::{DismissibleToast, ToastLink};
         use crate::workspace::WorkspaceAction;
@@ -2109,7 +2109,7 @@ impl AISettingsPageView {
     /// attempt's PKCE verifier.
     #[cfg(not(target_family = "wasm"))]
     fn submit_grok_code(&mut self, code: String, ctx: &mut ViewContext<Self>) {
-        use warp_core::safe_error;
+        use uncaged_core::safe_error;
 
         use crate::view_components::DismissibleToast;
         use crate::ToastStack;
@@ -2215,8 +2215,8 @@ impl AISettingsPageView {
                 // "Computer use in Cloud Agents" toggle doesn't apply — hide it.
                 if FeatureFlag::AgentModeComputerUse.is_enabled()
                     && !matches!(
-                        warp_core::channel::ChannelState::channel(),
-                        warp_core::channel::Channel::Oss
+                        uncaged_core::channel::ChannelState::channel(),
+                        uncaged_core::channel::Channel::Oss
                     )
                 {
                     widgets.push(Box::new(CloudAgentComputerUseWidget::default()));
@@ -2252,8 +2252,8 @@ impl AISettingsPageView {
                 // "Computer use in Cloud Agents" toggle doesn't apply — hide it.
                 if FeatureFlag::AgentModeComputerUse.is_enabled()
                     && !matches!(
-                        warp_core::channel::ChannelState::channel(),
-                        warp_core::channel::Channel::Oss
+                        uncaged_core::channel::ChannelState::channel(),
+                        uncaged_core::channel::Channel::Oss
                     )
                 {
                     widgets.push(Box::new(CloudAgentComputerUseWidget::default()));
@@ -2800,7 +2800,7 @@ impl AISettingsPageView {
     ) -> Vec<ViewHandle<super::custom_router_view::CustomRouterView>> {
         use super::custom_router_view::{CustomRouterView, CustomRouterViewEvent};
         use crate::user_config::WarpConfig;
-        if !warp_core::features::FeatureFlag::CustomModelRouters.is_enabled() {
+        if !uncaged_core::features::FeatureFlag::CustomModelRouters.is_enabled() {
             return Vec::new();
         }
         let routers: Vec<crate::ai::custom_model_routers::CustomModelRouter> =
@@ -2952,7 +2952,7 @@ impl View for AISettingsPageView {
         "AISettingsPage"
     }
 
-    fn render(&self, app: &warpui::AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &uncaged_ui::AppContext) -> Box<dyn uncaged_ui::Element> {
         self.page.render(self, app)
     }
 }
@@ -3924,7 +3924,10 @@ impl ActiveAIWidget {
                 .is_supported_on_current_platform()
     }
 
-    fn render_next_command_section(&self, app: &warpui::AppContext) -> Box<dyn warpui::Element> {
+    fn render_next_command_section(
+        &self,
+        app: &uncaged_ui::AppContext,
+    ) -> Box<dyn uncaged_ui::Element> {
         let ai_settings = AISettings::as_ref(app);
         let is_toggleable = ai_settings.is_active_ai_enabled(app);
 
@@ -3947,8 +3950,8 @@ impl ActiveAIWidget {
 
     fn render_prompt_suggestions_section(
         &self,
-        app: &warpui::AppContext,
-    ) -> Box<dyn warpui::Element> {
+        app: &uncaged_ui::AppContext,
+    ) -> Box<dyn uncaged_ui::Element> {
         let ai_settings = AISettings::as_ref(app);
         let is_toggleable = ai_settings.is_active_ai_enabled(app);
         Flex::column()
@@ -3970,8 +3973,8 @@ impl ActiveAIWidget {
 
     fn render_suggested_code_banners_section(
         &self,
-        app: &warpui::AppContext,
-    ) -> Box<dyn warpui::Element> {
+        app: &uncaged_ui::AppContext,
+    ) -> Box<dyn uncaged_ui::Element> {
         let ai_settings = AISettings::as_ref(app);
         let is_toggleable = ai_settings.is_active_ai_enabled(app);
         Flex::column()
@@ -3993,8 +3996,8 @@ impl ActiveAIWidget {
 
     fn render_shared_block_title_generation_section(
         &self,
-        app: &warpui::AppContext,
-    ) -> Box<dyn warpui::Element> {
+        app: &uncaged_ui::AppContext,
+    ) -> Box<dyn uncaged_ui::Element> {
         let ai_settings = AISettings::as_ref(app);
         let is_toggleable = ai_settings.is_active_ai_enabled(app);
         Flex::column()
@@ -4535,7 +4538,7 @@ impl AgentsWidget {
         dropdown_menu: &ViewHandle<Dropdown<AISettingsPageAction>>,
         ai_settings: &AISettings,
         appearance: &Appearance,
-        app: &warpui::AppContext,
+        app: &uncaged_ui::AppContext,
     ) -> Box<dyn Element> {
         let header = Container::new(render_body_item_label_with_icon::<AISettingsPageAction>(
             header_text.into(),
@@ -4763,7 +4766,7 @@ impl AgentsWidget {
         codebase_context_link_index: HighlightedHyperlink,
         ai_settings: &AISettings,
         appearance: &Appearance,
-        app: &warpui::AppContext,
+        app: &uncaged_ui::AppContext,
     ) -> Box<dyn Element> {
         let code_settings = CodeSettings::as_ref(app);
         let toggle = render_ai_setting_toggle(
@@ -5149,8 +5152,8 @@ impl AIInputWidget {
         view: &AISettingsPageView,
         ai_settings: &AISettings,
         appearance: &Appearance,
-        app: &warpui::AppContext,
-    ) -> Box<dyn warpui::Element> {
+        app: &uncaged_ui::AppContext,
+    ) -> Box<dyn uncaged_ui::Element> {
         let incorrect_autodetection_highlight_index =
             self.incorrect_autodetection_highlight_index.clone();
         let autodetection_toggle = self.autodetection_toggle.clone();
@@ -5510,7 +5513,7 @@ impl AIFactWidget {
         &self,
         ai_settings: &AISettings,
         appearance: &Appearance,
-        app: &warpui::AppContext,
+        app: &uncaged_ui::AppContext,
     ) -> Box<dyn Element> {
         let toggle = render_ai_setting_toggle(
             "Rules",
@@ -5559,7 +5562,7 @@ impl AIFactWidget {
     fn render_rule_suggestions_toggle(
         &self,
         ai_settings: &AISettings,
-        app: &warpui::AppContext,
+        app: &uncaged_ui::AppContext,
     ) -> Box<dyn Element> {
         let toggle = render_ai_setting_toggle(
             "Suggested Rules",
@@ -5953,7 +5956,7 @@ impl SettingsWidget for CLIAgentWidget {
                     .with_vertical_padding(3.)
                     .with_background(internal_colors::fg_overlay_2(theme))
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )))
                     .finish()
                 };
@@ -6147,7 +6150,7 @@ impl SettingsWidget for CLIAgentWidget {
                     .with_horizontal_padding(8.)
                     .with_vertical_padding(4.)
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )))
                     .with_margin_bottom(4.)
                     .finish();
@@ -6571,7 +6574,7 @@ impl ConnectModelWidget {
         .with_vertical_padding(3.)
         .with_background(internal_colors::fg_overlay_2(appearance.theme()))
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .finish()
     }
@@ -6886,7 +6889,7 @@ impl SettingsWidget for CustomModelRoutersWidget {
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
-                warpui::elements::Shrinkable::new(
+                uncaged_ui::elements::Shrinkable::new(
                     1.,
                     build_sub_header(appearance, "Custom Routers", Some(header_color)).finish(),
                 )
@@ -6895,13 +6898,15 @@ impl SettingsWidget for CustomModelRoutersWidget {
             .with_child({
                 #[cfg(feature = "local_fs")]
                 {
-                    warpui::elements::Container::new(view.add_router_button.as_ref(app).render(app))
-                        .with_margin_left(16.)
-                        .finish()
+                    uncaged_ui::elements::Container::new(
+                        view.add_router_button.as_ref(app).render(app),
+                    )
+                    .with_margin_left(16.)
+                    .finish()
                 }
                 #[cfg(not(feature = "local_fs"))]
                 {
-                    warpui::elements::Empty::new().finish()
+                    uncaged_ui::elements::Empty::new().finish()
                 }
             })
             .finish();
@@ -6941,7 +6946,7 @@ impl SettingsWidget for CustomModelRoutersWidget {
             // Router summary cards
             for view_handle in &view.router_views {
                 c.add_child(
-                    Container::new(warpui::elements::ChildView::new(view_handle).finish())
+                    Container::new(uncaged_ui::elements::ChildView::new(view_handle).finish())
                         .with_margin_top(8.)
                         .finish(),
                 );
@@ -6959,9 +6964,9 @@ impl SettingsWidget for CustomModelRoutersWidget {
 }
 
 mod styles {
-    use warp_core::ui::appearance::Appearance;
-    use warp_core::ui::theme::Fill;
-    use warpui::{AppContext, SingletonEntity};
+    use uncaged_core::ui::appearance::Appearance;
+    use uncaged_core::ui::theme::Fill;
+    use uncaged_ui::{AppContext, SingletonEntity};
 
     // Apply a negative margin to the description text so it appears closer to the main
     // settings option text.

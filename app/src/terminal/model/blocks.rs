@@ -10,12 +10,12 @@ use chrono::{DateTime, Local};
 use selection::BlockListSelection;
 pub use selection::SelectionRange;
 use sum_tree::{Dimension, Item, SeekBias, SumTree};
-use warp_core::features::FeatureFlag;
-use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use warpui::color::ColorU;
-use warpui::r#async::executor::Background;
-use warpui::units::{IntoLines, IntoPixels, Lines};
-use warpui::{record_trace_event, AppContext, EntityId, ViewHandle};
+use uncaged_core::features::FeatureFlag;
+use uncaged_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use uncaged_ui::color::ColorU;
+use uncaged_ui::r#async::executor::Background;
+use uncaged_ui::units::{IntoLines, IntoPixels, Lines};
+use uncaged_ui::{record_trace_event, AppContext, EntityId, ViewHandle};
 
 use super::ansi::{Handler, InputBufferValue};
 use super::block::{BlockId, BlockSize, BlockState, SerializedAIMetadata};

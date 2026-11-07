@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use warpui::ViewContext;
+use uncaged_ui::ViewContext;
 
 use super::Slide;
 

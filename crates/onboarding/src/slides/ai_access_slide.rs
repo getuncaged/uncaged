@@ -1,18 +1,18 @@
 use ui_components::{button, Component as _, Options as _};
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::icons::Icon;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill;
-use warpui_core::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::icons::Icon;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui_core::elements::{
     Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Flex, FormattedTextElement, MainAxisSize, ParentElement, Radius, Shrinkable,
 };
-use warpui_core::fonts::Weight;
-use warpui_core::keymap::Keystroke;
-use warpui_core::prelude::Align;
-use warpui_core::text_layout::TextAlignment;
-use warpui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use warpui_core::{
+use uncaged_ui_core::fonts::Weight;
+use uncaged_ui_core::keymap::Keystroke;
+use uncaged_ui_core::prelude::Align;
+use uncaged_ui_core::text_layout::TextAlignment;
+use uncaged_ui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use uncaged_ui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext,
 };
@@ -269,7 +269,7 @@ impl AiAccessSlide {
             .with_vertical_padding(3.)
             .with_background(internal_colors::fg_overlay_2(theme))
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .finish()
     }

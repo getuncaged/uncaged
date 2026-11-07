@@ -1,21 +1,21 @@
-use warp::integration_testing::clipboard::assert_clipboard_contains_string;
-use warp::integration_testing::secret_redaction::{
+use uncaged::integration_testing::clipboard::assert_clipboard_contains_string;
+use uncaged::integration_testing::secret_redaction::{
     assert_secret_tooltip_open, assert_secrets_redacted_for_ai,
 };
-use warp::integration_testing::settings::{toggle_hide_secrets_in_block_list, toggle_setting};
-use warp::integration_testing::step::new_step_with_default_assertions;
-use warp::integration_testing::terminal::util::ExpectedExitStatus;
-use warp::integration_testing::terminal::{
+use uncaged::integration_testing::settings::{toggle_hide_secrets_in_block_list, toggle_setting};
+use uncaged::integration_testing::step::new_step_with_default_assertions;
+use uncaged::integration_testing::terminal::util::ExpectedExitStatus;
+use uncaged::integration_testing::terminal::{
     assert_selected_block_index_is_last_renderable, execute_command_for_single_terminal_in_tab,
     initialize_secret_regexes, open_context_menu_for_selected_block, run_alt_grid_program,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::integration_testing::view_getters::single_terminal_view;
-use warp::settings_view::{SettingToggleAction, SettingsAction};
-use warp::terminal::model::index::Point;
-use warp::terminal::model::terminal_model::WithinModel;
-use warpui_core::async_assert;
-use warpui_core::integration::TestStep;
+use uncaged::integration_testing::view_getters::single_terminal_view;
+use uncaged::settings_view::{SettingToggleAction, SettingsAction};
+use uncaged::terminal::model::index::Point;
+use uncaged::terminal::model::terminal_model::WithinModel;
+use uncaged_ui_core::async_assert;
+use uncaged_ui_core::integration::TestStep;
 
 use super::{new_builder, Builder};
 use crate::util::skip_if_powershell_core_2303;

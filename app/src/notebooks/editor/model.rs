@@ -13,32 +13,32 @@ use mermaid_to_svg::MermaidTheme;
 use num_traits::SaturatingSub;
 use regex::Regex;
 use string_offset::CharOffset;
-use url::Url;
-use vec1::{vec1, Vec1};
-use warp_core::features::FeatureFlag;
-use warp_core::r#async::debounce;
-use warp_core::semantic_selection::SemanticSelection;
-use warp_editor::content::buffer::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::r#async::debounce;
+use uncaged_core::semantic_selection::SemanticSelection;
+use uncaged_editor::content::buffer::{
     AutoScrollBehavior, Buffer, BufferEditAction, BufferEvent, BufferSelectAction, EditOrigin,
     SelectionOffsets, ShouldAutoscroll,
 };
-use warp_editor::content::selection_model::BufferSelectionModel;
-use warp_editor::content::text::{
+use uncaged_editor::content::selection_model::BufferSelectionModel;
+use uncaged_editor::content::text::{
     BlockHeaderSize, BlockType, BufferBlockItem, BufferBlockStyle, BufferTextStyle, CodeBlockType,
     IndentBehavior, IndentUnit, TextStyles, TextStylesWithMetadata,
 };
-use warp_editor::model::{BufferUpdateWrapper, CoreEditorModel, RichTextEditorModel};
-use warp_editor::render::model::{
+use uncaged_editor::model::{BufferUpdateWrapper, CoreEditorModel, RichTextEditorModel};
+use uncaged_editor::render::model::{
     AutoScrollMode, BlockItem, RenderEvent, RenderState, RichTextStyles, StyleUpdateAction,
 };
-use warp_editor::search::Searcher;
-use warp_editor::selection::{SelectionMode, SelectionModel, TextDirection, TextUnit};
-use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::ListIndentLevel;
-use warpui::{
+use uncaged_editor::search::Searcher;
+use uncaged_editor::selection::{SelectionMode, SelectionModel, TextDirection, TextUnit};
+use uncaged_ui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::ListIndentLevel;
+use uncaged_ui::{
     AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity, WindowId,
 };
+use url::Url;
+use vec1::{vec1, Vec1};
 
 use super::embedding_model::NotebookEmbed;
 use super::interaction_state_model::InteractionStateModel;

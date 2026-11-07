@@ -3,12 +3,12 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use warp_completer::parsers::simple::{command_without_leading_env_vars, decompose_command};
-use warp_core::features::FeatureFlag;
-use warp_core::settings::Setting;
-use warp_core::user_preferences::GetUserPreferences;
-use warp_util::path::EscapeChar;
-use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
+use uncaged_completer::parsers::simple::{command_without_leading_env_vars, decompose_command};
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::settings::Setting;
+use uncaged_core::user_preferences::GetUserPreferences;
+use uncaged_ui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
+use uncaged_util::path::EscapeChar;
 
 use super::BlocklistAIHistoryModel;
 use crate::ai::agent::conversation::AIConversationId;

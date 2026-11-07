@@ -3,8 +3,8 @@ use std::fmt;
 
 use channel_versions::Changelog;
 use markdown_parser::FormattedText;
-use warpui::assets::asset_cache::AssetSource;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::assets::asset_cache::AssetSource;
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 #[derive(Default)]
 pub struct ChangelogModel {

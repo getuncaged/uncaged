@@ -1,15 +1,15 @@
 use chrono::{DateTime, Local};
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use warp_core::ui::color::coloru_with_opacity;
-use warp_core::ui::theme::Fill;
-use warp_core::ui::Icon;
-use warpui::elements::{ConstrainedBox, Container, Highlight, ParentElement, Shrinkable, Text};
-use warpui::fonts::{Properties, Weight};
-use warpui::prelude::{Align, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize};
-use warpui::scene::{CornerRadius, Radius};
-use warpui::text_layout::ClipConfig;
-use warpui::{AppContext, Element, SingletonEntity};
+use uncaged_core::ui::color::coloru_with_opacity;
+use uncaged_core::ui::theme::Fill;
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::{ConstrainedBox, Container, Highlight, ParentElement, Shrinkable, Text};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::prelude::{Align, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize};
+use uncaged_ui::scene::{CornerRadius, Radius};
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::conversation_status_ui::{render_status_element, STATUS_ELEMENT_PADDING};

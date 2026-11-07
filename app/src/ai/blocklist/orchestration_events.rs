@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use warp_multi_agent_api as api;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_agent_api as api;
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use super::history_model::{
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, ConversationStatusUpdate,

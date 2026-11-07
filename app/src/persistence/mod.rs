@@ -31,10 +31,10 @@ use lsp::supported_servers::LSPServerType;
 pub use sqlite::database_file_path_for_scope;
 #[cfg(any(feature = "local_fs", feature = "integration_tests"))]
 pub use sqlite::establish_ro_connection;
+use uncaged_agent_api as api;
+use uncaged_core::command::ExitCode;
+use uncaged_ui::{Entity, SingletonEntity};
 use uuid::Uuid;
-use warp_core::command::ExitCode;
-use warp_multi_agent_api as api;
-use warpui::{Entity, SingletonEntity};
 
 use self::model::{AgentConversation, AgentConversationData, Project};
 use crate::ai::blocklist::{PersistedAIInput, PersistedAIQueries};

@@ -86,7 +86,7 @@ static DISCOVERED_MODELS: std::sync::LazyLock<
     Mutex<std::collections::HashMap<String, Vec<String>>>,
 > = std::sync::LazyLock::new(Default::default);
 
-use warp_core::ui::icons::Icon;
+use uncaged_core::ui::icons::Icon;
 
 /// The vendor logo for a provider preset id, if it has one. `None` for
 /// "custom"/unknown providers, which fall back to the Uncaged mark.

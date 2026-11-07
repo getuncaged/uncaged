@@ -2,14 +2,14 @@ use std::iter;
 
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_geometry::vector::vec2f;
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::{
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Expanded, Flex, FormattedTextElement, HyperlinkLens, MainAxisAlignment, MainAxisSize,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -251,7 +251,7 @@ impl View for PluginInstructionsBlock {
             .with_horizontal_padding(*super::PADDING_LEFT - 6.)
             .with_vertical_padding(16.)
             .with_border(Border::all(1.).with_border_fill(theme.outline()))
-            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_corner_radius(uncaged_core::ui::radius::medium())
             .with_horizontal_margin(6.)
             .with_vertical_margin(6.)
             .finish();

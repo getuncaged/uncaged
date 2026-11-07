@@ -11,10 +11,10 @@
 //! Appearance sections) so it is easy to find and read.
 
 use ::settings::{Setting, ToggleableSetting};
-use warpui::elements::Element;
-use warpui::ui_components::components::UiComponent;
-use warpui::ui_components::switch::SwitchStateHandle;
-use warpui::{
+use uncaged_ui::elements::Element;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::ui_components::switch::SwitchStateHandle;
+use uncaged_ui::{
     AppContext, Entity, SingletonEntity, TypedActionView, UpdateModel, View, ViewContext,
     ViewHandle,
 };

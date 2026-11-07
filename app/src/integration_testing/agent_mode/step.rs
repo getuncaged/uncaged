@@ -4,8 +4,8 @@ use std::path::Path;
 use std::time::Duration;
 
 use prost::Message;
-use warpui::integration::TestStep;
-use warpui::{async_assert, SingletonEntity};
+use uncaged_ui::integration::TestStep;
+use uncaged_ui::{async_assert, SingletonEntity};
 
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::execution_profiles::ActionPermission;
@@ -78,7 +78,7 @@ pub fn exit_agent_view() -> TestStep {
 /// See the agent_mode_eval README for more details.
 pub fn hydrate_ai_conversation(file_name: &str) -> TestStep {
     let file_bytes = get_input_data(file_name);
-    let Ok(request) = warp_multi_agent_api::Request::decode(file_bytes) else {
+    let Ok(request) = uncaged_agent_api::Request::decode(file_bytes) else {
         panic!("Failed to decode request from protobuf");
     };
 
@@ -165,9 +165,10 @@ pub fn submit_ai_query(query: &str, timeout: Duration) -> TestStep {
 /// Returns an assertion that prints the conversation ID to stdout once available.
 /// This assertion will poll until the conversation token is received from the server.
 fn print_conversation_id_assertion(
-) -> impl FnMut(&mut warpui::App, warpui::WindowId) -> warpui::integration::AssertionOutcome {
+) -> impl FnMut(&mut uncaged_ui::App, uncaged_ui::WindowId) -> uncaged_ui::integration::AssertionOutcome
+{
     |app, window_id| {
-        use warpui::integration::AssertionOutcome;
+        use uncaged_ui::integration::AssertionOutcome;
 
         use crate::BlocklistAIHistoryModel;
         let terminal_view = terminal_view(app, window_id, 0, 0);

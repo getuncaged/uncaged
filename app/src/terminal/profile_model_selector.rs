@@ -6,17 +6,17 @@ use instant::{Duration, Instant};
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DropShadow, Empty, Expanded, Flex, Hoverable, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentElement as _, ParentOffsetBounds, Percentage, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, Rect, SavePosition, Stack, Text,
     DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::platform::Cursor;
-use warpui::text_layout::ClipConfig;
-use warpui::ui_components::components::UiComponent;
-use warpui::{
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity as _, TypedActionView,
     View, ViewContext, ViewHandle,
 };
@@ -24,10 +24,10 @@ use warpui::{
 const SIDECAR_HORIZONTAL_GAP: f32 = 8.;
 const SIDECAR_POSITION_ID: &str = "model_sidecar_panel";
 
-use warp_core::features::FeatureFlag;
-use warp_core::ui::color::{coloru_with_opacity, Opacity};
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::color::{coloru_with_opacity, Opacity};
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill;
 
 use crate::ai::blocklist::prompt::PromptIconButtonTheme;
 use crate::ai::blocklist::{
@@ -78,7 +78,7 @@ const PROFILE_SELECTOR_POSITION_ID: &str = "profile_selector";
 const PROFILE_PICKER_TOOLTIP: &str = "Choose an AI execution profile";
 const MODEL_PICKER_TOOLTIP: &str = "Choose an agent model";
 
-pub fn calculate_scaled_font_size(appearance: &warp_core::ui::appearance::Appearance) -> f32 {
+pub fn calculate_scaled_font_size(appearance: &uncaged_core::ui::appearance::Appearance) -> f32 {
     if FeatureFlag::AgentView.is_enabled() {
         udi_font_size(appearance)
     } else {
@@ -87,7 +87,9 @@ pub fn calculate_scaled_font_size(appearance: &warp_core::ui::appearance::Appear
 }
 
 /// Calculate the maximum width for profile name text (we will clip to this width)
-pub fn calculate_max_profile_name_width(appearance: &warp_core::ui::appearance::Appearance) -> f32 {
+pub fn calculate_max_profile_name_width(
+    appearance: &uncaged_core::ui::appearance::Appearance,
+) -> f32 {
     let scaled_font_size = calculate_scaled_font_size(appearance);
     scaled_font_size * MAX_PROFILE_NAME_WIDTH_SCALE_FACTOR
 }
@@ -718,7 +720,7 @@ impl ProfileModelSelector {
                     llm_preferences.hide_llm_popup(terminal_view_id);
                 } else if config.input_type.is_ai() {
                     ctx.spawn(
-                        warpui::r#async::Timer::after(NEW_MODEL_CHOICES_POPUP_DELAY),
+                        uncaged_ui::r#async::Timer::after(NEW_MODEL_CHOICES_POPUP_DELAY),
                         |_, _, ctx| {
                             ctx.notify();
                         },
@@ -2378,7 +2380,7 @@ impl View for ProfileModelSelector {
             crate::settings::InputSettings::as_ref(app).is_universal_developer_input_enabled(app);
 
         // The popup overflows the viewport on wasm mobile.
-        let is_wasm_mobile = warpui::platform::is_mobile_device();
+        let is_wasm_mobile = uncaged_ui::platform::is_mobile_device();
 
         if !is_wasm_mobile
             && (is_udi_enabled

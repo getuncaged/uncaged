@@ -1,25 +1,25 @@
 use ai::LLMId;
 use pathfinder_color::ColorU;
 use ui_components::{button, Component as _, Options as _};
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::icons::Icon;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill;
-use warpui_core::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::icons::Icon;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui_core::elements::{
     AnchorPair, Border, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, Empty, Flex, FormattedTextElement, Hoverable,
     Icon as WarpUiIcon, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
     OffsetType, ParentElement, ParentOffsetBounds, PositioningAxis, Radius, SavePosition,
     ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Stack, Text, XAxisAnchor, YAxisAnchor,
 };
-use warpui_core::fonts::{Properties, Weight};
-use warpui_core::keymap::Keystroke;
-use warpui_core::platform::Cursor;
-use warpui_core::scene::DropShadow;
-use warpui_core::text_layout::TextAlignment;
-use warpui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use warpui_core::{
+use uncaged_ui_core::fonts::{Properties, Weight};
+use uncaged_ui_core::keymap::Keystroke;
+use uncaged_ui_core::platform::Cursor;
+use uncaged_ui_core::scene::DropShadow;
+use uncaged_ui_core::text_layout::TextAlignment;
+use uncaged_ui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use uncaged_ui_core::{
     AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
 };
 
@@ -90,7 +90,7 @@ pub enum AgentSlideAction {
 }
 
 pub struct AgentSlide {
-    onboarding_state: warpui_core::ModelHandle<OnboardingStateModel>,
+    onboarding_state: uncaged_ui_core::ModelHandle<OnboardingStateModel>,
 
     /// Mouse state handles for each model row.
     model_mouse_states: Vec<MouseStateHandle>,
@@ -119,7 +119,7 @@ fn model_row_position_id(index: usize) -> String {
 
 impl AgentSlide {
     pub(crate) fn new(
-        onboarding_state: warpui_core::ModelHandle<OnboardingStateModel>,
+        onboarding_state: uncaged_ui_core::ModelHandle<OnboardingStateModel>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
         let model_count = onboarding_state.as_ref(ctx).models().len();
@@ -589,7 +589,7 @@ impl AgentSlide {
                     .with_padding_top(4.)
                     .with_padding_bottom(4.)
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )))
                     .with_background(Fill::Solid(internal_colors::neutral_3(theme)))
                     .finish()

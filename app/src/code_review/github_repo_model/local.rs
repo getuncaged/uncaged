@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use settings::Setting as _;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity as _};
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{Entity, ModelContext, ModelHandle, SingletonEntity as _};
 
 use super::GitHubRepoEvent;
 use crate::code_review::git_repo_model::{GitRepoStatusEvent, GitRepoStatusModel};

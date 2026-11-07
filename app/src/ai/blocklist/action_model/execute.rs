@@ -59,18 +59,18 @@ pub use start_agent::{
 pub use suggest_new_conversation::NewConversationDecision;
 use suggest_new_conversation::SuggestNewConversationExecutor;
 pub use suggest_prompt::PromptSuggestionExecutor;
+use uncaged_core::execution_mode::AppExecutionMode;
+use uncaged_core::features::FeatureFlag;
+#[cfg(feature = "local_fs")]
+use uncaged_files::{FileModel, TextFileReadResult};
+use uncaged_ui::r#async::{Spawnable, SpawnableOutput};
+use uncaged_ui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+#[cfg(feature = "local_fs")]
+use uncaged_util::file::FileLoadError;
+#[cfg(feature = "local_fs")]
+use uncaged_util::file_type::is_buffer_binary;
 use upload_artifact::UploadArtifactExecutor;
 use wait_for_events::WaitForEventsExecutor;
-use warp_core::execution_mode::AppExecutionMode;
-use warp_core::features::FeatureFlag;
-#[cfg(feature = "local_fs")]
-use warp_files::{FileModel, TextFileReadResult};
-#[cfg(feature = "local_fs")]
-use warp_util::file::FileLoadError;
-#[cfg(feature = "local_fs")]
-use warp_util::file_type::is_buffer_binary;
-use warpui::r#async::{Spawnable, SpawnableOutput};
-use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use self::search_codebase::SearchCodebaseExecutor;
 use crate::ai::agent::conversation::AIConversationId;
@@ -1101,11 +1101,11 @@ async fn should_read_as_binary(path: &std::path::Path) -> bool {
     is_file_content_binary_async(path).await
 }
 
-/// Async sibling of [`warp_util::file_type::is_file_content_binary`]. Reads
+/// Async sibling of [`uncaged_util::file_type::is_file_content_binary`]. Reads
 /// the first 1 KiB of `path` asynchronously and returns `true` if the content
 /// looks binary according to [`is_buffer_binary`]. Returns `true` on any I/O
 /// error so callers default to the binary code path. Kept local to this
-/// module so `warp_util` doesn't need to grow an `async_fs` dependency.
+/// module so `uncaged_util` doesn't need to grow an `async_fs` dependency.
 #[cfg(feature = "local_fs")]
 async fn is_file_content_binary_async(path: &std::path::Path) -> bool {
     const CHUNK_SIZE: usize = 1024;

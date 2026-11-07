@@ -1,17 +1,17 @@
-use warp::cmd_or_ctrl_shift;
-use warp::integration_testing::settings::toggle_hide_secrets_in_block_list;
-use warp::integration_testing::terminal::util::current_shell_starter_and_version;
-use warp::integration_testing::terminal::{
+use uncaged::cmd_or_ctrl_shift;
+use uncaged::integration_testing::settings::toggle_hide_secrets_in_block_list;
+use uncaged::integration_testing::terminal::util::current_shell_starter_and_version;
+use uncaged::integration_testing::terminal::{
     assert_context_menu_is_open, initialize_secret_regexes,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::integration_testing::view_getters::single_terminal_view_for_tab;
-use warp::settings_view::{SettingToggleAction, SettingsAction};
-use warp::terminal::model::index::Point;
-use warp::terminal::model::terminal_model::{BlockIndex, WithinBlock, WithinModel};
-use warp::terminal::shell::ShellType;
-use warp::terminal::GridType;
-use warpui_core::{async_assert, async_assert_eq};
+use uncaged::integration_testing::view_getters::single_terminal_view_for_tab;
+use uncaged::settings_view::{SettingToggleAction, SettingsAction};
+use uncaged::terminal::model::index::Point;
+use uncaged::terminal::model::terminal_model::{BlockIndex, WithinBlock, WithinModel};
+use uncaged::terminal::shell::ShellType;
+use uncaged::terminal::GridType;
+use uncaged_ui_core::{async_assert, async_assert_eq};
 
 use super::new_builder;
 use crate::test::integration_testing::block_filtering::{

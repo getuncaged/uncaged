@@ -2,7 +2,7 @@ use std::ffi::OsStr;
 
 use byte_unit::Byte;
 use sysinfo::ProcessesToUpdate;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use crate::system::memory_footprint;
 
@@ -69,7 +69,7 @@ impl SystemInfo {
     fn schedule_refresh(ctx: &mut ModelContext<Self>) {
         ctx.spawn(
             async {
-                warpui::r#async::Timer::after(REFRESH_INTERVAL).await;
+                uncaged_ui::r#async::Timer::after(REFRESH_INTERVAL).await;
             },
             |me, _, ctx| {
                 me.refresh(ctx);

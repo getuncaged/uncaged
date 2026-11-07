@@ -1,9 +1,9 @@
-use warpui::elements::{
+use uncaged_ui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, Flex, ParentElement, Radius,
 };
-use warpui::fonts::Weight;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::Element;
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::Element;
 
 use crate::appearance::Appearance;
 use crate::terminal::model::block::Block;

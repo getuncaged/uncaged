@@ -1,20 +1,22 @@
 use std::time::Duration;
 
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::color::blend::Blend;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{
+use uncaged_core::ui::color::blend::Blend;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, Element, EventHandler, Flex, Hoverable, MouseStateHandle,
     OffsetPositioning, Padding, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, SavePosition, Shrinkable, Stack,
 };
-use warpui::keymap::Keystroke;
-use warpui::platform::Cursor;
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::keyboard_shortcut::KeyboardShortcut;
-use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::keyboard_shortcut::KeyboardShortcut;
+use uncaged_ui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use crate::ai::agent_management::notifications::item_rendering::{
     create_notification_artifact_buttons_view, handle_notification_artifact_buttons_event,
@@ -367,7 +369,7 @@ fn render_toast(
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
-    let on_expand: OnExpandClick = Box::new(move |ctx: &mut warpui::EventContext| {
+    let on_expand: OnExpandClick = Box::new(move |ctx: &mut uncaged_ui::EventContext| {
         ctx.dispatch_typed_action(AgentNotificationToastAction::ToggleMessageExpanded(id));
     });
     let keybinding_hint = keystroke.map(|ks| render_keybinding_hint(ks, appearance));
@@ -475,7 +477,7 @@ fn render_keybinding_hint(keystroke: Keystroke, appearance: &Appearance) -> Box<
         font_size: Some(12.),
         background: Some(internal_colors::fg_overlay_3(theme).into()),
         border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         ))),
         padding: Some(Coords {
             top: 1.0,

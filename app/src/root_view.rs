@@ -14,16 +14,16 @@ use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use serde::{Deserialize, Serialize};
 use settings::Setting as _;
-use warp_core::context_flag::ContextFlag;
-use warp_core::user_preferences::GetUserPreferences as _;
-use warpui::elements::{
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_core::user_preferences::GetUserPreferences as _;
+use uncaged_ui::elements::{
     ChildAnchor, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Stack,
 };
-use warpui::keymap::{EditableBinding, FixedBinding};
-use warpui::platform::{WindowBounds, WindowStyle};
-use warpui::presenter::ChildView;
-use warpui::windowing::WindowManager;
-use warpui::{
+use uncaged_ui::keymap::{EditableBinding, FixedBinding};
+use uncaged_ui::platform::{WindowBounds, WindowStyle};
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{
     id, AddWindowOptions, AppContext, DisplayId, Element, Entity, EntityId, FocusContext,
     NextNewWindowsHasThisWindowsBoundsUponClose, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WindowId,
@@ -1079,7 +1079,7 @@ fn toggle_quake_mode_window(global_resource_handles: &GlobalResourceHandles, ctx
                     background_blur_texture: *window_settings.background_blur_texture,
                     // Ignore the quake window for positioning the next window
                     anchor_new_windows_from_closed_position:
-                        warpui::NextNewWindowsHasThisWindowsBoundsUponClose::No,
+                        uncaged_ui::NextNewWindowsHasThisWindowsBoundsUponClose::No,
                     on_gpu_driver_selected: None,
                     window_instance: Some(ChannelState::app_id().to_string() + "-hotkey"),
                     ..Default::default()
@@ -1310,7 +1310,7 @@ impl RootView {
     fn schedule_launch_splash_frame(ctx: &mut ViewContext<Self>) {
         ctx.spawn(
             async {
-                warpui::r#async::Timer::after(launch_splash::FRAME).await;
+                uncaged_ui::r#async::Timer::after(launch_splash::FRAME).await;
             },
             |me, _, ctx| {
                 if me
@@ -2136,7 +2136,7 @@ impl View for RootView {
         stack.finish()
     }
 
-    fn keymap_context(&self, app: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
         if quake_mode_window_is_open() {
             context.set.insert(flags::QUAKE_WINDOW_OPEN_FLAG);

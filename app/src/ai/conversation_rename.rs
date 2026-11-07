@@ -1,4 +1,4 @@
-use warpui::{SingletonEntity, View, ViewContext};
+use uncaged_ui::{SingletonEntity, View, ViewContext};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, RenameConversationError};

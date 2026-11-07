@@ -1,6 +1,6 @@
 use ai::LLMId;
-use warp_core::features::FeatureFlag;
-use warpui_core::{App, ModelHandle};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui_core::{App, ModelHandle};
 
 use crate::model::{AiSetupChoice, OnboardingStateModel, OnboardingStep};
 use crate::OnboardingIntention;

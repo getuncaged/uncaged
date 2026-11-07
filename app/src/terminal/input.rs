@@ -48,50 +48,50 @@ use parking_lot::Mutex;
 use regex::Regex;
 use settings::{Setting as _, ToggleableSetting};
 use string_offset::{ByteOffset, CharOffset};
-use vec1::Vec1;
-use vim::vim::{VimHandler, VimMode};
-use warp_completer::completer::{
+use uncaged_completer::completer::{
     self, CompleterOptions, CompletionContext, CompletionsFallbackStrategy, Description, Match,
     MatchStrategy, MatchType, PathSeparators, SuggestionResults,
 };
-use warp_completer::meta::{HasSpan, Spanned};
-use warp_completer::parsers::simple::command_at_cursor_position;
-use warp_completer::parsers::LiteCommand;
-use warp_completer::signatures::CommandRegistry;
-use warp_completer::util::parse_current_commands_and_tokens;
-use warp_core::context_flag::ContextFlag;
-use warp_core::r#async::debounce;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::AnsiColorIdentifier;
-use warp_core::user_preferences::GetUserPreferences as _;
-use warp_editor::editor::NavigationKey;
-use warp_util::path::ShellFamily;
-use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
-use warpui::clipboard::{ClipboardContent, ImageData};
-use warpui::clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES;
-use warpui::color::ColorU;
-use warpui::elements::{
+use uncaged_completer::meta::{HasSpan, Spanned};
+use uncaged_completer::parsers::simple::command_at_cursor_position;
+use uncaged_completer::parsers::LiteCommand;
+use uncaged_completer::signatures::CommandRegistry;
+use uncaged_completer::util::parse_current_commands_and_tokens;
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_core::r#async::debounce;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::AnsiColorIdentifier;
+use uncaged_core::user_preferences::GetUserPreferences as _;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
+use uncaged_ui::clipboard::{ClipboardContent, ImageData};
+use uncaged_ui::clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::{
     resizable_state_handle, Align, AnchorPair, ChildAnchor, Clipped, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DispatchEventResult, DropTargetData, Element, EventHandler,
     Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, OffsetType,
     ParentAnchor, ParentElement, PositionedElementOffsetBounds, PositioningAxis, Radius,
     ResizableStateHandle, SavePosition, SelectionHandle, Text, Wrap, XAxisAnchor, YAxisAnchor,
 };
-pub use warpui::elements::{ParentElement as _, Stack};
-pub use warpui::geometry::vector::{vec2f, Vector2F};
-use warpui::keymap::{EditableBinding, FixedBinding, Keystroke};
-use warpui::platform::OperatingSystem;
-use warpui::presenter::ChildView;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::text_layout::TextStyle;
-use warpui::ui_components::chip::Chip;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::units::IntoPixels;
-pub use warpui::WindowId;
-use warpui::{
+pub use uncaged_ui::elements::{ParentElement as _, Stack};
+pub use uncaged_ui::geometry::vector::{vec2f, Vector2F};
+use uncaged_ui::keymap::{EditableBinding, FixedBinding, Keystroke};
+use uncaged_ui::platform::OperatingSystem;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::text_layout::TextStyle;
+use uncaged_ui::ui_components::chip::Chip;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::units::IntoPixels;
+pub use uncaged_ui::WindowId;
+use uncaged_ui::{
     end_trace, start_trace, AppContext, Entity, EntityId, FocusContext, ModelAsRef, ModelHandle,
     SingletonEntity, TypedActionView, View, ViewContext, ViewHandle, WeakViewHandle,
 };
+use uncaged_util::path::ShellFamily;
+use vec1::Vec1;
+use vim::vim::{VimHandler, VimMode};
 
 use self::decorations::InputBackgroundJobOptions;
 use super::alias::is_expandable_alias;
@@ -1436,7 +1436,7 @@ struct AttachmentChip {
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     if cfg!(feature = "integration_tests") {
         app.register_fixed_bindings([
@@ -8242,7 +8242,8 @@ impl Input {
                             // the completions finish quickly, since that causes a jittery UX.
                             let _ = ctx.spawn(
                                 async move {
-                                    warpui::r#async::Timer::after(Duration::from_millis(750)).await;
+                                    uncaged_ui::r#async::Timer::after(Duration::from_millis(750))
+                                        .await;
                                     old_buffer_text_original
                                 },
                                 move |input, old_buffer_text_original, ctx| {
@@ -8781,7 +8782,7 @@ impl Input {
                                     .and_then(|pwd| {
                                         // Find git repo and construct absolute path
                                         use repo_metadata::repositories::DetectedRepositories;
-                                        use warp_util::local_or_remote_path::LocalOrRemotePath;
+                                        use uncaged_util::local_or_remote_path::LocalOrRemotePath;
                                         let git_repo_path = DetectedRepositories::as_ref(ctx)
                                             .get_root_for_path(&LocalOrRemotePath::Local(
                                                 Path::new(pwd).to_path_buf(),
@@ -8795,7 +8796,7 @@ impl Input {
                                             .map(|session| session.is_wsl())
                                             .unwrap_or(false);
 
-                                        let relative_path = warp_util::path::to_relative_path(
+                                        let relative_path = uncaged_util::path::to_relative_path(
                                             is_wsl,
                                             &absolute_path,
                                             Path::new(pwd),
@@ -8872,7 +8873,7 @@ impl Input {
                         None => image_filepaths.clone(),
                     };
                     let paths_str =
-                        warpui::clipboard_utils::escaped_paths_str(&transformed, shell_family);
+                        uncaged_ui::clipboard_utils::escaped_paths_str(&transformed, shell_family);
 
                     self.editor.update(ctx, |editor, ctx| {
                         editor.user_insert(&paths_str, ctx);
@@ -8909,7 +8910,7 @@ impl Input {
 
         // Check if we should insert clipboard text in advance
         let mut already_inserted_text = false;
-        if warpui::clipboard::should_insert_text_on_paste(&content) {
+        if uncaged_ui::clipboard::should_insert_text_on_paste(&content) {
             self.insert_clipboard_text_content(ctx, content.clone());
             already_inserted_text = true;
         }
@@ -8921,7 +8922,7 @@ impl Input {
             self.handle_pasted_image_data(content.clone(), ctx) == 0
         } else if content.num_paths() > 0 {
             // Else, we check the pasted file paths for any images.
-            let image_filepaths = warpui::clipboard_utils::get_image_filepaths_from_paths(
+            let image_filepaths = uncaged_ui::clipboard_utils::get_image_filepaths_from_paths(
                 content.paths.as_deref().unwrap_or(&[]),
             );
             let num_images_expected = image_filepaths.len();
@@ -12256,7 +12257,7 @@ impl Input {
                 border_width: Some(1.),
                 border_color: Some(internal_colors::neutral_4(appearance.theme()).into()),
                 border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 ))),
                 ..Default::default()
             },
@@ -12705,7 +12706,7 @@ impl View for Input {
         }
     }
 
-    fn keymap_context(&self, app: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> uncaged_ui::keymap::Context {
         let mut ctx = Self::default_keymap_context();
         let ai_settings = AISettings::as_ref(app);
 

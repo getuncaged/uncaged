@@ -1,15 +1,15 @@
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::appearance::Appearance;
-use warp_editor::editor::NavigationKey;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::elements::{
     Align, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, Flex, OffsetPositioning, ParentElement,
     PositionedElementAnchor, PositionedElementOffsetBounds, Radius, ScrollbarWidth,
 };
-use warpui::fonts::Weight;
-use warpui::keymap::FixedBinding;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -34,7 +34,7 @@ const HEADER_TEXT: &str = "Suggested rule";
 const MAX_EDITOR_HEIGHT: f32 = 240.;
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
@@ -479,7 +479,7 @@ impl SuggestedRuleView {
         let editor_border =
             Border::all(1.).with_border_fill(blended_colors::neutral_2(appearance.theme()));
         let editor_corner_radius =
-            CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL));
+            CornerRadius::with_all(Radius::Pixels(uncaged_core::ui::radius::SMALL));
         let editor_horizontal_padding = 16.;
         let editor_vertical_padding = 12.;
         let editor_margin = 16.;
@@ -506,7 +506,7 @@ impl SuggestedRuleView {
                             ScrollbarWidth::Auto,
                             appearance.theme().nonactive_ui_detail().into(),
                             appearance.theme().active_ui_detail().into(),
-                            warpui::elements::Fill::None,
+                            uncaged_ui::elements::Fill::None,
                         )
                         .finish(),
                     )

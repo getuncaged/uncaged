@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::fmt;
 
-use warpui::Action;
+use uncaged_ui::Action;
 
 use crate::terminal::available_shells::AvailableShell;
 use crate::terminal::view::TerminalAction;

@@ -1,4 +1,4 @@
-use warpui::{App, EntityId};
+use uncaged_ui::{App, EntityId};
 
 use super::*;
 use crate::ai::agent::conversation::AIConversationId;

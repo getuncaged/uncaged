@@ -1,6 +1,6 @@
 // Hard coded constants to divide keybindings into their respective categories/sections.
 // This should always align with documentation: https://github.com/uncaged-terminal/uncaged#readme
-use warpui::keymap::Keystroke;
+use uncaged_ui::keymap::Keystroke;
 
 use crate::util::bindings::CommandBinding;
 

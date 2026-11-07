@@ -1,4 +1,4 @@
-use warpui::Element;
+use uncaged_ui::Element;
 
 use super::{WarpDriveItem, WarpDriveItemId};
 use crate::appearance::Appearance;
@@ -52,7 +52,7 @@ impl WarpDriveItem for WarpDriveSpace {
         Box::new(self.clone())
     }
 
-    fn action_summary(&self, _app: &warpui::AppContext) -> Option<String> {
+    fn action_summary(&self, _app: &uncaged_ui::AppContext) -> Option<String> {
         None
     }
 }

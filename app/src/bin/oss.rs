@@ -3,10 +3,10 @@
 #![cfg_attr(feature = "release_bundle", windows_subsystem = "windows")]
 
 use anyhow::Result;
-use warp_core::channel::{Channel, ChannelConfig, ChannelState, WarpServerConfig};
-use warp_core::AppId;
+use uncaged_core::channel::{Channel, ChannelConfig, ChannelState, WarpServerConfig};
+use uncaged_core::AppId;
 
-// Simple wrapper around warp::run() for Warp OSS builds.
+// Simple wrapper around uncaged::run() for Warp OSS builds.
 fn main() -> Result<()> {
     let mut state = ChannelState::new(
         Channel::Oss,
@@ -25,11 +25,11 @@ fn main() -> Result<()> {
         },
     );
     if cfg!(debug_assertions) {
-        state = state.with_additional_features(warp_core::features::DEBUG_FLAGS);
+        state = state.with_additional_features(uncaged_core::features::DEBUG_FLAGS);
     }
     ChannelState::set(state);
 
-    warp::run()
+    uncaged::run()
 }
 
 // If we're not using an external plist, embed the following as the Info.plist.

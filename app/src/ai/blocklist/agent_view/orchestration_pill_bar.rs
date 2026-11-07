@@ -9,14 +9,14 @@ use std::hash::{Hash, Hasher};
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use warp_cli::agent::Harness;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::color::blend::Blend;
-use warp_core::ui::color::coloru_with_opacity;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::{Fill, WarpTheme};
-use warpui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
-use warpui::elements::{
+use uncaged_cli::agent::Harness;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::color::blend::Blend;
+use uncaged_core::ui::color::coloru_with_opacity;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::{Fill, WarpTheme};
+use uncaged_ui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
+use uncaged_ui::elements::{
     Align, AnchorPair, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Element, Empty, Fill as ElementFill, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, OffsetType, ParentAnchor,
@@ -24,12 +24,12 @@ use warpui::elements::{
     SavePosition, ScrollbarWidth, Stack, Text, XAxisAnchor, YAxisAnchor,
     DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::platform::{Cursor, LineStyle};
-use warpui::text_layout::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::platform::{Cursor, LineStyle};
+use uncaged_ui::text_layout::{
     ClipConfig, ClipDirection, ClipStyle, StyleAndFont, TextStyle, DEFAULT_TOP_BOTTOM_RATIO,
 };
-use warpui::{
+use uncaged_ui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -1207,7 +1207,7 @@ fn render_hover_card(
     //
     // Use `dirs::home_dir()` (cross-platform: `$HOME` on unix,
     // `%USERPROFILE%` on Windows) to find the home prefix, then defer to
-    // the shared `warp_util::path::user_friendly_path` helper so the cwd
+    // the shared `uncaged_util::path::user_friendly_path` helper so the cwd
     // displays as `~/foo` regardless of OS — and matches the same
     // tilde-substitution behaviour used by the tab title, prompt header,
     // and pwd chip.
@@ -1219,7 +1219,7 @@ fn render_hover_card(
         .filter(|s| !s.is_empty())
         .map(|cwd| {
             Text::new(
-                warp_util::path::user_friendly_path(&cwd, home_dir_str).into_owned(),
+                uncaged_util::path::user_friendly_path(&cwd, home_dir_str).into_owned(),
                 appearance.ui_font_family(),
                 appearance.monospace_font_size() - 1.,
             )
@@ -1346,7 +1346,7 @@ fn render_hover_card(
         .with_padding_top(HOVER_CARD_VERTICAL_PADDING)
         .with_padding_bottom(HOVER_CARD_VERTICAL_PADDING)
         .with_background(bg)
-        .with_border(warpui::elements::Border::all(1.).with_border_fill(outline))
+        .with_border(uncaged_ui::elements::Border::all(1.).with_border_fill(outline))
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))
         .finish();
 
@@ -1394,7 +1394,7 @@ fn render_status_badge(
         .with_padding_bottom(2.)
         .with_background_color(coloru_with_opacity(color, 10))
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .finish()
 }
@@ -1446,7 +1446,7 @@ fn render_chip(
         .with_padding_bottom(2.)
         .with_background(internal_colors::neutral_2(theme))
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .finish()
 }
@@ -1520,7 +1520,7 @@ fn render_pill(
     overflow_mouse_state: MouseStateHandle,
     pin_button_mouse_state: MouseStateHandle,
     menu_is_open_for_this: bool,
-    self_terminal_view_id: warpui::EntityId,
+    self_terminal_view_id: uncaged_ui::EntityId,
     app: &AppContext,
 ) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);
@@ -1562,7 +1562,7 @@ fn render_pill(
     let pill_text_color = internal_colors::fg_overlay_6(theme).into_solid();
 
     // `Hoverable::new`'s build closure is `FnOnce` (see
-    // `crates/warpui_core/src/elements/hoverable.rs`). We can therefore move
+    // `crates/uncaged_ui_core/src/elements/hoverable.rs`). We can therefore move
     // `label` into the closure by value rather than cloning it on every
     // build.
     let pill_body = Hoverable::new(mouse_state, move |hover_state| {
@@ -1666,7 +1666,7 @@ fn render_pill(
                         let mut container =
                             Container::new(render_pin_glyph_centered(is_pinned, text_color))
                                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                                    warp_core::ui::radius::SMALL,
+                                    uncaged_core::ui::radius::SMALL,
                                 )));
                         if pin_button_hovered {
                             container =
@@ -1852,7 +1852,7 @@ fn render_overflow_button(
             .with_height(PILL_ICON_SIZE)
             .finish();
         let mut container = Container::new(Align::new(icon).finish()).with_corner_radius(
-            CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL)),
+            CornerRadius::with_all(Radius::Pixels(uncaged_core::ui::radius::SMALL)),
         );
         if let Some(bg) = bg {
             container = container.with_background(bg);

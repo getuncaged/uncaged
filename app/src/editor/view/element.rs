@@ -9,26 +9,26 @@ use itertools::Itertools;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use smallvec::SmallVec;
-use vim::vim::{MotionType, VimMode};
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::DEFAULT_UI_FONT_SIZE;
-use warp_util::user_input::UserInput;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::DEFAULT_UI_FONT_SIZE;
+use uncaged_ui::elements::{
     AfterLayoutContext, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Element, Event, EventContext, Flex, LayoutContext, PaintContext, ParentElement, Point, Radius,
     SizeConstraint, Text, DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::event::{DispatchedEvent, ModifiersState};
-use warpui::keymap::Keystroke;
-use warpui::text_layout::{
+use uncaged_ui::event::{DispatchedEvent, ModifiersState};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::text_layout::{
     self, ComputeBaselinePositionArgs, LayoutCache, DEFAULT_TOP_BOTTOM_RATIO,
 };
-use warpui::text_selection_utils::{
+use uncaged_ui::text_selection_utils::{
     calculate_tick_width, create_newline_tick_rect, selection_crosses_newline_row_based,
     NewlineTickParams,
 };
-use warpui::ui_components::components::UiComponent;
-use warpui::{AppContext, SingletonEntity, TaskId, ViewHandle};
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{AppContext, SingletonEntity, TaskId, ViewHandle};
+use uncaged_util::user_input::UserInput;
+use vim::vim::{MotionType, VimMode};
 
 use super::super::soft_wrap::{
     ClampDirection, DisplayPointAndClampDirection, FrameLayouts, SoftWrapPoint, SoftWrapState,
@@ -827,7 +827,7 @@ impl EditorElement {
                         cursor.origin.y() - cursor_height,
                     );
                     // New layer is started so avatars are rendered over text and prompt
-                    ctx.scene.start_layer(warpui::ClipBounds::None);
+                    ctx.scene.start_layer(uncaged_ui::ClipBounds::None);
                     drawable_selections_data
                         .avatar
                         .paint(avatar_origin, ctx, app);
@@ -1425,7 +1425,7 @@ impl EditorElement {
         let cycle_next_command_hint = if self.should_show_cycle_next_command_hint(is_cycling, ctx) {
             let appearance = Appearance::as_ref(ctx);
             Some(
-                self.render_cycle_next_command_hint(warp_core::ui::theme::Fill::Solid(
+                self.render_cycle_next_command_hint(uncaged_core::ui::theme::Fill::Solid(
                     blended_colors::semantic_text_disabled(appearance.theme()),
                 )),
             )

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use settings::Setting as _;
-use warp_core::features::FeatureFlag;
-use warpui::units::{IntoPixels, Pixels};
-use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::units::{IntoPixels, Pixels};
+use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
 
 use super::styles::{HEADER_BORDER, HEADER_ROW_HEIGHT};
 use crate::ai::blocklist::agent_view::AgentViewController;

@@ -1,5 +1,5 @@
-use warp_core::settings::Setting;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_core::settings::Setting;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use crate::report_if_error;
 use crate::settings::AISettings;

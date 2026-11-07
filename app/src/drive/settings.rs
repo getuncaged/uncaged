@@ -27,8 +27,8 @@ impl WarpDriveSettings {
     /// Returns whether Warp Drive should be considered enabled.
     /// Uncaged runs fully local (no login), so this is driven purely by the
     /// user setting — we never gate on auth/login state.
-    pub fn is_warp_drive_enabled(app: &warpui::AppContext) -> bool {
-        use warpui::SingletonEntity as _;
+    pub fn is_warp_drive_enabled(app: &uncaged_ui::AppContext) -> bool {
+        use uncaged_ui::SingletonEntity as _;
         *Self::as_ref(app).enable_warp_drive
     }
 }

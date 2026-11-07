@@ -4,14 +4,14 @@
 
 use std::path::Path;
 
-use warp_core::ui::appearance::Appearance;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::elements::{
     ChildView, ClippedScrollStateHandle, Container, CornerRadius, CrossAxisAlignment, Element,
     Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
 };
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::ui_components::switch::SwitchStateHandle;
-use warpui::{AppContext, SingletonEntity, ViewContext, ViewHandle};
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::switch::SwitchStateHandle;
+use uncaged_ui::{AppContext, SingletonEntity, ViewContext, ViewHandle};
 
 use crate::code_review::diff_state::CommitChainMode;
 use crate::code_review::git_dialog::pr::show_pr_created_toast;

@@ -1,4 +1,4 @@
-use warpui::{AppContext, EntityId, SingletonEntity};
+use uncaged_ui::{AppContext, EntityId, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::AgentConversationsModel;

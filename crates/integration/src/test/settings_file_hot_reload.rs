@@ -7,18 +7,18 @@
 use std::time::Duration;
 
 use settings::Setting as _;
-use warp::features::FeatureFlag;
-use warp::integration_testing::step::new_step_with_default_assertions;
-use warp::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
-use warp::settings::FontSettings;
-use warpui_core::integration::TestStep;
-use warpui_core::{async_assert_eq, SingletonEntity};
+use uncaged::features::FeatureFlag;
+use uncaged::integration_testing::step::new_step_with_default_assertions;
+use uncaged::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use uncaged::settings::FontSettings;
+use uncaged_ui_core::integration::TestStep;
+use uncaged_ui_core::{async_assert_eq, SingletonEntity};
 
 use super::{new_builder, Builder};
 
 /// Helper: returns the path to the TOML settings file.
 fn toml_file_path() -> std::path::PathBuf {
-    warp::settings::user_preferences_toml_file_path()
+    uncaged::settings::user_preferences_toml_file_path()
 }
 
 /// Verifies the full settings hot-reload pipeline end-to-end: the filesystem

@@ -4,9 +4,9 @@
 //! the settings file and through these palette entries.
 
 use settings::{Setting as _, ToggleableSetting as _};
-use warp_core::features::FeatureFlag;
-use warpui::keymap::ContextPredicate;
-use warpui::{id, Action, AppContext, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::keymap::ContextPredicate;
+use uncaged_ui::{id, Action, AppContext, SingletonEntity};
 
 use super::{flags, SettingsAction, ToggleSettingActionPair};
 use crate::report_if_error;

@@ -3,17 +3,17 @@ use std::collections::HashMap;
 
 use anyhow::Error;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors::neutral_4;
-use warp_core::ui::theme::Fill;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors::neutral_4;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseState, MouseStateHandle, ParentElement, Radius,
 };
-use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -580,7 +580,7 @@ fn build_alias_pill<F: FnOnce(&MouseState, Fill) -> Box<dyn Element>>(
                 .with_horizontal_padding(ALIAS_PILL_HORIZONTAL_PADDING)
                 .with_vertical_margin(ALIAS_PILL_VERTICAL_MARGIN)
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .with_background(background)
                 .finish(),

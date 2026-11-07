@@ -1,10 +1,10 @@
 use async_io::block_on;
 use pathfinder_color::ColorU;
 use plist::{Dictionary, Value};
+use uncaged_core::ui::theme::{Fill, WarpTheme};
+use uncaged_ui::fonts::FontInfo;
+use uncaged_ui::keymap::Keystroke;
 use virtual_fs::{Stub, VirtualFS};
-use warp_core::ui::theme::{Fill, WarpTheme};
-use warpui::fonts::FontInfo;
-use warpui::keymap::Keystroke;
 
 use super::{color_dictionary_to_coloru, ITermTheme, ITermThemeType};
 use crate::settings::import::config::{

@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 /// like `custom_model_providers::{CustomModelProvider, CustomModel}`.
 use api::request::settings::custom_model_routers as proto;
 use serde::{Deserialize, Serialize};
-use warp_multi_agent_api as api;
+use uncaged_agent_api as api;
 
 use super::llms::{LLMContextWindow, LLMId, LLMInfo, LLMProvider, LLMUsageMetadata};
 
@@ -116,7 +116,7 @@ impl CustomModelRouter {
             Some(path) => {
                 format!(
                     "{routing_kind} · {}",
-                    warp_core::paths::home_relative_path(path)
+                    uncaged_core::paths::home_relative_path(path)
                 )
             }
             None => routing_kind.to_owned(),

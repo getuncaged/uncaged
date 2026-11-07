@@ -1,14 +1,16 @@
-use warpui::elements::{
+use uncaged_ui::elements::{
     Border, Container, CornerRadius, CrossAxisAlignment, Expanded, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius,
 };
-use warpui::keymap::macros::*;
-use warpui::keymap::{FixedBinding, Keystroke};
-use warpui::platform::Cursor;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::keyboard_shortcut::KeyboardShortcut;
-use warpui::ui_components::text::Span;
-use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use uncaged_ui::keymap::macros::*;
+use uncaged_ui::keymap::{FixedBinding, Keystroke};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::keyboard_shortcut::KeyboardShortcut;
+use uncaged_ui::ui_components::text::Span;
+use uncaged_ui::{
+    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
+};
 
 use crate::appearance::Appearance;
 use crate::ui_components::blended_colors;
@@ -121,7 +123,7 @@ impl<T: 'static> View for ToggleableItemsView<T> {
         "ToggleableItemsView"
     }
 
-    fn keymap_context(&self, _app: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, _app: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
         if !self.items.is_empty() {
             context.set.insert(HAS_ITEMS);
@@ -215,7 +217,7 @@ impl<T: 'static> View for ToggleableItemsView<T> {
                     .with_horizontal_padding(12.)
                     .with_vertical_padding(8.)
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )))
                     .with_border(Border::all(1.).with_border_fill(row_border_color))
                     .finish()

@@ -2,22 +2,22 @@ use std::borrow::Cow;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::color::blend::Blend as _;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::Icon;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::color::blend::Blend as _;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::{
     ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow, Expanded,
     Flex, Hoverable, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement as _,
     ParentOffsetBounds, Radius, Stack,
 };
-use warpui::fonts::Weight;
-use warpui::keymap::EditableBinding;
-use warpui::platform::file_picker::FilePickerError;
-use warpui::platform::{Cursor, FilePickerConfiguration};
-use warpui::ui_components::components::{UiComponent as _, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::keymap::EditableBinding;
+use uncaged_ui::platform::file_picker::FilePickerError;
+use uncaged_ui::platform::{Cursor, FilePickerConfiguration};
+use uncaged_ui::ui_components::components::{UiComponent as _, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity as _, TypedActionView, View, ViewContext,
 };
 
@@ -26,7 +26,7 @@ use crate::util::bindings::{keybinding_name_to_display_string, BindingGroup, Cus
 const BUTTON_MIN_WIDTH: f32 = 149.;
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_editable_bindings([
         EditableBinding::new(
@@ -129,7 +129,7 @@ impl ProjectButtons {
                 )
                 .with_border(theme.outline().into_solid())
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .with_drop_shadow(
                     DropShadow::new_with_standard_offset_and_spread(ColorU::new(255, 143, 253, 15))

@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{Entity, EntityId, ModelContext, SingletonEntity};
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
@@ -117,7 +117,7 @@ impl WaitForEventsExecutor {
         let watchdog_tool_call_id = tool_call_id.clone();
         let watchdog_handle = ctx.spawn(
             async move {
-                warpui::r#async::Timer::after(timeout).await;
+                uncaged_ui::r#async::Timer::after(timeout).await;
             },
             move |me, (), ctx| {
                 me.fire_watchdog_if_current(

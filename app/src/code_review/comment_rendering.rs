@@ -7,20 +7,22 @@ use std::rc::Rc;
 
 use chrono::{Duration, Local};
 use pathfinder_color::ColorU;
-use warp_core::ui::theme::color::internal_colors::{neutral_1, neutral_2, text_sub};
-use warp_core::ui::theme::Fill;
-use warp_editor::content::buffer::InitialBufferState;
-use warp_editor::render::element::VerticalExpansionBehavior;
-use warpui::elements::new_scrollable::ScrollableAppearance;
-use warpui::elements::{
+use uncaged_core::ui::theme::color::internal_colors::{neutral_1, neutral_2, text_sub};
+use uncaged_core::ui::theme::Fill;
+use uncaged_editor::content::buffer::InitialBufferState;
+use uncaged_editor::render::element::VerticalExpansionBehavior;
+use uncaged_ui::elements::new_scrollable::ScrollableAppearance;
+use uncaged_ui::elements::{
     Border, ChildView, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, ScrollbarWidth,
     Shrinkable, Text,
 };
-use warpui::platform::Cursor;
-use warpui::text_layout::ClipConfig;
-use warpui::units::Pixels;
-use warpui::{AppContext, Element, EventContext, SingletonEntity, View, ViewContext, ViewHandle};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::units::Pixels;
+use uncaged_ui::{
+    AppContext, Element, EventContext, SingletonEntity, View, ViewContext, ViewHandle,
+};
 
 use crate::appearance::Appearance;
 use crate::code::buffer_location::LocalOrRemotePath;
@@ -43,7 +45,7 @@ pub(crate) struct HeaderClickHandler {
 /// (rounded corners, neutral background, outline border).
 fn comment_card_container(
     content: Box<dyn Element>,
-    theme: &warp_core::ui::theme::WarpTheme,
+    theme: &uncaged_core::ui::theme::WarpTheme,
 ) -> Box<dyn Element> {
     Container::new(content)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))

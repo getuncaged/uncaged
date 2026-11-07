@@ -3,11 +3,11 @@
 #[cfg(feature = "local_fs")]
 use std::path::Path;
 
-use warpui::elements::{
+use uncaged_ui::elements::{
     Border, Container, CornerRadius, Flex, MouseStateHandle, ParentElement, Radius, Text,
 };
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, EventContext};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{AppContext, Element, EventContext};
 
 use crate::appearance::Appearance;
 use crate::terminal::model::secrets::SecretLevel;
@@ -191,7 +191,7 @@ where
     Container::new(tooltip_element)
         .with_background(background_color)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
         .finish()
@@ -205,7 +205,7 @@ where
 /// - Whether Uncaged is an OS-level default editor (skips Markdown files)
 #[cfg(feature = "local_fs")]
 pub fn should_show_open_in_warp_link(path: &Path, app: &AppContext) -> bool {
-    use warpui::SingletonEntity;
+    use uncaged_ui::SingletonEntity;
 
     use crate::code::view::is_binary_file;
     use crate::notebooks::file::is_markdown_file;

@@ -5,8 +5,8 @@
 //! how many panes are in each tab.
 //! See https://github.com/warpdotdev/warp-internal/pull/4785#issue-1634862270
 
-use warpui::integration::AssertionCallback;
-use warpui::{async_assert, App, Entity, View, ViewHandle, WindowId};
+use uncaged_ui::integration::AssertionCallback;
+use uncaged_ui::{async_assert, App, Entity, View, ViewHandle, WindowId};
 
 use crate::input_suggestions::InputSuggestions;
 use crate::notebooks::notebook::NotebookView;

@@ -14,31 +14,31 @@ use syntect::highlighting::{self, Theme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
 use ui_components::lightbox::{LightboxImage, LightboxImageSource};
-use warp_completer::signatures::CommandRegistry;
-use warp_core::r#async::debounce;
-use warp_editor::content::anchor::Anchor;
-use warp_editor::content::buffer::{Buffer, BufferEvent, EditOrigin};
-use warp_editor::content::mermaid_diagram::mermaid_asset_source;
-use warp_editor::content::selection_model::BufferSelectionModel;
-use warp_editor::content::text::{
+use uncaged_completer::signatures::CommandRegistry;
+use uncaged_core::r#async::debounce;
+use uncaged_editor::content::anchor::Anchor;
+use uncaged_editor::content::buffer::{Buffer, BufferEvent, EditOrigin};
+use uncaged_editor::content::mermaid_diagram::mermaid_asset_source;
+use uncaged_editor::content::selection_model::BufferSelectionModel;
+use uncaged_editor::content::text::{
     BlockType, BufferBlockStyle, CodeBlockType, CODE_BLOCK_DEFAULT_DISPLAY_LANG,
     CODE_BLOCK_SHELL_DISPLAY_LANG,
 };
-use warp_editor::editor::RunnableCommandModel;
-use warp_util::user_input::UserInput;
-use warpui::elements::{
+use uncaged_editor::editor::RunnableCommandModel;
+use uncaged_ui::elements::{
     Align, Border, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, MainAxisAlignment,
     MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
-use warpui::fonts::Properties;
-use warpui::platform::Cursor;
-use warpui::presenter::ChildView;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::Properties;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, AssetProvider as _, Element, Entity, ModelAsRef, ModelContext, ModelHandle,
     SingletonEntity, ViewHandle, WeakModelHandle, WindowId,
 };
+use uncaged_util::user_input::UserInput;
 
 use super::interaction_state_model::InteractionStateModel;
 use super::keys::{custom_action_to_display, NotebookKeybindings};
@@ -637,7 +637,7 @@ impl RunnableCommandModel for NotebookCommand {
                         appearance.ui_font_size(),
                     )
                     .with_style(Properties {
-                        weight: warpui::fonts::Weight::Light,
+                        weight: uncaged_ui::fonts::Weight::Light,
                         ..Default::default()
                     })
                     .with_color(
@@ -728,7 +728,7 @@ impl RunnableCommandModel for NotebookCommand {
                 .with_background(appearance.theme().background())
                 .with_border(Border::all(1.).with_border_fill(appearance.theme().surface_3()))
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .finish(),
             );

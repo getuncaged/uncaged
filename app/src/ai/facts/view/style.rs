@@ -1,8 +1,8 @@
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{CornerRadius, Radius};
-use warpui::fonts::Weight;
-use warpui::ui_components::components::{Coords, UiComponentStyles};
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{CornerRadius, Radius};
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::ui_components::components::{Coords, UiComponentStyles};
 
 pub const HEADER_FONT_SIZE: f32 = 16.;
 pub const TEXT_FONT_SIZE: f32 = 14.;
@@ -34,7 +34,7 @@ pub fn search_bar(appearance: &Appearance) -> UiComponentStyles {
         background: Some(internal_colors::neutral_2(appearance.theme()).into()),
         border_color: Some(internal_colors::neutral_4(appearance.theme()).into()),
         border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         ))),
         padding: Some(Coords {
             top: 8.,

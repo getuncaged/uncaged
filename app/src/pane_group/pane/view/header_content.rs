@@ -3,10 +3,10 @@
 //! This module provides the infrastructure for backing views to declaratively
 //! specify their header content without worrying about draggable behavior.
 
-use warpui::elements::{DraggableState, MouseStateHandle};
-use warpui::fonts::Properties;
-use warpui::text_layout::ClipConfig;
-use warpui::Element;
+use uncaged_ui::elements::{DraggableState, MouseStateHandle};
+use uncaged_ui::fonts::Properties;
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::Element;
 
 /// Context provided to backing views when rendering header content.
 ///

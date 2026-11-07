@@ -1,6 +1,6 @@
 use ai::project_context::model::ProjectRuleContents;
 use futures::future::{BoxFuture, FutureExt as _};
-use warp_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 pub(crate) fn read_project_rule_contents(
     rule_paths: Vec<LocalOrRemotePath>,

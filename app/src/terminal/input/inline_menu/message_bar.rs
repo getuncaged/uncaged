@@ -1,5 +1,5 @@
-use warpui::elements::Element;
-use warpui::{AppContext, Entity, ModelHandle, View, ViewContext};
+use uncaged_ui::elements::Element;
+use uncaged_ui::{AppContext, Entity, ModelHandle, View, ViewContext};
 
 use crate::terminal::input::inline_menu::model::InlineMenuModel;
 use crate::terminal::input::inline_menu::{InlineMenuAction, InlineMenuMessageProvider};

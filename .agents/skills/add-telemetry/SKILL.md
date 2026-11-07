@@ -29,7 +29,7 @@ Add a new variant to an enum that implements `TelemetryEvent`, or create a new e
 ```rust
 use serde_json::{json, Value};
 use strum_macros::{EnumDiscriminants, EnumIter};
-use warp_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
+use uncaged_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 
 #[derive(Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
@@ -86,7 +86,7 @@ impl TelemetryEvent for YourFeatureTelemetryEvent {
     }
 
     fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        warp_core::telemetry::enum_events::<Self>()
+        uncaged_core::telemetry::enum_events::<Self>()
     }
 }
 ```
@@ -124,7 +124,7 @@ impl TelemetryEventDesc for YourFeatureTelemetryEventDiscriminants {
 At the end of your telemetry module, register the event:
 
 ```rust
-warp_core::register_telemetry_event!(YourFeatureTelemetryEvent);
+uncaged_core::register_telemetry_event!(YourFeatureTelemetryEvent);
 ```
 
 ### 6. Send telemetry events from your code
@@ -132,7 +132,7 @@ warp_core::register_telemetry_event!(YourFeatureTelemetryEvent);
 Use `send_telemetry_from_ctx!` in views or models with a `ViewContext` or `ModelContext`:
 
 ```rust
-use warp_core::send_telemetry_from_ctx;
+use uncaged_core::send_telemetry_from_ctx;
 
 // In a view update or model method
 send_telemetry_from_ctx!(

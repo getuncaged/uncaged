@@ -1,12 +1,12 @@
 use std::path::Path;
 
 use string_offset::CharOffset;
-use warp_core::features::FeatureFlag;
-use warpui_core::assets::asset_cache::{AssetCache, AssetSource, AssetState};
-use warpui_core::fonts::{Properties, Style, Weight};
-use warpui_core::image_cache::ImageType;
-use warpui_core::text_layout::{LayoutCache, StyleAndFont, TextStyle};
-use warpui_core::{App, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui_core::assets::asset_cache::{AssetCache, AssetSource, AssetState};
+use uncaged_ui_core::fonts::{Properties, Style, Weight};
+use uncaged_ui_core::image_cache::ImageType;
+use uncaged_ui_core::text_layout::{LayoutCache, StyleAndFont, TextStyle};
+use uncaged_ui_core::{App, SingletonEntity};
 
 use super::{
     BlockLocation, LayOutArgs, layout_mermaid_diagram_block, layout_table_block, layout_text_block,

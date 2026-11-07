@@ -1,10 +1,10 @@
 use futures::Future;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, Flex, Hoverable, MouseStateHandle, ParentElement, SavePosition, Shrinkable,
 };
-use warpui::presenter::ChildView;
-use warpui::windowing::{StateEvent, WindowManager};
-use warpui::{
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::windowing::{StateEvent, WindowManager};
+use uncaged_ui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -582,7 +582,7 @@ impl View for DrivePanel {
         }
     }
 
-    fn render(&self, _app: &warpui::AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, _app: &uncaged_ui::AppContext) -> Box<dyn uncaged_ui::Element> {
         let body = Hoverable::new(
             self.mouse_state_handles.focus_panel_mouse_state.clone(),
             |_| {
@@ -604,7 +604,7 @@ impl View for DrivePanel {
 
         let mut col = Flex::column();
         col.add_child(Shrinkable::new(1., body).finish());
-        col.with_main_axis_size(warpui::elements::MainAxisSize::Max)
+        col.with_main_axis_size(uncaged_ui::elements::MainAxisSize::Max)
             .finish()
     }
 }

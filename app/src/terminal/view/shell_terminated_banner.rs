@@ -1,16 +1,16 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::builder::UiBuilder;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::WarpTheme;
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::*;
-use warpui::text_layout::ClipConfig;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::UiComponent as _;
-use warpui::{Entity, SingletonEntity as _, TypedActionView, View, ViewContext};
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::builder::UiBuilder;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::WarpTheme;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::*;
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::UiComponent as _;
+use uncaged_ui::{Entity, SingletonEntity as _, TypedActionView, View, ViewContext};
 
 use crate::ui_components;
 

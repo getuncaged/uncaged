@@ -4,23 +4,23 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::builder::MIN_FONT_SIZE;
-use warp_core::ui::radius;
-use warp_core::ui::theme::Fill;
-use warp_editor::editor::NavigationKey;
-use warpui::color::ColorU;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::builder::MIN_FONT_SIZE;
+use uncaged_core::ui::radius;
+use uncaged_core::ui::theme::Fill;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss,
     DispatchEventResult, DropShadow, Empty, EventHandler, Flex, Highlight, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseInBehavior, MouseStateHandle, ParentElement, Radius,
     SavePosition, ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth, Stack, Text,
     UniformList, UniformListState,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::FixedBinding;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -81,7 +81,7 @@ const MENU_ITEM_INSET: f32 = 4.;
 const MENU_WIDTH: f32 = 360.;
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -778,7 +778,7 @@ impl DisplayChipMenu {
             scrollbar_width,
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .with_padding_end(0.)
         .with_padding_start(0.);

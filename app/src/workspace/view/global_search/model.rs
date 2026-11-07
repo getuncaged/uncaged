@@ -7,10 +7,10 @@ use instant::Instant;
 use num_traits::SaturatingSub;
 use regex::escape;
 use string_offset::ByteOffset;
-use warp_ripgrep::search::{Match as RipgrepMatch, Submatch};
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{Entity, ModelContext, ModelSpawner};
+use uncaged_ripgrep::search::{Match as RipgrepMatch, Submatch};
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{Entity, ModelContext, ModelSpawner};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use crate::workspace::view::global_search::view::GlobalSearchEvent;
 use crate::workspace::view::global_search::{GlobalSearchMatch, SearchConfig};
@@ -271,7 +271,7 @@ impl GlobalSearch {
         );
 
         let stream =
-            warp_ripgrep::search::search_streaming(&[pattern], &roots, ignore_case, multiline)?;
+            uncaged_ripgrep::search::search_streaming(&[pattern], &roots, ignore_case, multiline)?;
         futures::pin_mut!(stream);
 
         let mut total_match_count: usize = 0;

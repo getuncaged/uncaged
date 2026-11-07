@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use ordered_float::OrderedFloat;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Border, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Highlight,
     MainAxisAlignment, MainAxisSize, ParentElement, Radius, Shrinkable, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, SingletonEntity};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::search::command_search::searcher::{AcceptedWorkflow, CommandSearchItemAction};
@@ -92,7 +92,7 @@ impl WorkflowSearchItem {
         )
         .with_background_color(theme.surface_2().into_solid())
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .with_border(Border::all(1.).with_border_fill(theme.split_pane_border_color()))
         .with_uniform_padding(4.)

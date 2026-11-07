@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use async_channel::Sender;
 #[cfg(unix)]
-use warpui::AppContext;
-use warpui::{Entity, View, ViewContext};
+use uncaged_ui::AppContext;
+use uncaged_ui::{Entity, View, ViewContext};
 
 use crate::ai::agent::AIAgentPtyWriteMode;
 #[cfg(unix)]

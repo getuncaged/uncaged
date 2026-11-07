@@ -15,9 +15,9 @@ diesel = { workspace = true, features = ["sqlite", "chrono"] }
 log.workspace = true
 persistence.workspace = true
 serde.workspace = true
-warp_core.workspace = true
+uncaged_core.workspace = true
 
 [dev-dependencies]
 cloud_objects = { workspace = true, features = ["test-util"] }
 diesel_migrations = { version = "2.2.0", features = ["sqlite"] }
-warp_core = { workspace = true, features = ["test-util"] }
+uncaged_core = { workspace = true, features = ["test-util"] }

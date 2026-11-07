@@ -10,13 +10,13 @@ pub use entry::{
 };
 use itertools::Itertools;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use warp_cli::agent::Harness;
-use warp_core::execution_mode::AppExecutionMode;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::WarpTheme;
-use warpui::color::ColorU;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
+use uncaged_cli::agent::Harness;
+use uncaged_core::execution_mode::AppExecutionMode;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::WarpTheme;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::api::ServerConversationToken;

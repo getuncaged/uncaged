@@ -3,20 +3,20 @@
 use std::cmp;
 
 use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
-use warp_core::ui::radius;
-use warp_core::ui::theme::Fill;
-use warp_editor::editor::NavigationKey;
-use warpui::color::ColorU;
-use warpui::elements::{
+use uncaged_core::ui::radius;
+use uncaged_core::ui::theme::Fill;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss,
     DispatchEventResult, DropShadow, Element, Empty, EventHandler, Flex, Highlight, MainAxisSize,
     MouseInBehavior, ParentElement, Radius, ScrollStateHandle, Scrollable, ScrollableElement,
     ScrollbarWidth, Text, UniformList, UniformListState,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::FixedBinding;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     id, AppContext, Entity, FocusContext, SingletonEntity as _, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -416,7 +416,7 @@ impl CodeReviewDiffMenu {
             ScrollbarWidth::None,
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .with_padding_end(0.)
         .with_padding_start(0.);

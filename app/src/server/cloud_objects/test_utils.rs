@@ -1,8 +1,8 @@
 use std::sync::mpsc::{sync_channel, Receiver};
 
 use settings::manager::SettingsManager;
-use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
-use warpui::{App, ModelHandle, SingletonEntity};
+use uncaged_core::execution_mode::{AppExecutionMode, ExecutionMode};
+use uncaged_ui::{App, ModelHandle, SingletonEntity};
 
 use super::update_manager::{ObjectOperationResult, UpdateManager, UpdateManagerEvent};
 use crate::cloud_object::model::actions::ObjectActions;

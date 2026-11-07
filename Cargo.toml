@@ -13,10 +13,10 @@ default-members = [
   "crates/editor",
   "crates/markdown_parser",
   "crates/sum_tree",
-  "crates/warpui",
-  "crates/warp_completer",
-  "crates/warp_terminal",
-  "crates/warp_util",
+  "crates/uncaged_ui",
+  "crates/uncaged_completer",
+  "crates/uncaged_terminal",
+  "crates/uncaged_util",
 ]
 
 [workspace.package]
@@ -28,8 +28,7 @@ publish = false
 # Local workspace crates. This lets us reference them in other crates without specifying a path.
 ai = { path = "crates/ai" }
 uncaged_engine = { path = "crates/uncaged_engine" }
-# The library is named `warp_multi_agent_api` (the path callers import).
-warp_multi_agent_api = { path = "crates/uncaged_agent_api", package = "uncaged_agent_api" }
+uncaged_agent_api = { path = "crates/uncaged_agent_api" }
 asset_cache = { path = "crates/asset_cache" }
 asset_macro = { path = "crates/asset_macro" }
 channel_versions = { path = "crates/channel_versions", default-features = false }
@@ -66,25 +65,25 @@ syntax_tree = { path = "crates/syntax_tree" }
 ui_components = { path = "crates/ui_components" }
 vim = { path = "crates/vim" }
 virtual-fs = { path = "crates/virtual_fs" }
-warp = { path = "app" }
-warp_assets = { path = "crates/warp_assets" }
-warp_cli = { path = "crates/warp_cli" }
-warp_completer = { path = "crates/warp_completer" }
-warp_core = { path = "crates/warp_core" }
-warp_editor = { path = "crates/editor" }
-warp_features = { path = "crates/warp_features" }
-warp_files = { path = "crates/warp_files" }
-warp_isolation_platform = { path = "crates/isolation_platform" }
-warp_js = { path = "crates/warp_js" }
-warp_logging = { path = "crates/warp_logging" }
-warp_ripgrep = { path = "crates/warp_ripgrep" }
-warp_search_core = { path = "crates/warp_search_core" }
-warp_terminal = { path = "crates/warp_terminal" }
-warp_util = { path = "crates/warp_util" }
-warp_web_event_bus = { path = "crates/warp_web_event_bus" }
-warpui = { path = "crates/warpui" }
-warpui_core = { path = "crates/warpui_core" }
-warpui_extras = { path = "crates/warpui_extras", default-features = false }
+uncaged = { path = "app" }
+uncaged_assets = { path = "crates/uncaged_assets" }
+uncaged_cli = { path = "crates/uncaged_cli" }
+uncaged_completer = { path = "crates/uncaged_completer" }
+uncaged_core = { path = "crates/uncaged_core" }
+uncaged_editor = { path = "crates/editor" }
+uncaged_features = { path = "crates/uncaged_features" }
+uncaged_files = { path = "crates/uncaged_files" }
+uncaged_isolation_platform = { path = "crates/isolation_platform" }
+uncaged_js = { path = "crates/uncaged_js" }
+uncaged_logging = { path = "crates/uncaged_logging" }
+uncaged_ripgrep = { path = "crates/uncaged_ripgrep" }
+uncaged_search_core = { path = "crates/uncaged_search_core" }
+uncaged_terminal = { path = "crates/uncaged_terminal" }
+uncaged_util = { path = "crates/uncaged_util" }
+uncaged_web_event_bus = { path = "crates/uncaged_web_event_bus" }
+uncaged_ui = { path = "crates/uncaged_ui" }
+uncaged_ui_core = { path = "crates/uncaged_ui_core" }
+uncaged_ui_extras = { path = "crates/uncaged_ui_extras", default-features = false }
 watcher = { path = "crates/watcher" }
 
 # Workspace-level dependencies used by multiple crates. Prefer adding dependencies
@@ -387,7 +386,7 @@ split-debuginfo = "unpacked"
 
 [profile.dev.package]
 # Improve the performance of core terminal logic.
-warp_terminal.opt-level = 3
+uncaged_terminal.opt-level = 3
 # Minimize the runtime overhead of CPU profiling at the cost of a small
 # increase in compile time for this crate.
 backtrace.opt-level = 3

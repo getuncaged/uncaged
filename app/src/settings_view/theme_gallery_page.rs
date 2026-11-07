@@ -5,10 +5,12 @@
 //! [`ThemeExplorerBody`], hosted here as a child view; this page exists to give it a home in
 //! Settings and to raise toasts, which belong to the window rather than the view.
 
-use warpui::elements::Element;
-use warpui::platform::SystemTheme;
-use warpui::presenter::ChildView;
-use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use uncaged_ui::elements::Element;
+use uncaged_ui::platform::SystemTheme;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use super::settings_page::{
     MatchData, PageType, SettingsPageMeta, SettingsPageViewHandle, SettingsWidget,

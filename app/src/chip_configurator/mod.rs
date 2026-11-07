@@ -11,16 +11,16 @@ pub(crate) use modal_shell::{
 };
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::theme::Fill;
-use warpui::elements::{
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::{
     Border, ConstrainedBox, Container, CrossAxisAlignment, Dash, DispatchEventResult, Draggable,
     DraggableState, Element, Empty, EventHandler, Flex, Hoverable, MouseStateHandle,
     OffsetPositioning, ParentElement, ParentOffsetBounds, SavePosition, Stack, Text, Wrap,
 };
-use warpui::fonts::Properties;
-use warpui::platform::Cursor;
-use warpui::ui_components::components::UiComponent;
-use warpui::{Action, View, ViewContext};
+use uncaged_ui::fonts::Properties;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{Action, View, ViewContext};
 
 use crate::ai::blocklist::agent_view::toolbar_item::AgentToolbarItemKind;
 use crate::appearance::Appearance;
@@ -277,8 +277,8 @@ impl ControlItemRenderer {
                 OffsetPositioning::offset_from_parent(
                     vec2f(0., -2.5 * font_size),
                     ParentOffsetBounds::Unbounded,
-                    warpui::elements::ParentAnchor::Center,
-                    warpui::elements::ChildAnchor::Center,
+                    uncaged_ui::elements::ParentAnchor::Center,
+                    uncaged_ui::elements::ChildAnchor::Center,
                 ),
             );
             stack.finish()

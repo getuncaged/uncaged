@@ -2,8 +2,8 @@ use std::ops::Range;
 
 use itertools::Itertools;
 use string_offset::CharOffset;
+use uncaged_ui_core::{AppContext, Entity, ModelHandle};
 use vec1::{Vec1, vec1};
-use warpui_core::{AppContext, Entity, ModelHandle};
 
 use crate::content::anchor::{Anchor, AnchorSide, AnchorUpdate, Anchors};
 use crate::content::buffer::{Buffer, SelectionOffsets, ToBufferPoint};
@@ -307,7 +307,7 @@ impl BufferSelectionModel {
     }
 
     /// Validate the buffer content with this selection model's anchors.
-    pub fn validate_buffer(&self, ctx: &impl warpui_core::ModelAsRef) {
+    pub fn validate_buffer(&self, ctx: &impl uncaged_ui_core::ModelAsRef) {
         self.buffer.as_ref(ctx).validate(&self.anchors);
     }
 

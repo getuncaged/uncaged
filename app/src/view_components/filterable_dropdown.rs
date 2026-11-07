@@ -1,17 +1,17 @@
 use std::marker::PhantomData;
 
-use warp_editor::editor::NavigationKey;
-use warpui::elements::{
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Dismiss, DispatchEventResult, Element, EventHandler, Flex,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentElement,
     PositionedElementAnchor, PositionedElementOffsetBounds, Radius, SavePosition, Shrinkable,
     Stack,
 };
-use warpui::geometry::vector::vec2f;
-use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::geometry::vector::vec2f;
+use uncaged_ui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, BlurContext, Entity, FocusContext, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -585,7 +585,7 @@ where
                 Border::all(1.).with_border_fill(appearance.theme().foreground().with_opacity(20)),
             )
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .finish()
     }
@@ -629,7 +629,7 @@ where
                         .with_border_fill(appearance.theme().foreground().with_opacity(20)),
                 )
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .finish(),
         )

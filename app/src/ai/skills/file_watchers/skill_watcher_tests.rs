@@ -11,11 +11,11 @@ use repo_metadata::{
     StandingQueryContent, StandingQueryResults, StandingQueryResultsDelta, TargetFile,
 };
 use tempfile::TempDir;
-use warp_util::host_id::HostId;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::remote_path::RemotePath;
-use warp_util::standardized_path::StandardizedPath;
-use warpui::App;
+use uncaged_ui::App;
+use uncaged_util::host_id::HostId;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::remote_path::RemotePath;
+use uncaged_util::standardized_path::StandardizedPath;
 
 use super::super::subscribers::SkillRepositoryMessage;
 use super::{parse_project_skill_contents, SkillWatcher};

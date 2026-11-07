@@ -1,16 +1,16 @@
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::icons::Icon;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill;
-use warpui_core::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::icons::Icon;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui_core::elements::{
     Align, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex,
     Hoverable, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, Stack, Text,
 };
-use warpui_core::fonts::{Properties, Weight};
-use warpui_core::platform::Cursor;
-use warpui_core::Element;
+use uncaged_ui_core::fonts::{Properties, Weight};
+use uncaged_ui_core::platform::Cursor;
+use uncaged_ui_core::Element;
 
 use super::agent_slide::AgentSlideAction;
 
@@ -156,7 +156,7 @@ pub(super) fn render_two_line_button(
                 .with_padding_top(2.)
                 .with_padding_bottom(2.)
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .with_background_color(theme.ansi_fg_green())
                 .finish();

@@ -7,13 +7,13 @@ use anyhow::Result;
 use async_recursion::async_recursion;
 use futures_lite::StreamExt;
 use pathfinder_color::ColorU;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
     MouseStateHandle, ParentElement, Radius, Shrinkable,
 };
-use warpui::platform::Cursor;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::Element;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::Element;
 
 use super::modal_body::{ImportModalBodyAction, BASE_INDENT, IMPORT_FONT_SIZE, INDENT_MARGIN};
 use crate::appearance::Appearance;
@@ -881,7 +881,7 @@ fn render_highlighted_pill(
                 Container::new(inner)
                     .with_background(appearance.theme().surface_3())
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )))
                     .finish()
             } else {

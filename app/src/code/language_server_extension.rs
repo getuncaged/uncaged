@@ -2,18 +2,18 @@ use lsp::{HoverContents, LspServerLogLevel, MarkupKind};
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use num_traits::SaturatingSub;
 use string_offset::CharOffset;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::WarpTheme;
-use warp_editor::content::buffer::InitialBufferState;
-use warp_editor::render::element::VerticalExpansionBehavior;
-use warp_editor::render::model::Decoration;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::WarpTheme;
+use uncaged_editor::content::buffer::InitialBufferState;
+use uncaged_editor::render::element::VerticalExpansionBehavior;
+use uncaged_editor::render::model::Decoration;
+use uncaged_ui::elements::{
     Border, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Flex, FormattedTextElement, HighlightedHyperlink, Hoverable,
     MouseStateHandle, ParentElement, Radius, Rect, ScrollbarWidth,
 };
-use warpui::{AppContext, Element, SingletonEntity, ViewContext};
+use uncaged_ui::{AppContext, Element, SingletonEntity, ViewContext};
 
 use super::editor::view::{CodeEditorRenderOptions, CodeEditorView};
 use crate::code::local_code_editor::{
@@ -529,7 +529,7 @@ impl LocalCodeEditorView {
             ScrollbarWidth::Auto,
             theme.disabled_ui_text_color().into(),
             theme.active_ui_text_color().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .finish();
 
@@ -543,7 +543,7 @@ impl LocalCodeEditorView {
             .with_vertical_padding(6.)
             .with_background(theme.background())
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_border(Border::all(1.).with_border_fill(internal_colors::neutral_4(theme)))
             .finish();

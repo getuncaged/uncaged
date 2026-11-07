@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use chrono::Local;
 use smol_str::SmolStr;
-use warp_editor::render::model::LineCount;
-use warp_util::path::EscapeChar;
-use warpui::App;
+use uncaged_editor::render::model::LineCount;
+use uncaged_ui::App;
+use uncaged_util::path::EscapeChar;
 
 use super::{
     build_diff_hunk_prompt, build_review_prompt, build_selection_line_range_prompt,

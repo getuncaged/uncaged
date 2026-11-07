@@ -32,11 +32,11 @@ mod tests;
 - Prefer runtime feature checks (e.g., `FeatureFlag::X.is_enabled()`) over `#[cfg(...)]` so tests don’t require recompilation to toggle behavior.
 
 ## Quickstart harness (UI/model tests)
-- Prefer `warpui::App::test` for deterministic unit tests around views/models.
+- Prefer `uncaged_ui::App::test` for deterministic unit tests around views/models.
 - Initialize app models once, then mutate via `update` and assert via `read`.
 
 ```rust
-use warpui::App;
+use uncaged_ui::App;
 // In app crate tests prefer `crate::test_util::...`; from other crates use `warp::test_util::...`.
 use warp::test_util::{terminal::initialize_app_for_terminal_view, add_window_with_terminal};
 

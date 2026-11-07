@@ -21,9 +21,9 @@ use std::time::Duration;
 use context_chip::PromptGenerator;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
-use warpui::color::ColorU;
-use warpui::elements::Text;
-use warpui::fonts::{Properties, Weight};
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::Text;
+use uncaged_ui::fonts::{Properties, Weight};
 
 #[allow(unused_imports)]
 pub use self::context_chip::{

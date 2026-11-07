@@ -27,8 +27,8 @@ settings.workspace = true
 settings_value = { workspace = true, features = ["derive"] }
 uuid.workspace = true
 warp-workflows.workspace = true
-warp_core.workspace = true
-warp_util.workspace = true
+uncaged_core.workspace = true
+uncaged_util.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 cloud_object_persistence.workspace = true

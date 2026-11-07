@@ -1,15 +1,15 @@
 use settings::Setting;
-use warp_core::report_if_error;
-use warp_core::ui::Icon;
-use warpui::elements::{
+use uncaged_core::report_if_error;
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::{
     ChildAnchor, Container, CrossAxisAlignment, Flex, MainAxisSize, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Stack, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::Keystroke;
-use warpui::prelude::{vec2f, ConstrainedBox, Cursor, Empty, Hoverable, MouseStateHandle};
-use warpui::scene::Border;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::prelude::{vec2f, ConstrainedBox, Cursor, Empty, Hoverable, MouseStateHandle};
+use uncaged_ui::scene::Border;
+use uncaged_ui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
@@ -276,7 +276,7 @@ impl View for TerminalViewZeroStateBlock {
                     .with_horizontal_padding(*terminal::view::PADDING_LEFT - CARD_INSET)
                     .with_vertical_padding(styles::CONTAINER_VERTICAL_PADDING)
                     .with_border(Border::all(1.).with_border_fill(theme.outline()))
-                    .with_corner_radius(warp_core::ui::radius::medium())
+                    .with_corner_radius(uncaged_core::ui::radius::medium())
                     .with_horizontal_margin(CARD_INSET)
                     .with_vertical_margin(CARD_INSET)
                     .finish(),

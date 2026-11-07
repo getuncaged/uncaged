@@ -10,11 +10,11 @@ use aho_corasick::{AhoCorasick, MatchKind};
 use anyhow::{anyhow, Context};
 #[cfg(feature = "local_fs")]
 use futures::AsyncWriteExt;
-use warp_util::path::ShellFamily;
-use warpui::platform::file_picker::FilePickerError;
-use warpui::platform::{FilePickerConfiguration, OperatingSystem};
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity, WindowId};
+use uncaged_ui::platform::file_picker::FilePickerError;
+use uncaged_ui::platform::{FilePickerConfiguration, OperatingSystem};
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity, WindowId};
+use uncaged_util::path::ShellFamily;
 
 use super::CloudObjectTypeAndId;
 use crate::cloud_object::model::persistence::CloudModel;

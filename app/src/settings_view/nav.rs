@@ -1,10 +1,10 @@
 use pathfinder_geometry::vector::vec2f;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Container, Element, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, Text,
 };
-use warpui::fonts::Weight;
-use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use super::settings_page::{MatchData, NAV_ITEM_LEFT_MARGIN};
 use super::SettingsSection;
@@ -107,7 +107,7 @@ impl SettingsUmbrella {
                 GROUP_LABEL_FONT_SIZE,
             )
             .with_color(theme.sub_text_color(theme.background()).into_solid())
-            .with_style(warpui::fonts::Properties::default().weight(Weight::Semibold))
+            .with_style(uncaged_ui::fonts::Properties::default().weight(Weight::Semibold))
             .finish(),
         )
         .with_margin_top(GROUP_LABEL_MARGIN_TOP)

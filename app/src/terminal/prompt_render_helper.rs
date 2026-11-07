@@ -2,15 +2,15 @@ use std::fmt;
 use std::num::NonZeroUsize;
 
 use settings::Setting as _;
-use warp_core::semantic_selection::SemanticSelection;
-use warpui::elements::{
+use uncaged_core::semantic_selection::SemanticSelection;
+use uncaged_ui::elements::{
     Container, DispatchEventResult, Element, EventHandler, SavePosition, SelectableArea,
     SelectionHandle, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::presenter::ChildView;
-use warpui::units::Pixels;
-use warpui::{AppContext, EntityId, ModelAsRef, ModelHandle, SingletonEntity, ViewHandle};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::units::Pixels;
+use uncaged_ui::{AppContext, EntityId, ModelAsRef, ModelHandle, SingletonEntity, ViewHandle};
 
 use super::input::InputRenderStateModel;
 use super::model::block::Block;

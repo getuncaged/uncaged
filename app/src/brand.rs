@@ -21,7 +21,7 @@
 
 #![allow(dead_code)]
 
-use warpui::color::ColorU;
+use uncaged_ui::color::ColorU;
 
 /// Product name, as shown in every user-facing surface.
 pub const NAME: &str = "Uncaged";
@@ -133,7 +133,7 @@ pub const HTTP_USER_AGENT: &str = concat!("Uncaged/", env!("CARGO_PKG_VERSION"))
 
 // ── Brand artwork ────────────────────────────────────────────────────────────
 //
-// The monochrome glyph paths are DEFINED ONCE in `warp_core::ui::icons` (next to
+// The monochrome glyph paths are DEFINED ONCE in `uncaged_core::ui::icons` (next to
 // the `Icon` -> asset mapping, which is the lowest crate every surface can reach)
 // and re-exported here so this file stays the one design entry point. Change the
 // value there — or swap the SVG — and every surface follows, including the icon
@@ -142,9 +142,9 @@ pub const HTTP_USER_AGENT: &str = concat!("Uncaged/", env!("CARGO_PKG_VERSION"))
 /// Bundled path to the AI / agent caret glyph (recolour sentinel). Re-exported so the
 /// design entry point names every brand glyph, even where the app reaches it via `Icon`.
 #[allow(unused_imports)]
-pub use warp_core::ui::icons::BRAND_AGENT_SVG as AGENT_SVG;
+pub use uncaged_core::ui::icons::BRAND_AGENT_SVG as AGENT_SVG;
 /// Bundled path to the in-app monochrome mark (recolour sentinel).
-pub use warp_core::ui::icons::BRAND_MARK_SVG as MARK_SVG;
+pub use uncaged_core::ui::icons::BRAND_MARK_SVG as MARK_SVG;
 
 /// Bundled path to the colour app-icon master.
 pub const ICON_SVG: &str = "bundled/svg/brand/uncaged-icon.svg";
@@ -170,11 +170,11 @@ pub const COMMUNITY_LABEL: &str = "Community";
 
 /// The in-app iconography — every glyph the app uses for its OWN surfaces, in
 /// one place so a fork can re-skin the whole UI from here. Values are
-/// `warp_core::ui::Icon` variants; their SVGs live in `app/assets/bundled/svg/`
+/// `uncaged_core::ui::Icon` variants; their SVGs live in `app/assets/bundled/svg/`
 /// (brand marks under `brand/`). To change a rail/agent icon in a fork, edit
 /// the constant here (and/or swap the underlying SVG).
 pub mod design {
-    use warp_core::ui::Icon;
+    use uncaged_core::ui::Icon;
 
     /// The app's own mark (window / tab / agent avatar identity): the terminal
     /// cage glyph — `brand/uncaged-mark.svg`.

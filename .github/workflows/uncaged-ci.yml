@@ -82,7 +82,7 @@ jobs:
       - name: cargo clippy (default features)
         timeout-minutes: 40
         run: >-
-          cargo clippy -p warp -p uncaged_engine
+          cargo clippy -p uncaged -p uncaged_engine
           --all-targets --tests -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
@@ -94,7 +94,7 @@ jobs:
       - name: cargo clippy (all features)
         timeout-minutes: 40
         run: >-
-          cargo clippy -p warp -p uncaged_engine
+          cargo clippy -p uncaged -p uncaged_engine
           --all-targets --all-features --tests -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
@@ -148,7 +148,7 @@ jobs:
       # Catches code only this platform compiles, which the macOS lint never sees.
       - name: cargo clippy (warp-oss)
         run: >-
-          cargo clippy -p warp --lib --tests --bin warp-oss -- -D warnings
+          cargo clippy -p uncaged --lib --tests --bin warp-oss -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
   windows:
@@ -180,5 +180,5 @@ jobs:
       # Catches code only this platform compiles, which the macOS lint never sees.
       - name: cargo clippy (warp-oss)
         run: >-
-          cargo clippy -p warp --lib --tests --bin warp-oss -- -D warnings
+          cargo clippy -p uncaged --lib --tests --bin warp-oss -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion

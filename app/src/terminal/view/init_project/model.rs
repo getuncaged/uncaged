@@ -6,8 +6,8 @@ use enum_iterator::Sequence;
 use lsp::supported_servers::LSPServerType;
 #[cfg(not(target_family = "wasm"))]
 use repo_metadata::repositories::DetectedRepositories;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::{Entity, ModelContext, SingletonEntity as _};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity as _};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::settings::CodeSettings;
@@ -174,7 +174,7 @@ impl InitProjectModel {
     }
 
     /// Check if there are any steps that need user action
-    pub fn should_have_available_steps(path: &Path, ctx: &warpui::AppContext) -> bool {
+    pub fn should_have_available_steps(path: &Path, ctx: &uncaged_ui::AppContext) -> bool {
         // Note that we consider auto-indexing setting to true to satisfy the codebase context step.
         // This avoids the potential race condition with the banner showing just when we start auto-indexing.
         let has_pending_codebase_context = CodeSettings::is_codebase_context_enabled(ctx)

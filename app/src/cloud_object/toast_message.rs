@@ -1,4 +1,4 @@
-use warpui::AppContext;
+use uncaged_ui::AppContext;
 
 use super::{CloudObject, ObjectType};
 use crate::server::cloud_objects::update_manager::{InitiatedBy, ObjectOperation};

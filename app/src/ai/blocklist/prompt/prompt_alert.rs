@@ -1,11 +1,11 @@
 use ai::api_keys::ApiKeyManager;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use warp_core::ui::appearance::Appearance;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, FormattedTextElement,
     HighlightedHyperlink, MainAxisAlignment, MainAxisSize, ParentElement,
 };
-use warpui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext};
+use uncaged_ui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext};
 
 use crate::ai::blocklist::error_color;
 use crate::ai::AIRequestUsageModel;

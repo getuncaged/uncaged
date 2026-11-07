@@ -1,14 +1,14 @@
 use pathfinder_geometry::vector::vec2f;
-use warpui::color::ColorU;
-use warpui::elements::{
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::{
     Align, Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Dismiss, Element, Flex, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::{FixedBinding, Keystroke};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::{FixedBinding, Keystroke};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -17,7 +17,7 @@ use crate::appearance::Appearance;
 use crate::themes::theme::Fill;
 use crate::ui_components::{blended_colors, icons};
 
-pub const MODAL_CORNER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::LARGE);
+pub const MODAL_CORNER_RADIUS: Radius = Radius::Pixels(uncaged_core::ui::radius::LARGE);
 pub const MODAL_WIDTH: f32 = 440.;
 pub const MODAL_HEADER_HEIGHT: f32 = 70.;
 pub const MODAL_PADDING: f32 = 28.;
@@ -97,7 +97,7 @@ pub enum ModalAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_fixed_bindings(vec![FixedBinding::new(
         "escape",

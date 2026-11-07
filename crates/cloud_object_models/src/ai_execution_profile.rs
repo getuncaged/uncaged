@@ -10,8 +10,8 @@ use cloud_objects::ids::GenericStringObjectId;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use warp_core::channel::ChannelState;
-use warp_core::features::FeatureFlag;
+use uncaged_core::channel::ChannelState;
+use uncaged_core::features::FeatureFlag;
 
 use crate::{JsonModel, JsonSerializer};
 

@@ -87,7 +87,7 @@ $BUNDLE_ID = "dev.warp.$app_name"
 # the application name (see app/src/channel.rs) and BUNDLE_ID is derived as
 # dev.warp.$APP_NAME. The oss (Uncaged) channel is special: its runtime identity
 # (AppUserModelID) is hardcoded in Rust as dev.uncaged.WarpOss (see
-# crates/warp_core/src/channel/state.rs), and BUNDLE_ID is overridden below to
+# crates/uncaged_core/src/channel/state.rs), and BUNDLE_ID is overridden below to
 # match. APP_NAME still drives the app's display name and installer filename.
 #
 # WARP_BIN is the name of the binary produced by cargo;
@@ -106,7 +106,7 @@ $BINARY_PATH = "$CARGO_TARGET_OUTPUT_DIR\$BINARY_NAME"
 $BUNDLE_ID = "dev.warp.$APP_NAME"
 # Uncaged: the oss channel's user-visible bundle id / AppUserModelID is
 # dev.uncaged.WarpOss, matching the Rust runtime identity
-# (crates/warp_core/src/channel/state.rs) rather than the dev.warp.* namespace.
+# (crates/uncaged_core/src/channel/state.rs) rather than the dev.warp.* namespace.
 if ("$CHANNEL" -eq 'oss') {
     $BUNDLE_ID = 'dev.uncaged.WarpOss'
 }
@@ -127,7 +127,7 @@ if ($DEBUG_BUILD) {
 # then exit.  We use this script to invoke `cargo check` to ensure that we are
 # using the same feature flags and profile that we would be using in production.
 if ($CHECK_ONLY) {
-    cargo check -p warp --profile "$CARGO_PROFILE" --bin "$WARP_BIN" --features "$FEATURES" --target $PLATFORM_TARGET
+    cargo check -p uncaged --profile "$CARGO_PROFILE" --bin "$WARP_BIN" --features "$FEATURES" --target $PLATFORM_TARGET
     if (-Not $?) {
         Write-Error "Failed to verify Warp $WARP_BIN compilation with profile $CARGO_PROFILE"
         exit 1
@@ -139,7 +139,7 @@ if (-Not $SKIP_BUILD_BINARY) {
     Write-Output "Building Warp for channel $CHANNEL and bundle id $BUNDLE_ID"
     $env:CARGO_BIN_NAME = $CHANNEL
     $env:WARP_APP_NAME = $APP_NAME
-    cargo build -p warp --profile "$CARGO_PROFILE" --bin "$WARP_BIN" --features "$FEATURES" --target $PLATFORM_TARGET
+    cargo build -p uncaged --profile "$CARGO_PROFILE" --bin "$WARP_BIN" --features "$FEATURES" --target $PLATFORM_TARGET
     if (-Not $?) {
         Write-Error "Failed to build Warp $WARP_BIN binary with profile $CARGO_PROFILE"
         exit 1

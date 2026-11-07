@@ -3,14 +3,14 @@ use std::collections::HashMap;
 
 use ::settings::Setting as _;
 use cfg_if::cfg_if;
-use warp_cli::RecoveryMechanism;
-use warp_core::channel::{Channel, ChannelState};
-use warpui::{Entity, ModelContext, SingletonEntity, WindowId};
-use warpui_extras::user_preferences::UserPreferences;
+use uncaged_cli::RecoveryMechanism;
+use uncaged_core::channel::{Channel, ChannelState};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity, WindowId};
+use uncaged_ui_extras::user_preferences::UserPreferences;
 
 use crate::{report_if_error, settings};
 
-/// Keep in sync with [`warp_cli::AppArgs`].
+/// Keep in sync with [`uncaged_cli::AppArgs`].
 pub const RECOVERY_MECHANISM_ARG: &str = "crash-recovery-mechanism";
 
 pub enum Event {
@@ -22,7 +22,7 @@ pub enum Event {
 }
 
 /// Returns true if this process is the crash recovery process.
-pub fn is_crash_recovery_process(args: &warp_cli::AppArgs) -> bool {
+pub fn is_crash_recovery_process(args: &uncaged_cli::AppArgs) -> bool {
     args.crash_recovery_mechanism.is_some()
 }
 
@@ -67,7 +67,7 @@ impl CrashRecoveryProcess {
         let _ = self.process.wait();
 
         self.is_alive = false;
-        warp_logging::on_crash_recovery_process_killed();
+        uncaged_logging::on_crash_recovery_process_killed();
     }
 
     fn handle_draw_frame_error(&mut self, window_id: WindowId) {
@@ -198,14 +198,14 @@ impl CrashRecovery {
     }
 
     #[cfg(test)]
-    pub fn register_for_test(app: &mut warpui::App) {
-        use warp_core::user_preferences::GetUserPreferences as _;
+    pub fn register_for_test(app: &mut uncaged_ui::App) {
+        use uncaged_core::user_preferences::GetUserPreferences as _;
 
         app.update(|ctx| {
             ctx.add_singleton_model(|ctx| {
                 let user_preferences = ctx.private_user_preferences();
                 let launch_mode = crate::LaunchMode::App {
-                    args: warp_cli::AppArgs::default(),
+                    args: uncaged_cli::AppArgs::default(),
                 };
                 crate::crash_recovery::CrashRecovery::new(&launch_mode, user_preferences)
             })
@@ -360,7 +360,7 @@ fn spawn_recovery_process(
 }
 
 #[cfg(windows)]
-fn wait_for_parent_crash(args: &warp_cli::AppArgs) {
+fn wait_for_parent_crash(args: &uncaged_cli::AppArgs) {
     use windows::Win32::Foundation::{GetLastError, WAIT_FAILED, WAIT_OBJECT_0};
     use windows::Win32::System::Threading::{GetProcessId, WaitForSingleObject, INFINITE};
 
@@ -390,7 +390,7 @@ fn wait_for_parent_crash(args: &warp_cli::AppArgs) {
 }
 
 #[cfg(unix)]
-fn wait_for_parent_crash(args: &warp_cli::AppArgs) {
+fn wait_for_parent_crash(args: &uncaged_cli::AppArgs) {
     use nix::unistd::Pid;
 
     let parent_pid = args
@@ -418,7 +418,7 @@ fn handle_parent_crash(
     recovery_mechanism: RecoveryMechanism,
     user_preferences: &dyn UserPreferences,
 ) -> bool {
-    warp_logging::on_parent_process_crash();
+    uncaged_logging::on_parent_process_crash();
 
     match recovery_mechanism {
         #[cfg(target_os = "linux")]

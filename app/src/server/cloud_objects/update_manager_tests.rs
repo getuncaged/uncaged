@@ -1,5 +1,5 @@
 use chrono::Utc;
-use warpui::{App, SingletonEntity};
+use uncaged_ui::{App, SingletonEntity};
 
 use super::{get_duplicate_object_name, InitiatedBy, ObjectOperation, ObjectOperationResult};
 use crate::cloud_object::model::actions::{ObjectActionType, ObjectActions};

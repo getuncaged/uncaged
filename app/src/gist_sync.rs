@@ -64,7 +64,7 @@ pub fn set_auto_sync(enabled: bool) {
 }
 
 fn state_path() -> PathBuf {
-    warp_core::paths::data_dir().join("gist_sync.json")
+    uncaged_core::paths::data_dir().join("gist_sync.json")
 }
 
 fn now_secs() -> u64 {

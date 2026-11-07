@@ -79,7 +79,7 @@ Yes. Use whatever you like — Uncaged's built-in Agent Mode, Claude Code, Codex
 
 ### What license is Uncaged under?
 
-The Uncaged client is licensed under [AGPL-3.0](LICENSE-AGPL); the `warpui` / `warpui_core` UI crates remain [MIT](LICENSE-MIT). Uncaged is a fork of the open-source Warp client (© Denver Technologies, Inc.); the upstream attribution is preserved in the repository's `NOTICE` file.
+The Uncaged client is licensed under [AGPL-3.0](LICENSE-AGPL); the `uncaged_ui` / `uncaged_ui_core` UI crates remain [MIT](LICENSE-MIT). Uncaged is a fork of the open-source Warp client (© Denver Technologies, Inc.); the upstream attribution is preserved in the repository's `NOTICE` file.
 
 ### Why AGPL?
 

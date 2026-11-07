@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
-use url::Url;
 #[cfg(target_family = "wasm")]
-use warp_core::context_flag::ContextFlag;
+use uncaged_core::context_flag::ContextFlag;
+use url::Url;
 
 #[cfg(target_family = "wasm")]
 use crate::uri::browser_url_handler::parse_current_url;

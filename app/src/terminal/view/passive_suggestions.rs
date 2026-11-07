@@ -1,4 +1,4 @@
-use warpui::ViewContext;
+use uncaged_ui::ViewContext;
 
 use super::TerminalView;
 use crate::terminal::view::CodeDiffAction;

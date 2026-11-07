@@ -7,25 +7,25 @@ use bimap::BiMap;
 use futures_util::stream::AbortHandle;
 use lsp::types::TextDocumentContentChangeEvent;
 use lsp::{LspManagerModel, LspServerLogLevel, LspServerModel};
+use uncaged_core::features::FeatureFlag;
+use uncaged_editor::content::buffer::Buffer;
+use uncaged_editor::content::diff::{text_diff, TextDiff};
+use uncaged_editor::content::edit::PreciseDelta;
+use uncaged_editor::content::version::BufferVersion;
+use uncaged_ui::{Entity, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle};
+use uncaged_util::content_version::ContentVersion;
+use uncaged_util::file::{FileId, FileLoadError, FileSaveError};
 use vec1::vec1;
-use warp_core::features::FeatureFlag;
-use warp_editor::content::buffer::Buffer;
-use warp_editor::content::diff::{text_diff, TextDiff};
-use warp_editor::content::edit::PreciseDelta;
-use warp_editor::content::version::BufferVersion;
-use warp_util::content_version::ContentVersion;
-use warp_util::file::{FileId, FileLoadError, FileSaveError};
-use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity, WeakModelHandle};
 
 use super::buffer_location::LocalOrRemotePath;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
         use lsp::LspManagerModelEvent;
-        use warp_files::{FileModelEvent, FileModel};
-        use warp_editor::content::text::IndentBehavior;
-        use warp_editor::content::text::IndentUnit;
-        use warp_editor::content::buffer::EditOrigin;
+        use uncaged_files::{FileModelEvent, FileModel};
+        use uncaged_editor::content::text::IndentBehavior;
+        use uncaged_editor::content::text::IndentUnit;
+        use uncaged_editor::content::buffer::EditOrigin;
     }
 }
 
@@ -775,7 +775,7 @@ impl GlobalBufferModel {
         // Subscribe to buffer events for LSP sync.
         let path_clone = path.clone();
         ctx.subscribe_to_model(&buffer, move |me, _, event, ctx| {
-            use warp_editor::content::buffer::BufferEvent;
+            use uncaged_editor::content::buffer::BufferEvent;
 
             let Some(state) = me.buffers.get(&file_id) else {
                 return;
@@ -852,7 +852,7 @@ impl GlobalBufferModel {
             // Remote files have no backend; hand back an unregistered empty buffer.
             LocalOrRemotePath::Remote(remote_path) => {
                 log::warn!("Cannot open a buffer for remote path {remote_path:?}");
-                use warp_editor::content::text::{IndentBehavior, IndentUnit};
+                use uncaged_editor::content::text::{IndentBehavior, IndentUnit};
                 let buffer = ctx.add_model(|_| {
                     Buffer::new(Box::new(|_, _| {
                         IndentBehavior::TabIndent(IndentUnit::Space(4))
@@ -911,7 +911,7 @@ impl GlobalBufferModel {
 
         let path_clone = path.to_path_buf();
         ctx.subscribe_to_model(&buffer, move |me, _, event, ctx| {
-            use warp_editor::content::buffer::BufferEvent;
+            use uncaged_editor::content::buffer::BufferEvent;
 
             let Some(state) = me.buffers.get(&file_id) else {
                 me.log_lsp_sync_debug(
@@ -1051,7 +1051,7 @@ impl GlobalBufferModel {
         line_numbers: Vec<usize>,
         ctx: &mut ModelContext<Self>,
     ) -> Option<Vec<(usize, String)>> {
-        use warp_editor::content::text::LineCount;
+        use uncaged_editor::content::text::LineCount;
 
         if line_numbers.is_empty() {
             return Some(Vec::new());

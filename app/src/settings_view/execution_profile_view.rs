@@ -1,15 +1,15 @@
 use std::path::PathBuf;
 
-use uuid::Uuid;
-use warp_core::features::FeatureFlag;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
     ParentElement, Shrinkable, Text, Wrap,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
+use uuid::Uuid;
 
 use crate::ai::blocklist::BlocklistAIPermissions;
 use crate::ai::execution_profiles::profiles::{
@@ -382,10 +382,10 @@ impl View for ExecutionProfileView {
         )
         .with_background(appearance.theme().surface_2())
         .with_border(
-            warpui::elements::Border::new(1.).with_border_fill(appearance.theme().outline()),
+            uncaged_ui::elements::Border::new(1.).with_border_fill(appearance.theme().outline()),
         )
-        .with_corner_radius(warpui::elements::CornerRadius::with_all(
-            warpui::elements::Radius::Pixels(warp_core::ui::radius::SMALL),
+        .with_corner_radius(uncaged_ui::elements::CornerRadius::with_all(
+            uncaged_ui::elements::Radius::Pixels(uncaged_core::ui::radius::SMALL),
         ))
         .with_horizontal_padding(16.)
         .with_vertical_padding(12.)
@@ -441,11 +441,11 @@ where
                         )
                         .with_background(appearance.theme().surface_2())
                         .with_border(
-                            warpui::elements::Border::all(1.)
+                            uncaged_ui::elements::Border::all(1.)
                                 .with_border_fill(appearance.theme().outline()),
                         )
-                        .with_corner_radius(warpui::elements::CornerRadius::with_all(
-                            warpui::elements::Radius::Pixels(warp_core::ui::radius::SMALL),
+                        .with_corner_radius(uncaged_ui::elements::CornerRadius::with_all(
+                            uncaged_ui::elements::Radius::Pixels(uncaged_core::ui::radius::SMALL),
                         ))
                         .with_horizontal_padding(6.)
                         .with_vertical_padding(2.)
@@ -510,7 +510,9 @@ fn render_allowlist_denylist_row(
             .finish(),
     )
     .with_margin_left(8.)
-    .with_border(warpui::elements::Border::left(1.).with_border_fill(appearance.theme().outline()))
+    .with_border(
+        uncaged_ui::elements::Border::left(1.).with_border_fill(appearance.theme().outline()),
+    )
     .with_padding_left(8.)
     .finish()
 }

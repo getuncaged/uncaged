@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use warpui::elements::ChildView;
-use warpui::{Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
+use uncaged_ui::elements::ChildView;
+use uncaged_ui::{Element, Entity, ModelHandle, View, ViewContext, ViewHandle};
 
 use crate::ai::blocklist::agent_view::AgentViewController;
 use crate::search::data_source::{Query, QueryFilter};
@@ -144,7 +144,7 @@ impl View for InlineReposMenuView {
         "InlineReposMenuView"
     }
 
-    fn render(&self, _app: &warpui::AppContext) -> Box<dyn Element> {
+    fn render(&self, _app: &uncaged_ui::AppContext) -> Box<dyn Element> {
         ChildView::new(&self.menu_view).finish()
     }
 }

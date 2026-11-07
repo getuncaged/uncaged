@@ -2,20 +2,20 @@ use std::time::Duration;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use uuid::Uuid;
-use warpui::elements::{
+use uncaged_ui::elements::{
     ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
     DropShadow, EventHandler, Expanded, Flex, Hoverable, Icon, MouseStateHandle, OffsetPositioning,
     Padding, ParentElement, PositionedElementAnchor, PositionedElementOffsetBounds, Radius,
     SavePosition, Stack,
 };
-use warpui::keymap::Keystroke;
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, EntityId, SingletonEntity, TypedActionView, View, ViewContext,
     WindowId,
 };
+use uuid::Uuid;
 
 use crate::appearance::Appearance;
 use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
@@ -25,7 +25,7 @@ use crate::workspace::{Workspace, WorkspaceAction};
 
 const AGENT_TOAST_WIDTH: f32 = 260.;
 const AGENT_TOAST_PADDING: f32 = 12.;
-const AGENT_TOAST_CORNER_RADIUS: f32 = warp_core::ui::radius::MEDIUM;
+const AGENT_TOAST_CORNER_RADIUS: f32 = uncaged_core::ui::radius::MEDIUM;
 const CLOSE_BUTTON_SIZE: f32 = 20.;
 
 /// Data for an individual agent toast
@@ -431,7 +431,7 @@ impl AgentToast {
         appearance: &Appearance,
         keystroke: Keystroke,
     ) -> Box<dyn Element> {
-        use warpui::ui_components::keyboard_shortcut::KeyboardShortcut;
+        use uncaged_ui::ui_components::keyboard_shortcut::KeyboardShortcut;
 
         use crate::ui_components::blended_colors;
 
@@ -443,7 +443,7 @@ impl AgentToast {
             font_size: Some(appearance.ui_font_size()),
             background: Some(theme.surface_2().into()),
             border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             ))),
             padding: Some(Coords {
                 top: 1.0,

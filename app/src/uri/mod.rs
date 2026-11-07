@@ -9,11 +9,11 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, ensure, Result};
+use uncaged_ui::notification::UserNotification;
+use uncaged_ui::platform::TerminationMode;
+use uncaged_ui::{AppContext, SingletonEntity as _, TypedActionView, WindowId};
+use uncaged_util::path::LineAndColumnArg;
 use url::Url;
-use warp_util::path::LineAndColumnArg;
-use warpui::notification::UserNotification;
-use warpui::platform::TerminationMode;
-use warpui::{AppContext, SingletonEntity as _, TypedActionView, WindowId};
 
 use self::docker::open_docker_container;
 use crate::cloud_object::ObjectType;

@@ -1,19 +1,19 @@
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::Icon;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Fill, Flex, Hoverable, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, SavePosition, Stack, Text, DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::platform::Cursor;
-use warpui::ui_components::components::UiComponent;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity as _, TypedActionView,
     View, ViewContext, ViewHandle,
 };
@@ -232,9 +232,9 @@ impl PlanAndTodoListView {
         let chip_content = ConstrainedBox::new(chip_content).with_height(content_line_height);
 
         let corner_radius = if has_todo_list {
-            CornerRadius::with_left(Radius::Pixels(warp_core::ui::radius::SMALL))
+            CornerRadius::with_left(Radius::Pixels(uncaged_core::ui::radius::SMALL))
         } else {
-            CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
+            CornerRadius::with_all(Radius::Pixels(uncaged_core::ui::radius::SMALL))
         };
 
         let conversation_is_streaming = self
@@ -402,9 +402,9 @@ impl PlanAndTodoListView {
             .finish();
 
         let corner_radius = if has_planning_document {
-            CornerRadius::with_right(Radius::Pixels(warp_core::ui::radius::SMALL))
+            CornerRadius::with_right(Radius::Pixels(uncaged_core::ui::radius::SMALL))
         } else {
-            CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
+            CornerRadius::with_all(Radius::Pixels(uncaged_core::ui::radius::SMALL))
         };
 
         let todo_button = self
@@ -430,8 +430,8 @@ impl PlanAndTodoListView {
                     OffsetPositioning::offset_from_save_position_element(
                         TODO_BUTTON_SAVE_POSITION_ID,
                         vec2f(0., 4.),
-                        warpui::elements::PositionedElementOffsetBounds::WindowByPosition,
-                        warpui::elements::PositionedElementAnchor::BottomLeft,
+                        uncaged_ui::elements::PositionedElementOffsetBounds::WindowByPosition,
+                        uncaged_ui::elements::PositionedElementAnchor::BottomLeft,
                         ChildAnchor::TopLeft,
                     )
                 }
@@ -439,8 +439,8 @@ impl PlanAndTodoListView {
                     OffsetPositioning::offset_from_save_position_element(
                         TODO_BUTTON_SAVE_POSITION_ID,
                         vec2f(0., -4.),
-                        warpui::elements::PositionedElementOffsetBounds::WindowByPosition,
-                        warpui::elements::PositionedElementAnchor::TopLeft,
+                        uncaged_ui::elements::PositionedElementOffsetBounds::WindowByPosition,
+                        uncaged_ui::elements::PositionedElementAnchor::TopLeft,
                         ChildAnchor::BottomLeft,
                     )
                 }
@@ -464,7 +464,7 @@ impl View for PlanAndTodoListView {
         "PlanAndTodoListView"
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn uncaged_ui::Element> {
         let appearance = Appearance::as_ref(app);
 
         // Calculate icon size

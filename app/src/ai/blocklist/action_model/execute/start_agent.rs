@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use shell_words::split as split_shell_words;
-use warp_cli::agent::Harness;
-use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_cli::agent::Harness;
+use uncaged_ui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};

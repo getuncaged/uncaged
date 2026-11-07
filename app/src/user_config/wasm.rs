@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use warpui::ModelContext;
+use uncaged_ui::ModelContext;
 
 use crate::launch_configs::launch_config::LaunchConfig;
 use crate::tab_configs::{TabConfig, TabConfigError};

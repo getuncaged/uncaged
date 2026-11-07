@@ -4,21 +4,21 @@
 use itertools::Itertools;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-use warp_editor::content::text::{
+use uncaged_editor::content::text::{
     BlockType as ContentBlockType, BufferBlockStyle, BufferTextStyle, TextStyles,
     TextStylesWithMetadata,
 };
-use warp_editor::model::RichTextEditorModel;
-use warp_editor::render::model::RenderState;
-use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
-use warpui::elements::{
+use uncaged_editor::model::RichTextEditorModel;
+use uncaged_editor::render::model::RenderState;
+use uncaged_ui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
+use uncaged_ui::elements::{
     AnchorPair, Border, ConstrainedBox, Container, CornerRadius, DropShadow, Flex, MainAxisSize,
     MouseStateHandle, OffsetPositioning, OffsetType, ParentElement, Point,
     PositionedElementOffsetBounds, PositioningAxis, Radius, Rect, XAxisAnchor, YAxisAnchor,
 };
-use warpui::presenter::ChildView;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, SizeConstraint, TypedActionView,
     View, ViewContext, ViewHandle,
 };
@@ -258,7 +258,7 @@ impl View for Omnibar {
         "Omnibar"
     }
 
-    fn render(&self, app: &warpui::AppContext) -> Box<dyn Element> {
+    fn render(&self, app: &uncaged_ui::AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let mut actions = Flex::row().with_main_axis_size(MainAxisSize::Min);
 
@@ -363,7 +363,7 @@ impl View for Omnibar {
         )
         .with_uniform_padding(OMNIBAR_PADDING)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .with_background(appearance.theme().surface_2())
         .with_border(Border::all(1.).with_border_fill(appearance.theme().outline()))
@@ -485,9 +485,9 @@ impl Compact {
 impl Element for Compact {
     fn layout(
         &mut self,
-        constraint: warpui::SizeConstraint,
-        ctx: &mut warpui::LayoutContext,
-        app: &warpui::AppContext,
+        constraint: uncaged_ui::SizeConstraint,
+        ctx: &mut uncaged_ui::LayoutContext,
+        app: &uncaged_ui::AppContext,
     ) -> Vector2F {
         self.child.layout(
             SizeConstraint {
@@ -502,8 +502,8 @@ impl Element for Compact {
     fn paint(
         &mut self,
         origin: Vector2F,
-        ctx: &mut warpui::PaintContext,
-        app: &warpui::AppContext,
+        ctx: &mut uncaged_ui::PaintContext,
+        app: &uncaged_ui::AppContext,
     ) {
         self.child.paint(origin, ctx, app)
     }
@@ -518,18 +518,18 @@ impl Element for Compact {
 
     fn dispatch_event(
         &mut self,
-        event: &warpui::event::DispatchedEvent,
-        ctx: &mut warpui::EventContext,
-        app: &warpui::AppContext,
+        event: &uncaged_ui::event::DispatchedEvent,
+        ctx: &mut uncaged_ui::EventContext,
+        app: &uncaged_ui::AppContext,
     ) -> bool {
         self.child.dispatch_event(event, ctx, app)
     }
 
-    fn after_layout(&mut self, ctx: &mut warpui::AfterLayoutContext, app: &AppContext) {
+    fn after_layout(&mut self, ctx: &mut uncaged_ui::AfterLayoutContext, app: &AppContext) {
         self.child.after_layout(ctx, app)
     }
 
-    fn z_index(&self) -> Option<warpui::elements::ZIndex> {
+    fn z_index(&self) -> Option<uncaged_ui::elements::ZIndex> {
         self.child.z_index()
     }
 

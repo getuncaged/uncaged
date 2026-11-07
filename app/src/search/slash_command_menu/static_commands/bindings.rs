@@ -1,4 +1,4 @@
-use warpui::keymap::{BindingDescription, PerPlatformKeystroke};
+use uncaged_ui::keymap::{BindingDescription, PerPlatformKeystroke};
 
 use super::StaticCommand;
 

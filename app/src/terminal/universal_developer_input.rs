@@ -6,18 +6,18 @@ use std::rc::Rc;
 use pathfinder_color::ColorU;
 #[cfg(not(target_family = "wasm"))]
 use settings::Setting as _;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::color::contrast::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::color::contrast::{
     foreground_color_with_minimum_contrast, MinimumAllowedContrast,
 };
-use warp_core::ui::color::{coloru_with_opacity, Opacity, Rgb};
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{ChildView, CornerRadius, Fill, Radius};
-use warpui::ui_components::components::UiComponentStyles;
-use warpui::ui_components::segmented_control::{
+use uncaged_core::ui::color::{coloru_with_opacity, Opacity, Rgb};
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{ChildView, CornerRadius, Fill, Radius};
+use uncaged_ui::ui_components::components::UiComponentStyles;
+use uncaged_ui::ui_components::segmented_control::{
     RenderableOptionConfig, SegmentedControl, SegmentedControlEvent, TooltipConfig,
 };
-use warpui::{
+use uncaged_ui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, View, ViewContext, ViewHandle,
 };
 
@@ -363,7 +363,7 @@ impl View for InputModeToggle {
         "InputModeToggle"
     }
 
-    fn render(&self, _: &AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, _: &AppContext) -> Box<dyn uncaged_ui::Element> {
         ChildView::new(&self.segmented_control).finish()
     }
 }
@@ -384,7 +384,7 @@ fn segmented_control_styles(app: &AppContext) -> UiComponentStyles {
         width: Some(button_size), // Match InputPrompt button height for square buttons
         height: Some(button_size), // Match InputPrompt button height
         border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         ))),
         border_width: Some(1.0),
         border_color: Some(Fill::Solid(theme.outline().into_solid())),

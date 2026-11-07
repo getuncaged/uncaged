@@ -1,6 +1,6 @@
-use warpui::elements::{Container, Flex, Highlight, ParentElement, Text};
-use warpui::fonts::{Properties, Weight};
-use warpui::Element;
+use uncaged_ui::elements::{Container, Flex, Highlight, ParentElement, Text};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::Element;
 
 use super::new_session_option::NewSessionOption;
 use crate::appearance::Appearance;

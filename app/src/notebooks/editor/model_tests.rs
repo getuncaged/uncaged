@@ -11,23 +11,23 @@ use markdown_parser::{
 };
 use pathfinder_geometry::vector::Vector2F;
 use string_offset::CharOffset;
-use vec1::vec1;
-use warp_core::features::FeatureFlag;
-use warp_editor::content::buffer::{AutoScrollBehavior, BufferSelectAction, SelectionOffsets};
-use warp_editor::content::text::{BlockType, BufferBlockStyle, CodeBlockType, TextStyles};
-use warp_editor::model::{CoreEditorModel, RichTextEditorModel};
-use warp_editor::render::model::viewport::SizeInfo;
-use warp_editor::render::model::{BlockItem, RenderEvent};
-use warp_editor::selection::{TextDirection, TextUnit};
-use warpui::elements::ListIndentLevel;
-use warpui::platform::WindowStyle;
-use warpui::presenter::ChildView;
-use warpui::r#async::{block_on, FutureId, Timer};
-use warpui::text::word_boundaries::WordBoundariesPolicy;
-use warpui::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_editor::content::buffer::{AutoScrollBehavior, BufferSelectAction, SelectionOffsets};
+use uncaged_editor::content::text::{BlockType, BufferBlockStyle, CodeBlockType, TextStyles};
+use uncaged_editor::model::{CoreEditorModel, RichTextEditorModel};
+use uncaged_editor::render::model::viewport::SizeInfo;
+use uncaged_editor::render::model::{BlockItem, RenderEvent};
+use uncaged_editor::selection::{TextDirection, TextUnit};
+use uncaged_ui::elements::ListIndentLevel;
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::r#async::{block_on, FutureId, Timer};
+use uncaged_ui::text::word_boundaries::WordBoundariesPolicy;
+use uncaged_ui::{
     AddSingletonModel, App, AppContext, Element, Entity, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewHandle,
 };
+use vec1::vec1;
 
 use super::super::rich_text_styles;
 use super::NotebooksEditorModel;
@@ -66,7 +66,7 @@ impl View for TestView {
         "TestView"
     }
 
-    fn render(&self, _app: &warpui::AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, _app: &uncaged_ui::AppContext) -> Box<dyn uncaged_ui::Element> {
         ChildView::new(&self.editor).finish()
     }
 }

@@ -7,12 +7,12 @@ pub use header::PaneHeaderAction::CustomAction as PaneHeaderCustomAction;
 pub use header_content::{
     HeaderContent, HeaderRenderContext, StandardHeader, StandardHeaderOptions,
 };
-use warpui::elements::{
+use uncaged_ui::elements::{
     Border, Container, DropTarget, DropTargetData, Flex, MainAxisSize, ParentElement, SavePosition,
     Shrinkable,
 };
-use warpui::presenter::ChildView;
-use warpui::{
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -364,7 +364,7 @@ impl<P: BackingView> View for PaneView<P> {
         if is_card {
             container = container
                 .with_border(Border::all(1.).with_border_fill(card_outline(appearance)))
-                .with_corner_radius(warp_core::ui::radius::large())
+                .with_corner_radius(uncaged_core::ui::radius::large())
                 .with_uniform_margin(PANEL_CARD_MARGIN);
         }
         if pane_configuration.show_accent_border {
@@ -372,9 +372,9 @@ impl<P: BackingView> View for PaneView<P> {
             container = container
                 .with_border(border)
                 .with_corner_radius(if is_card {
-                    warp_core::ui::radius::large()
+                    uncaged_core::ui::radius::large()
                 } else {
-                    warp_core::ui::radius::medium()
+                    uncaged_core::ui::radius::medium()
                 });
         }
 

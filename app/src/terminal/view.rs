@@ -99,27 +99,20 @@ use serde_json::json;
 use settings::{Setting, ToggleableSetting};
 use ssh_file_upload::{FileUpload, FileUploadEvent};
 use sum_tree::SeekBias;
-use use_agent_footer::UseAgentToolbar;
-use uuid::Uuid;
-use vec1::vec1;
-use warp_core::channel::ChannelState;
-use warp_core::command::ExitCode;
-use warp_core::context_flag::ContextFlag;
-use warp_core::r#async::debounce;
-use warp_core::semantic_selection::SemanticSelection;
-use warp_core::user_preferences::GetUserPreferences as _;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-#[cfg(feature = "local_fs")]
-use warp_util::path::LineAndColumnArg;
-use warp_util::path::ShellFamily;
-use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
-use warpui::assets::asset_cache::{AssetCache, AssetCacheEvent};
-use warpui::clipboard::ClipboardContent;
-use warpui::clipboard_utils::get_image_filepaths_from_paths;
-use warpui::elements::new_scrollable::{
+use uncaged_core::channel::ChannelState;
+use uncaged_core::command::ExitCode;
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_core::r#async::debounce;
+use uncaged_core::semantic_selection::SemanticSelection;
+use uncaged_core::user_preferences::GetUserPreferences as _;
+use uncaged_ui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
+use uncaged_ui::assets::asset_cache::{AssetCache, AssetCacheEvent};
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::clipboard_utils::get_image_filepaths_from_paths;
+use uncaged_ui::elements::new_scrollable::{
     NewScrollableElement, ScrollableAppearance, SingleAxisConfig,
 };
-use warpui::elements::{
+use uncaged_ui::elements::{
     get_rich_content_position_id, Align, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, DropTarget,
     DropTargetData, Empty, EventHandler, Fill, Flex, Hoverable, Icon, LiveElement,
@@ -128,24 +121,33 @@ use warpui::elements::{
     PositionedElementOffsetBounds, Radius, Rect, SavePosition, ScrollStateHandle, Scrollable,
     ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text,
 };
-use warpui::event::ModifiersState;
-use warpui::fonts::{Cache as FontCache, FamilyId, Properties};
-use warpui::geometry::vector::{vec2f, Vector2F};
-use warpui::image_cache::ImageType;
-use warpui::keymap::Keystroke;
-use warpui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
-use warpui::platform::{Cursor, OperatingSystem};
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::text::SelectionType;
-use warpui::ui_components::components::UiComponent;
-use warpui::units::{IntoLines, IntoPixels, Lines, Pixels};
-use warpui::windowing::WindowManager;
-use warpui::{
+use uncaged_ui::event::ModifiersState;
+use uncaged_ui::fonts::{Cache as FontCache, FamilyId, Properties};
+use uncaged_ui::geometry::vector::{vec2f, Vector2F};
+use uncaged_ui::image_cache::ImageType;
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::notification::{
+    NotificationSendError, RequestPermissionsOutcome, UserNotification,
+};
+use uncaged_ui::platform::{Cursor, OperatingSystem};
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::text::SelectionType;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::units::{IntoLines, IntoPixels, Lines, Pixels};
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{
     end_trace_after_next, record_trace_event, windowing, AccessibilityData, AppContext,
     BlurContext, CursorInfo, Element, Entity, EntityId, EventContext, FocusContext, ModelAsRef,
     ModelHandle, SingletonEntity, Tracked, TypedActionView, View, ViewAsRef, ViewContext,
     ViewHandle, WeakModelHandle, WeakViewHandle, WindowId,
 };
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+#[cfg(feature = "local_fs")]
+use uncaged_util::path::LineAndColumnArg;
+use uncaged_util::path::ShellFamily;
+use use_agent_footer::UseAgentToolbar;
+use uuid::Uuid;
+use vec1::vec1;
 
 use self::link_detection::HighlightedLinkOption;
 pub use self::link_detection::{GridHighlightedLink, RichContentLink, RichContentLinkTooltipInfo};
@@ -2206,14 +2208,14 @@ pub struct TerminalView {
     ///   2. Whether this View's window is the active window.
     ///
     /// We need to derive and cache this state on this View in order to correctly implement focus
-    /// reporting. Because focus is window-scoped, i.e. warpui does not consider activating a
+    /// reporting. Because focus is window-scoped, i.e. uncaged_ui does not consider activating a
     /// different window as blurring the focused View in the previously active window, we cannot
-    /// simply rely on the warpui::View::on_blur and on_focus methods to report focus-in/out to the
+    /// simply rely on the uncaged_ui::View::on_blur and on_focus methods to report focus-in/out to the
     /// PTY, as those methods will not trigger when changing active windows. The singleton model
-    /// [`warpui::windowing::State`] will allow us to subscribe to active window change. So, we can
+    /// [`uncaged_ui::windowing::State`] will allow us to subscribe to active window change. So, we can
     /// subscribe to that and have that callback also report focus-in/out. However, that will still
     /// leave cases for potential double-reporting, as a single click can trigger both
-    /// [`warpui::View::on_focus`] and emit a [`warpui::windowing::StateEvent`]. This field will
+    /// [`uncaged_ui::View::on_focus`] and emit a [`uncaged_ui::windowing::StateEvent`]. This field will
     /// guard against that double- reporting case, though it needs to be kept in sync with the
     /// focused view and active window.
     is_focused_and_active: bool,
@@ -2381,7 +2383,7 @@ pub struct TerminalView {
     /// Mouse state handle for the conversation details panel toggle button in the pane header.
     /// Only available on non-WASM platforms (WASM uses a per-window button instead).
     #[cfg(not(target_arch = "wasm32"))]
-    conversation_details_panel_toggle_mouse_state: warpui::elements::MouseStateHandle,
+    conversation_details_panel_toggle_mouse_state: uncaged_ui::elements::MouseStateHandle,
 
     /// Weak handle to the [`PaneStack`] this view is part of, allowing push/pop operations.
     pane_stack: Option<WeakModelHandle<crate::pane_group::pane::PaneStack<Self>>>,
@@ -6260,7 +6262,7 @@ impl TerminalView {
     }
 
     #[cfg(any(test, feature = "integration_tests"))]
-    pub fn sessions<'a, A: warpui::ModelAsRef>(&self, ctx: &'a A) -> &'a Sessions {
+    pub fn sessions<'a, A: uncaged_ui::ModelAsRef>(&self, ctx: &'a A) -> &'a Sessions {
         self.sessions.as_ref(ctx)
     }
 
@@ -7098,7 +7100,7 @@ impl TerminalView {
         });
     }
 
-    /// Receiving the warpui::Event::KeyDown event from a child element.
+    /// Receiving the uncaged_ui::Event::KeyDown event from a child element.
     /// Generally, this should be control characters rather than printable characters.
     fn keydown_on_terminal(&mut self, characters: &str, ctx: &mut ViewContext<Self>) {
         if self.is_long_running() {
@@ -7140,7 +7142,7 @@ impl TerminalView {
 
         was_bootstrap_script_echoed
     }
-    /// Receiving a warpui::Event::TypedCharacters event from a child element.
+    /// Receiving a uncaged_ui::Event::TypedCharacters event from a child element.
     /// We can assume `characters` consists of all printable characters, and therefore,
     /// can go into the input box.
     fn typed_characters_on_terminal(&mut self, characters: &str, ctx: &mut ViewContext<Self>) {
@@ -9500,7 +9502,7 @@ impl TerminalView {
                 if self.is_login_shell_bootstrapped {
                     let _ = ctx.spawn(
                         async move {
-                            warpui::r#async::Timer::after(EXECUTE_PENDING_COMMAND_DELAY).await;
+                            uncaged_ui::r#async::Timer::after(EXECUTE_PENDING_COMMAND_DELAY).await;
                         },
                         Self::execute_pending_command,
                     );
@@ -9539,14 +9541,14 @@ impl TerminalView {
                                     .and_then(|session| {
                                         let escape_char = session.shell_family().escape_char();
                                         let cmd =
-                                            warp_completer::parsers::simple::top_level_command(
+                                            uncaged_completer::parsers::simple::top_level_command(
                                                 command,
                                                 escape_char,
                                             )?;
                                         let cmd = session
                                             .alias_value(cmd.as_str())
                                             .and_then(|alias| {
-                                                warp_completer::parsers::simple::top_level_command(
+                                                uncaged_completer::parsers::simple::top_level_command(
                                                     alias,
                                                     escape_char,
                                                 )
@@ -9882,7 +9884,7 @@ impl TerminalView {
 
                 ctx.spawn(
                     async {
-                        warpui::r#async::Timer::after(*TRIGGER_RC_FILE_SUBSHELL_BOOTSTRAP_DELAY)
+                        uncaged_ui::r#async::Timer::after(*TRIGGER_RC_FILE_SUBSHELL_BOOTSTRAP_DELAY)
                             .await
                     },
                     move |me, _, ctx| {
@@ -12151,7 +12153,7 @@ impl TerminalView {
     fn start_bootstrap_timer(&self, duration: Duration, ctx: &mut ViewContext<Self>) {
         let _ = ctx.spawn(
             async move {
-                warpui::r#async::Timer::after(duration).await;
+                uncaged_ui::r#async::Timer::after(duration).await;
             },
             Self::on_bootstrap_failed_timer_complete,
         );
@@ -20665,7 +20667,7 @@ impl TerminalView {
                 && session.shell_family() == ShellFamily::Posix
                 && is_in_long_running_command;
             if is_msys2_long_running {
-                let input = warpui::clipboard_utils::escaped_paths_str(paths, None);
+                let input = uncaged_ui::clipboard_utils::escaped_paths_str(paths, None);
                 self.typed_characters_on_terminal(&input, ctx);
                 return;
             }
@@ -20676,7 +20678,7 @@ impl TerminalView {
             let paths = if session.is_wsl() {
                 paths_converted = paths
                     .iter()
-                    .map(|p| warp_util::path::convert_windows_path_to_wsl(p))
+                    .map(|p| uncaged_util::path::convert_windows_path_to_wsl(p))
                     .collect::<Vec<_>>();
                 paths_converted.as_slice()
             } else {
@@ -20684,7 +20686,7 @@ impl TerminalView {
             };
 
             let input =
-                warpui::clipboard_utils::escaped_paths_str(paths, Some(self.shell_family(ctx)));
+                uncaged_ui::clipboard_utils::escaped_paths_str(paths, Some(self.shell_family(ctx)));
             self.typed_characters_on_terminal(&input, ctx);
         }
     }
@@ -20747,7 +20749,7 @@ impl TerminalView {
                 let active_block_id = self.model.lock().block_list().active_block_id().clone();
                 ctx.spawn(
                     async {
-                        warpui::r#async::Timer::after(Duration::from_secs(3)).await;
+                        uncaged_ui::r#async::Timer::after(Duration::from_secs(3)).await;
                         active_block_id
                     },
                     move |terminal_view, active_block_id, _| {
@@ -21907,7 +21909,7 @@ impl TypedActionView for TerminalView {
                     }
                     images.push(ui_components::lightbox::LightboxImage {
                         source: ui_components::lightbox::LightboxImageSource::Resolved {
-                            asset_source: warpui::assets::asset_cache::AssetSource::Raw {
+                            asset_source: uncaged_ui::assets::asset_cache::AssetSource::Raw {
                                 id: asset_id,
                             },
                         },
@@ -22779,7 +22781,7 @@ impl View for TerminalView {
             );
 
             Flex::row()
-                .with_main_axis_size(warpui::elements::MainAxisSize::Max)
+                .with_main_axis_size(uncaged_ui::elements::MainAxisSize::Max)
                 .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
                 .with_child(Shrinkable::new(1., final_element).finish())
                 .with_child(panel_with_background)
@@ -22809,7 +22811,7 @@ impl View for TerminalView {
         }
     }
 
-    fn keymap_context(&self, app: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
         context.map.insert(
             "TerminalView_BlockSelectionCardinality",

@@ -1,20 +1,20 @@
-use warp::integration_testing::command_palette::{
+use uncaged::integration_testing::command_palette::{
     open_command_palette_and_run_action, TestStepsExt,
 };
-use warp::integration_testing::step::new_step_with_default_assertions;
-use warp::integration_testing::terminal::util::ExpectedExitStatus;
-use warp::integration_testing::terminal::{
+use uncaged::integration_testing::step::new_step_with_default_assertions;
+use uncaged::integration_testing::terminal::util::ExpectedExitStatus;
+use uncaged::integration_testing::terminal::{
     execute_command_for_single_terminal_in_tab, wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::integration_testing::window::save_active_window_id;
-use warp::integration_testing::workflow::{
+use uncaged::integration_testing::window::save_active_window_id;
+use uncaged::integration_testing::workflow::{
     assert_no_workflow_pane_open, assert_open_workflow_pane_count_equals, assert_workflow_id,
     create_a_personal_workflow, open_workflow,
 };
-use warp::integration_testing::{self, view_of_type};
-use warp::workflows::CategoriesView;
-use warpui_core::integration::TestStep;
-use warpui_core::{async_assert_eq, ViewHandle};
+use uncaged::integration_testing::{self, view_of_type};
+use uncaged::workflows::CategoriesView;
+use uncaged_ui_core::integration::TestStep;
+use uncaged_ui_core::{async_assert_eq, ViewHandle};
 
 use super::{new_builder, TEST_ONLY_ASSETS};
 use crate::Builder;

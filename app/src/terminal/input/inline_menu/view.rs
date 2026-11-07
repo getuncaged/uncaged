@@ -3,30 +3,30 @@ use std::sync::LazyLock;
 
 use itertools::Itertools;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::color::blend::Blend;
-use warp_core::ui::theme::Fill;
-use warp_core::ui::Icon;
-use warpui::color::ColorU;
-use warpui::elements::drag_resize::drag_resize_handle;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::color::blend::Blend;
+use uncaged_core::ui::theme::Fill;
+use uncaged_core::ui::Icon;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::drag_resize::drag_resize_handle;
+use uncaged_ui::elements::{
     ChildAnchor, Clipped, DispatchEventResult, DragResizeElement, DragResizeHandle, EventHandler,
     Expanded, Hoverable, MainAxisAlignment, MainAxisSize, MouseInBehavior, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, ResizeEndFn,
     ScrollStateHandle, Scrollable, ScrollableElement, ScrollbarWidth, SizeConstraintCondition,
     SizeConstraintSwitch, Stack, UniformList, UniformListState,
 };
-use warpui::fonts::Weight;
-use warpui::platform::Cursor;
-use warpui::prelude::{
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::prelude::{
     Align, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Empty, Flex, SavePosition,
     Text,
 };
-use warpui::scene::{Border, CornerRadius, Radius};
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::scene::{Border, CornerRadius, Radius};
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
@@ -105,7 +105,7 @@ pub(super) static QUERY_RESULT_RENDERER_STYLES: LazyLock<QueryResultRendererStyl
         panel_border_fn: |appearance| {
             Border::all(1.0).with_border_fill(appearance.theme().outline())
         },
-        panel_corner_radius: warp_core::ui::radius::medium(),
+        panel_corner_radius: uncaged_core::ui::radius::medium(),
         result_vertical_padding: 2.,
         ..Default::default()
     });
@@ -133,8 +133,8 @@ impl<A: InlineMenuAction> QueryResultRendererExt for QueryResultRenderer<A> {
         is_selected: bool,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        use warpui::elements::{DispatchEventResult, EventHandler, Hoverable};
-        use warpui::platform::Cursor;
+        use uncaged_ui::elements::{DispatchEventResult, EventHandler, Hoverable};
+        use uncaged_ui::platform::Cursor;
 
         if self.search_result.is_static_separator() {
             return self.render_inline_with_highlight_state(ItemHighlightState::Default, true, app);
@@ -191,7 +191,7 @@ impl<A: InlineMenuAction> QueryResultRendererExt for QueryResultRenderer<A> {
         is_static_separator: bool,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        use warpui::elements::{MainAxisSize, Shrinkable};
+        use uncaged_ui::elements::{MainAxisSize, Shrinkable};
 
         let appearance = Appearance::as_ref(app);
         let icon = self.search_result.render_icon(highlight_state, appearance);
@@ -855,7 +855,7 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> InlineMenuView<A, T> {
 
         // Uncaged: the menu is a rounded card (see `render`), so the header fills the card's
         // outer end and rounds with it; the card's own border replaces the full-width rules.
-        let inner_radius = Radius::Pixels(warp_core::ui::radius::MEDIUM - 1.);
+        let inner_radius = Radius::Pixels(uncaged_core::ui::radius::MEDIUM - 1.);
         let header = Container::new(header_row)
             .with_padding_left(*terminal::view::PADDING_LEFT)
             .with_padding_right(8.)
@@ -935,7 +935,7 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> InlineMenuView<A, T> {
             ScrollbarWidth::Auto,
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .with_overlayed_scrollbar()
         .finish();
@@ -1180,7 +1180,7 @@ impl<A: InlineMenuAction, T: 'static + Send + Sync> View for InlineMenuView<A, T
         // full-width band fenced by rules.
         Container::new(column.with_children(children).finish())
             .with_border(Border::all(1.).with_border_fill(theme.outline()))
-            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_corner_radius(uncaged_core::ui::radius::medium())
             .with_horizontal_margin(INLINE_MENU_CARD_INSET)
             .finish()
     }

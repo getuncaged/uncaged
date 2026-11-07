@@ -1,4 +1,4 @@
-//! Lower a `warp_multi_agent_api::Request` into the neutral conversation.
+//! Lower a `uncaged_agent_api::Request` into the neutral conversation.
 //!
 //! History lives in `task_context.tasks[].messages`; the latest user turn and
 //! freshly-executed tool results arrive in `input`. The two can overlap (the

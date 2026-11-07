@@ -8,19 +8,19 @@ use onboarding::slides::OnboardingModelInfo;
 use onboarding::{AgentOnboardingEvent, AgentOnboardingView, SelectedSettings};
 use pathfinder_color::ColorU;
 use rust_embed::RustEmbed;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::icons::Icon;
-use warp_core::ui::theme::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::icons::Icon;
+use uncaged_core::ui::theme::{
     AnsiColor, AnsiColors, Details, Fill, Image, TerminalColors, WarpTheme,
 };
-use warpui_core::assets::asset_cache::AssetSource;
-use warpui_core::elements::{
+use uncaged_ui_core::assets::asset_cache::AssetSource;
+use uncaged_ui_core::elements::{
     Container, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize, ParentElement,
 };
-use warpui_core::fonts::{Cache, FamilyId, Weight};
-use warpui_core::presenter::ChildView;
-use warpui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
-use warpui_core::{
+use uncaged_ui_core::fonts::{Cache, FamilyId, Weight};
+use uncaged_ui_core::presenter::ChildView;
+use uncaged_ui_core::ui_components::components::{UiComponent as _, UiComponentStyles};
+use uncaged_ui_core::{
     platform, AddWindowOptions, AppContext, AssetProvider, Element, Entity, SingletonEntity as _,
     TypedActionView, View, ViewContext, ViewHandle,
 };
@@ -41,13 +41,13 @@ impl AssetProvider for Assets {
 
 fn main() -> Result<()> {
     // Initialize logging for the onboarding binary.
-    warp_logging::init(warp_logging::LogConfig {
+    uncaged_logging::init(uncaged_logging::LogConfig {
         is_cli: false,
         log_destination: None,
         ..Default::default()
     })?;
 
-    let app_builder = warpui::platform::AppBuilder::new(
+    let app_builder = uncaged_ui::platform::AppBuilder::new(
         platform::AppCallbacks::default(),
         Box::new(ASSETS),
         None,
@@ -264,7 +264,7 @@ impl View for OnboardingMainView {
         }
     }
 
-    fn on_focus(&mut self, focus_ctx: &warpui_core::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, focus_ctx: &uncaged_ui_core::FocusContext, ctx: &mut ViewContext<Self>) {
         if let OnboardingMainState::Onboarding(view) = &self.state {
             if focus_ctx.is_self_focused() {
                 ctx.focus(view);

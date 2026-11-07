@@ -4,14 +4,14 @@ use std::borrow::Cow;
 
 pub use model::*;
 use pathfinder_color::ColorU;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::elements::{
     Border, Container, CrossAxisAlignment, Expanded, Flex, ParentElement, Text,
 };
-use warpui::keymap::Keystroke;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, SingletonEntity};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{AppContext, Element, SingletonEntity};
 
 use crate::ai::blocklist::agent_view::{
     ENTER_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE, ENTER_CLOUD_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE,
@@ -247,14 +247,14 @@ pub fn render_agent_shortcuts_view(
     .with_vertical_padding(16.)
     .with_padding_left(*terminal::view::PADDING_LEFT - 6.)
     .with_border(Border::all(1.).with_border_color(blended_colors::neutral_2(appearance.theme())))
-    .with_corner_radius(warp_core::ui::radius::medium())
+    .with_corner_radius(uncaged_core::ui::radius::medium())
     .with_horizontal_margin(6.)
     .with_margin_bottom(4.)
     .finish()
 }
 
 pub mod styles {
-    use warp_core::ui::appearance::Appearance;
+    use uncaged_core::ui::appearance::Appearance;
 
     pub fn keystroke_size(appearance: &Appearance) -> f32 {
         font_size(appearance) + 2.

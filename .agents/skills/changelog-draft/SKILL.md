@@ -62,7 +62,7 @@ The script outputs JSON to stdout with this structure:
         { "category": "NEW-FEATURE", "text": "Added dark mode" }
       ],
       "linked_issues": [5678],
-      "changed_files": ["app/src/ai/agent.rs", "crates/warp_features/src/lib.rs"],
+      "changed_files": ["app/src/ai/agent.rs", "crates/uncaged_features/src/lib.rs"],
       "source_repo": "warpdotdev/warp",
       "internal_pr": {
         "number": 25712,
@@ -104,7 +104,7 @@ Run the `extract_feature_flags.py` script to get the current flag gate lists:
 
 ```bash
 python3 .agents/skills/changelog-draft/scripts/extract_feature_flags.py \
-  --file crates/warp_features/src/lib.rs
+  --file crates/uncaged_features/src/lib.rs
 ```
 
 Output JSON:
@@ -172,7 +172,7 @@ For each unmarked PR, produce a classification:
 - When in doubt, set `needs_review: true` and `confidence: "low"`
 - Bot PRs (dependabot, renovate, etc.) → `include: false`
 
-**Feature-flag detection:** Use the `changed_files` list from Step 2 to check if any PR touches `crates/warp_features/src/lib.rs` or references a `FeatureFlag` variant in its title/body. Cross-reference with the flag lists from Step 4 to determine channel visibility.
+**Feature-flag detection:** Use the `changed_files` list from Step 2 to check if any PR touches `crates/uncaged_features/src/lib.rs` or references a `FeatureFlag` variant in its title/body. Cross-reference with the flag lists from Step 4 to determine channel visibility.
 
 **Unknown contributors:** Authors in the `unknown` bucket (org membership check failed due to auth) should be treated conservatively — do not attribute them as external. Note them in the output for manual verification.
 

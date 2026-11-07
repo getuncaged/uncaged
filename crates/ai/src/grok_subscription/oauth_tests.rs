@@ -52,6 +52,6 @@ fn manual_code_exchange_rejects_blank_code() {
     let exchange = ManualCodeExchange {
         verifier: "verifier".to_string(),
     };
-    let result = warpui_core::r#async::block_on(exchange.exchange("   "));
+    let result = uncaged_ui_core::r#async::block_on(exchange.exchange("   "));
     assert!(result.is_err());
 }

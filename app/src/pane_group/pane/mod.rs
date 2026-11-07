@@ -30,14 +30,14 @@ use std::any::Any;
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
-use url::Url;
-use warp_util::remote_path::RemotePath;
-use warpui::elements::{DispatchEventResult, EventHandler, MouseInBehavior};
-use warpui::presenter::ChildView;
-use warpui::{
+use uncaged_ui::elements::{DispatchEventResult, EventHandler, MouseInBehavior};
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::{
     Action, AppContext, Element, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity,
     View, ViewContext, ViewHandle, WeakModelHandle,
 };
+use uncaged_util::remote_path::RemotePath;
+use url::Url;
 
 pub use self::view::{PaneHeaderAction, PaneHeaderCustomAction, PaneView, PaneViewEvent};
 use super::{ActivationReason, LeafContents, PaneGroup, PaneGroupAction};
@@ -356,7 +356,7 @@ impl PaneId {
     pub(super) fn deferred_placeholder_pane_id() -> Self {
         Self(IPaneId {
             pane_type: IPaneType::DeferredPlaceholder,
-            pane_view_id: warpui::EntityId::new(),
+            pane_view_id: uncaged_ui::EntityId::new(),
         })
     }
 
@@ -365,7 +365,7 @@ impl PaneId {
     pub fn dummy_pane_id() -> Self {
         Self(IPaneId {
             pane_type: IPaneType::Dummy,
-            pane_view_id: warpui::EntityId::new(),
+            pane_view_id: uncaged_ui::EntityId::new(),
         })
     }
 
@@ -464,9 +464,9 @@ impl PaneId {
             IPaneType::NetworkLog => {
                 ChildView::<PaneView<NetworkLogView>>::with_id(self.0.pane_view_id).finish()
             }
-            IPaneType::DeferredPlaceholder => warpui::elements::Empty::new().finish(),
+            IPaneType::DeferredPlaceholder => uncaged_ui::elements::Empty::new().finish(),
             #[cfg(test)]
-            IPaneType::Dummy => warpui::elements::Empty::new().finish(),
+            IPaneType::Dummy => uncaged_ui::elements::Empty::new().finish(),
         };
         if *PaneSettings::as_ref(app).focus_panes_on_hover {
             element = EventHandler::new(element)

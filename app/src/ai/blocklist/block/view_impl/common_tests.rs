@@ -5,11 +5,11 @@ use std::sync::Arc;
 use ai::skills::{ParsedSkill, SkillProvider, SkillScope};
 use itertools::Itertools;
 use ui_components::lightbox::{LightboxImage, LightboxImageSource};
-use warp_util::local_or_remote_path::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]
-use warpui::assets::asset_cache::AssetSource;
-use warpui::elements::{Empty, MouseStateHandle};
-use warpui::{App, Element};
+use uncaged_ui::assets::asset_cache::AssetSource;
+use uncaged_ui::elements::{Empty, MouseStateHandle};
+use uncaged_ui::{App, Element};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 #[cfg(feature = "local_fs")]
 use super::{blocklist_image_asset_source, ResolvedBlocklistImageSources};
@@ -328,7 +328,7 @@ fn blocklist_image_asset_source_uses_cached_resolution_when_available() {
 }
 
 /// `is_supported_blocklist_image_source` should accept the same image extensions
-/// that `warp_util::file_type::is_binary_file` recognises (plus `svg`, which is
+/// that `uncaged_util::file_type::is_binary_file` recognises (plus `svg`, which is
 /// text/XML and not in `is_binary_file`). Until #9395 / this fix landed the
 /// blocklist list was only `jpg | jpeg | png | gif | webp | svg`, so inline
 /// references to local `.bmp` / `.tiff` / `.tif` / `.ico` images failed the

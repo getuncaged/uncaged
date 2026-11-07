@@ -1,7 +1,7 @@
 use enum_iterator::Sequence;
 use instant::Instant;
+use uncaged_ui::EntityId;
 use uuid::Uuid;
-use warpui::EntityId;
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::artifacts::Artifact;

@@ -18,4 +18,9 @@ pub struct LogService {}
 impl ipc::Service for LogService {
     type Request = LogServiceRequest;
     type Response = LogServiceResponse;
+
+    /// The ID this service had before the crate rename; kept so it stays stable on the wire.
+    fn id() -> &'static str {
+        "warp::plugin::service::logging::LogService"
+    }
 }

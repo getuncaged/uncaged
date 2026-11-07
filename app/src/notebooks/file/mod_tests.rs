@@ -7,13 +7,13 @@ use repo_metadata::watcher::DirectoryWatcher;
 #[cfg(feature = "local_fs")]
 use repo_metadata::RepoMetadataModel;
 use string_offset::CharOffset;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_editor::render::model::BlockItem;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_editor::render::model::BlockItem;
 #[cfg(feature = "local_fs")]
-use warp_files::FileModel;
-use warpui::platform::WindowStyle;
-use warpui::{App, SingletonEntity, View};
+use uncaged_files::FileModel;
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::{App, SingletonEntity, View};
 
 use super::{FileNotebookView, FileState, MarkdownDisplayMode, SourceFile};
 use crate::cloud_object::model::persistence::CloudModel;

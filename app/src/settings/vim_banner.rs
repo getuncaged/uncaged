@@ -1,5 +1,5 @@
 use settings::SupportedPlatforms;
-use warp_core::define_settings_group;
+use uncaged_core::define_settings_group;
 
 use crate::banner::BannerState;
 

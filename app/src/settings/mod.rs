@@ -61,9 +61,9 @@ pub use scroll::*;
 pub use select::*;
 pub use ssh::*;
 pub use theme::*;
+use uncaged_core::user_preferences::GetUserPreferences as _;
 pub use updates::*;
 pub use vim_banner::*;
-use warp_core::user_preferences::GetUserPreferences as _;
 
 /// Describes errors encountered when loading settings from `settings.toml`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -124,10 +124,10 @@ use pathfinder_geometry::vector::Vector2F;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use settings::Setting as _;
-use warp_core::features::FeatureFlag;
-use warpui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
-use warpui::keymap::Keystroke;
-use warpui::{AppContext, DisplayIdx, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::{AppContext, DisplayIdx, SingletonEntity};
 
 use crate::root_view::QuakeModePinPosition;
 use crate::terminal::{BlockListSettings, BlockPadding};
@@ -588,10 +588,10 @@ pub struct ExtraMetaKeysChangedArg {
 
 /// Returns the path to the user preferences file.
 pub fn user_preferences_file_path() -> PathBuf {
-    warp_core::paths::config_local_dir().join("user_preferences.json")
+    uncaged_core::paths::config_local_dir().join("user_preferences.json")
 }
 
 /// Returns the path to the TOML settings file.
 pub fn user_preferences_toml_file_path() -> PathBuf {
-    warp_core::paths::config_local_dir().join("settings.toml")
+    uncaged_core::paths::config_local_dir().join("settings.toml")
 }

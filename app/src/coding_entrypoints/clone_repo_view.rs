@@ -1,5 +1,5 @@
-use warpui::elements::{ChildView, Flex, ParentElement as _};
-use warpui::{
+use uncaged_ui::elements::{ChildView, Flex, ParentElement as _};
+use uncaged_ui::{
     AppContext, Element, Entity, FocusContext, TypedActionView, View, ViewContext, ViewHandle,
 };
 

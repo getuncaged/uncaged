@@ -1,6 +1,6 @@
 use settings::macros::define_settings_group;
 use settings::SupportedPlatforms;
-use warpui::{AppContext, WindowId};
+use uncaged_ui::{AppContext, WindowId};
 
 define_settings_group!(WindowSettings, settings: [
     background_blur_radius: BackgroundBlurRadius {

@@ -1,12 +1,12 @@
 #[cfg(feature = "local_fs")]
 use std::path::PathBuf;
 
-use warpui::elements::{
+use uncaged_ui::elements::{
     ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment,
     MainAxisSize, ParentElement, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext, ViewHandle};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext, ViewHandle};
 
 use crate::ai::custom_model_routers::{CustomModelRouter, CustomModelRouting};
 use crate::ai::llms::{LLMId, LLMPreferences};
@@ -218,10 +218,10 @@ impl View for CustomRouterView {
         )
         .with_background(appearance.theme().surface_2())
         .with_border(
-            warpui::elements::Border::new(1.).with_border_fill(appearance.theme().outline()),
+            uncaged_ui::elements::Border::new(1.).with_border_fill(appearance.theme().outline()),
         )
-        .with_corner_radius(warpui::elements::CornerRadius::with_all(
-            warpui::elements::Radius::Pixels(warp_core::ui::radius::SMALL),
+        .with_corner_radius(uncaged_ui::elements::CornerRadius::with_all(
+            uncaged_ui::elements::Radius::Pixels(uncaged_core::ui::radius::SMALL),
         ))
         .with_horizontal_padding(16.)
         .with_vertical_padding(12.)
@@ -230,7 +230,7 @@ impl View for CustomRouterView {
 }
 
 #[cfg(feature = "local_fs")]
-impl warpui::TypedActionView for CustomRouterView {
+impl uncaged_ui::TypedActionView for CustomRouterView {
     type Action = CustomRouterViewAction;
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
@@ -249,7 +249,7 @@ impl warpui::TypedActionView for CustomRouterView {
 fn render_targets_row(
     routing: &CustomModelRouting,
     appearance: &Appearance,
-    sub_color: warp_core::ui::theme::Fill,
+    sub_color: uncaged_core::ui::theme::Fill,
     _is_ai_enabled: bool,
     app: &AppContext,
 ) -> Box<dyn Element> {
@@ -342,7 +342,7 @@ fn render_model_line(
     label: impl Into<String>,
     model_id: impl Into<String>,
     appearance: &Appearance,
-    sub_color: warp_core::ui::theme::Fill,
+    sub_color: uncaged_core::ui::theme::Fill,
 ) -> Box<dyn Element> {
     Flex::row()
         .with_cross_axis_alignment(CrossAxisAlignment::Center)
@@ -370,9 +370,9 @@ pub fn render_router_error_card(
     error_message: impl Into<String>,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
-    use warpui::elements::Shrinkable;
+    use uncaged_ui::elements::Shrinkable;
     let theme = appearance.theme();
-    let error_fill = warp_core::ui::theme::Fill::Solid(theme.ui_error_color());
+    let error_fill = uncaged_core::ui::theme::Fill::Solid(theme.ui_error_color());
     let sub = theme.sub_text_color(theme.surface_2());
     let file_name = file_name.into();
     let error_message = error_message.into();
@@ -419,9 +419,9 @@ pub fn render_router_error_card(
             .finish(),
     )
     .with_background(theme.surface_2())
-    .with_border(warpui::elements::Border::new(1.).with_border_fill(error_fill))
-    .with_corner_radius(warpui::elements::CornerRadius::with_all(
-        warpui::elements::Radius::Pixels(warp_core::ui::radius::SMALL),
+    .with_border(uncaged_ui::elements::Border::new(1.).with_border_fill(error_fill))
+    .with_corner_radius(uncaged_ui::elements::CornerRadius::with_all(
+        uncaged_ui::elements::Radius::Pixels(uncaged_core::ui::radius::SMALL),
     ))
     .with_horizontal_padding(16.)
     .with_vertical_padding(10.)

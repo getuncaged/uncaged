@@ -1,9 +1,9 @@
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::color::coloru_with_opacity;
-use warp_core::ui::theme::{Fill, WarpTheme};
-use warpui::color::ColorU;
-use warpui::elements::{ConstrainedBox, Container, CornerRadius, Radius};
-use warpui::Element;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::color::coloru_with_opacity;
+use uncaged_core::ui::theme::{Fill, WarpTheme};
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::{ConstrainedBox, Container, CornerRadius, Radius};
+use uncaged_ui::Element;
 
 use crate::ai::agent::conversation::{ConversationStatus, StatusColorStyle};
 use crate::ai::agent_conversations_model::AgentRunDisplayStatus;
@@ -46,7 +46,7 @@ pub fn render_status_element(
     .with_uniform_padding(STATUS_ELEMENT_PADDING)
     .with_background(coloru_with_opacity(color, 10))
     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-        warp_core::ui::radius::SMALL,
+        uncaged_core::ui::radius::SMALL,
     )))
     .finish()
 }

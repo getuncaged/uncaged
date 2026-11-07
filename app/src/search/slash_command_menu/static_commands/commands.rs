@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::icons::BRAND_MARK_SVG;
 use uuid::Uuid;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::icons::BRAND_MARK_SVG;
 
 use super::Availability;
 use crate::search::slash_command_menu::static_commands::Argument;

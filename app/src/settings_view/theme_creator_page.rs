@@ -12,10 +12,10 @@
 //! file picker, and surfacing errors.
 
 use settings::Setting as _;
-use warpui::elements::Element;
-use warpui::platform::{FilePickerConfiguration, FileType};
-use warpui::presenter::ChildView;
-use warpui::{
+use uncaged_ui::elements::Element;
+use uncaged_ui::platform::{FilePickerConfiguration, FileType};
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::{
     AppContext, Entity, SingletonEntity, TypedActionView, UpdateModel, View, ViewContext,
     ViewHandle,
 };

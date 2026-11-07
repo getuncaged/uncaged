@@ -46,6 +46,6 @@ pub use slides::{
     ProjectOnboardingSettings,
 };
 
-pub fn init(app: &mut warpui_core::AppContext) {
+pub fn init(app: &mut uncaged_ui_core::AppContext) {
     agent_onboarding_view::init(app);
 }

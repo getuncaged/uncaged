@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
-use warp_core::ui::radius;
-use warp_util::path::user_friendly_path;
-use warpui::elements::{Border, ChildView, Container, Hoverable, MouseStateHandle, Text};
-use warpui::platform::Cursor;
-use warpui::text_layout::ClipConfig;
-use warpui::ui_components::components::UiComponentStyles;
-use warpui::{
+use uncaged_core::ui::radius;
+use uncaged_ui::elements::{Border, ChildView, Container, Hoverable, MouseStateHandle, Text};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::ui_components::components::UiComponentStyles;
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
+use uncaged_util::path::user_friendly_path;
 
 use crate::ai::persisted_workspace::{PersistedWorkspace, PersistedWorkspaceEvent};
 use crate::appearance::Appearance;

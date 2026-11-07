@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use string_offset::ByteOffset;
-use warp_ripgrep::search::Submatch;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_ripgrep::search::Submatch;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::GlobalSearch;
 use crate::workspace::view::global_search::GlobalSearchMatch;

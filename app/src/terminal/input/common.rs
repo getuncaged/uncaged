@@ -1,19 +1,19 @@
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
-use vim::vim::{VimMode, VimState};
-use warp_completer::completer::Description;
-use warp_core::features::FeatureFlag;
-use warpui::elements::{
+use uncaged_completer::completer::Description;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::elements::{
     AnchorPair, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, Element, EventHandler, Flex, OffsetPositioning, OffsetType, ParentAnchor,
     ParentElement, ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius,
     Shrinkable, Stack, Text, XAxisAnchor,
 };
-use warpui::fonts::Weight;
-use warpui::presenter::ChildView;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{AppContext, SingletonEntity, ViewHandle};
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{AppContext, SingletonEntity, ViewHandle};
+use vim::vim::{VimMode, VimState};
 
 use crate::appearance::Appearance;
 use crate::settings::{AISettings, InputSettings};
@@ -454,7 +454,7 @@ fn render_command_token_description(
             .with_margin_bottom(TOKEN_DESCRIPTION_MARGIN)
             .with_border(Border::all(1.).with_border_fill(theme.split_pane_border_color()))
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_background_color(theme.surface_2().into_solid())
             .finish(),

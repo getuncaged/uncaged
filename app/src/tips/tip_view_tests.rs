@@ -1,6 +1,6 @@
-use warpui::elements::{ChildView, Empty, SavePosition};
-use warpui::platform::WindowStyle;
-use warpui::{App, ViewHandle};
+use uncaged_ui::elements::{ChildView, Empty, SavePosition};
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::{App, ViewHandle};
 
 use super::*;
 

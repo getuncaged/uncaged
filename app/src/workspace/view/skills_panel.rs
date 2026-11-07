@@ -14,12 +14,12 @@
 use std::path::{Path, PathBuf};
 
 use ai::skills::SKILL_PROVIDER_DEFINITIONS;
-use warp_core::ui::radius;
-use warpui::elements::{
+use uncaged_core::ui::radius;
+use uncaged_ui::elements::{
     ClippedScrollStateHandle, ClippedScrollable, Container, CrossAxisAlignment, Element, Fill,
     Flex, Hoverable, MainAxisSize, MouseStateHandle, ParentElement, ScrollbarWidth, Text,
 };
-use warpui::platform::Cursor;
+use uncaged_ui::platform::Cursor;
 
 use crate::appearance::Appearance;
 use crate::WorkspaceAction;

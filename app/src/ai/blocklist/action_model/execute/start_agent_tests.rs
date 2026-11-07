@@ -1,6 +1,6 @@
 use ai::agent::action_result::StartAgentVersion;
-use warp_core::features::FeatureFlag;
-use warpui::{App, Entity, EntityId, ModelHandle};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{App, Entity, EntityId, ModelHandle};
 
 use super::*;
 use crate::ai::agent::conversation::ConversationStatus;

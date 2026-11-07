@@ -3,10 +3,10 @@ use std::time::Duration;
 
 use instant::Instant;
 use parking_lot::FairMutex;
-use warp_core::ui::appearance::Appearance;
-use warpui::keymap::Keystroke;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{DismissalStrategy, EphemeralMessage, EphemeralMessageModel};
 use crate::ai::agent::conversation::AIConversationId;
@@ -506,14 +506,17 @@ impl AgentViewController {
         self.clear_pending_confirmation(ctx);
         self.pending_confirmation = Some(pending_confirmation);
 
-        let abort_handle = ctx.spawn_abortable(
-            async move { warpui::r#async::Timer::after(ENTER_OR_EXIT_CONFIRMATION_WINDOW).await },
-            move |me, _, _ctx| {
-                me.pending_confirmation = None;
-                me.pending_confirmation_abort_handle = None;
-            },
-            |_, _| (),
-        );
+        let abort_handle =
+            ctx.spawn_abortable(
+                async move {
+                    uncaged_ui::r#async::Timer::after(ENTER_OR_EXIT_CONFIRMATION_WINDOW).await
+                },
+                move |me, _, _ctx| {
+                    me.pending_confirmation = None;
+                    me.pending_confirmation_abort_handle = None;
+                },
+                |_, _| (),
+            );
         self.pending_confirmation_abort_handle = Some(abort_handle);
 
         self.ephemeral_message_model.update(ctx, |model, ctx| {

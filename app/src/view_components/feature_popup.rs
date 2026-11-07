@@ -1,9 +1,11 @@
-use warpui::elements::{
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable, MouseStateHandle,
     ParentElement, Radius, Text,
 };
-use warpui::platform::Cursor;
-use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::{
+    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
+};
 
 use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
@@ -146,7 +148,7 @@ impl View for FeaturePopup {
             .with_vertical_padding(4.)
             .with_background(appearance.theme().main_text_color(background))
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .finish(),
         )

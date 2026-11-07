@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use warpui::{Entity, ModelHandle};
+use uncaged_ui::{Entity, ModelHandle};
 
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::DataSourceRunErrorWrapper;
@@ -31,7 +31,7 @@ impl SyncDataSource for ZeroStateDataSource {
     fn run_query(
         &self,
         query: &Query,
-        app: &warpui::AppContext,
+        app: &uncaged_ui::AppContext,
     ) -> Result<Vec<QueryResult<Self::Action>>, DataSourceRunErrorWrapper> {
         if !query.text.is_empty() {
             return Ok(vec![]);

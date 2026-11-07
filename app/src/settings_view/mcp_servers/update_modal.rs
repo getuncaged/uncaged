@@ -1,20 +1,20 @@
 use chrono::{Local, TimeZone};
-use uuid::Uuid;
-use warp_core::ui::external_product_icon::ExternalProductIcon;
-use warp_core::ui::icons::Icon;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{
+use uncaged_core::ui::external_product_icon::ExternalProductIcon;
+use uncaged_core::ui::icons::Icon;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{
     Align, Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Flex, Hoverable, MainAxisAlignment, MouseStateHandle, Padding, ParentElement, Radius,
     Shrinkable, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::Keystroke;
-use warpui::platform::Cursor;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
+use uuid::Uuid;
 
 use crate::ai::mcp::{Author, MCPServerUpdate};
 use crate::appearance::Appearance;
@@ -177,7 +177,7 @@ impl UpdateModalBody {
                         .finish(),
                     )
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )))
                     .with_padding(Padding::uniform(2.));
                     if state.is_hovered() {
@@ -206,7 +206,7 @@ impl UpdateModalBody {
         )
         .with_background_color(theme.surface_2().into())
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .with_padding(Padding::uniform(4.))
         .finish();

@@ -4,7 +4,7 @@
 //! This IPC is hosted by the rust app process and called by the plugin process when plugins
 //! register command signatures.
 use serde::{Deserialize, Serialize};
-use warp_completer::signatures::CommandSignature;
+use uncaged_completer::signatures::CommandSignature;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct RegisterCommandSignatureRequest {
@@ -24,4 +24,9 @@ pub struct RegisterCommandSignatureService {}
 impl ipc::Service for RegisterCommandSignatureService {
     type Request = RegisterCommandSignatureRequest;
     type Response = RegisterCommandSignatureResponse;
+
+    /// The ID this service had before the crate rename; kept so it stays stable on the wire.
+    fn id() -> &'static str {
+        "warp::plugin::service::completions::RegisterCommandSignatureService"
+    }
 }

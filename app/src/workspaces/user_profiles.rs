@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 pub use cloud_object_models::UserProfileWithUID;
 use cloud_objects::UserUid;
-use warpui::{Entity, SingletonEntity};
+use uncaged_ui::{Entity, SingletonEntity};
 
 pub enum UserProfilesEvent {}
 

@@ -5,16 +5,16 @@ use std::time::Duration;
 use instant::Instant;
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::Fill;
-use warp_multi_agent_api as api;
-use warpui::elements::shimmering_text::ShimmeringTextStateHandle;
-use warpui::elements::{Border, Container, Empty, Flex, MouseStateHandle, ParentElement, Text};
-use warpui::keymap::Keystroke;
-use warpui::presenter::ChildView;
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::{
+use uncaged_agent_api as api;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::shimmering_text::ShimmeringTextStateHandle;
+use uncaged_ui::elements::{Border, Container, Empty, Flex, MouseStateHandle, ParentElement, Text};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -862,7 +862,7 @@ fn latest_model_used_before_exchange<V: View>(
 
 fn render_agent_tip(tip: &AgentTip, app: &AppContext) -> Box<dyn Element> {
     use markdown_parser::{FormattedTextFragment, FormattedTextLine};
-    use warpui::text_layout::ClipConfig;
+    use uncaged_ui::text_layout::ClipConfig;
 
     use crate::ai::agent_tips::AITip;
 
@@ -883,7 +883,7 @@ fn render_agent_tip(tip: &AgentTip, app: &AppContext) -> Box<dyn Element> {
 
     let formatted_text =
         markdown_parser::FormattedText::new(vec![FormattedTextLine::Line(fragments)]);
-    warpui::elements::FormattedTextElement::new(
+    uncaged_ui::elements::FormattedTextElement::new(
         formatted_text,
         appearance.monospace_font_size() - 3.,
         appearance.ui_font_family(),
@@ -895,7 +895,7 @@ fn render_agent_tip(tip: &AgentTip, app: &AppContext) -> Box<dyn Element> {
     .set_selectable(true)
     .with_clip(ClipConfig::ellipsis())
     .register_default_click_handlers_with_action_support(move |link, evt, app| {
-        use warpui::elements::HyperlinkLens;
+        use uncaged_ui::elements::HyperlinkLens;
         match link {
             HyperlinkLens::Url(url) => {
                 app.open_url(url);
@@ -989,7 +989,7 @@ impl View for BlocklistAIStatusBar {
         "BlocklistAIStatusBar"
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn uncaged_ui::Element> {
         let appearance = Appearance::as_ref(app);
         let agent_view_controller = self.agent_view_controller.as_ref(app);
         let status_element = if self

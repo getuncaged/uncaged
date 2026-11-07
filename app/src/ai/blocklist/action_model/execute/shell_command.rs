@@ -10,11 +10,11 @@ use futures::{select, FutureExt};
 use futures_lite::pin;
 use itertools::Itertools;
 use parking_lot::FairMutex;
-use warp_core::command::ExitCode;
-use warp_core::execution_mode::AppExecutionMode;
-use warp_util::path::ShellFamily;
-use warpui::r#async::{Spawnable, Timer};
-use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::command::ExitCode;
+use uncaged_core::execution_mode::AppExecutionMode;
+use uncaged_ui::r#async::{Spawnable, Timer};
+use uncaged_ui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_util::path::ShellFamily;
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::{

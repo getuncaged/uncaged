@@ -1,5 +1,5 @@
 use anyhow::Result;
-use warpui::AppContext;
+use uncaged_ui::AppContext;
 
 use super::{DisplayMap, DisplayPoint};
 

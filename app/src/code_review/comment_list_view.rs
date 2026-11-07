@@ -4,21 +4,20 @@ use indexmap::IndexMap;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use string_offset::CharOffset;
-use vec1::vec1;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::color::blend::Blend;
-use warp_core::ui::theme::color::internal_colors::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::color::blend::Blend;
+use uncaged_core::ui::theme::color::internal_colors::{
     accent_overlay_2, accent_overlay_3, neutral_1, neutral_3, neutral_4, neutral_6, text_main,
     text_sub,
 };
-use warp_core::ui::theme::Fill;
-use warp_editor::model::CoreEditorModel;
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
-use warpui::elements::resizable::{
+use uncaged_core::ui::theme::Fill;
+use uncaged_editor::model::CoreEditorModel;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
+use uncaged_ui::elements::resizable::{
     resizable_state_handle, DragBarSide, Resizable, ResizableStateHandle,
 };
-use warpui::elements::{
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, DispatchEventResult, Element, Empty, EventHandler,
     Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
@@ -26,15 +25,16 @@ use warpui::elements::{
     Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack,
     Text,
 };
-use warpui::keymap::Keystroke;
-use warpui::platform::Cursor;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::UiComponent;
-use warpui::units::Pixels;
-use warpui::{
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::units::Pixels;
+use uncaged_ui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle,
 };
+use vec1::vec1;
 
 use crate::ai::request_usage_model::AIRequestUsageModel;
 use crate::appearance::Appearance;
@@ -611,7 +611,7 @@ impl CommentListView {
             },
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
         .with_propagate_mousewheel_if_not_handled(true)
@@ -673,7 +673,7 @@ impl CommentListView {
         let mut outdated_section = Container::new(outdated_column.finish())
             .with_border(Border::all(1.).with_border_fill(Fill::Solid(yellow_border)))
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_margin_bottom(8.);
         if !is_collapsed {
@@ -702,7 +702,7 @@ impl CommentListView {
                 };
 
                 let icon_element = icon
-                    .to_warpui_icon(warp_core::ui::theme::Fill::Solid(text_sub(
+                    .to_warpui_icon(uncaged_core::ui::theme::Fill::Solid(text_sub(
                         theme,
                         neutral_1(theme),
                     )))
@@ -741,7 +741,7 @@ impl CommentListView {
                         .with_border(Border::bottom(1.).with_border_color(yellow_border));
                 }
 
-                let radius = Radius::Pixels(warp_core::ui::radius::SMALL);
+                let radius = Radius::Pixels(uncaged_core::ui::radius::SMALL);
                 let header_corners = if is_collapsed {
                     CornerRadius::with_all(radius)
                 } else {
@@ -784,7 +784,7 @@ impl CommentListView {
                         false, /* bottom */
                         true,  /* right */
                     )
-                    .with_border_fill(warp_core::ui::theme::Fill::Solid(neutral_4(theme))),
+                    .with_border_fill(uncaged_core::ui::theme::Fill::Solid(neutral_4(theme))),
             )
             .finish()
     }
@@ -846,7 +846,7 @@ impl CommentListView {
                 };
 
                 let icon_element = icon
-                    .to_warpui_icon(warp_core::ui::theme::Fill::Solid(text_sub(
+                    .to_warpui_icon(uncaged_core::ui::theme::Fill::Solid(text_sub(
                         theme,
                         neutral_3(theme),
                     )))
@@ -860,7 +860,7 @@ impl CommentListView {
                 )
                 .with_margin_right(8.)
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )));
 
                 let container = if mouse_state.is_hovered() {
@@ -1137,8 +1137,8 @@ impl View for CommentListView {
 
             Resizable::new(self.view_state.resizable_state.clone(), panel)
                 .with_dragbar_side(DragBarSide::Top)
-                .with_dragbar_color(warpui::elements::Fill::Solid(
-                    warpui::color::ColorU::transparent_black(),
+                .with_dragbar_color(uncaged_ui::elements::Fill::Solid(
+                    uncaged_ui::color::ColorU::transparent_black(),
                 ))
                 .with_bounds_callback(Box::new(|window_size| (100.0, window_size.y() * 0.8)))
                 .on_resize(|ctx, _| {

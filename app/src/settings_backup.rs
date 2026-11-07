@@ -27,7 +27,7 @@ const WHITELIST: &[&str] = &[
 
 /// The user config directory (e.g. `~/.uncaged`).
 fn config_dir() -> PathBuf {
-    warp_core::paths::data_dir()
+    uncaged_core::paths::data_dir()
 }
 
 fn existing_items(dir: &Path) -> Vec<String> {

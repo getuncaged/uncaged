@@ -1,9 +1,9 @@
 use std::time::{Duration, SystemTime};
 
 use serde::{Deserialize, Serialize};
+use uncaged_ui_core::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui_extras::secure_storage::{self, AppContextExt};
 use uuid::Uuid;
-use warpui_core::{Entity, ModelContext, SingletonEntity};
-use warpui_extras::secure_storage::{self, AppContextExt};
 
 pub use crate::geap_credentials::{
     GeapCredentials, GeapCredentialsState, GeapFederation, GeapMintBinding,

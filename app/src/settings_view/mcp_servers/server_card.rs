@@ -1,23 +1,25 @@
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::external_product_icon::ExternalProductIcon;
-use warp_core::ui::icons::{Icon, ICON_DIMENSIONS};
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::AnsiColorIdentifier;
-use warpui::accessibility::ActionAccessibilityContent;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::external_product_icon::ExternalProductIcon;
+use uncaged_core::ui::icons::{Icon, ICON_DIMENSIONS};
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::AnsiColorIdentifier;
+use uncaged_ui::accessibility::ActionAccessibilityContent;
+use uncaged_ui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Expanded, Fill, Flex,
     FormattedTextElement, HighlightedHyperlink, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseState, MouseStateHandle, Padding, ParentElement, Radius, Text, Wrap,
 };
-use warpui::fonts::Weight;
-use warpui::platform::Cursor;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::chip::Chip;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::switch::SwitchStateHandle;
-use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::chip::Chip;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::switch::SwitchStateHandle;
+use uncaged_ui::{
+    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
+};
 
 use crate::ai::mcp::templatable::CloudTemplatableMCPServer;
 use crate::ai::mcp::{MCPServerState, TemplatableMCPServerManager};
@@ -448,7 +450,7 @@ impl ServerCardView {
                         )),
                         background: Some(internal_colors::neutral_4(appearance.theme()).into()),
                         border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                            warp_core::ui::radius::SMALL,
+                            uncaged_core::ui::radius::SMALL,
                         ))),
                         ..Default::default()
                     },
@@ -553,7 +555,7 @@ impl ServerCardView {
         Container::new(inner)
             .with_background(appearance.theme().surface_3())
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_horizontal_padding(3.)
             .with_vertical_padding(1.)
@@ -835,7 +837,7 @@ impl ServerCardView {
         }
 
         if self.render_options.show_add_icon {
-            let add_icon = warpui::elements::Icon::new(
+            let add_icon = uncaged_ui::elements::Icon::new(
                 Icon::Plus.into(),
                 blended_colors::text_main(appearance.theme(), appearance.theme().background()),
             );

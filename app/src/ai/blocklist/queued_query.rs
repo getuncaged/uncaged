@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
+use uncaged_ui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 use uuid::Uuid;
-use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel, PendingAttachment};

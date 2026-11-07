@@ -1,17 +1,17 @@
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::Fill;
-use warp_core::ui::Icon;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::Fill;
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::{
     Axis, Border, CacheOption, Clipped, Container, CornerRadius, Element, FormattedTextElement,
     Hoverable, Image, ParentElement, Radius, Shrinkable, Wrap, WrapFill,
     DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::platform::Cursor;
-use warpui::prelude::{Align, ConstrainedBox, CrossAxisAlignment, Flex, MainAxisSize, Text};
-use warpui::ui_components::keyboard_shortcut::keystroke_to_keys;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::prelude::{Align, ConstrainedBox, CrossAxisAlignment, Flex, MainAxisSize, Text};
+use uncaged_ui::ui_components::keyboard_shortcut::keystroke_to_keys;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use crate::ai::blocklist::agent_view::agent_view_bg_color;
 use crate::ai::blocklist::agent_view::shortcuts::render_keystroke_with_color_overrides;
@@ -31,7 +31,7 @@ pub fn render_standard_message_bar(
     right_element: Option<Box<dyn Element>>,
     app: &AppContext,
 ) -> Box<dyn Element> {
-    use warpui::prelude::MainAxisAlignment;
+    use uncaged_ui::prelude::MainAxisAlignment;
 
     let (left_items, right_chips): (Vec<_>, Vec<_>) = message.items.into_iter().partition(|item| {
         !matches!(
@@ -552,8 +552,8 @@ pub fn disableable_message_item_color_overrides(
 
 pub mod styles {
     use pathfinder_color::ColorU;
-    use warp_core::ui::appearance::Appearance;
-    use warpui::{AppContext, SingletonEntity};
+    use uncaged_core::ui::appearance::Appearance;
+    use uncaged_ui::{AppContext, SingletonEntity};
 
     use crate::ui_components::blended_colors;
 

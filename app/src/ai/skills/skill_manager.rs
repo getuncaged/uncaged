@@ -7,10 +7,10 @@ use ai::skills::{
     provider_rank, ParsedSkill, SkillPathOrigin, SkillProvider, SkillReference, SkillScope,
 };
 pub use file_watchers::{extract_skill_parent_directory, SkillWatcher, SkillWatcherEvent};
-use warp_core::features::FeatureFlag;
-use warp_util::host_id::HostId;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_util::host_id::HostId;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 #[cfg(test)]
 use super::bundled::{

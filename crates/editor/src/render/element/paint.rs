@@ -3,13 +3,13 @@
 use std::ops::Range;
 
 use string_offset::CharOffset;
+use uncaged_core::ui::appearance::DEFAULT_UI_FONT_SIZE;
+use uncaged_ui_core::PaintContext;
+use uncaged_ui_core::elements::{CornerRadius, Point, Radius};
+use uncaged_ui_core::geometry::rect::RectF;
+use uncaged_ui_core::geometry::vector::{Vector2F, vec2f};
+use uncaged_ui_core::text_layout::{Line, PaintStyleOverride, TextFrame};
 use vim::vim::VimMode;
-use warp_core::ui::appearance::DEFAULT_UI_FONT_SIZE;
-use warpui_core::PaintContext;
-use warpui_core::elements::{CornerRadius, Point, Radius};
-use warpui_core::geometry::rect::RectF;
-use warpui_core::geometry::vector::{Vector2F, vec2f};
-use warpui_core::text_layout::{Line, PaintStyleOverride, TextFrame};
 
 use crate::editor::TextDecoration;
 use crate::render::layout::line_height;

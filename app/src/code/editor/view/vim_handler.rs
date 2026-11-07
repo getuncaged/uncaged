@@ -1,18 +1,18 @@
+use uncaged_editor::content::buffer::{
+    AutoScrollBehavior, BufferEditAction, EditOrigin, SelectionOffsets, ToBufferCharOffset as _,
+    VimInsertPoint,
+};
+use uncaged_editor::model::{CoreEditorModel, PlainTextEditorModel};
+use uncaged_editor::render::model::AutoScrollMode;
+use uncaged_editor::selection::{TextDirection, TextUnit};
+use uncaged_ui::text::point::Point;
+use uncaged_ui::units::IntoPixels;
+use uncaged_ui::{SingletonEntity, ViewContext};
 use vim::vim::{
     BracketChar, CharacterMotion, Direction, FindCharMotion, FirstNonWhitespaceMotion,
     InsertPosition, LineMotion, ModeTransition, MotionType, TextObjectType, VimHandler, VimMode,
     VimMotion, VimOperand, VimOperator, VimTextObject, WordMotion,
 };
-use warp_editor::content::buffer::{
-    AutoScrollBehavior, BufferEditAction, EditOrigin, SelectionOffsets, ToBufferCharOffset as _,
-    VimInsertPoint,
-};
-use warp_editor::model::{CoreEditorModel, PlainTextEditorModel};
-use warp_editor::render::model::AutoScrollMode;
-use warp_editor::selection::{TextDirection, TextUnit};
-use warpui::text::point::Point;
-use warpui::units::IntoPixels;
-use warpui::{SingletonEntity, ViewContext};
 
 use super::{CodeEditorEvent, CodeEditorView};
 use crate::code::editor::find::view::Event as FindViewEvent;
@@ -152,7 +152,7 @@ impl VimHandler for CodeEditorView {
     ) {
         // Selection logic is almost the same for all operators, so capture that in a closure first.
         let selection_change =
-            |model: &mut CodeEditorModel, ctx: &mut warpui::ModelContext<CodeEditorModel>| {
+            |model: &mut CodeEditorModel, ctx: &mut uncaged_ui::ModelContext<CodeEditorModel>| {
                 match operand {
                     VimOperand::Motion {
                         motion,

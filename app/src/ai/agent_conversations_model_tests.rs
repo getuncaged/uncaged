@@ -5,9 +5,9 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
 use persistence::model::{AgentConversationData, ConversationUsageMetadata};
-use warp_cli::agent::Harness;
-use warp_core::features::FeatureFlag;
-use warpui::{App, EntityId, ModelHandle, SingletonEntity};
+use uncaged_cli::agent::Harness;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{App, EntityId, ModelHandle, SingletonEntity};
 
 use super::entry::{
     AgentConversationEntryId, AgentConversationNavigationSubject, AgentConversationProvenance,

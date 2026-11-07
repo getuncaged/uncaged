@@ -2,12 +2,12 @@ use std::marker::PhantomData;
 use std::ops::Range;
 
 use itertools::Itertools;
-use warpui::elements::{
+use uncaged_ui::elements::{
     ConstrainedBox, Container, Empty, Flex, ParentElement, SavePosition, ScrollStateHandle,
     Scrollable, ScrollableElement, ScrollbarWidth, Text, UniformList, UniformListState,
 };
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
     Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, View, ViewContext,
     ViewHandle, WeakViewHandle,
 };
@@ -177,7 +177,7 @@ impl<T: Action + Clone> SearchResultsMenuView<T> {
                 ScrollbarWidth::Auto,
                 theme.nonactive_ui_detail().into(),
                 theme.active_ui_detail().into(),
-                warpui::elements::Fill::None,
+                uncaged_ui::elements::Fill::None,
             )
             .with_overlayed_scrollbar()
             .finish(),

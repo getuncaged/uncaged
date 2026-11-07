@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
-use warp_multi_agent_api::{FileContent, FileContentLineRange};
+use uncaged_agent_api::{FileContent, FileContentLineRange};
 
 use crate::ai::agent::{
     AIAgentContext, AIAgentOutput, AIAgentOutputMessage, AIAgentOutputMessageType, AIAgentText,

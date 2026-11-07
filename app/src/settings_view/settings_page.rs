@@ -6,24 +6,24 @@ use itertools::Itertools as _;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use settings::Setting;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::new_scrollable::{
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::new_scrollable::{
     ClippedAxisConfiguration, DualAxisConfig, ScrollableAppearance, SingleAxisConfig,
 };
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Element, Empty, Expanded, Flex, Hoverable, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, NewScrollable, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth,
     Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::platform::Cursor;
-use warpui::ui_components::button::{Button, ButtonVariant};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::slider::SliderStateHandle;
-use warpui::units::Pixels;
-use warpui::{Action, AppContext, SingletonEntity, ViewContext, ViewHandle};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::button::{Button, ButtonVariant};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::slider::SliderStateHandle;
+use uncaged_ui::units::Pixels;
+use uncaged_ui::{Action, AppContext, SingletonEntity, ViewContext, ViewHandle};
 
 use super::about_page::AboutPageView;
 use super::ai_page::{AISettingsPageAction, AISettingsPageView};
@@ -320,7 +320,7 @@ pub fn settings_description_color(appearance: &Appearance) -> ColorU {
 pub fn settings_card(content: Box<dyn Element>, appearance: &Appearance) -> Container {
     Container::new(content)
         .with_background(appearance.theme().surface_1())
-        .with_corner_radius(warp_core::ui::radius::medium())
+        .with_corner_radius(uncaged_core::ui::radius::medium())
         .with_horizontal_padding(SETTINGS_CARD_HORIZONTAL_PADDING)
         .with_padding_top(SETTINGS_CARD_TOP_PADDING)
 }
@@ -388,7 +388,7 @@ pub fn render_full_pane_width_ai_button(
             Border::new(1.).with_border_fill(internal_colors::neutral_4(appearance.theme())),
         )
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .with_horizontal_padding(16.)
         .with_vertical_padding(11.)
@@ -826,7 +826,7 @@ pub fn render_segmented_control<A: Action + Clone>(
 ) -> Box<dyn Element> {
     let theme = appearance.theme();
     let segment_radius = CornerRadius::with_all(Radius::Pixels(
-        warp_core::ui::radius::SMALL - SEGMENT_TRACK_PADDING,
+        uncaged_core::ui::radius::SMALL - SEGMENT_TRACK_PADDING,
     ));
     let mut row = Flex::row()
         .with_main_axis_size(MainAxisSize::Min)
@@ -884,7 +884,7 @@ pub fn render_segmented_control<A: Action + Clone>(
     Container::new(row.finish())
         .with_uniform_padding(SEGMENT_TRACK_PADDING)
         .with_background(theme.surface_2())
-        .with_corner_radius(warp_core::ui::radius::small())
+        .with_corner_radius(uncaged_core::ui::radius::small())
         .finish()
 }
 
@@ -1128,7 +1128,7 @@ fn render_alternating_color_list_item<SettingsPageAction: Action + Clone>(
     .with_background(background)
     .with_uniform_padding(ALTERNATING_LIST_ITEM_PADDING)
     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-        warp_core::ui::radius::SMALL,
+        uncaged_core::ui::radius::SMALL,
     )))
     // The bottom has a bit of extra padding b/c lines of text have more space above the text
     // than below. This visually balances that to make it look vertically centered.
@@ -1159,7 +1159,7 @@ where
 
 /// Structured contents of a settings tab page. This type breaks all the content into
 /// [`SettingsWidget`]s.
-pub(super) enum PageType<V: warpui::View> {
+pub(super) enum PageType<V: uncaged_ui::View> {
     /// A page where the contents cannot be separated for showing search results. If any part
     /// matches the search query, the whole page must show. The whole page is one big
     /// [`SettingsWidget`].
@@ -1249,7 +1249,7 @@ impl From<usize> for MatchData {
     }
 }
 
-impl<V: warpui::View> PageType<V> {
+impl<V: uncaged_ui::View> PageType<V> {
     /// A page where the contents cannot be separated for showing search results. If any part
     /// matches the search query, the whole page must show. The whole page is one big
     /// [`SettingsWidget`].
@@ -1689,7 +1689,7 @@ impl<V: warpui::View> PageType<V> {
                 },
                 theme.nonactive_ui_detail().into(),
                 theme.active_ui_detail().into(),
-                warpui::elements::Fill::None,
+                uncaged_ui::elements::Fill::None,
             )
             // Uncaged: the scrollbar floats in the page's side padding rather than taking width
             // from it, so the page's column stays centred under the title above it.
@@ -1719,7 +1719,7 @@ impl<V: warpui::View> PageType<V> {
                     },
                     theme.nonactive_ui_detail().into(),
                     theme.active_ui_detail().into(),
-                    warpui::elements::Fill::None,
+                    uncaged_ui::elements::Fill::None,
                 )
                 .finish(),
             )],
@@ -1743,7 +1743,7 @@ impl<V: warpui::View> PageType<V> {
 }
 
 /// The results from a [`PageType`] with only matching [`SettingsWidget`]s.
-pub(super) enum FilteredPageType<'a, V: warpui::View> {
+pub(super) enum FilteredPageType<'a, V: uncaged_ui::View> {
     Monolith {
         widget: Option<&'a dyn SettingsWidget<View = V>>,
         title: Option<&'static str>,
@@ -1768,13 +1768,13 @@ pub(super) enum FilteredPageType<'a, V: warpui::View> {
 }
 
 /// A grouping of related [`SettingsWidget`]s that fall under the same sub-header.
-pub(super) struct Category<V: warpui::View> {
+pub(super) struct Category<V: uncaged_ui::View> {
     title: &'static str,
     subtitle: Option<&'static str>,
     widgets: Vec<Box<dyn SettingsWidget<View = V>>>,
 }
 
-impl<V: warpui::View> Category<V> {
+impl<V: uncaged_ui::View> Category<V> {
     pub(super) fn new(
         title: &'static str,
         widgets: Vec<Box<dyn SettingsWidget<View = V>>>,
@@ -1793,7 +1793,7 @@ impl<V: warpui::View> Category<V> {
 }
 
 /// A [`Category`] with only the results which match a search query.
-pub(super) struct FilteredCategory<'a, V: warpui::View> {
+pub(super) struct FilteredCategory<'a, V: uncaged_ui::View> {
     pub(super) title: &'static str,
     pub(super) subtitle: Option<&'static str>,
     pub(super) widgets: Vec<&'a dyn SettingsWidget<View = V>>,
@@ -1803,7 +1803,7 @@ pub(super) struct FilteredCategory<'a, V: warpui::View> {
 /// content to match against.
 pub(super) trait SettingsWidget {
     /// Which View (settings page) this widget belongs to.
-    type View: warpui::View;
+    type View: uncaged_ui::View;
 
     fn static_widget_id() -> &'static str
     where
@@ -1835,7 +1835,7 @@ pub(super) trait SettingsWidget {
             content = Container::new(content)
                 .with_border(Border::all(1.).with_border_fill(appearance.theme().accent()))
                 .with_background(internal_colors::accent_overlay_1(appearance.theme()))
-                .with_corner_radius(warp_core::ui::radius::small())
+                .with_corner_radius(uncaged_core::ui::radius::small())
                 .with_horizontal_padding(8.)
                 .with_padding_top(8.)
                 .finish()

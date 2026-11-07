@@ -1,6 +1,6 @@
-use warpui_core::elements::{Border, CornerRadius, ListIndentLevel, Radius, Rect};
-use warpui_core::geometry::vector::vec2f;
-use warpui_core::{Element, SizeConstraint};
+use uncaged_ui_core::elements::{Border, CornerRadius, ListIndentLevel, Radius, Rect};
+use uncaged_ui_core::geometry::vector::vec2f;
+use uncaged_ui_core::{Element, SizeConstraint};
 
 use super::RenderableBlock;
 use super::paint::RenderContext;
@@ -61,8 +61,8 @@ impl RenderableBlock for RenderableBulletList {
     fn layout(
         &mut self,
         model: &RenderState,
-        ctx: &mut warpui_core::LayoutContext,
-        app: &warpui_core::AppContext,
+        ctx: &mut uncaged_ui_core::LayoutContext,
+        app: &uncaged_ui_core::AppContext,
     ) {
         self.bullet_point.layout(
             SizeConstraint::strict(vec2f(self.bullet_size, self.bullet_size)),
@@ -86,7 +86,7 @@ impl RenderableBlock for RenderableBulletList {
         &mut self,
         model: &RenderState,
         ctx: &mut RenderContext,
-        app: &warpui_core::AppContext,
+        app: &uncaged_ui_core::AppContext,
     ) {
         let content = model.content();
         let unordered_list = extract_block!(self.viewport_item, content, (block, BlockItem::UnorderedList{ paragraph: inner, ..}) => block.unordered_list(inner));

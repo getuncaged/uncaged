@@ -1,13 +1,13 @@
 use asset_macro::bundled_or_fetched_asset;
 use pathfinder_color::ColorU;
-use warp_core::ui::color::blend::Blend;
-use warp_core::ui::color::{coloru_with_opacity, OPAQUE};
-use warp_core::ui::theme::color::CustomDetails;
-use warp_core::ui::theme::{
+use uncaged_core::ui::color::blend::Blend;
+use uncaged_core::ui::color::{coloru_with_opacity, OPAQUE};
+use uncaged_core::ui::theme::color::CustomDetails;
+use uncaged_core::ui::theme::{
     AnsiColor, AnsiColors, Details, Fill, HorizontalGradient, Image, TerminalColors,
     VerticalGradient, WarpTheme,
 };
-use warpui::assets::asset_cache::AssetSource;
+use uncaged_ui::assets::asset_cache::AssetSource;
 
 const DARK_MODE_NORMAL_COLORS: AnsiColors = AnsiColors::new(
     AnsiColor::from_u32(0x616161FF),

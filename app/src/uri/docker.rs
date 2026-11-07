@@ -3,9 +3,9 @@ use std::fmt::Display;
 
 use anyhow::{anyhow, Result};
 use regex::Regex;
+use uncaged_ui::AppContext;
+use uncaged_util::path::{is_posix_portable_pathname, ShellFamily};
 use url::Url;
-use warp_util::path::{is_posix_portable_pathname, ShellFamily};
-use warpui::AppContext;
 
 use crate::root_view::SubshellCommandArg;
 use crate::terminal::shell::ShellType;

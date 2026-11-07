@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use warp_editor::render::model::{LineCount, RenderLineLocation};
+use uncaged_editor::render::model::{LineCount, RenderLineLocation};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditorLineLocation {

@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use anyhow::anyhow;
-use warp_core::report_error;
-use warp_multi_agent_api as api;
+use uncaged_agent_api as api;
+use uncaged_core::report_error;
 
 use crate::notebooks::NotebookId;
 

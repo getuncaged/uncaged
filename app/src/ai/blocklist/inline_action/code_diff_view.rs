@@ -15,20 +15,17 @@ use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_geometry::vector::vec2f;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng as _};
-use warp_core::features::FeatureFlag;
-use warp_core::platform::SessionPlatform;
-use warp_core::settings::ToggleableSetting;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::color::CLAUDE_ORANGE;
-use warp_core::ui::theme::color::internal_colors::{fg_overlay_6, neutral_1, neutral_4};
-use warp_core::ui::theme::Fill;
-use warp_editor::content::buffer::InitialBufferState;
-use warp_editor::render::element::VerticalExpansionBehavior;
-use warp_util::file::FileSaveError;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::standardized_path::StandardizedPath;
-use warpui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::platform::SessionPlatform;
+use uncaged_core::settings::ToggleableSetting;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::color::CLAUDE_ORANGE;
+use uncaged_core::ui::theme::color::internal_colors::{fg_overlay_6, neutral_1, neutral_4};
+use uncaged_core::ui::theme::Fill;
+use uncaged_editor::content::buffer::InitialBufferState;
+use uncaged_editor::render::element::VerticalExpansionBehavior;
+use uncaged_ui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
+use uncaged_ui::elements::{
     Align, Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty, EventHandler, Flex,
     FormattedTextElement, HighlightedHyperlink, Hoverable, MainAxisAlignment, MainAxisSize,
@@ -37,13 +34,16 @@ use warpui::elements::{
     SavePosition, ScrollTarget, ScrollToPositionMode, ScrollbarWidth, Shrinkable,
     SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
 };
-use warpui::keymap::{EditableBinding, FixedBinding, Keystroke};
-use warpui::platform::{Cursor, OperatingSystem};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::keymap::{EditableBinding, FixedBinding, Keystroke};
+use uncaged_ui::platform::{Cursor, OperatingSystem};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
+use uncaged_util::file::FileSaveError;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::standardized_path::StandardizedPath;
 
 use crate::ai::agent::icons::{self, yellow_stop_icon};
 use crate::ai::agent::{AIAgentActionId, AIIdentifiers, FileEdit, FileLocations};
@@ -133,7 +133,7 @@ lazy_static! {
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -541,8 +541,8 @@ impl CodeDiffView {
                 ctx,
             )
             .with_horizontal_scrollbar_appearance(
-                warpui::elements::new_scrollable::ScrollableAppearance::new(
-                    warpui::elements::ScrollbarWidth::Auto,
+                uncaged_ui::elements::new_scrollable::ScrollableAppearance::new(
+                    uncaged_ui::elements::ScrollbarWidth::Auto,
                     true,
                 ),
             )
@@ -1158,7 +1158,7 @@ impl CodeDiffView {
 
     fn render_scroll_icon_for_inline_banner(&self, appearance: &Appearance) -> Box<dyn Element> {
         let background = appearance.theme().foreground();
-        let icon = warpui::elements::Icon::new(
+        let icon = uncaged_ui::elements::Icon::new(
             Icon::ArrowDown.into(),
             appearance.theme().main_text_color(background).into_solid(),
         )
@@ -1183,7 +1183,7 @@ impl CodeDiffView {
                 )
                 .with_background(background)
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .with_uniform_padding(2.)
                 .finish()
@@ -1337,7 +1337,7 @@ impl CodeDiffView {
             .with_background(neutral_1(theme))
             .with_border(Border::all(1.).with_border_fill(neutral_4(theme)))
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_vertical_padding(4.)
             .with_horizontal_padding(8.)
@@ -1368,7 +1368,7 @@ impl CodeDiffView {
             }
             CodeDiffState::WaitingForUser => {
                 if self.display_mode().is_inline_banner() {
-                    warpui::elements::Icon::new(
+                    uncaged_ui::elements::Icon::new(
                         Icon::Code2.into(),
                         appearance
                             .theme()
@@ -1879,7 +1879,7 @@ impl CodeDiffView {
                 },
                 theme.nonactive_ui_detail().into(),
                 theme.active_ui_detail().into(),
-                warpui::elements::Fill::None,
+                uncaged_ui::elements::Fill::None,
             )
             .with_horizontal_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Custom(4.), true))
             .with_propagate_mousewheel_if_not_handled(true)
@@ -2550,7 +2550,7 @@ impl View for CodeDiffView {
         root_stack.finish()
     }
 
-    fn keymap_context(&self, _app: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, _app: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         if self.display_mode().is_full_pane() {
@@ -2938,7 +2938,7 @@ impl BackingView for CodeDiffView {
             title: "Requested Edit".to_string(),
             title_secondary: None,
             title_style: None,
-            title_clip_config: warpui::text_layout::ClipConfig::start(),
+            title_clip_config: uncaged_ui::text_layout::ClipConfig::start(),
             title_max_width: None,
             left_of_title: None,
             right_of_title: None,

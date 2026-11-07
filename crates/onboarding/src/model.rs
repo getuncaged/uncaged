@@ -1,5 +1,5 @@
 use ai::LLMId;
-use warpui_core::{Entity, ModelContext};
+use uncaged_ui_core::{Entity, ModelContext};
 
 use crate::slides::{
     AgentAutonomy, AgentDevelopmentSettings, OnboardingModelInfo, ProjectOnboardingSettings,
@@ -70,7 +70,7 @@ pub enum SelectedSettings {
 
 impl SelectedSettings {
     pub fn is_ai_enabled(&self) -> bool {
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
         match self {
             // Agent-driven development always means "I want AI" (including the
             // bring-your-own-agents `disable_oz` path). This reflects intent and
@@ -192,7 +192,7 @@ impl OnboardingStateModel {
     }
 
     pub(crate) fn settings(&self) -> SelectedSettings {
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
         let ui_customization = if FeatureFlag::OpenWarpNewSettingsModes.is_enabled() {
             Some(self.ui_customization.clone())
         } else {
@@ -472,7 +472,7 @@ impl OnboardingStateModel {
         default_model_id: LLMId,
         ctx: &mut ModelContext<Self>,
     ) {
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
 
         // If the user is past the agent slide, don't change the agent model from underneath them.
         // When the new settings modes flag is on, ThemePicker comes after the agent slides
@@ -539,7 +539,7 @@ impl OnboardingStateModel {
     }
 
     pub(crate) fn back(&mut self, ctx: &mut ModelContext<Self>) {
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
         let theme_picker_last = FeatureFlag::OpenWarpNewSettingsModes.is_enabled();
         let prev = if theme_picker_last {
             // Uncaged: reverse of the four-step flow.
@@ -576,7 +576,7 @@ impl OnboardingStateModel {
     }
 
     pub(crate) fn next(&mut self, ctx: &mut ModelContext<Self>) {
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
         let theme_picker_last = FeatureFlag::OpenWarpNewSettingsModes.is_enabled();
 
         if theme_picker_last {
@@ -624,7 +624,7 @@ impl OnboardingStateModel {
     /// The `(step_index, step_count)` shown by the bottom-nav progress dots for the
     /// current step, intention, and flow variant.
     pub(crate) fn progress(&self) -> (usize, usize) {
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
 
         if !FeatureFlag::OpenWarpNewSettingsModes.is_enabled() {
             // Legacy flow: ThemePicker → Intention → Agent → Project.

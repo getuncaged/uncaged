@@ -5,21 +5,21 @@ use std::time::Duration;
 use ai::agent::action::{AskUserQuestionItem, AskUserQuestionOption, AskUserQuestionType};
 use ai::agent::action_result::{AskUserQuestionAnswerItem, AskUserQuestionResult};
 use itertools::Itertools;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::WarpTheme;
-use warpui::elements::new_scrollable::SingleAxisConfig;
-use warpui::elements::{
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::WarpTheme;
+use uncaged_ui::elements::new_scrollable::SingleAxisConfig;
+use uncaged_ui::elements::{
     Border, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Fill, Flex, FormattedTextElement, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Point, Radius, Stack, Text, DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::event::DispatchedEvent;
-use warpui::geometry::vector::Vector2F;
-use warpui::keymap::{FixedBinding, Keystroke};
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::ui_components::components::Coords;
-use warpui::units::Pixels;
-use warpui::{
+use uncaged_ui::event::DispatchedEvent;
+use uncaged_ui::geometry::vector::Vector2F;
+use uncaged_ui::keymap::{FixedBinding, Keystroke};
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::ui_components::components::Coords;
+use uncaged_ui::units::Pixels;
+use uncaged_ui::{
     AfterLayoutContext, AppContext, Element, Entity, EntityId, EventContext, FocusContext,
     LayoutContext, ModelHandle, PaintContext, SingletonEntity, SizeConstraint, TypedActionView,
     View, ViewContext, ViewHandle,
@@ -90,7 +90,7 @@ fn ask_user_question_auto_advance_enabled(is_multiselect: bool, is_last_question
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     // Scope these shortcuts to the active ask-user-question block so arrow/submit keys don't leak
     // into surrounding views.
@@ -317,7 +317,7 @@ struct AskUserQuestionInteractiveViews {
 /// Header state for the collapsed/expanded completion summary.
 struct AskUserQuestionCompletionState {
     label: String,
-    status_icon: warpui::elements::Icon,
+    status_icon: uncaged_ui::elements::Icon,
 }
 
 /// Local questionnaire state machine used by the view.
@@ -1386,7 +1386,7 @@ impl AskUserQuestionView {
         questions: &[AskUserQuestionItem],
         answers: Option<&[AskUserQuestionAnswerItem]>,
         label: String,
-        status_icon: warpui::elements::Icon,
+        status_icon: uncaged_ui::elements::Icon,
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
@@ -1540,7 +1540,7 @@ impl AskUserQuestionView {
         scroll_state: ClippedScrollStateHandle,
         theme: &WarpTheme,
     ) -> Box<dyn Element> {
-        let scrollable = warpui::elements::NewScrollable::vertical(
+        let scrollable = uncaged_ui::elements::NewScrollable::vertical(
             SingleAxisConfig::Clipped {
                 handle: scroll_state,
                 child: Self::body_column(question_text, options),
@@ -1695,7 +1695,7 @@ impl View for AskUserQuestionView {
         }
     }
 
-    fn keymap_context(&self, app: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
         // These context flags are what activate the fixed bindings registered in init().
         if matches!(self.session.phase(), AskUserQuestionPhase::Editing)

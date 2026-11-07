@@ -1,6 +1,6 @@
 use std::iter;
 
-use warp_util::path::CleanPathResult;
+use uncaged_util::path::CleanPathResult;
 
 use super::super::TerminalView;
 use super::{path_without_trailing_sentence_period, GridHighlightedLink};

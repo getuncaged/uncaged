@@ -1,12 +1,12 @@
 use pathfinder_geometry::vector::vec2f;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Highlight,
     ParentElement, Radius, Shrinkable, Wrap,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::units::IntoPixels;
-use warpui::{AppContext, Element, SingletonEntity};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::units::IntoPixels;
+use uncaged_ui::{AppContext, Element, SingletonEntity};
 
 use crate::appearance::Appearance;
 use crate::context_chips::display_chip::{
@@ -125,7 +125,7 @@ fn render_current_session_pill(
         .with_margin_right(8.)
         .with_background_color(appearance.theme().background().into_solid())
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .finish();
 

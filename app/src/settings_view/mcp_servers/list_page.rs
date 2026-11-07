@@ -5,21 +5,21 @@ use std::path::PathBuf;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use settings::ToggleableSetting as _;
 use strum::IntoEnumIterator;
-use uuid::Uuid;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::AppearanceEvent;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::Icon;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::AppearanceEvent;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::{
     Align, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Expanded, Fill,
     Flex, FormattedTextElement, HighlightedHyperlink, MainAxisAlignment, MainAxisSize,
     ParentElement, Radius, Text,
 };
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::switch::SwitchStateHandle;
-use warpui::{
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::switch::SwitchStateHandle;
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
+use uuid::Uuid;
 
 use crate::ai::mcp::templatable::TemplatableMCPServer;
 use crate::ai::mcp::templatable_manager::{
@@ -148,7 +148,7 @@ impl MCPServersListPageView {
                     background: Some(internal_colors::neutral_2(appearance.theme()).into()),
                     border_color: Some(internal_colors::neutral_4(appearance.theme()).into()),
                     border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     ))),
                     padding: Some(Coords {
                         top: 8.,
@@ -1167,7 +1167,7 @@ impl MCPServersListPageView {
         )
         // Uncaged: a quiet rounded card, like the other settings sections, not a 1px box.
         .with_background(appearance.theme().surface_1())
-        .with_corner_radius(warp_core::ui::radius::medium())
+        .with_corner_radius(uncaged_core::ui::radius::medium())
         .with_margin_bottom(style::SECTION_MARGIN)
         .finish()
     }

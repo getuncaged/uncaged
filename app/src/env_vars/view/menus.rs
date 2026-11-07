@@ -1,7 +1,7 @@
 use pathfinder_geometry::vector::Vector2F;
-use warp_core::context_flag::ContextFlag;
-use warpui::keymap::Trigger;
-use warpui::{SingletonEntity, ViewContext, ViewHandle};
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_ui::keymap::Trigger;
+use uncaged_ui::{SingletonEntity, ViewContext, ViewHandle};
 
 use super::env_var_collection::{EnvVarCollectionAction, EnvVarCollectionView, VariableRowIndex};
 use crate::cloud_object::{GenericStringObjectFormat, Space};

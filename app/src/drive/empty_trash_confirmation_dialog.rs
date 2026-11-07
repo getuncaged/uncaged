@@ -1,9 +1,11 @@
-use warpui::elements::MouseStateHandle;
-use warpui::fonts::Weight;
-use warpui::platform::Cursor;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use uncaged_ui::elements::MouseStateHandle;
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
+    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
+};
 
 use crate::appearance::Appearance;
 use crate::ui_components::dialog::{dialog_styles, Dialog};

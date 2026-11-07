@@ -1,18 +1,18 @@
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-use warpui::elements::{
+use uncaged_ui::elements::{
     AcceptedByDropTarget, Border, ChildAnchor, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Draggable, DraggableState, DropShadow, Empty, Flex, Hoverable,
     MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, SavePosition, Shrinkable, SizeConstraintCondition,
     SizeConstraintSwitch, Stack,
 };
-use warpui::fonts::Weight;
-use warpui::platform::Cursor;
-use warpui::presenter::PositionCache;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::ui_components::text::Span;
-use warpui::{AppContext, Element, SingletonEntity, ViewHandle};
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::presenter::PositionCache;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::text::Span;
+use uncaged_ui::{AppContext, Element, SingletonEntity, ViewHandle};
 
 use super::WarpDriveItemId;
 use crate::appearance::Appearance;
@@ -94,7 +94,7 @@ impl WarpDriveItemStyles {
                 .set_font_size(ITEM_FONT_SIZE)
                 .set_font_color(theme.foreground().into())
                 .set_background(
-                    warp_core::ui::theme::color::internal_colors::fg_overlay_4(theme).into(),
+                    uncaged_core::ui::theme::color::internal_colors::fg_overlay_4(theme).into(),
                 )
                 .set_border_color(theme.accent().into()),
             hovered: UiComponentStyles::default()
@@ -102,7 +102,7 @@ impl WarpDriveItemStyles {
                 .set_font_size(ITEM_FONT_SIZE)
                 .set_font_color(blended_colors::text_main(theme, background))
                 .set_background(
-                    warp_core::ui::theme::color::internal_colors::fg_overlay_2(theme).into(),
+                    uncaged_core::ui::theme::color::internal_colors::fg_overlay_2(theme).into(),
                 ),
         }
     }
@@ -766,7 +766,7 @@ impl UiComponent for WarpDriveRow<'_> {
                 )
                 .with_margin_bottom(ITEM_MARGIN_BOTTOM)
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )));
 
                 match container_background_fill {

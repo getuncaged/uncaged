@@ -1,6 +1,6 @@
 use chrono::{Local, TimeZone};
-use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
-use warpui::{App, ModelHandle, UpdateModel};
+use uncaged_core::execution_mode::{AppExecutionMode, ExecutionMode};
+use uncaged_ui::{App, ModelHandle, UpdateModel};
 
 use super::*;
 

@@ -3,9 +3,9 @@ use std::sync::Arc;
 use ai::agent::action::{AIAgentActionType, FileEdit};
 use ai::diff_validation::ParsedDiff;
 use parking_lot::FairMutex;
-use warp_core::features::FeatureFlag;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::super::controller::{BlocklistAIController, BlocklistAIControllerEvent};
 use crate::ai::agent::api::generate_multi_agent_output;
@@ -27,12 +27,12 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "local_fs")] {
         use std::{path::PathBuf, time::Duration};
         use crate::ai::blocklist::{read_local_file_context, BlocklistAIPermissions};
-        use warp_terminal::shell::ShellLaunchData;
+        use uncaged_terminal::shell::ShellLaunchData;
         use crate::util::link_detection::{detect_file_paths, DetectedLinkType};
         use crate::util::openable_file_type::is_binary_file;
         use ai::agent::FileLocations;
-        use warpui::AppContext;
-        use warpui::r#async::FutureExt as AsyncFutureExt;
+        use uncaged_ui::AppContext;
+        use uncaged_ui::r#async::FutureExt as AsyncFutureExt;
         use itertools::Itertools;
     }
 }
@@ -130,7 +130,7 @@ impl PassiveSuggestionsModel {
         &mut self,
         followup_conversation_id: Option<AIConversationId>,
         trigger: PassiveSuggestionTrigger,
-        supported_tools: Vec<warp_multi_agent_api::ToolType>,
+        supported_tools: Vec<uncaged_agent_api::ToolType>,
         ctx: &mut ModelContext<Self>,
     ) {
         // Capture before the call — `Some` means there's a real conversation
@@ -372,7 +372,7 @@ impl PassiveSuggestionsModel {
                 PassiveSuggestionTrigger::AgentResponseCompleted {
                     exchange_id: latest_exchange_id,
                 },
-                vec![warp_multi_agent_api::ToolType::SuggestPrompt],
+                vec![uncaged_agent_api::ToolType::SuggestPrompt],
                 ctx,
             );
         }
@@ -383,7 +383,7 @@ impl PassiveSuggestionsModel {
         conversation_id: Option<AIConversationId>,
         block_context: Box<BlockContext>,
         relevant_files: Vec<FileContext>,
-        supported_tools: Vec<warp_multi_agent_api::ToolType>,
+        supported_tools: Vec<uncaged_agent_api::ToolType>,
         ctx: &mut ModelContext<Self>,
     ) {
         let trigger =
@@ -421,7 +421,7 @@ impl PassiveSuggestionsModel {
 
         let mut supported_tools = Vec::new();
         if is_prompt_suggestions_enabled {
-            supported_tools.push(warp_multi_agent_api::ToolType::SuggestPrompt);
+            supported_tools.push(uncaged_agent_api::ToolType::SuggestPrompt);
         }
 
         let block_context = BlockContext::from_completed_block(block_completed);
@@ -487,7 +487,7 @@ impl PassiveSuggestionsModel {
                         me.pending_file_read_handle =
                             Some(ctx.spawn(read_files(file_locations, current_working_directory, shell), move |me, relevant_files, ctx| {
                                 me.pending_file_read_handle = None;
-                                supported_tools.push(warp_multi_agent_api::ToolType::ApplyFileDiffs);
+                                supported_tools.push(uncaged_agent_api::ToolType::ApplyFileDiffs);
                                 me.send_shell_command_completed_request(
                                     conversation_id,
                                     block_context,
@@ -533,7 +533,7 @@ enum ExtractedSuggestion {
         is_trigger_irrelevant: bool,
     },
     CodeDiff {
-        apply_file_diffs: warp_multi_agent_api::message::tool_call::ApplyFileDiffs,
+        apply_file_diffs: uncaged_agent_api::message::tool_call::ApplyFileDiffs,
     },
 }
 
@@ -547,7 +547,7 @@ async fn extract_suggestion_from_stream(
     >,
 ) -> Option<StreamExtractionResult> {
     use futures_util::StreamExt;
-    use warp_multi_agent_api as api;
+    use uncaged_agent_api as api;
 
     use crate::ai::agent::task::helper::MessageExt;
 
@@ -627,13 +627,13 @@ async fn extract_suggestion_from_stream(
 /// Coalesces a sequence of client actions into final message state by applying
 /// field-mask updates and appends incrementally.
 fn coalesce_messages_from_client_actions(
-    client_actions: &[warp_multi_agent_api::ClientAction],
-) -> Vec<warp_multi_agent_api::Message> {
+    client_actions: &[uncaged_agent_api::ClientAction],
+) -> Vec<uncaged_agent_api::Message> {
     use std::collections::HashMap;
 
-    use warp_multi_agent_api as api;
-    use warp_multi_agent_api::client_action::Action;
-    use warp_multi_agent_api::field_mask;
+    use uncaged_agent_api as api;
+    use uncaged_agent_api::client_action::Action;
+    use uncaged_agent_api::field_mask;
 
     let mut messages_by_id: HashMap<String, api::Message> = HashMap::new();
     let mut message_order: Vec<String> = Vec::new();

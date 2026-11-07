@@ -7,11 +7,11 @@ use itertools::Itertools;
 use num_traits::Float as _;
 use parking_lot::Mutex;
 use pathfinder_color::ColorU;
+use uncaged_core::semantic_selection::SemanticSelection;
+use uncaged_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use uncaged_ui::text::SelectionType;
+use uncaged_ui::units::Lines;
 use vec1::Vec1;
-use warp_core::semantic_selection::SemanticSelection;
-use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use warpui::text::SelectionType;
-use warpui::units::Lines;
 
 use super::find::RegexDFAs;
 use super::grid::RespectDisplayedOutput;

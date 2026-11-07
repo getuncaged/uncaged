@@ -1,9 +1,9 @@
 use pathfinder_geometry::vector::vec2f;
 use string_offset::ByteOffset;
-use warp_core::ui::appearance::Appearance;
-use warp_editor::model::CoreEditorModel;
-use warpui::platform::WindowStyle;
-use warpui::App;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_editor::model::CoreEditorModel;
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::App;
 
 use super::MenuSource;
 use crate::cloud_object::model::persistence::CloudModel;

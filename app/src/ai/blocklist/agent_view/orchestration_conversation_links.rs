@@ -1,16 +1,16 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::Fill;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Expanded, Flex, Hoverable,
     MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
-use warpui::fonts::Properties;
-use warpui::fonts::Weight::Bold;
-use warpui::platform::Cursor;
-use warpui::text_layout::ClipConfig;
-use warpui::{AppContext, Element, EntityId, EventContext, SingletonEntity};
+use uncaged_ui::fonts::Properties;
+use uncaged_ui::fonts::Weight::Bold;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::{AppContext, Element, EntityId, EventContext, SingletonEntity};
 
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
@@ -285,7 +285,7 @@ pub(crate) fn conversation_navigation_card_with_icon(
         Container::new(row)
             .with_background_color(background.into())
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_horizontal_padding(10.)
             .with_vertical_padding(8.)

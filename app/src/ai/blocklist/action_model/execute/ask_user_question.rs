@@ -1,7 +1,7 @@
 use ai::agent::action_result::{AskUserQuestionAnswerItem, AskUserQuestionResult};
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use warpui::{Entity, EntityId, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::{AIAgentActionResultType, AIAgentActionType};

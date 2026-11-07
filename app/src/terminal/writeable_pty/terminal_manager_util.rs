@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use async_channel::Receiver;
 use parking_lot::FairMutex;
-use warpui::{AppContext, Entity, ModelHandle, ViewHandle};
+use uncaged_ui::{AppContext, Entity, ModelHandle, ViewHandle};
 
 use crate::persistence::ModelEvent;
 use crate::terminal::line_editor_status::LineEditorStatus;

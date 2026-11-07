@@ -17,27 +17,27 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Mapping;
 use string_offset::{CharOffset, impl_offset};
 use sum_tree::{SeekBias, SumTree};
-use vec1::Vec1;
-use vim::vim::{MotionType, VimMode};
-use warp_core::channel::ChannelState;
-use warp_core::ui::Icon;
-use warp_core::ui::theme::Fill as ThemeFill;
-use warpui_core::assets::asset_cache::AssetSource;
-use warpui_core::color::ColorU;
-use warpui_core::elements::{
+use uncaged_core::channel::ChannelState;
+use uncaged_core::ui::Icon;
+use uncaged_core::ui::theme::Fill as ThemeFill;
+use uncaged_ui_core::assets::asset_cache::AssetSource;
+use uncaged_ui_core::color::ColorU;
+use uncaged_ui_core::elements::{
     Border, Fill, ListIndentLevel, ListNumbering, Margin, MouseStateHandle, Padding, ScrollData,
 };
-use warpui_core::fonts::{FamilyId, Properties, Weight};
-use warpui_core::geometry::rect::RectF;
-use warpui_core::geometry::vector::{Vector2F, vec2f};
-use warpui_core::platform::LineStyle;
-use warpui_core::text_layout::{CaretPosition, LayoutCache, Line, TextFrame};
-use warpui_core::text_selection_utils::{
+use uncaged_ui_core::fonts::{FamilyId, Properties, Weight};
+use uncaged_ui_core::geometry::rect::RectF;
+use uncaged_ui_core::geometry::vector::{Vector2F, vec2f};
+use uncaged_ui_core::platform::LineStyle;
+use uncaged_ui_core::text_layout::{CaretPosition, LayoutCache, Line, TextFrame};
+use uncaged_ui_core::text_selection_utils::{
     NewlineTickParams, calculate_tick_width, create_newline_tick_rect,
     selection_crosses_newline_offset_based,
 };
-use warpui_core::units::{IntoPixels, Pixels};
-use warpui_core::{AppContext, Entity, EntityId, ModelContext, ModelHandle};
+use uncaged_ui_core::units::{IntoPixels, Pixels};
+use uncaged_ui_core::{AppContext, Entity, EntityId, ModelContext, ModelHandle};
+use vec1::Vec1;
+use vim::vim::{MotionType, VimMode};
 
 use self::location::WrapDirection;
 pub use self::location::{HitTestOptions, Location};
@@ -443,7 +443,7 @@ impl CharCellState {
     /// channel (no font engine): the channel only carries an `EditDelta` (not the
     /// full text this rebuild needs) and is async, whereas TUI cursor queries need
     /// fresh `line_starts` synchronously within the same frame as the edit.
-    /// [`on_buffer_version_updated`](warp_editor::model::CoreEditorModel::on_buffer_version_updated)
+    /// [`on_buffer_version_updated`](uncaged_editor::model::CoreEditorModel::on_buffer_version_updated)
     /// is the guaranteed-synchronous post-edit hook that calls this.
     ///
     /// `text` should be the buffer's current plain text (without any trailing
@@ -841,7 +841,7 @@ impl ColumnUnit {
 }
 
 /// A character offset within a [`TextFrame`]. These offsets count characters in the Rust string
-/// passed to [`warpui_core::text_layout::LayoutCache::layout_text()`].
+/// passed to [`uncaged_ui_core::text_layout::LayoutCache::layout_text()`].
 ///
 /// Frame offsets often, but not always, correspond to glyph indices and caret positions. However,
 /// they do not line up 1:1 if a glyph or grapheme contains multiple characters
@@ -4612,7 +4612,7 @@ impl<'a> Positioned<'a, Paragraph> {
                 vec2f(underline_width, UNDERLINE_THICKNESS),
             );
 
-            let dash = warpui_core::scene::Dash {
+            let dash = uncaged_ui_core::scene::Dash {
                 dash_length: DASHED_UNDERLINE_DASH_LENGTH,
                 gap_length: DASHED_UNDERLINE_GAP_LENGTH,
                 force_consistent_gap_length: true,
@@ -4621,7 +4621,7 @@ impl<'a> Positioned<'a, Paragraph> {
                 .scene
                 .draw_rect_without_hit_recording(underline_rect)
                 .with_border(
-                    warpui_core::scene::Border::bottom(UNDERLINE_THICKNESS)
+                    uncaged_ui_core::scene::Border::bottom(UNDERLINE_THICKNESS)
                         .with_dashed_border(dash)
                         .with_border_color(color),
                 );

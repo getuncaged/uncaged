@@ -5,7 +5,7 @@
 //! Gemini CLI, Codex), it displays a specialized footer with additional functionality.
 
 use base64::Engine;
-use warpui::clipboard::{ClipboardContent, ImageData};
+use uncaged_ui::clipboard::{ClipboardContent, ImageData};
 
 use crate::ai::agent::ImageContext;
 use crate::ai::blocklist::agent_view::agent_input_footer::{
@@ -22,26 +22,26 @@ use std::time::Duration;
 use anyhow::anyhow;
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
-use warp_core::features::FeatureFlag;
-use warp_core::report_error;
-use warp_core::settings::Setting;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::color::contrast::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::report_error;
+use uncaged_core::settings::Setting;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::color::contrast::{
     high_enough_contrast, pick_best_foreground_color, MinimumAllowedContrast,
 };
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill as ThemeFill;
-use warp_terminal::model::escape_sequences::{BRACKETED_PASTE_END, BRACKETED_PASTE_START};
-use warpify_footer::{WarpifyFooterView, WarpifyFooterViewEvent};
-use warpui::elements::{
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill as ThemeFill;
+use uncaged_terminal::model::escape_sequences::{BRACKETED_PASTE_END, BRACKETED_PASTE_START};
+use uncaged_ui::elements::{
     ChildView, Container, CrossAxisAlignment, Empty, Expanded, Flex, MainAxisSize, ParentElement,
 };
-use warpui::keymap::Keystroke;
-use warpui::r#async::Timer;
-use warpui::{
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::r#async::Timer;
+use uncaged_ui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
+use warpify_footer::{WarpifyFooterView, WarpifyFooterViewEvent};
 
 use super::{RichContentInsertionPosition, TerminalAction, TerminalView};
 use crate::ai::blocklist::agent_view::agent_view_bg_fill;

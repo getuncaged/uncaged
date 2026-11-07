@@ -8,12 +8,12 @@
 
 mod warpify;
 
-pub use warpify::*;
-use warpui::elements::{
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CornerRadius, Hoverable, MouseState, MouseStateHandle,
     ParentElement, Radius, Stack,
 };
-use warpui::Element;
+use uncaged_ui::Element;
+pub use warpify::*;
 
 use crate::themes::theme::WarpTheme;
 

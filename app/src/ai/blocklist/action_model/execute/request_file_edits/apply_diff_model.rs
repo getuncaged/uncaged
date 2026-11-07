@@ -7,9 +7,9 @@
 
 use ai::diff_validation::AIRequestedCodeDiff;
 use futures::FutureExt;
+use uncaged_ui::r#async::BoxFuture;
+use uncaged_ui::{Entity, ModelContext, ModelHandle};
 use vec1::Vec1;
-use warpui::r#async::BoxFuture;
-use warpui::{Entity, ModelContext, ModelHandle};
 
 use super::diff_application::{apply_edits, DiffApplicationError, FileReadResult};
 use crate::ai::agent::FileEdit;

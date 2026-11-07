@@ -6,10 +6,10 @@ use repo_metadata::repository::{RepositorySubscriber, SubscriberId};
 use repo_metadata::{DirectoryWatcher, Repository, RepositoryUpdate};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use warp_core::safe_warn;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::standardized_path::StandardizedPath;
-use warpui_core::{ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::safe_warn;
+use uncaged_ui_core::{ModelContext, ModelHandle, SingletonEntity};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::standardized_path::StandardizedPath;
 use watcher::{HomeDirectoryWatcher, HomeDirectoryWatcherEvent};
 
 use super::model::{GlobalRulesDelta, ProjectContextModel, ProjectContextModelEvent, ProjectRule};

@@ -1,11 +1,11 @@
 // The code in this file is adapted from the alacritty_terminal crate under the
-// Apache license; see: crates/warp_terminal/src/model/LICENSE-ALACRITTY.
+// Apache license; see: crates/uncaged_terminal/src/model/LICENSE-ALACRITTY.
 
 use std::ops::BitOrAssign;
 
-use warp_terminal::model::char_or_str::CharOrStr;
-use warp_util::path::LineAndColumnArg;
-use warpui::text::words::is_default_word_boundary;
+use uncaged_terminal::model::char_or_str::CharOrStr;
+use uncaged_ui::text::words::is_default_word_boundary;
+use uncaged_util::path::LineAndColumnArg;
 
 use super::*;
 use crate::terminal::model::blockgrid::BlockGrid;

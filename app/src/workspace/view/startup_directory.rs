@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use warpui::{AppContext, SingletonEntity, ViewContext, WindowId};
+use uncaged_ui::{AppContext, SingletonEntity, ViewContext, WindowId};
 
 use super::Workspace;
 use crate::terminal::available_shells::AvailableShell;

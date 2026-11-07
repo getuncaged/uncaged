@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, ModelContext, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, ModelContext, SingletonEntity};
 
 use super::{
     add_pending_file_attachments, input_context_for_request, parse_context_attachments,

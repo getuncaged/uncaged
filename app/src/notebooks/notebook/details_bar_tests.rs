@@ -1,5 +1,5 @@
 use cloud_objects::UserUid;
-use warpui::{App, SingletonEntity};
+use uncaged_ui::{App, SingletonEntity};
 
 use super::editor_display_name;
 use crate::workspaces::user_profiles::{UserProfileWithUID, UserProfiles};

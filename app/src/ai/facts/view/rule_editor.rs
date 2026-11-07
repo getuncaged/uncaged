@@ -1,14 +1,14 @@
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warp_editor::editor::NavigationKey;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::elements::{
     Border, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, ScrollbarWidth,
 };
-use warpui::platform::Cursor;
-use warpui::ui_components::components::UiComponent;
-use warpui::{
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -288,7 +288,7 @@ impl RuleEditorView {
                 Border::all(1.).with_border_color(internal_colors::neutral_4(appearance.theme())),
             )
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_margin_bottom(style::ITEM_BOTTOM_MARGIN)
             .with_horizontal_padding(style::EDITOR_HORIZONTAL_PADDING)
@@ -307,7 +307,7 @@ impl RuleEditorView {
                     ScrollbarWidth::Auto,
                     appearance.theme().nonactive_ui_detail().into(),
                     appearance.theme().active_ui_detail().into(),
-                    warpui::elements::Fill::None,
+                    uncaged_ui::elements::Fill::None,
                 )
                 .finish(),
             )
@@ -316,7 +316,7 @@ impl RuleEditorView {
                 Border::all(1.).with_border_color(internal_colors::neutral_4(appearance.theme())),
             )
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_margin_bottom(style::ITEM_BOTTOM_MARGIN)
             .with_padding_left(style::EDITOR_HORIZONTAL_PADDING)

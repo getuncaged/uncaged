@@ -5,8 +5,8 @@ use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 use chrono::Local;
 use lazy_static::lazy_static;
 use regex::Regex;
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{

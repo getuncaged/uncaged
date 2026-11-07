@@ -22,17 +22,17 @@ echo "Checking for inline Rust test modules..."
 echo "Inline Rust test module check succeeded..."
 
 echo "Running clippy..."
-# Exclude warp_completer because we run clippy on it with default features (rather than all features) below.
+# Exclude uncaged_completer because we run clippy on it with default features (rather than all features) below.
 #
 # TODO(vorporeal): Re-enable the `all-features` flag once we've fixed things.
-cargo clippy --workspace --exclude warp_completer --all-targets --tests -- -D warnings
-# Run clippy on warp_completer with default, rather than all features enabled, because there is
+cargo clippy --workspace --exclude uncaged_completer --all-targets --tests -- -D warnings
+# Run clippy on uncaged_completer with default, rather than all features enabled, because there is
 # feature-gated logic for the WIP completions-on-js implementation.
-cargo clippy -p warp_completer --all-targets --tests -- -D warnings
+cargo clippy -p uncaged_completer --all-targets --tests -- -D warnings
 echo "clippy succeeded..."
 
 echo "Running clang-format..."
-./script/run-clang-format.py -r --extensions 'c,h,cpp,m' ./crates/warpui/src/ ./app/src/
+./script/run-clang-format.py -r --extensions 'c,h,cpp,m' ./crates/uncaged_ui/src/ ./app/src/
 echo "clang-format succeeded..."
 
 echo "Running wgslfmt..."
@@ -57,9 +57,9 @@ fi
 
 echo "Running tests via nextest..."
 cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
-# Run warp_completer tests with the "v2" (completions-on-js) flag enabled. We do this to ensure that
+# Run uncaged_completer tests with the "v2" (completions-on-js) flag enabled. We do this to ensure that
 # the v2 completions implementation doesn't regress/rot while it's development is paused.
-cargo nextest run -p warp_completer --features v2
+cargo nextest run -p uncaged_completer --features v2
 echo "Running doc tests..."
 cargo test --doc
 echo "Tests succeeded..."

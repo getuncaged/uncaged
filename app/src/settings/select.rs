@@ -2,8 +2,8 @@ use std::ops::Not;
 
 use settings::macros::define_settings_group;
 use settings::{Setting, SupportedPlatforms};
-use warpui::clipboard::ClipboardContent;
-use warpui::AppContext;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::AppContext;
 
 define_settings_group!(SelectionSettings, settings: [
     copy_on_select: CopyOnSelect {

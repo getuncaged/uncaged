@@ -9,14 +9,14 @@ use base64::Engine;
 use hex::FromHexError;
 use itertools::{Either, Itertools};
 use serde::Serialize;
-use warp_core::features::FeatureFlag;
-use warp_core::semantic_selection::SemanticSelection;
-pub use warp_terminal::model::BlockIndex;
-use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use warpui::assets::asset_cache::Asset;
-use warpui::image_cache::ImageType;
-use warpui::r#async::executor::Background;
-use warpui::AppContext;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::semantic_selection::SemanticSelection;
+pub use uncaged_terminal::model::BlockIndex;
+use uncaged_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use uncaged_ui::assets::asset_cache::Asset;
+use uncaged_ui::image_cache::ImageType;
+use uncaged_ui::r#async::executor::Background;
+use uncaged_ui::AppContext;
 
 use super::super::{AltScreen, BlockList};
 use super::ansi::{BootstrappedValue, FinishUpdateValue, InputBufferValue, Mode, PendingHook};
@@ -2140,7 +2140,7 @@ impl ansi::Handler for TerminalModel {
         delegate!(self.configure_charset(index, charset));
     }
 
-    fn set_color(&mut self, index: usize, color: warpui::color::ColorU) {
+    fn set_color(&mut self, index: usize, color: uncaged_ui::color::ColorU) {
         self.override_colors[index] = Some(color);
     }
 

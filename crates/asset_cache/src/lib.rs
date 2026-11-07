@@ -7,7 +7,7 @@ use base64::Engine as _;
 use base64::prelude::BASE64_STANDARD;
 use bytes::Bytes;
 use reqwest::Url;
-use warpui_core::assets::asset_cache::{
+use uncaged_ui_core::assets::asset_cache::{
     Asset, AssetCache, AssetSource, AssetState, AsyncAssetId, AsyncAssetType,
 };
 

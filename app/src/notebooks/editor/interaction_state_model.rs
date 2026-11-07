@@ -1,4 +1,4 @@
-use warpui::{Entity, ModelContext};
+use uncaged_ui::{Entity, ModelContext};
 
 use crate::editor::InteractionState;
 

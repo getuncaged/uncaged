@@ -3,9 +3,9 @@ use std::future::Future;
 use std::sync::mpsc::SyncSender;
 
 use itertools::Itertools;
-use warp_core::features::FeatureFlag;
-use warp_util::sync::Condition;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity};
+use uncaged_util::sync::Condition;
 
 use crate::ai::execution_profiles::CloudAIExecutionProfile;
 use crate::cloud_object::{

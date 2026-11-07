@@ -26,10 +26,10 @@ use instant::Instant;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::debug;
+pub use uncaged_terminal::model::ansi::control_sequence_parameters::*;
+use uncaged_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
+use uncaged_ui::color::ColorU;
 use vte::{Params, Parser as VteParser, Perform as VtePerform};
-pub use warp_terminal::model::ansi::control_sequence_parameters::*;
-use warp_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
-use warpui::color::ColorU;
 
 use super::kitty::parse_kitty_chunk;
 use crate::features::FeatureFlag;

@@ -35,6 +35,34 @@ use pathfinder_geometry::vector::Vector2F;
 use settings::Setting as _;
 use snapshot::{EditorHeightShrinkDelay, ViewSnapshot};
 use string_offset::{ByteOffset, CharOffset};
+use uncaged_completer::completer::Description;
+use uncaged_core::safe_error;
+use uncaged_core::semantic_selection::SemanticSelection;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
+use uncaged_ui::actions::StandardAction;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::{
+    ChildView, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable, MainAxisSize,
+    MouseStateHandle, ParentElement, Radius, Shrinkable, DEFAULT_UI_LINE_HEIGHT_RATIO,
+};
+use uncaged_ui::fonts::{Cache as FontCache, FamilyId, Properties, Weight};
+use uncaged_ui::keymap::{EditableBinding, FixedBinding, Keystroke, PerPlatformKeystroke};
+use uncaged_ui::platform::{Cursor, FilePickerConfiguration, OperatingSystem};
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::text::word_boundaries::WordBoundariesPolicy;
+use uncaged_ui::text::TextBuffer;
+use uncaged_ui::text_layout::TextStyle;
+use uncaged_ui::ui_components::button::ButtonTooltipPosition;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{
+    elements, windowing, AppContext, BlurContext, CursorInfo, Element, Entity, EntityId,
+    FocusContext, ModelAsRef, ModelContext, ModelHandle, SingletonEntity, TypedActionView, View,
+    ViewContext, ViewHandle, WindowId,
+};
+use uncaged_util::path::ShellFamily;
+use uncaged_util::user_input::UserInput;
 use vec1::{vec1, Vec1};
 use vim::vim::{
     BracketChar, CharacterMotion, Direction, FindCharMotion, FirstNonWhitespaceMotion,
@@ -45,34 +73,6 @@ use vim::vim::{
 use vim::{
     vim_a_block, vim_a_paragraph, vim_a_quote, vim_a_word, vim_inner_block, vim_inner_paragraph,
     vim_inner_quote, vim_inner_word, vim_word_iterator_from_offset,
-};
-use warp_completer::completer::Description;
-use warp_core::safe_error;
-use warp_core::semantic_selection::SemanticSelection;
-use warp_editor::editor::NavigationKey;
-use warp_util::path::ShellFamily;
-use warp_util::user_input::UserInput;
-use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
-use warpui::actions::StandardAction;
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::{
-    ChildView, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable, MainAxisSize,
-    MouseStateHandle, ParentElement, Radius, Shrinkable, DEFAULT_UI_LINE_HEIGHT_RATIO,
-};
-use warpui::fonts::{Cache as FontCache, FamilyId, Properties, Weight};
-use warpui::keymap::{EditableBinding, FixedBinding, Keystroke, PerPlatformKeystroke};
-use warpui::platform::{Cursor, FilePickerConfiguration, OperatingSystem};
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::text::word_boundaries::WordBoundariesPolicy;
-use warpui::text::TextBuffer;
-use warpui::text_layout::TextStyle;
-use warpui::ui_components::button::ButtonTooltipPosition;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::windowing::WindowManager;
-use warpui::{
-    elements, windowing, AppContext, BlurContext, CursorInfo, Element, Entity, EntityId,
-    FocusContext, ModelAsRef, ModelContext, ModelHandle, SingletonEntity, TypedActionView, View,
-    ViewContext, ViewHandle, WindowId,
 };
 /// The editor interfaces that we publicly expose to consumers.
 /// This should be a very limited set; if you need to add something here,
@@ -131,7 +131,7 @@ pub const ACCEPT_AUTOSUGGESTION_KEYBINDING_NAME: &str = "editor_view:insert_auto
 
 pub const MAX_IMAGES_PER_CONVERSATION: usize = 200;
 
-use warpui::clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES;
+use uncaged_ui::clipboard_utils::CLIPBOARD_IMAGE_MIME_TYPES;
 
 #[derive(Clone, Copy)]
 pub enum AutosuggestionLocation {
@@ -173,7 +173,7 @@ pub const SELECT_UP_ACTION_NAME: &str = "editor_view:select_up";
 pub const SELECT_DOWN_ACTION_NAME: &str = "editor_view:select_down";
 
 pub fn init(ctx: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     ctx.register_fixed_bindings(vec![
         // Below are default bindings that are similar to the behavior in all other text editors.
@@ -1367,7 +1367,7 @@ type RenderDecoratorElementsFn = Box<dyn Fn(&AppContext) -> EditorDecoratorEleme
 
 /// Type alias for a closure that allows parent views to add flags to the EditorView's keymap context.
 /// The closure takes the context by mutable reference and can insert additional flags.
-pub type KeymapContextModifierFn = Box<dyn Fn(&mut warpui::keymap::Context, &AppContext)>;
+pub type KeymapContextModifierFn = Box<dyn Fn(&mut uncaged_ui::keymap::Context, &AppContext)>;
 
 /// Enum to choose between different methods of computing the baseline offset for text.
 #[derive(Clone, Debug)]
@@ -7761,7 +7761,7 @@ impl EditorView {
         // from the filesystem (the path transformer, if any, only applies to text insertion).
         let paths_as_strings: Vec<String> = paths.iter().map(|path| path.to_string()).collect();
         let image_filepaths =
-            warpui::clipboard_utils::get_image_filepaths_from_paths(&paths_as_strings);
+            uncaged_ui::clipboard_utils::get_image_filepaths_from_paths(&paths_as_strings);
 
         // If we have image file paths, emit event for parent to handle terminal-specific processing
         let num_image_files = image_filepaths.len();
@@ -7780,7 +7780,7 @@ impl EditorView {
         };
 
         let input =
-            warpui::clipboard_utils::escaped_paths_str(&transformed_paths, self.shell_family);
+            uncaged_ui::clipboard_utils::escaped_paths_str(&transformed_paths, self.shell_family);
 
         self.user_insert(&input, ctx);
     }
@@ -8478,7 +8478,7 @@ impl View for EditorView {
         }
     }
 
-    fn keymap_context(&self, ctx: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, ctx: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         if self.single_cursor_at_buffer_end(false /* respect_line_cap */, ctx) {

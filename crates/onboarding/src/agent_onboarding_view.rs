@@ -2,20 +2,20 @@ use ai::LLMId;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use ui_components::{button, Component as _, Options as _};
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::{Fill, WarpTheme};
-use warp_core::ui::Icon;
-use warpui_core::assets::asset_cache::AssetSource;
-use warpui_core::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::{Fill, WarpTheme};
+use uncaged_core::ui::Icon;
+use uncaged_ui_core::assets::asset_cache::AssetSource;
+use uncaged_ui_core::elements::{
     Align, CacheOption, ChildAnchor, Container, Dismiss, Empty, Image, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Rect, Shrinkable, Stack,
 };
-use warpui_core::image_cache::ImageType;
-use warpui_core::keymap::macros::*;
-use warpui_core::keymap::{FixedBinding, Keystroke};
-use warpui_core::presenter::ChildView;
-use warpui_core::{
+use uncaged_ui_core::image_cache::ImageType;
+use uncaged_ui_core::keymap::macros::*;
+use uncaged_ui_core::keymap::{FixedBinding, Keystroke};
+use uncaged_ui_core::presenter::ChildView;
+use uncaged_ui_core::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -268,7 +268,7 @@ impl AgentOnboardingView {
     /// Eagerly loads all onboarding slide images into the asset cache
     /// so they display instantly when the user navigates between slides.
     fn preload_onboarding_images(ctx: &mut ViewContext<Self>) {
-        let asset_cache = warpui_core::assets::asset_cache::AssetCache::as_ref(ctx);
+        let asset_cache = uncaged_ui_core::assets::asset_cache::AssetCache::as_ref(ctx);
         // Preload the shared background image used on all right panels.
         asset_cache.load_asset::<ImageType>(AssetSource::Bundled {
             path: crate::slides::layout::ONBOARDING_BG_PATH,

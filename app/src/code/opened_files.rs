@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use instant::Instant;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 /// Tracks opened files within a single repository.
 /// Keys are repo-relative file paths (e.g. `src/main.rs`).

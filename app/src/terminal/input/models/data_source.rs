@@ -2,21 +2,21 @@ use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
 use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use ordered_float::OrderedFloat;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::icons::Icon;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::icons::Icon;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CornerRadius, FormattedTextElement, Highlight, HighlightedHyperlink,
     MouseStateHandle, Radius, Text,
 };
-use warpui::fonts::{Properties, Style, Weight};
-use warpui::keymap::Keystroke;
-use warpui::platform::{Cursor, OperatingSystem};
-use warpui::text_layout::ClipConfig;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, Entity, EntityId, SingletonEntity as _};
+use uncaged_ui::fonts::{Properties, Style, Weight};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::{Cursor, OperatingSystem};
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{AppContext, Element, Entity, EntityId, SingletonEntity as _};
 
 use super::model_spec_scores::{
     render_model_spec_header, render_model_spec_scores, CostRow, ModelSpecScoresLayout,
@@ -329,8 +329,8 @@ impl SearchItem for ModelSearchItem {
         _highlight_state: ItemHighlightState,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        use warpui::elements::{Flex, ParentElement as _};
-        use warpui::prelude::CrossAxisAlignment;
+        use uncaged_ui::elements::{Flex, ParentElement as _};
+        use uncaged_ui::prelude::CrossAxisAlignment;
 
         let appearance = crate::appearance::Appearance::as_ref(app);
         let theme = appearance.theme();
@@ -433,7 +433,7 @@ impl SearchItem for ModelSearchItem {
             .with_padding_right(4.)
             .with_background(theme.green_overlay_1())
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_margin_left(6.)
             .finish();
@@ -452,7 +452,7 @@ impl SearchItem for ModelSearchItem {
     }
 
     fn render_details(&self, app: &AppContext) -> Option<Box<dyn Element>> {
-        use warpui::elements::{Flex, ParentElement as _};
+        use uncaged_ui::elements::{Flex, ParentElement as _};
 
         let appearance = crate::appearance::Appearance::as_ref(app);
         let theme = appearance.theme();

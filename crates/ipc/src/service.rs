@@ -10,7 +10,7 @@ pub(crate) type ServiceId = String;
 
 /// Returns a unique ID for the `Service` implementation specified as a type parameter.
 pub(crate) fn service_id<S: Service>() -> ServiceId {
-    std::any::type_name::<S>().to_owned()
+    S::id().to_owned()
 }
 
 /// A typed IPC service interface.
@@ -21,6 +21,13 @@ pub(crate) fn service_id<S: Service>() -> ServiceId {
 pub trait Service: Send + Sync + 'static {
     type Request: Message + 'static;
     type Response: Message + 'static;
+
+    /// The ID that identifies this service on the wire. Defaults to the type's path; override it
+    /// with a fixed string to keep the ID stable when the type moves or its crate is renamed, so
+    /// processes built from different versions can still talk to each other.
+    fn id() -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 /// To be implemented for each IPC service, where a service has a defined request/response type.

@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use warp_multi_agent_api::response_event::stream_finished;
+use uncaged_agent_api::response_event::stream_finished;
 
 use super::*;
 use crate::persistence::model::ModelTokenUsage;
@@ -179,7 +179,7 @@ fn eviction_is_deterministic() {
 }
 
 /// An encoded `Task` written by the build before the agent protocol was
-/// vendored (git `warp_multi_agent_api` at ac1af73). It sets every field of
+/// vendored (git `uncaged_agent_api` at ac1af73). It sets every field of
 /// every message type reachable from `Task` (to a bounded depth), with one
 /// `Message` per (oneof variant, seed) pair so every variant of every nested
 /// oneof appears at least once.

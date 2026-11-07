@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use warp_util::standardized_path::StandardizedPath;
-use warpui::{AppContext, ModelContext, ModelHandle};
+use uncaged_ui::{AppContext, ModelContext, ModelHandle};
+use uncaged_util::standardized_path::StandardizedPath;
 
 use crate::code_review::diff_size_limits::DiffSize;
 use crate::util::git::{BranchEntry, Commit, FileChangeEntry, PrInfo};
@@ -386,7 +386,7 @@ pub enum DiffStateModel {
     Local(ModelHandle<LocalDiffStateModel>),
 }
 
-impl warpui::Entity for DiffStateModel {
+impl uncaged_ui::Entity for DiffStateModel {
     type Event = DiffStateModelEvent;
 }
 

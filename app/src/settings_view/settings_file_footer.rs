@@ -8,16 +8,16 @@
 //!   error *and* the user has dismissed the workspace banner.
 //! * Otherwise, a plain bordered "Open settings file" button.
 use pathfinder_color::ColorU;
-use warp_core::ui::color::coloru_with_opacity;
-use warp_core::ui::theme::Fill;
-use warpui::elements::{
+use uncaged_core::ui::color::coloru_with_opacity;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::{
     Border, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Element, Empty, Expanded, Flex, Highlight, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, ScrollbarWidth, Text,
     Wrap,
 };
-use warpui::fonts::{FamilyId, Properties, Weight};
-use warpui::platform::Cursor;
+use uncaged_ui::fonts::{FamilyId, Properties, Weight};
+use uncaged_ui::platform::Cursor;
 
 use crate::appearance::Appearance;
 use crate::settings::SettingsFileError;
@@ -160,7 +160,7 @@ fn render_footer_button(
         let mut container = Container::new(Clipped::new(row).finish())
             .with_border(Border::all(1.).with_border_color(border_color))
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::MEDIUM,
+                uncaged_core::ui::radius::MEDIUM,
             )));
         if state.is_hovered() {
             container = container.with_background_color(coloru_with_opacity(text_color, 10));
@@ -230,7 +230,7 @@ pub fn render_settings_error_alert(
     // action buttons below stay fixed and always actionable. Scrollbar thumb
     // colors are derived from `text_color` (which already contrasts against
     // the yellow alert background) so they remain visible in both themes.
-    // `ClippedScrollable` wants `warpui::elements::Fill` (not the theme
+    // `ClippedScrollable` wants `uncaged_ui::elements::Fill` (not the theme
     // `Fill` used elsewhere in this file), so the three fills below are
     // fully qualified to avoid an import alias.
     let scrollable_text = ConstrainedBox::new(
@@ -238,9 +238,9 @@ pub fn render_settings_error_alert(
             mouse_states.alert_text_scroll_state.clone(),
             text_row,
             ScrollbarWidth::Auto,
-            warpui::elements::Fill::Solid(coloru_with_opacity(text_color, 30)),
-            warpui::elements::Fill::Solid(coloru_with_opacity(text_color, 60)),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::Solid(coloru_with_opacity(text_color, 30)),
+            uncaged_ui::elements::Fill::Solid(coloru_with_opacity(text_color, 60)),
+            uncaged_ui::elements::Fill::None,
         )
         .finish(),
     )
@@ -301,7 +301,7 @@ pub fn render_settings_error_alert(
     Container::new(alert_body)
         .with_background_color(bg_color)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::MEDIUM,
+            uncaged_core::ui::radius::MEDIUM,
         )))
         .with_uniform_padding(12.)
         .finish()
@@ -408,7 +408,7 @@ fn render_alert_action_button(
 
         let mut container = Container::new(row.finish())
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::MEDIUM,
+                uncaged_core::ui::radius::MEDIUM,
             )))
             .with_horizontal_padding(ALERT_BUTTON_HORIZONTAL_PADDING);
         if bordered {

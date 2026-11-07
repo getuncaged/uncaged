@@ -11,11 +11,11 @@ use serde::{Deserialize, Serialize};
 mod package_installers;
 pub(crate) use history::UpArrowHistoryConfig;
 pub use history::{History, HistoryEntry, HistoryEvent, ShellHost};
+pub use uncaged_terminal::shell::{self, ShellLaunchData};
+use uncaged_ui::geometry::vector::Vector2F;
+use uncaged_ui::units::{IntoPixels, Lines, Pixels};
+use uncaged_ui::{AppContext, WindowId};
 pub use view::{Event, TerminalView};
-pub use warp_terminal::shell::{self, ShellLaunchData};
-use warpui::geometry::vector::Vector2F;
-use warpui::units::{IntoPixels, Lines, Pixels};
-use warpui::{AppContext, WindowId};
 mod block_list_settings;
 
 mod alias;

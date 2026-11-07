@@ -8,9 +8,9 @@ use std::time::Duration;
 use command::r#async::Command;
 use parking_lot::FairMutex;
 use serde_json::json;
-use warp_core::features::FeatureFlag;
-use warpui::r#async::{FutureExt as AsyncFutureExt, SpawnedFutureHandle, Timer};
-use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::r#async::{FutureExt as AsyncFutureExt, SpawnedFutureHandle, Timer};
+use uncaged_ui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::static_prompt_suggestions::static_suggested_query;
 use crate::ai::agent::CancellationReason;

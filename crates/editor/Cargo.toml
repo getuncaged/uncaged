@@ -1,5 +1,5 @@
 [package]
-name = "warp_editor"
+name = "uncaged_editor"
 authors = ["Warp Team <dev@warp.dev>"]
 version = "0.1.0"
 edition = "2024"
@@ -48,9 +48,9 @@ thiserror.workspace = true
 pathfinder_color = "0.5.0"
 unicode-width.workspace = true
 vec1.workspace = true
-warpui_core.workspace = true
-warp_core.workspace = true
-warp_util.workspace = true
+uncaged_ui_core.workspace = true
+uncaged_core.workspace = true
+uncaged_util.workspace = true
 rayon.workspace = true
 line-ending.workspace = true
 vim.workspace = true
@@ -61,8 +61,8 @@ rust-embed.workspace = true
 enclose = "1.1.8"
 env_logger.workspace = true
 sum_tree = { workspace = true, features = ["test-util"] }
-warp_core = { workspace = true, features = ["test-util"] }
-warpui = { workspace = true, features = ["test-util"] }
+uncaged_core = { workspace = true, features = ["test-util"] }
+uncaged_ui = { workspace = true, features = ["test-util"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [[bench]]

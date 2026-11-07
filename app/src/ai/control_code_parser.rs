@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use regex::Regex;
-use warpui::keymap::Keystroke;
+use uncaged_ui::keymap::Keystroke;
 
 use crate::terminal::model::escape_sequences::C0;
 

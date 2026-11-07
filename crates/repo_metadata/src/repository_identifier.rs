@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::remote_path::RemotePath;
-use warp_util::standardized_path::StandardizedPath;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::remote_path::RemotePath;
+use uncaged_util::standardized_path::StandardizedPath;
 
 /// Identifies a repository across local and remote environments.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -1,8 +1,8 @@
 use pathfinder_color::ColorU;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill;
-use warpui::elements::{CornerRadius, MouseState};
-use warpui::Element;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::{CornerRadius, MouseState};
+use uncaged_ui::Element;
 
 use crate::appearance::Appearance;
 use crate::ui_components::blended_colors;
@@ -52,7 +52,7 @@ impl ItemHighlightState {
         match self {
             ItemHighlightState::None => None,
             ItemHighlightState::Selected | ItemHighlightState::Hovered => {
-                Some(warp_core::ui::radius::small())
+                Some(uncaged_core::ui::radius::small())
             }
         }
     }

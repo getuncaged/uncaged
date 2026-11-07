@@ -6,11 +6,11 @@ use ai::skills::SkillReference;
 use command_corrections::Correction;
 pub use onboarding::OnboardingIntention;
 use pathfinder_geometry::vector::Vector2F;
-use warp_util::user_input::UserInput;
-use warpui::elements::HyperlinkUrl;
-use warpui::event::ModifiersState;
-use warpui::units::Lines;
-use warpui::EntityId;
+use uncaged_ui::elements::HyperlinkUrl;
+use uncaged_ui::event::ModifiersState;
+use uncaged_ui::units::Lines;
+use uncaged_ui::EntityId;
+use uncaged_util::user_input::UserInput;
 
 use super::inline_banner::{OpenInWarpBannerAction, VimModeBannerAction};
 use super::{
@@ -241,7 +241,7 @@ pub enum TerminalAction {
     OpenCodeInWarp {
         path: PathBuf,
         layout: crate::util::file::external_editor::settings::EditorLayout,
-        line_col: Option<warp_util::path::LineAndColumnArg>,
+        line_col: Option<uncaged_util::path::LineAndColumnArg>,
     },
     OpenWorkflowModal,
     OpenWorkflowModalForAIWorkflow(Workflow),

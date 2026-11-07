@@ -22,7 +22,7 @@ macro_rules! assert_eventually {
                 pass = true;
                 break;
             }
-            warpui::r#async::Timer::after(std::time::Duration::from_millis(5)).await;
+            uncaged_ui::r#async::Timer::after(std::time::Duration::from_millis(5)).await;
         }
         if !pass {
             panic!("{}", format_args!($($arg)+));

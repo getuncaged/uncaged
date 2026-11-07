@@ -1,15 +1,15 @@
 use std::path::PathBuf;
 
-use warp_core::ui::appearance::Appearance;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::elements::{
     Align, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, Flex,
     MainAxisSize, ParentElement, ScrollbarWidth,
 };
-use warpui::{
+use uncaged_ui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::{AIFact, CloudAIFact, CloudAIFactModel};
 use crate::pane_group::focus_state::PaneFocusHandle;
@@ -214,7 +214,7 @@ impl View for AIFactView {
             ScrollbarWidth::Auto,
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .finish()
     }
@@ -244,16 +244,16 @@ impl BackingView for AIFactView {
     fn handle_pane_header_overflow_menu_action(
         &mut self,
         _action: &Self::PaneHeaderOverflowMenuAction,
-        _ctx: &mut warpui::ViewContext<Self>,
+        _ctx: &mut uncaged_ui::ViewContext<Self>,
     ) {
         self.handle_action(_action, _ctx)
     }
 
-    fn close(&mut self, ctx: &mut warpui::ViewContext<Self>) {
+    fn close(&mut self, ctx: &mut uncaged_ui::ViewContext<Self>) {
         ctx.emit(AIFactViewEvent::Pane(PaneEvent::Close));
     }
 
-    fn focus_contents(&mut self, ctx: &mut warpui::ViewContext<Self>) {
+    fn focus_contents(&mut self, ctx: &mut uncaged_ui::ViewContext<Self>) {
         self.focus(ctx);
     }
 

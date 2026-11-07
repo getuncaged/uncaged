@@ -5,8 +5,8 @@ use ai::agent::action_result::StartAgentVersion;
 use ai::skills::SkillReference;
 use cloud_objects::UserUid;
 use settings::Setting;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::{App, SingletonEntity};
+use uncaged_ui::{App, SingletonEntity};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::{
     default_collapsible_state_for_orchestration_action,

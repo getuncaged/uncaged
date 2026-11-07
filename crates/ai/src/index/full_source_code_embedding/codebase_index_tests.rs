@@ -8,9 +8,9 @@ use chrono::Utc;
 use futures::executor::block_on;
 use repo_metadata::DirectoryWatcher;
 use string_offset::ByteOffset;
+use uncaged_ui_core::{App, SingletonEntity};
+use uncaged_util::standardized_path::StandardizedPath;
 use virtual_fs::{Stub, VirtualFS};
-use warp_util::standardized_path::StandardizedPath;
-use warpui_core::{App, SingletonEntity};
 
 use super::{
     CodebaseIndex, CodebaseIndexTimeStampMetadata, ServerSyncResult, TreeSourceSyncState,

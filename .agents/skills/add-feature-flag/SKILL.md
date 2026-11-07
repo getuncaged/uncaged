@@ -22,7 +22,7 @@ your_feature_name = []
 ```
 
 ### 2. Add to FeatureFlag enum
-Add a new variant to the `FeatureFlag` enum in `warp_core/src/features.rs`:
+Add a new variant to the `FeatureFlag` enum in `uncaged_core/src/features.rs`:
 
 ```rust
 #[derive(Sequence)]

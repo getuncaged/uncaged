@@ -9,22 +9,22 @@ use cloud_objects::UserUid;
 use instant::Instant;
 use parking_lot::RwLock;
 use pathfinder_color::ColorU;
-use warp_cli::agent::Harness;
-use warp_cli::skill::SkillSpec;
-use warp_core::ui::color::coloru_with_opacity;
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::new_scrollable::{NewScrollable, SingleAxisConfig};
-use warpui::elements::{
+use uncaged_cli::agent::Harness;
+use uncaged_cli::skill::SkillSpec;
+use uncaged_core::ui::color::coloru_with_opacity;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::new_scrollable::{NewScrollable, SingleAxisConfig};
+use uncaged_ui::elements::{
     resizable_state_handle, Border, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DragBarSide, Empty, Expanded, Flex, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, ParentElement, Radius, Resizable, ResizableStateHandle,
     SelectableArea, SelectionHandle, Shrinkable, Text, Wrap,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::FixedBinding;
-use warpui::platform::Cursor;
-use warpui::ui_components::components::UiComponent;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -549,7 +549,7 @@ pub enum ConversationDetailsPanelAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_fixed_bindings([FixedBinding::custom(
         CustomAction::Copy,
@@ -818,16 +818,16 @@ impl ConversationDetailsPanel {
             .unwrap_or_else(|| AvatarContent::DisplayName(creator.display_name.clone()));
         let avatar = Avatar::new(
             avatar_content,
-            warpui::ui_components::components::UiComponentStyles {
+            uncaged_ui::ui_components::components::UiComponentStyles {
                 width: Some(20.),
                 height: Some(20.),
-                border_radius: Some(warpui::elements::CornerRadius::with_all(
-                    warpui::elements::Radius::Percentage(50.),
+                border_radius: Some(uncaged_ui::elements::CornerRadius::with_all(
+                    uncaged_ui::elements::Radius::Percentage(50.),
                 )),
                 background: Some(blended_colors::accent(theme).into()),
                 font_color: Some(ColorU::black()),
                 font_family_id: Some(appearance.ui_font_family()),
-                font_weight: Some(warpui::fonts::Weight::Bold),
+                font_weight: Some(uncaged_ui::fonts::Weight::Bold),
                 font_size: Some(small_font_size),
                 ..Default::default()
             },
@@ -1005,7 +1005,7 @@ impl ConversationDetailsPanel {
         .with_uniform_padding(4.)
         .with_background(coloru_with_opacity(color, 10))
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .finish();
 
@@ -1276,7 +1276,7 @@ impl ConversationDetailsPanel {
         let duration = COPY_FEEDBACK_DURATION;
         ctx.spawn(
             async move {
-                warpui::r#async::Timer::after(duration).await;
+                uncaged_ui::r#async::Timer::after(duration).await;
             },
             |me, _, ctx| {
                 ctx.notify();
@@ -1586,7 +1586,7 @@ impl View for ConversationDetailsPanel {
             },
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .finish();
 
@@ -1616,7 +1616,7 @@ impl View for ConversationDetailsPanel {
 
         // On mobile, add background and skip Resizable
         #[cfg(target_family = "wasm")]
-        if warpui::platform::wasm::is_mobile_device() {
+        if uncaged_ui::platform::wasm::is_mobile_device() {
             return Container::new(panel_content)
                 .with_background(theme.surface_1())
                 .finish();

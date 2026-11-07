@@ -55,25 +55,22 @@ use repo_metadata::repositories::DetectedRepositories;
 #[cfg(feature = "local_fs")]
 use repo_metadata::RemoteRepositoryIdentifier;
 use serde_json;
-#[cfg(target_family = "wasm")]
-use url::Url;
-use warp_core::context_flag::ContextFlag;
-use warp_core::features::FeatureFlag;
-use warp_core::semantic_selection::SemanticSelection;
-use warp_core::ui::color::coloru_with_opacity;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::phenomenon::PhenomenonStyle;
-use warp_core::ui::theme::{AnsiColors, Fill};
-use warp_core::ui::Icon;
-use warp_editor::editor::NavigationKey;
-use warp_util::path::{user_friendly_path, LineAndColumnArg};
-use warpui::accessibility::{
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::semantic_selection::SemanticSelection;
+use uncaged_core::ui::color::coloru_with_opacity;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::phenomenon::PhenomenonStyle;
+use uncaged_core::ui::theme::{AnsiColors, Fill};
+use uncaged_core::ui::Icon;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::accessibility::{
     AccessibilityContent, AccessibilityVerbosity, ActionAccessibilityContent, WarpA11yRole,
 };
-use warpui::clipboard::ClipboardContent;
+use uncaged_ui::clipboard::ClipboardContent;
 #[cfg(target_family = "wasm")]
-use warpui::elements::Percentage;
-use warpui::elements::{
+use uncaged_ui::elements::Percentage;
+use uncaged_ui::elements::{
     Align, Border, CacheOption, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, DispatchEventResult, DragAxis, Draggable,
     DraggableState, DropTarget, Element, Empty, EventHandler, Expanded, Fill as ElementFill, Flex,
@@ -82,23 +79,28 @@ use warpui::elements::{
     ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Rect,
     SavePosition, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::geometry::vector::{vec2f, Vector2F};
-use warpui::keymap::Context;
-use warpui::modals::{AlertDialogWithCallbacks, AppModalCallback, ModalButton};
-use warpui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
-use warpui::platform::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::geometry::vector::{vec2f, Vector2F};
+use uncaged_ui::keymap::Context;
+use uncaged_ui::modals::{AlertDialogWithCallbacks, AppModalCallback, ModalButton};
+use uncaged_ui::notification::{
+    NotificationSendError, RequestPermissionsOutcome, UserNotification,
+};
+use uncaged_ui::platform::{
     Cursor, FilePickerConfiguration, FullscreenState, SystemTheme, TerminationMode,
 };
-use warpui::text_layout::ClipConfig;
-use warpui::ui_components::button::Button;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::windowing::state::ApplicationStage;
-use warpui::windowing::{StateEvent, WindowManager};
-use warpui::{
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::ui_components::button::Button;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::windowing::state::ApplicationStage;
+use uncaged_ui::windowing::{StateEvent, WindowManager};
+use uncaged_ui::{
     AppContext, Entity, EntityId, FocusContext, ModelHandle, SingletonEntity, TypedActionView,
     UpdateModel, UpdateView, View, ViewAsRef, ViewContext, ViewHandle, WindowId,
 };
+use uncaged_util::path::{user_friendly_path, LineAndColumnArg};
+#[cfg(target_family = "wasm")]
+use url::Url;
 
 use self::vertical_tabs::{
     htab_group_position_id, pane_summary_kind, render_detail_sidecar, render_settings_popup,
@@ -476,7 +478,7 @@ pub(crate) fn rounded_panel(
 ) -> Box<dyn Element> {
     let mut card = Container::new(contents)
         .with_border(Border::all(1.).with_border_fill(card_outline(appearance)))
-        .with_corner_radius(warp_core::ui::radius::large())
+        .with_corner_radius(uncaged_core::ui::radius::large())
         .with_margin_top(PANEL_CARD_MARGIN)
         .with_margin_bottom(PANEL_CARD_MARGIN)
         .with_margin_left(PANEL_CARD_MARGIN)
@@ -2148,7 +2150,7 @@ impl Workspace {
                 .finish();
 
                 let mut button = Container::new(icon).with_corner_radius(CornerRadius::with_all(
-                    Radius::Pixels(warp_core::ui::radius::SMALL),
+                    Radius::Pixels(uncaged_core::ui::radius::SMALL),
                 ));
                 if hover_state.is_hovered() {
                     button =
@@ -5365,7 +5367,7 @@ impl Workspace {
     #[cfg(not(target_family = "wasm"))]
     fn view_logs(&mut self, ctx: &mut ViewContext<Self>) {
         ctx.spawn(
-            async { tokio::task::spawn_blocking(warp_logging::create_log_bundle_zip).await },
+            async { tokio::task::spawn_blocking(uncaged_logging::create_log_bundle_zip).await },
             |me, result, ctx| match result {
                 Ok(Ok(path)) => {
                     ctx.open_file_path_in_explorer(&path);
@@ -7424,13 +7426,13 @@ impl Workspace {
     }
 
     /// Find an active session and pre-fill the input editor the Warp executable with the
-    /// [`warp_cli::Command::DumpDebugInfo`] subcommand.
+    /// [`uncaged_cli::Command::DumpDebugInfo`] subcommand.
     fn dump_debug_info(&mut self, ctx: &mut ViewContext<Self>) {
         if let Some(exec) = std::env::current_exe()
             .ok()
             .map(|path| path.to_string_lossy().into_owned())
         {
-            let command = format!("{exec} {}", warp_cli::dump_debug_info_flag());
+            let command = format!("{exec} {}", uncaged_cli::dump_debug_info_flag());
             // Get the active session for this tab if it exists.
             let mut active_session_handle = self
                 .active_tab_pane_group()
@@ -8436,7 +8438,7 @@ impl Workspace {
                         .with_padding_bottom(NEW_SESSION_SIDECAR_SEARCH_BOX_VERTICAL_PADDING)
                         .with_border(Border::all(1.).with_border_fill(theme.surface_3()))
                         .with_corner_radius(CornerRadius::with_top(Radius::Pixels(
-                            warp_core::ui::radius::SMALL,
+                            uncaged_core::ui::radius::SMALL,
                         )))
                         .finish(),
                 )
@@ -8535,7 +8537,7 @@ impl Workspace {
                         .with_background(bg)
                         .with_border(Border::top(1.).with_border_fill(border_fill))
                         .with_corner_radius(CornerRadius::with_bottom(Radius::Pixels(
-                            warp_core::ui::radius::SMALL,
+                            uncaged_core::ui::radius::SMALL,
                         )))
                         .finish(),
                     )
@@ -8543,7 +8545,7 @@ impl Workspace {
                     .finish()
                 })
                 .with_cursor(Cursor::PointingHand)
-                .on_click(|ctx: &mut warpui::elements::EventContext, _, _| {
+                .on_click(|ctx: &mut uncaged_ui::elements::EventContext, _, _| {
                     ctx.dispatch_typed_action(WorkspaceAction::OpenWorktreeAddRepoPicker);
                     ctx.dispatch_typed_action(crate::menu::MenuAction::Close(true));
                 })
@@ -8907,7 +8909,7 @@ impl Workspace {
                     Err(e) => log::error!("settings backup failed: {e:#}"),
                 }
             },
-            warpui::platform::FilePickerConfiguration::new().folders_only(),
+            uncaged_ui::platform::FilePickerConfiguration::new().folders_only(),
         );
     }
 
@@ -8927,7 +8929,7 @@ impl Workspace {
                     Err(e) => log::error!("settings restore failed: {e:#}"),
                 }
             },
-            warpui::platform::FilePickerConfiguration::new(),
+            uncaged_ui::platform::FilePickerConfiguration::new(),
         );
     }
 
@@ -9078,7 +9080,7 @@ impl Workspace {
                     });
                 });
             },
-            warpui::platform::FilePickerConfiguration::new().folders_only(),
+            uncaged_ui::platform::FilePickerConfiguration::new().folders_only(),
         );
     }
 
@@ -9152,7 +9154,7 @@ impl Workspace {
             .map(crate::util::git::list_local_branches_sync)
             .unwrap_or_default();
         let branch_refs: HashSet<&str> = branches.iter().map(|s| s.as_str()).collect();
-        Some(warp_util::worktree_names::generate_worktree_branch_name(
+        Some(uncaged_util::worktree_names::generate_worktree_branch_name(
             &branch_refs,
         ))
     }
@@ -9192,7 +9194,7 @@ impl Workspace {
         } else {
             let branches = crate::util::git::list_local_branches_sync(Path::new(repo));
             let branch_refs: HashSet<&str> = branches.iter().map(|s| s.as_str()).collect();
-            warp_util::worktree_names::generate_worktree_branch_name(&branch_refs)
+            uncaged_util::worktree_names::generate_worktree_branch_name(&branch_refs)
         };
 
         let toml_content = crate::tab_configs::build_worktree_config_toml(
@@ -9266,7 +9268,7 @@ impl Workspace {
                     });
                 });
             },
-            warpui::platform::FilePickerConfiguration::new().folders_only(),
+            uncaged_ui::platform::FilePickerConfiguration::new().folders_only(),
         );
     }
 
@@ -9287,7 +9289,7 @@ impl Workspace {
         };
         let branches = crate::util::git::list_local_branches_sync(Path::new(&repo_path));
         let branch_refs: HashSet<&str> = branches.iter().map(|s| s.as_str()).collect();
-        let branch_name = warp_util::worktree_names::generate_worktree_branch_name(&branch_refs);
+        let branch_name = uncaged_util::worktree_names::generate_worktree_branch_name(&branch_refs);
         let repo_display_name = Path::new(&repo_path)
             .file_name()
             .map(|name| name.to_string_lossy().to_string())
@@ -9360,7 +9362,7 @@ impl Workspace {
                     persisted.user_added_workspace(path_buf, ctx);
                 });
             },
-            warpui::platform::FilePickerConfiguration::new().folders_only(),
+            uncaged_ui::platform::FilePickerConfiguration::new().folders_only(),
         );
     }
 
@@ -12101,7 +12103,7 @@ impl Workspace {
 
     #[cfg(target_os = "macos")]
     pub fn sync_window_button_visibility(&self, ctx: &mut ViewContext<Self>) {
-        use warpui::platform::mac::WindowExt;
+        use uncaged_ui::platform::mac::WindowExt;
         let show = if FeatureFlag::FullScreenZenMode.is_enabled()
             && TabSettings::as_ref(ctx)
                 .workspace_decoration_visibility
@@ -12579,12 +12581,12 @@ impl Workspace {
                             .and_then(|wd| match wd {
                                 LocalOrRemotePath::Remote(remote) => {
                                     let std_path =
-                                        warp_util::standardized_path::StandardizedPath::try_new(
+                                        uncaged_util::standardized_path::StandardizedPath::try_new(
                                             path,
                                         )
                                         .ok()?;
                                     Some(LocalOrRemotePath::Remote(
-                                        warp_util::remote_path::RemotePath::new(
+                                        uncaged_util::remote_path::RemotePath::new(
                                             remote.host_id.clone(),
                                             std_path,
                                         ),
@@ -16510,7 +16512,7 @@ impl Workspace {
             font_family_id: Some(appearance.ui_font_family()),
             height: Some(24.),
             border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             ))),
             border_width: Some(0.),
             padding: Some(Coords {
@@ -16667,7 +16669,7 @@ impl Workspace {
                             internal_colors::fg_overlay_1(theme)
                         })
                         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                            warp_core::ui::radius::SMALL,
+                            uncaged_core::ui::radius::SMALL,
                         )))
                         .with_padding_left(16.)
                         .with_padding_right(16.)
@@ -16710,7 +16712,7 @@ impl Workspace {
             // Left: Warp logo - clickable to link to warp.dev
             let warp_logo = Hoverable::new(self.mouse_states.warp_logo.clone(), |_state| {
                 ConstrainedBox::new(
-                    warp_core::ui::Icon::Warp
+                    uncaged_core::ui::Icon::Warp
                         .to_warpui_icon(appearance.theme().foreground())
                         .finish(),
                 )
@@ -16752,7 +16754,7 @@ impl Workspace {
             }
 
             // Hide "Open in Warp" button on mobile devices
-            if !warpui::platform::wasm::is_mobile_device() {
+            if !uncaged_ui::platform::wasm::is_mobile_device() {
                 right_row.add_child(ChildView::new(&self.open_in_warp_button).finish());
             }
             tab_bar.add_child(right_row.finish());
@@ -17348,7 +17350,7 @@ impl Workspace {
     }
 
     fn render_new_session_button(&self, ctx: &AppContext) -> Box<dyn Element> {
-        const CORNER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
+        const CORNER_RADIUS: Radius = Radius::Pixels(uncaged_core::ui::radius::SMALL);
         const BUTTON_HEIGHT: f32 = 24.;
         const SIDE_MENU_WIDTH: f32 = 16.;
         const BUTTON_WIDTH: f32 = 24. + SIDE_MENU_WIDTH;
@@ -18228,7 +18230,7 @@ impl Workspace {
                             .with_uniform_padding(2.)
                             .with_corner_radius(
                                 CornerRadius::with_all(Radius::Pixels(
-                                    warp_core::ui::radius::SMALL,
+                                    uncaged_core::ui::radius::SMALL,
                                 )),
                             );
                             if state.is_hovered() {
@@ -18307,7 +18309,7 @@ impl Workspace {
 
             let mut container = Container::new(row.finish())
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .with_horizontal_padding(8.);
             if matches!(variant, BannerButtonVariant::Outlined) {
@@ -18477,7 +18479,7 @@ impl Workspace {
         }
 
         #[cfg(target_family = "wasm")]
-        if !warpui::platform::wasm::is_mobile_device()
+        if !uncaged_ui::platform::wasm::is_mobile_device()
             && self
                 .current_workspace_state
                 .is_transcript_details_panel_open
@@ -18552,7 +18554,7 @@ impl Workspace {
                 )
             }
             HeaderToolbarItemKind::ToolsPanel => {
-                if !pane_group.left_panel_open || warpui::platform::is_mobile_device() {
+                if !pane_group.left_panel_open || uncaged_ui::platform::is_mobile_device() {
                     return None;
                 }
                 Some(ChildView::new(&self.left_panel_view).finish())
@@ -21224,7 +21226,7 @@ impl View for Workspace {
         self.sync_window_button_visibility(ctx);
     }
 
-    fn keymap_context(&self, app: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         if NetworkStatus::as_ref(app).is_online() {
@@ -21460,7 +21462,7 @@ impl View for Workspace {
         // places would dim twice, so with an image this one goes transparent.
         let has_background_image = appearance.theme().background_image().is_some();
         let panels_background = if has_background_image {
-            warpui::elements::Fill::None
+            uncaged_ui::elements::Fill::None
         } else {
             util::get_terminal_background_fill(self.window_id, app)
         };
@@ -21497,7 +21499,7 @@ impl View for Workspace {
         #[cfg(target_family = "wasm")]
         {
             let pane_group = self.active_tab_pane_group().as_ref(app);
-            if warpui::platform::wasm::is_mobile_device() && pane_group.left_panel_open {
+            if uncaged_ui::platform::wasm::is_mobile_device() && pane_group.left_panel_open {
                 let scrim = Rect::new()
                     .with_background(Fill::Solid(ColorU::new(
                         0,
@@ -21601,7 +21603,7 @@ impl View for Workspace {
 
         // Transcript details panel overlay (right side, mobile only)
         #[cfg(target_family = "wasm")]
-        if warpui::platform::wasm::is_mobile_device()
+        if uncaged_ui::platform::wasm::is_mobile_device()
             && self
                 .current_workspace_state
                 .is_transcript_details_panel_open
@@ -22442,7 +22444,7 @@ impl View for Workspace {
                             Border::all(2.)
                                 .with_border_fill(internal_colors::accent_bg_strong(theme)),
                         )
-                        .with_corner_radius(warp_core::ui::radius::large())
+                        .with_corner_radius(uncaged_core::ui::radius::large())
                         .with_uniform_margin(PANEL_CARD_MARGIN)
                         .finish(),
                 )
@@ -24245,7 +24247,7 @@ fn render_cross_window_ghost_chip(
     appearance: &Appearance,
     app: &AppContext,
 ) -> Box<dyn Element> {
-    use warpui::elements::DropShadow;
+    use uncaged_ui::elements::DropShadow;
 
     let theme = appearance.theme();
 

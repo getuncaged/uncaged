@@ -5,9 +5,9 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use chrono::{DateTime, Local, TimeDelta};
 use futures::channel::oneshot;
+use uncaged_agent_api::response_event;
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 use uuid::Uuid;
-use warp_multi_agent_api::response_event;
-use warpui::{Entity, ModelContext, SingletonEntity};
 
 use crate::ai::agent::api::{self, generate_multi_agent_output, ConvertToAPITypeError};
 use crate::ai::agent::conversation::AIConversationId;
@@ -290,12 +290,12 @@ impl ResponseStream {
             Ok(response_event) => {
                 if let Some(event_type) = &response_event.r#type {
                     match event_type {
-                        warp_multi_agent_api::response_event::Type::Init(_) => {}
-                        warp_multi_agent_api::response_event::Type::ClientActions(_) => {
+                        uncaged_agent_api::response_event::Type::Init(_) => {}
+                        uncaged_agent_api::response_event::Type::ClientActions(_) => {
                             // Mark that we've received client actions
                             self.has_received_client_actions = true;
                         }
-                        warp_multi_agent_api::response_event::Type::Finished(_) => {
+                        uncaged_agent_api::response_event::Type::Finished(_) => {
                             self.stream_finished_received = true;
                         }
                     }

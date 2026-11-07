@@ -3,8 +3,8 @@ use chrono::{DateTime, Utc};
 use cloud_object_models::ServerAIExecutionProfile;
 use onboarding::slides::{AgentAutonomy, AgentDevelopmentSettings, ProjectOnboardingSettings};
 use onboarding::SelectedSettings;
-use warp_core::features::FeatureFlag;
-use warpui::{App, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{App, SingletonEntity};
 
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::execution_profiles::{

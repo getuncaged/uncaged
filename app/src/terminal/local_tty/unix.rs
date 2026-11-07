@@ -1,5 +1,5 @@
 // The code in this file is adapted from the alacritty_terminal crate under the
-// Apache license; see: crates/warp_terminal/src/model/LICENSE-ALACRITTY.
+// Apache license; see: crates/uncaged_terminal/src/model/LICENSE-ALACRITTY.
 
 //! TTY related functionality.
 use std::collections::HashMap;
@@ -21,9 +21,9 @@ use nix::pty::openpty;
 use nix::sys::termios::{self, InputFlags, SetArg};
 use serde::{Deserialize, Serialize};
 use signal_hook_mio::v1_0::Signals;
-use warp_core::channel::ChannelState;
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_core::channel::ChannelState;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use super::event_loop::{PTY_TOKEN, SIGNALS_TOKEN};
 use super::spawner::{PtyHandle, PtySpawnInfo, PtySpawner};
@@ -420,7 +420,7 @@ fn spawn_command_in_pty(
 
     // Detect isolation platform outside pre_exec, since detect() is not async-signal-safe.
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-    let is_isolated = warp_isolation_platform::detect().is_some();
+    let is_isolated = uncaged_isolation_platform::detect().is_some();
 
     unsafe {
         let fdlimit = libc::sysconf(libc::_SC_OPEN_MAX) as i32;

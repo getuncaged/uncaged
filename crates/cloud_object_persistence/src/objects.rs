@@ -16,7 +16,7 @@ use persistence::model::{
     NewObjectPermissions, ObjectMetadata, ObjectPermissions,
 };
 use persistence::schema;
-use warp_core::features::FeatureFlag;
+use uncaged_core::features::FeatureFlag;
 
 use crate::{decode_guests, decode_link_sharing, encode_guests, encode_link_sharing};
 

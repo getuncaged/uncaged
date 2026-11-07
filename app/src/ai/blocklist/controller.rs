@@ -18,10 +18,10 @@ use itertools::Itertools;
 use parking_lot::FairMutex;
 use pending_response_streams::PendingResponseStreams;
 pub use slash_command::*;
-use warp_core::assertions::safe_assert;
-use warp_multi_agent_api::{message, Task, ToolType};
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_agent_api::{message, Task, ToolType};
+use uncaged_core::assertions::safe_assert;
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use self::response_stream::{ResponseStream, ResponseStreamEvent};
 use super::action_model::{BlocklistAIActionEvent, BlocklistAIActionModel};
@@ -2340,7 +2340,7 @@ impl BlocklistAIController {
                             return;
                         };
                         match event {
-                            warp_multi_agent_api::response_event::Type::Init(init_event) => {
+                            uncaged_agent_api::response_event::Type::Init(init_event) => {
                                 history_model.update(ctx, |history_model, ctx| {
                                     history_model.initialize_output_for_response_stream(
                                         &stream_id,
@@ -2361,9 +2361,7 @@ impl BlocklistAIController {
                                     }
                                 });
                             }
-                            warp_multi_agent_api::response_event::Type::Finished(
-                                finished_event,
-                            ) => {
+                            uncaged_agent_api::response_event::Type::Finished(finished_event) => {
                                 self.handle_response_stream_finished(
                                     &stream_id,
                                     finished_event,
@@ -2372,7 +2370,7 @@ impl BlocklistAIController {
                                     ctx,
                                 );
                             }
-                            warp_multi_agent_api::response_event::Type::ClientActions(actions) => {
+                            uncaged_agent_api::response_event::Type::ClientActions(actions) => {
                                 let client_actions = actions.actions;
                                 let skill_path_origin = SessionContext::from_session(
                                     self.active_session.as_ref(ctx),
@@ -2608,7 +2606,7 @@ impl BlocklistAIController {
     pub(super) fn handle_response_stream_finished(
         &mut self,
         stream_id: &ResponseStreamId,
-        mut finished_event: warp_multi_agent_api::response_event::StreamFinished,
+        mut finished_event: uncaged_agent_api::response_event::StreamFinished,
         conversation_id: AIConversationId,
         did_request_contain_user_query: bool,
         ctx: &mut ModelContext<Self>,
@@ -2632,7 +2630,7 @@ impl BlocklistAIController {
 
         let history_model = BlocklistAIHistoryModel::handle(ctx);
         match finished_event.reason {
-            Some(warp_multi_agent_api::response_event::stream_finished::Reason::Done(_)) | None => {
+            Some(uncaged_agent_api::response_event::stream_finished::Reason::Done(_)) | None => {
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_successfully(
                         stream_id,
@@ -2642,8 +2640,9 @@ impl BlocklistAIController {
                     );
                 });
             }
-            Some(warp_multi_agent_api::response_event::stream_finished::Reason::Other(_)) => {
-                let error_message = "Response stream finished unexpectedly (with finish reason `Other`).";
+            Some(uncaged_agent_api::response_event::stream_finished::Reason::Other(_)) => {
+                let error_message =
+                    "Response stream finished unexpectedly (with finish reason `Other`).";
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_with_error(
                         RenderableAIError::Other {
@@ -2660,7 +2659,11 @@ impl BlocklistAIController {
                     );
                 });
             }
-            Some(warp_multi_agent_api::response_event::stream_finished::Reason::ContextWindowExceeded(_)) => {
+            Some(
+                uncaged_agent_api::response_event::stream_finished::Reason::ContextWindowExceeded(
+                    _,
+                ),
+            ) => {
                 let error_message = "Input exceeded context window limit.";
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_with_error(
@@ -2673,7 +2676,7 @@ impl BlocklistAIController {
                     );
                 });
             }
-            Some(warp_multi_agent_api::response_event::stream_finished::Reason::QuotaLimit(_)) => {
+            Some(uncaged_agent_api::response_event::stream_finished::Reason::QuotaLimit(_)) => {
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_with_error(
                         RenderableAIError::QuotaLimit {
@@ -2687,7 +2690,7 @@ impl BlocklistAIController {
                     );
                 });
             }
-            Some(warp_multi_agent_api::response_event::stream_finished::Reason::LlmUnavailable(_)) => {
+            Some(uncaged_agent_api::response_event::stream_finished::Reason::LlmUnavailable(_)) => {
                 let error_message = "The LLM is currently unavailable.";
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_with_error(
@@ -2705,8 +2708,10 @@ impl BlocklistAIController {
                     );
                 });
             }
-            Some(warp_multi_agent_api::response_event::stream_finished::Reason::InvalidApiKey(details)) => {
-                use warp_multi_agent_api::LlmProvider;
+            Some(uncaged_agent_api::response_event::stream_finished::Reason::InvalidApiKey(
+                details,
+            )) => {
+                use uncaged_agent_api::LlmProvider;
                 let provider = details.provider.try_into().ok().and_then(|p| match p {
                     LlmProvider::Google => Some("Google"),
                     LlmProvider::Anthropic => Some("Anthropic"),
@@ -2731,8 +2736,9 @@ impl BlocklistAIController {
                     );
                 });
             }
-            Some(warp_multi_agent_api::response_event::stream_finished::Reason::InternalError(
-                warp_multi_agent_api::response_event::stream_finished::InternalError{ message})) => {
+            Some(uncaged_agent_api::response_event::stream_finished::Reason::InternalError(
+                uncaged_agent_api::response_event::stream_finished::InternalError { message },
+            )) => {
                 let error_message = format!(
                     "Response stream finished unexpectedly with internal error: {message}",
                 );
@@ -2752,7 +2758,7 @@ impl BlocklistAIController {
                     );
                 });
             }
-            Some(warp_multi_agent_api::response_event::stream_finished::Reason::MaxTokenLimit(_)) => {
+            Some(uncaged_agent_api::response_event::stream_finished::Reason::MaxTokenLimit(_)) => {
                 let error_message = "Input exceeded context window limit.";
                 history_model.update(ctx, |history_model, ctx| {
                     history_model.mark_response_stream_completed_with_error(
@@ -2818,9 +2824,9 @@ fn input_for_query(
         .and_then(|c| c.get_task(task_id))
         .and_then(|task| {
             if task.is_root_task() {
-                Some(warp_multi_agent_api::AgentType::Primary)
+                Some(uncaged_agent_api::AgentType::Primary)
             } else if task.is_cli_subagent() {
-                Some(warp_multi_agent_api::AgentType::Cli)
+                Some(uncaged_agent_api::AgentType::Cli)
             } else {
                 None
             }

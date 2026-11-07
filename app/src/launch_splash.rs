@@ -11,16 +11,16 @@ use std::time::Duration;
 use instant::Instant;
 use pathfinder_color::ColorU;
 use settings::Setting as _;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::Icon;
-use warpui::elements::shimmering_text::{
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::shimmering_text::{
     ShimmerConfig, ShimmeringTextElement, ShimmeringTextStateHandle,
 };
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, ConstrainedBox, Container, CrossAxisAlignment, Flex, MainAxisAlignment, MainAxisSize,
     ParentElement,
 };
-use warpui::{AppContext, Element, SingletonEntity as _};
+use uncaged_ui::{AppContext, Element, SingletonEntity as _};
 
 use crate::appearance::Appearance;
 use crate::channel::{Channel, ChannelState};

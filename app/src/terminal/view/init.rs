@@ -1,9 +1,9 @@
-use warpui::keymap::{
+use uncaged_ui::keymap::{
     BindingDescription, ContextPredicate, EditableBinding, FixedBinding, PerPlatformKeystroke,
 };
-use warpui::platform::OperatingSystem;
-use warpui::units::IntoLines;
-use warpui::AppContext;
+use uncaged_ui::platform::OperatingSystem;
+use uncaged_ui::units::IntoLines;
+use uncaged_ui::AppContext;
 
 use super::{AskAISource, ContextMenuAction, TerminalAction};
 use crate::ai::blocklist::agent_view::{
@@ -55,7 +55,7 @@ pub const CAN_SHOW_CONVERSATION_DETAILS_KEY: &str = "CanShowConversationDetails"
 /// these into their own function to ensure we pay special attention to
 /// these overlaps, and ensure only 1 action is taken.
 fn init_overlapping_keybindings(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     let escape_key: &str = "escape";
 
@@ -71,7 +71,7 @@ fn init_overlapping_keybindings(app: &mut AppContext) {
 
 /// Register keybindings for [`TerminalView`] actions.
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_binding_validator::<TerminalView>(is_binding_pty_compliant);
 
@@ -162,7 +162,7 @@ pub fn init(app: &mut AppContext) {
         // On the web, we get pastes from system paste events.
         #[cfg(target_family = "wasm")]
         FixedBinding::standard(
-            warpui::actions::StandardAction::Paste,
+            uncaged_ui::actions::StandardAction::Paste,
             TerminalAction::Paste,
             id!("Terminal") & !id!("IMEOpen"),
         ),
@@ -951,7 +951,7 @@ pub fn init(app: &mut AppContext) {
 
 /// Registers bindings related to input modes.
 fn register_input_mode_bindings(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     // A context predicate that matches when the input mode bindings are
     // available for use. Disabled when a CLI agent session is active — the

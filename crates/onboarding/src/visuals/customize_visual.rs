@@ -1,8 +1,8 @@
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::Icon;
-use warpui_core::elements::Align;
-use warpui_core::Element;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::Icon;
+use uncaged_ui_core::elements::Align;
+use uncaged_ui_core::Element;
 
 use super::onboarding_visual::{IconPct, OnboardingVisual, Pill, Rect, RectPct};
 

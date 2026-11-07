@@ -3,8 +3,8 @@ use std::sync::Arc;
 use async_channel::Sender;
 use async_trait::async_trait;
 use ipc::{Client, ConnectionAddress};
+use uncaged_ui::r#async::executor::Background;
 use url::Url;
-use warpui::r#async::executor::Background;
 
 use super::single_instance_manager::uri_named_pipe_name;
 
@@ -14,6 +14,11 @@ pub(super) struct UriService {}
 impl ipc::Service for UriService {
     type Request = Vec<Url>;
     type Response = ();
+
+    /// The ID this service had before the crate rename; kept so it stays stable on the wire.
+    fn id() -> &'static str {
+        "warp::app_services::windows::service_impl::UriService"
+    }
 }
 
 #[derive(Clone)]

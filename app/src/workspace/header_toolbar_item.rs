@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use settings::Setting as _;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use crate::features::FeatureFlag;
 use crate::settings::AISettings;

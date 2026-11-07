@@ -19,7 +19,7 @@ use ::ai::index::locations::CodeContextLocation;
 use futures::channel::{mpsc, oneshot};
 use futures::FutureExt as _;
 use uncaged_engine::{CodeSearchFn, CodeSearchRequest};
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 /// Lines shown from one match before the rest is cut.
 const MAX_LINES_PER_MATCH: usize = 80;

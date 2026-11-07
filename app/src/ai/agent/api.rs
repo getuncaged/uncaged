@@ -16,11 +16,11 @@ use futures_lite::Stream;
 use mcp::TemplatableMCPServerInfo;
 pub use r#impl::generate_multi_agent_output;
 use serde::Serialize;
-use warp_core::channel::ChannelState;
-use warp_core::execution_mode::AppExecutionMode;
-use warp_core::features::FeatureFlag;
-use warp_core::user_preferences::GetUserPreferences;
-use warpui::{AppContext, EntityId, SingletonEntity as _};
+use uncaged_core::channel::ChannelState;
+use uncaged_core::execution_mode::AppExecutionMode;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::user_preferences::GetUserPreferences;
+use uncaged_ui::{AppContext, EntityId, SingletonEntity as _};
 
 use super::{AIAgentInput, MCPContext, MCPServer, RequestMetadata, Suggestions};
 use crate::ai::agent::conversation::AIConversationId;
@@ -77,7 +77,7 @@ pub struct RequestParams {
     pub conversation_token: Option<ServerConversationToken>,
     pub forked_from_conversation_token: Option<ServerConversationToken>,
     pub ambient_agent_task_id: Option<AmbientAgentTaskId>,
-    pub tasks: Vec<warp_multi_agent_api::Task>,
+    pub tasks: Vec<uncaged_agent_api::Task>,
     pub existing_suggestions: Option<Suggestions>,
     pub metadata: Option<RequestMetadata>,
     pub session_context: SessionContext,
@@ -95,21 +95,21 @@ pub struct RequestParams {
 
     /// User-defined custom model routers referenced by the current selection: the selected
     /// model's `config_key` indexes into this registry. `None` when no custom router is selected.
-    pub custom_model_routers: Option<warp_multi_agent_api::request::settings::CustomModelRouters>,
-    pub autonomy_level: warp_multi_agent_api::AutonomyLevel,
-    pub isolation_level: warp_multi_agent_api::IsolationLevel,
+    pub custom_model_routers: Option<uncaged_agent_api::request::settings::CustomModelRouters>,
+    pub autonomy_level: uncaged_agent_api::AutonomyLevel,
+    pub isolation_level: uncaged_agent_api::IsolationLevel,
     pub web_search_enabled: bool,
     pub ask_user_question_enabled: bool,
     pub research_agent_enabled: bool,
     pub orchestration_enabled: bool,
-    pub supported_tools_override: Option<Vec<warp_multi_agent_api::ToolType>>,
+    pub supported_tools_override: Option<Vec<uncaged_agent_api::ToolType>>,
     /// The conversation ID of the parent agent that spawned this child agent, if any.
     pub parent_agent_id: Option<String>,
     /// The display name for this agent (e.g. "Agent 1"), assigned by the orchestrator.
     pub agent_name: Option<String>,
 }
 
-pub type Event = Result<warp_multi_agent_api::ResponseEvent, Arc<AIApiError>>;
+pub type Event = Result<uncaged_agent_api::ResponseEvent, Arc<AIApiError>>;
 
 #[cfg(not(target_family = "wasm"))]
 pub type ResponseStream = Pin<Box<dyn Stream<Item = Event> + Send + 'static>>;
@@ -123,7 +123,7 @@ pub type ResponseStream = Pin<Box<dyn Stream<Item = Event>>>;
 #[derive(Debug, Clone)]
 pub struct ConversationData {
     pub id: AIConversationId,
-    pub tasks: Vec<warp_multi_agent_api::Task>,
+    pub tasks: Vec<uncaged_agent_api::Task>,
     pub server_conversation_token: Option<ServerConversationToken>,
     pub forked_from_conversation_token: Option<ServerConversationToken>,
     pub ambient_agent_task_id: Option<AmbientAgentTaskId>,
@@ -254,15 +254,15 @@ impl RequestParams {
 
         let app_execution_mode = AppExecutionMode::as_ref(app);
         let autonomy_level = if app_execution_mode.is_autonomous() {
-            warp_multi_agent_api::AutonomyLevel::Unsupervised
+            uncaged_agent_api::AutonomyLevel::Unsupervised
         } else {
-            warp_multi_agent_api::AutonomyLevel::Supervised
+            uncaged_agent_api::AutonomyLevel::Supervised
         };
 
         let isolation_level = if app_execution_mode.is_sandboxed() {
-            warp_multi_agent_api::IsolationLevel::Sandbox
+            uncaged_agent_api::IsolationLevel::Sandbox
         } else {
-            warp_multi_agent_api::IsolationLevel::None
+            uncaged_agent_api::IsolationLevel::None
         };
 
         let web_search_enabled =

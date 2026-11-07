@@ -28,10 +28,10 @@ serde_json.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 uuid.workspace = true
-warp_core = { workspace = true }
-warpui.workspace = true
-warpui_core.workspace = true
-warp_logging.workspace = true
+uncaged_core = { workspace = true }
+uncaged_ui.workspace = true
+uncaged_ui_core.workspace = true
+uncaged_logging.workspace = true
 
 [dev-dependencies]
-warp_core = { workspace = true, features = ["test-util"] }
+uncaged_core = { workspace = true, features = ["test-util"] }

@@ -12,11 +12,11 @@ use rand::SeedableRng;
 use rand::rngs::StdRng;
 use serde_yaml::{Mapping, Value};
 use string_offset::{ByteOffset, CharOffset};
+use uncaged_ui_core::elements::ListIndentLevel;
+use uncaged_ui_core::text::point::Point;
+use uncaged_ui_core::{App, AppContext, ModelContext, ModelHandle, ReadModel};
+use uncaged_util::content_version::ContentVersion;
 use vec1::{Vec1, vec1};
-use warp_util::content_version::ContentVersion;
-use warpui_core::elements::ListIndentLevel;
-use warpui_core::text::point::Point;
-use warpui_core::{App, AppContext, ModelContext, ModelHandle, ReadModel};
 
 use super::{BufferEvent, EditResult, ToBufferCharOffset};
 use crate::content::buffer::{

@@ -3,7 +3,7 @@
 use std::cell::{Cell, OnceCell};
 use std::collections::HashMap;
 
-use warpui::{Entity, SingletonEntity};
+use uncaged_ui::{Entity, SingletonEntity};
 
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
 use crate::ai::blocklist::history_model::convert_persisted_conversation_to_ai_conversation_with_metadata;

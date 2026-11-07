@@ -18,22 +18,22 @@ use settings_page::{
     SettingsPageEvent, SettingsPageMeta, SettingsPageViewHandle, HEADER_FONT_SIZE, HEADER_PADDING,
     MAX_PAGE_WIDTH, PAGE_PADDING, PAGE_TOP_PADDING,
 };
-use warp_core::channel::ChannelState;
-use warp_core::context_flag::ContextFlag;
-use warp_core::features::FeatureFlag;
-use warp_core::settings::ToggleableSetting as _;
-use warp_editor::editor::NavigationKey;
-use warpui::elements::{
+use uncaged_core::channel::ChannelState;
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::settings::ToggleableSetting as _;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::elements::{
     Align, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult, Empty,
     EventHandler, Expanded, Fill, Flex, MainAxisAlignment, MainAxisSize, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition, ScrollbarWidth,
     Shrinkable, Stack, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::{ContextPredicate, EnabledPredicate, FixedBinding};
-use warpui::platform::SystemTheme;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::{ContextPredicate, EnabledPredicate, FixedBinding};
+use uncaged_ui::platform::SystemTheme;
+use uncaged_ui::{
     id, Action, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView,
     UpdateView as _, View, ViewContext, ViewHandle,
 };
@@ -138,7 +138,7 @@ pub(super) fn render_beta_chip(appearance: &Appearance) -> Box<dyn Element> {
     )
     .with_background(theme.surface_3())
     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-        warp_core::ui::radius::SMALL,
+        uncaged_core::ui::radius::SMALL,
     )))
     .with_horizontal_padding(4.)
     .with_vertical_padding(1.)
@@ -673,7 +673,7 @@ impl<T: Action + Clone> ToggleSettingActionPair<T> {
         context_prefix: &ContextPredicate,
         context_boolean_flag: &'static str,
     ) -> Self {
-        use warpui::keymap::macros::id;
+        use uncaged_ui::keymap::macros::id;
 
         ToggleSettingActionPair {
             descriptions: SettingActionPairDescriptions {
@@ -2411,16 +2411,16 @@ impl BackingView for SettingsView {
     fn handle_pane_header_overflow_menu_action(
         &mut self,
         action: &Self::PaneHeaderOverflowMenuAction,
-        ctx: &mut warpui::ViewContext<Self>,
+        ctx: &mut uncaged_ui::ViewContext<Self>,
     ) {
         self.handle_action(action, ctx)
     }
 
-    fn close(&mut self, ctx: &mut warpui::ViewContext<Self>) {
+    fn close(&mut self, ctx: &mut uncaged_ui::ViewContext<Self>) {
         ctx.emit(SettingsViewEvent::Pane(PaneEvent::Close));
     }
 
-    fn focus_contents(&mut self, ctx: &mut warpui::ViewContext<Self>) {
+    fn focus_contents(&mut self, ctx: &mut uncaged_ui::ViewContext<Self>) {
         ctx.focus(&self.search_editor)
     }
 

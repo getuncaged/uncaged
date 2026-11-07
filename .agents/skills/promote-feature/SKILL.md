@@ -10,14 +10,14 @@ Guides the staged promotion of a gated `FeatureFlag` variant to Dogfood, Preview
 ## Overview
 
 Feature flags have two interacting layers:
-- **Runtime** (`warp_core/src/features.rs`): `DOGFOOD_FLAGS`, `PREVIEW_FLAGS`, `RELEASE_FLAGS` — enabled per-channel at startup.
+- **Runtime** (`uncaged_core/src/features.rs`): `DOGFOOD_FLAGS`, `PREVIEW_FLAGS`, `RELEASE_FLAGS` — enabled per-channel at startup.
 - **Compile-time** (`app/Cargo.toml` + `app/src/lib.rs`): Cargo features in `[features]`. The `default = [...]` array enables a feature for all builds. `enabled_features()` in `app/src/lib.rs` bridges each Cargo feature to its `FeatureFlag` variant via `#[cfg(feature = "...")]`.
 
 **Do not remove the flag immediately after promoting to Stable.** Keep it for at least 1–2 release cycles so a rollback is a one-line PR (remove the entry from `default`). Use the `remove-feature-flag` skill for the cleanup step later.
 
 ## Promote to Dogfood
 
-Add the flag to `DOGFOOD_FLAGS` in `warp_core/src/features.rs`:
+Add the flag to `DOGFOOD_FLAGS` in `uncaged_core/src/features.rs`:
 
 ```rust
 pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
@@ -30,7 +30,7 @@ No other file changes needed.
 
 ## Promote to Preview
 
-1. Add to `PREVIEW_FLAGS` in `warp_core/src/features.rs`.
+1. Add to `PREVIEW_FLAGS` in `uncaged_core/src/features.rs`.
 2. Remove from `DOGFOOD_FLAGS` if present — Preview flags are automatically included in Dogfood builds.
 
 ```rust
@@ -55,7 +55,7 @@ default = [
 ]
 ```
 
-Prefer this over adding to `RELEASE_FLAGS` (see comment at `warp_core/src/features.rs:787-790`). It compiles the feature into all builds and enables a one-line rollback.
+Prefer this over adding to `RELEASE_FLAGS` (see comment at `uncaged_core/src/features.rs:787-790`). It compiles the feature into all builds and enables a one-line rollback.
 
 ### 2. `app/src/lib.rs` — add to `enabled_features()` bridge
 
@@ -68,7 +68,7 @@ FeatureFlag::YourFeature,
 
 Place it near logically related entries.
 
-### 3. `warp_core/src/features.rs` — remove from `PREVIEW_FLAGS` / `DOGFOOD_FLAGS`
+### 3. `uncaged_core/src/features.rs` — remove from `PREVIEW_FLAGS` / `DOGFOOD_FLAGS`
 
 Remove the variant from whichever arrays it currently lives in:
 

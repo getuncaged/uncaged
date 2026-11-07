@@ -8,27 +8,27 @@ use palette::{FromColor, Hsv, Srgb};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use settings::Setting as _;
-use warp_core::ui::color::hex_color::{coloru_from_hex_string, coloru_to_hex_string};
-use warp_core::ui::radius;
-use warp_core::ui::theme::{
+use uncaged_core::ui::color::hex_color::{coloru_from_hex_string, coloru_to_hex_string};
+use uncaged_core::ui::radius;
+use uncaged_core::ui::theme::{
     AnsiColors, ColorScheme, Details, Fill as ThemeFill, Image as ThemeImage, TerminalColors,
     VerticalGradient, WarpTheme,
 };
-use warpui::assets::asset_cache::AssetSource;
-use warpui::elements::{
+use uncaged_ui::assets::asset_cache::AssetSource;
+use uncaged_ui::elements::{
     Align, Border, CacheOption, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DispatchEventResult, EventHandler, Expanded, Fill, Flex, Hoverable, Icon,
     Image, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Rect,
     SavePosition, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack, Text, Wrap,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::platform::Cursor;
-use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::slider::SliderStateHandle;
-use warpui::ui_components::switch::SwitchStateHandle;
-use warpui::ui_components::text_input::TextInput;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::slider::SliderStateHandle;
+use uncaged_ui::ui_components::switch::SwitchStateHandle;
+use uncaged_ui::ui_components::text_input::TextInput;
+use uncaged_ui::{
     AppContext, Element, Entity, EventContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };

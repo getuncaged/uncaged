@@ -130,7 +130,7 @@ tests, platform notes) is in [AGENTS.md](AGENTS.md).
 ## Licensing & attribution
 
 - **AGPL-3.0.** Uncaged stays under the upstream client's license (see
-  [`LICENSE-AGPL`](LICENSE-AGPL)); the `warpui` / `warpui_core` UI crates remain
+  [`LICENSE-AGPL`](LICENSE-AGPL)); the `uncaged_ui` / `uncaged_ui_core` UI crates remain
   [MIT](LICENSE-MIT). If you distribute Uncaged, or run a modified version others
   use over a network, AGPL §13 requires you to offer them your complete
   corresponding source. Keep it open.

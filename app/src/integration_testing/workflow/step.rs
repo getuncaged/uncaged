@@ -1,6 +1,6 @@
-use warpui::integration::TestStep;
-use warpui::windowing::WindowManager;
-use warpui::{async_assert, SingletonEntity, WindowId};
+use uncaged_ui::integration::TestStep;
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{async_assert, SingletonEntity, WindowId};
 
 use super::open_workflow_count;
 use crate::cloud_object::model::persistence::CloudModel;

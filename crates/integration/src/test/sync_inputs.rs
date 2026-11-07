@@ -1,15 +1,15 @@
-use warp::cmd_or_ctrl_shift;
-use warp::integration_testing::step::new_step_with_default_assertions;
-use warp::integration_testing::terminal::util::ExpectedExitStatus;
-use warp::integration_testing::terminal::{
+use uncaged::cmd_or_ctrl_shift;
+use uncaged::integration_testing::step::new_step_with_default_assertions;
+use uncaged::integration_testing::terminal::util::ExpectedExitStatus;
+use uncaged::integration_testing::terminal::{
     assert_active_block_output, assert_command_executed, assert_long_running_block_executing,
     assert_no_block_executing, execute_command, run_alt_grid_program, wait_until_bootstrapped_pane,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::integration_testing::view_getters::{terminal_view, workspace_view};
-use warp::workspace::WorkspaceAction;
-use warpui_core::integration::TestStep;
-use warpui_core::{async_assert, async_assert_eq};
+use uncaged::integration_testing::view_getters::{terminal_view, workspace_view};
+use uncaged::workspace::WorkspaceAction;
+use uncaged_ui_core::integration::TestStep;
+use uncaged_ui_core::{async_assert, async_assert_eq};
 
 use super::{new_builder, Builder};
 use crate::util::{get_input_buffer, skip_if_powershell_core_2303};

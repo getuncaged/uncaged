@@ -84,7 +84,7 @@
       "request": "launch",
       "name": "Debug unit tests in executable 'warp'",
       "cargo": {
-        "args": ["test", "--no-run", "--bin=warp", "--package=warp"],
+        "args": ["test", "--no-run", "--bin=warp", "--package=uncaged"],
         "filter": {
           "name": "warp",
           "kind": "bin"
@@ -99,7 +99,7 @@
       "request": "launch",
       "name": "Debug integration tests in executable 'integration'",
       "cargo": {
-        "args": ["build", "--bin=integration", "--package=warp"],
+        "args": ["build", "--bin=integration", "--package=uncaged"],
         "env": {
           "WARPUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS": "1"
         },
@@ -115,11 +115,11 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'warpui'",
+      "name": "Debug unit tests in library 'uncaged_ui'",
       "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=warpui"],
+        "args": ["test", "--no-run", "--lib", "--package=uncaged_ui"],
         "filter": {
-          "name": "warpui",
+          "name": "uncaged_ui",
           "kind": "lib"
         }
       },

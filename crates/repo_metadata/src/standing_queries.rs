@@ -6,7 +6,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use warp_util::standardized_path::StandardizedPath;
+use uncaged_util::standardized_path::StandardizedPath;
 
 /// Repository-scoped standing query configuration.
 #[derive(Debug, Clone)]

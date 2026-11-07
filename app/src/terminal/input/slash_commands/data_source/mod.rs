@@ -8,11 +8,11 @@ use ai::skills::SkillProvider;
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
 pub(crate) use saved_prompts::*;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::Icon as WarpIcon;
-use warpui::fonts::FamilyId;
-use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::Icon as WarpIcon;
+use uncaged_ui::fonts::FamilyId;
+use uncaged_ui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
 pub use zero_state::*;
 
 use super::AcceptSlashCommandOrSavedPrompt;
@@ -339,7 +339,7 @@ impl SyncDataSource for SlashCommandDataSource {
     fn run_query(
         &self,
         query: &Query,
-        app: &warpui::AppContext,
+        app: &uncaged_ui::AppContext,
     ) -> Result<Vec<QueryResult<Self::Action>>, DataSourceRunErrorWrapper> {
         if query.text.is_empty() {
             return Ok(vec![]);

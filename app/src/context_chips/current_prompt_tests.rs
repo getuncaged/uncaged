@@ -8,10 +8,10 @@ use parking_lot::Mutex;
 #[cfg(feature = "local_fs")]
 use repo_metadata::DirectoryWatcher;
 use settings::Setting as _;
-use warp_completer::completer::{CommandExitStatus, CommandOutput};
-use warp_core::command::ExitCode;
-use warpui::{App, SingletonEntity};
-use warpui_extras::user_preferences;
+use uncaged_completer::completer::{CommandExitStatus, CommandOutput};
+use uncaged_core::command::ExitCode;
+use uncaged_ui::{App, SingletonEntity};
+use uncaged_ui_extras::user_preferences;
 
 use super::{ChipUpdateStatus, CurrentPrompt, PromptContext};
 #[cfg(feature = "local_fs")]
@@ -512,7 +512,7 @@ fn test_externally_driven_chip_skips_periodic_timer() {
         let repo_handle = watcher_handle.update(&mut app, |watcher, ctx| {
             watcher
                 .add_directory(
-                    warp_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                    uncaged_util::standardized_path::StandardizedPath::from_local_canonicalized(
                         temp_dir.path(),
                     )
                     .unwrap(),
@@ -573,7 +573,7 @@ fn test_git_status_change_updates_chip_value() {
         let repo_handle = watcher_handle.update(&mut app, |watcher, ctx| {
             watcher
                 .add_directory(
-                    warp_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                    uncaged_util::standardized_path::StandardizedPath::from_local_canonicalized(
                         temp_dir.path(),
                     )
                     .unwrap(),
@@ -644,7 +644,7 @@ fn test_git_status_change_updates_branch_status_chip_value() {
         let repo_handle = watcher_handle.update(&mut app, |watcher, ctx| {
             watcher
                 .add_directory(
-                    warp_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                    uncaged_util::standardized_path::StandardizedPath::from_local_canonicalized(
                         temp_dir.path(),
                     )
                     .unwrap(),
@@ -725,7 +725,7 @@ fn test_git_status_pr_info_updates_github_pr_chip_value() {
         let repo_handle = watcher_handle.update(&mut app, |watcher, ctx| {
             watcher
                 .add_directory(
-                    warp_util::standardized_path::StandardizedPath::from_local_canonicalized(
+                    uncaged_util::standardized_path::StandardizedPath::from_local_canonicalized(
                         temp_dir.path(),
                     )
                     .unwrap(),

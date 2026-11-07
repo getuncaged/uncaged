@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use ai::skills::SkillPathOrigin;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 #[cfg(feature = "local_fs")]
 mod bundled;

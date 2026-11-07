@@ -1,8 +1,8 @@
-use warp_multi_agent_api as api;
-use warp_util::host_id::HostId;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::remote_path::RemotePath;
-use warp_util::standardized_path::StandardizedPath;
+use uncaged_agent_api as api;
+use uncaged_util::host_id::HostId;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::remote_path::RemotePath;
+use uncaged_util::standardized_path::StandardizedPath;
 
 use super::{
     skill_reference_from_api_skill_ref, skill_reference_from_read_skill_ref, SkillConversionError,

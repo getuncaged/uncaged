@@ -14,25 +14,21 @@ use pathfinder_geometry::vector::{vec2f, Vector2F};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use string_offset::CharOffset;
-use vec1::Vec1;
-use warp_core::channel::{Channel, ChannelState};
-use warp_core::features::FeatureFlag;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::{safe_error, safe_info};
-use warp_editor::content::buffer::{AutoScrollBehavior, InitialBufferState, SelectionOffsets};
-use warp_editor::model::CoreEditorModel;
-use warp_editor::render::element::VerticalExpansionBehavior;
+use uncaged_core::channel::{Channel, ChannelState};
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::{safe_error, safe_info};
+use uncaged_editor::content::buffer::{AutoScrollBehavior, InitialBufferState, SelectionOffsets};
+use uncaged_editor::model::CoreEditorModel;
+use uncaged_editor::render::element::VerticalExpansionBehavior;
 #[cfg(not(target_family = "wasm"))]
-use warp_editor::render::model::AutoScrollMode;
-use warp_editor::render::model::LineCount;
-use warp_util::content_version::ContentVersion;
-use warp_util::path::LineAndColumnArg;
-use warp_util::standardized_path::StandardizedPath;
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::new_scrollable::{
+use uncaged_editor::render::model::AutoScrollMode;
+use uncaged_editor::render::model::LineCount;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::new_scrollable::{
     NewScrollable, NewScrollableElement, ScrollableAppearance, SingleAxisConfig,
 };
-use warpui::elements::{
+use uncaged_ui::elements::{
     resizable_state_handle, Align, Border, ChildAnchor, ChildView, Clipped,
     ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, DragBarSide, Element, Empty, EventHandler, Flex, Hoverable, List,
@@ -42,17 +38,21 @@ use warpui::elements::{
     ScrollOffset, ScrollStateHandle, ScrollbarWidth, Shrinkable, Stack, Text,
     DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::Keystroke;
-use warpui::platform::Cursor;
-use warpui::text_layout::{default_compute_baseline_position, ClipConfig};
-use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::units::Pixels;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::text_layout::{default_compute_baseline_position, ClipConfig};
+use uncaged_ui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::units::Pixels;
+use uncaged_ui::{
     AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle, WindowId,
 };
+use uncaged_util::content_version::ContentVersion;
+use uncaged_util::path::LineAndColumnArg;
+use uncaged_util::standardized_path::StandardizedPath;
+use vec1::Vec1;
 
 use super::code_review_header::CodeReviewHeader;
 use super::comment_list_view::{CommentListDebugState, CommentListEvent, CommentListView};
@@ -173,7 +173,7 @@ pub fn render_file_navigation_button<F>(
     on_click: F,
 ) -> Box<dyn Element>
 where
-    F: Fn(&mut warpui::EventContext<'_>) + 'static,
+    F: Fn(&mut uncaged_ui::EventContext<'_>) + 'static,
 {
     let ui_builder = appearance.ui_builder().clone();
     let icon_color = appearance
@@ -200,9 +200,9 @@ where
             .build()
             .finish()
     })
-    .with_tooltip_position(warpui::ui_components::button::ButtonTooltipPosition::BelowLeft)
+    .with_tooltip_position(uncaged_ui::ui_components::button::ButtonTooltipPosition::BelowLeft)
     .build()
-    .on_click(move |ctx: &mut warpui::EventContext<'_>, _, _| {
+    .on_click(move |ctx: &mut uncaged_ui::EventContext<'_>, _, _| {
         on_click(ctx);
     });
 
@@ -866,9 +866,11 @@ impl CodeReviewView {
             .map(|p| p.to_path_buf())
             .or_else(|| {
                 repo_metadata::repositories::DetectedRepositories::as_ref(ctx)
-                    .get_root_for_path(&warp_util::local_or_remote_path::LocalOrRemotePath::Local(
-                        path.to_path_buf(),
-                    ))
+                    .get_root_for_path(
+                        &uncaged_util::local_or_remote_path::LocalOrRemotePath::Local(
+                            path.to_path_buf(),
+                        ),
+                    )
                     .and_then(|r| r.to_local_path().map(std::path::Path::to_path_buf))
             })
             .or_else(|| path.parent().map(|p| p.to_path_buf()));
@@ -911,9 +913,11 @@ impl CodeReviewView {
             .map(|p| p.to_path_buf())
             .or_else(|| {
                 repo_metadata::repositories::DetectedRepositories::as_ref(ctx)
-                    .get_root_for_path(&warp_util::local_or_remote_path::LocalOrRemotePath::Local(
-                        path.to_path_buf(),
-                    ))
+                    .get_root_for_path(
+                        &uncaged_util::local_or_remote_path::LocalOrRemotePath::Local(
+                            path.to_path_buf(),
+                        ),
+                    )
                     .and_then(|r| r.to_local_path().map(std::path::Path::to_path_buf))
             })
             .or_else(|| path.parent().map(|p| p.to_path_buf()));
@@ -3541,7 +3545,7 @@ impl CodeReviewView {
 
         let header_text = "Loading open changes...";
         let loading_icon = Icon::Loading
-            .to_warpui_icon(warp_core::ui::theme::Fill::Solid(
+            .to_warpui_icon(uncaged_core::ui::theme::Fill::Solid(
                 internal_colors::neutral_6(theme),
             ))
             .finish();
@@ -3679,7 +3683,7 @@ impl CodeReviewView {
                 Container::new(
                     ConstrainedBox::new(
                         Icon::AlertTriangle
-                            .to_warpui_icon(warp_core::ui::theme::Fill::Solid(
+                            .to_warpui_icon(uncaged_core::ui::theme::Fill::Solid(
                                 internal_colors::neutral_6(theme),
                             ))
                             .finish(),
@@ -3737,7 +3741,7 @@ impl CodeReviewView {
                         .with_text_and_icon_label(TextAndIcon::new(
                             TextAndIconAlignment::IconFirst,
                             " Retry".to_string(),
-                            Icon::Refresh.to_warpui_icon(warp_core::ui::theme::Fill::Solid(
+                            Icon::Refresh.to_warpui_icon(uncaged_core::ui::theme::Fill::Solid(
                                 theme.main_text_color(theme.background()).into(),
                             )),
                             MainAxisSize::Min,
@@ -3787,7 +3791,7 @@ impl CodeReviewView {
                 Container::new(
                     ConstrainedBox::new(
                         Icon::FolderClosed
-                            .to_warpui_icon(warp_core::ui::theme::Fill::Solid(
+                            .to_warpui_icon(uncaged_core::ui::theme::Fill::Solid(
                                 internal_colors::neutral_6(theme),
                             ))
                             .finish(),
@@ -3864,7 +3868,7 @@ impl CodeReviewView {
         state: &LoadedState,
         appearance: &Appearance,
         is_in_split_pane: bool,
-        app: &warpui::AppContext,
+        app: &uncaged_ui::AppContext,
     ) -> Box<dyn Element> {
         let top_section = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
@@ -3929,7 +3933,7 @@ impl CodeReviewView {
                 Container::new(
                     ConstrainedBox::new(
                         Icon::Diff
-                            .to_warpui_icon(warp_core::ui::theme::Fill::Solid(
+                            .to_warpui_icon(uncaged_core::ui::theme::Fill::Solid(
                                 internal_colors::neutral_6(theme),
                             ))
                             .finish(),
@@ -4252,7 +4256,7 @@ impl CodeReviewView {
 
         // Add file icon
         let file_icon = Icon::File
-            .to_warpui_icon(warp_core::ui::theme::Fill::Solid(
+            .to_warpui_icon(uncaged_core::ui::theme::Fill::Solid(
                 internal_colors::neutral_6(theme),
             ))
             .finish();
@@ -4276,7 +4280,7 @@ impl CodeReviewView {
                     appearance.ui_font_size(),
                 )
                 .with_color(
-                    warp_core::ui::theme::Fill::Solid(internal_colors::neutral_6(theme)).into(),
+                    uncaged_core::ui::theme::Fill::Solid(internal_colors::neutral_6(theme)).into(),
                 )
                 .with_line_height_ratio(appearance.line_height_ratio())
                 .with_style(Properties::default().weight(Weight::Semibold))
@@ -4300,7 +4304,7 @@ impl CodeReviewView {
                 )
                 .with_style(Properties::default().weight(Weight::Bold))
                 .with_color(
-                    warp_core::ui::theme::Fill::Solid(internal_colors::neutral_6(theme)).into(),
+                    uncaged_core::ui::theme::Fill::Solid(internal_colors::neutral_6(theme)).into(),
                 )
                 .finish(),
             )
@@ -4355,7 +4359,7 @@ impl CodeReviewView {
             axis_config,
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
         .with_propagate_mousewheel_if_not_handled(true)
@@ -4412,11 +4416,11 @@ impl CodeReviewView {
                         .with_vertical_padding(5.)
                         .with_horizontal_padding(8.)
                         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                            warp_core::ui::radius::SMALL,
+                            uncaged_core::ui::radius::SMALL,
                         )));
 
                     if mouse_state.is_hovered() {
-                        container = container.with_background(warp_core::ui::theme::Fill::Solid(
+                        container = container.with_background(uncaged_core::ui::theme::Fill::Solid(
                             internal_colors::neutral_3(appearance.theme()),
                         ))
                     }
@@ -4437,7 +4441,7 @@ impl CodeReviewView {
             },
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
         .finish();
@@ -4720,9 +4724,9 @@ impl CodeReviewView {
                     // We effectively make this an absolutely positioned header.
                     OffsetPositioning::offset_from_parent(
                         vec2f(0., scroll_offset_from_top.offset_from_start().as_f32()),
-                        warpui::elements::ParentOffsetBounds::ParentByPosition,
-                        warpui::elements::ParentAnchor::TopMiddle,
-                        warpui::elements::ChildAnchor::TopMiddle,
+                        uncaged_ui::elements::ParentOffsetBounds::ParentByPosition,
+                        uncaged_ui::elements::ParentAnchor::TopMiddle,
+                        uncaged_ui::elements::ChildAnchor::TopMiddle,
                     ),
                 );
             }
@@ -4992,7 +4996,7 @@ impl CodeReviewView {
                     Text::new("•", appearance.ui_font_family(), appearance.ui_font_size())
                         .with_style(Properties::default().weight(Weight::Bold))
                         .with_color(
-                            warp_core::ui::theme::Fill::Solid(internal_colors::neutral_6(
+                            uncaged_core::ui::theme::Fill::Solid(internal_colors::neutral_6(
                                 appearance.theme(),
                             ))
                             .into(),
@@ -5020,7 +5024,7 @@ impl CodeReviewView {
             .with_horizontal_padding(8.)
             .with_vertical_padding(4.)
             .with_border(
-                Border::all(1.).with_border_fill(warp_core::ui::theme::Fill::Solid(
+                Border::all(1.).with_border_fill(uncaged_core::ui::theme::Fill::Solid(
                     internal_colors::neutral_4(appearance.theme()),
                 )),
             )
@@ -5317,7 +5321,7 @@ impl CodeReviewView {
             },
             appearance.theme().nonactive_ui_detail().into(),
             appearance.theme().active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .with_vertical_scrollbar(ScrollableAppearance::new(ScrollbarWidth::Auto, false))
         .finish();
@@ -5805,7 +5809,7 @@ impl CodeReviewView {
     fn insert_diff_hunk_as_context(
         &mut self,
         file_path: String,
-        line_range: Range<warp_editor::render::model::LineCount>,
+        line_range: Range<uncaged_editor::render::model::LineCount>,
         ctx: &mut ViewContext<Self>,
     ) {
         let Some(repo_path) = self.repo_path().map(LocalOrRemotePath::path_component) else {
@@ -5940,7 +5944,7 @@ impl CodeReviewView {
     fn extract_diff_hunk_data(
         &self,
         repo_relative_path: &str,
-        line_range: &Range<warp_editor::render::model::LineCount>,
+        line_range: &Range<uncaged_editor::render::model::LineCount>,
     ) -> Option<(DiffHunk, u32, u32)> {
         if let CodeReviewViewState::Loaded(state) = self.state() {
             // Find the file state that matches the given file path
@@ -6069,7 +6073,7 @@ impl CodeReviewView {
     fn restore_cursor_position(
         editor: &CodeEditorView,
         selections: Vec<SelectionOffsets>,
-        ctx: &mut warpui::ViewContext<CodeEditorView>,
+        ctx: &mut uncaged_ui::ViewContext<CodeEditorView>,
     ) {
         if let Ok(selections_vec1) = Vec1::try_from_vec(selections) {
             editor.model.update(ctx, |model, ctx| {
@@ -6874,7 +6878,7 @@ impl View for CodeReviewView {
         "CodeReviewView"
     }
 
-    fn keymap_context(&self, ctx: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, ctx: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         // Suppress pane-level shortcuts (e.g. `F`) when a descendant text editor

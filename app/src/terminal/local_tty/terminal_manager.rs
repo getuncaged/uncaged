@@ -16,8 +16,8 @@ use nix::sys::termios::LocalFlags;
 use parking_lot::{FairMutex, Mutex};
 use pathfinder_geometry::vector::Vector2F;
 use settings::Setting as _;
-use warp_core::SessionId;
-use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, ViewHandle};
+use uncaged_core::SessionId;
+use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, ViewHandle};
 
 use super::event_loop::EventLoop;
 use super::mio_channel;
@@ -755,7 +755,7 @@ pub fn get_shell_starter(
     // TODO(alokedesai): Further refactor this function to make it clear that it's expensive.
     shell_starter_or_wsl_name
         .and_then(|starter| {
-            warpui::r#async::block_on(async { starter.to_shell_starter_source().await })
+            uncaged_ui::r#async::block_on(async { starter.to_shell_starter_source().await })
         })
         .map(get_shell_starter_internal)
 }

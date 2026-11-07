@@ -1,5 +1,5 @@
-use warp_core::features::FeatureFlag;
-use warp_multi_agent_api as api;
+use uncaged_agent_api as api;
+use uncaged_core::features::FeatureFlag;
 
 use super::{get_supported_cli_agent_tools, get_supported_tools, supports_orchestration_v2};
 use crate::ai::agent::api::RequestParams;

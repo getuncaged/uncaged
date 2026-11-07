@@ -10,12 +10,12 @@ use ai::skills::{
 };
 use lazy_static::lazy_static;
 use siphasher::sip::SipHasher;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::Icon;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::prelude::MouseStateHandle;
-use warpui::{AppContext, Element, EventContext, SingletonEntity};
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::Icon;
+use uncaged_ui::prelude::MouseStateHandle;
+use uncaged_ui::{AppContext, Element, EventContext, SingletonEntity};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::{SkillDescriptor, SkillManager};
 use crate::ai::agent::conversation::AIConversationId;

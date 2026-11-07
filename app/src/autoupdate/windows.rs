@@ -9,7 +9,7 @@ use command::blocking::Command;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use tempfile::TempPath;
-use warp_core::channel::{Channel, ChannelState};
+use uncaged_core::channel::{Channel, ChannelState};
 
 use super::{release_assets_directory_url, DownloadReady};
 use crate::util::windows::install_dir;
@@ -74,7 +74,7 @@ pub(super) async fn download_update_and_cleanup(
 const UPDATE_LOG_FILENAME: &str = "warp_update.log";
 
 fn autoupdate_log_file() -> Result<PathBuf> {
-    warp_logging::log_directory().map(|dir| dir.join(UPDATE_LOG_FILENAME))
+    uncaged_logging::log_directory().map(|dir| dir.join(UPDATE_LOG_FILENAME))
 }
 
 pub(super) fn relaunch() -> Result<()> {

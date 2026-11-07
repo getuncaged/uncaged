@@ -11,12 +11,12 @@ use ai::agent::action_result::{RunAgentsAgentOutcomeKind, RunAgentsResult};
 use ai::agent::orchestration_config::{OrchestrationConfig, OrchestrationConfigStatus};
 use ai::skills::SkillReference;
 use pathfinder_geometry::vector::vec2f;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Border, ChildView, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, MainAxisSize,
     OffsetPositioning, ParentElement, Radius, Stack, Text,
 };
-use warpui::keymap::FixedBinding;
-use warpui::{
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -55,7 +55,7 @@ use crate::view_components::{FilterableDropdownEvent, FilterableDropdownOrientat
 const RUN_AGENTS_CARD_TITLE: &str = "Can I start additional agents for this task?";
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -215,8 +215,8 @@ fn resolve_interactive_defaults(
 ) {
     if state.orch.model_id.is_empty() {
         let harness =
-            warp_cli::agent::Harness::parse_orchestration_harness(&state.orch.harness_type);
-        if matches!(harness, Some(warp_cli::agent::Harness::Oz) | None) {
+            uncaged_cli::agent::Harness::parse_orchestration_harness(&state.orch.harness_type);
+        if matches!(harness, Some(uncaged_cli::agent::Harness::Oz) | None) {
             if let Some(base) = block_model.base_model(ctx).map(|id| id.to_string()) {
                 state.orch.model_id = base;
             }
@@ -397,9 +397,10 @@ impl RunAgentsCardView {
             }
         }
         if new_state.orch.model_id.is_empty() {
-            let harness =
-                warp_cli::agent::Harness::parse_orchestration_harness(&new_state.orch.harness_type);
-            if matches!(harness, Some(warp_cli::agent::Harness::Oz) | None) {
+            let harness = uncaged_cli::agent::Harness::parse_orchestration_harness(
+                &new_state.orch.harness_type,
+            );
+            if matches!(harness, Some(uncaged_cli::agent::Harness::Oz) | None) {
                 if let Some(base) = self.block_model.base_model(ctx).map(|id| id.to_string()) {
                     new_state.orch.model_id = base;
                 }
@@ -534,8 +535,8 @@ impl RunAgentsCardView {
             // matching the other dropdowns in this card.
             handle.update(ctx, |picker, picker_ctx| {
                 picker.set_menu_position(
-                    warpui::elements::PositionedElementAnchor::TopLeft,
-                    warpui::elements::ChildAnchor::BottomLeft,
+                    uncaged_ui::elements::PositionedElementAnchor::TopLeft,
+                    uncaged_ui::elements::ChildAnchor::BottomLeft,
                     picker_ctx,
                 );
             });
@@ -592,8 +593,8 @@ impl RunAgentsCardView {
     ) {
         dropdown_handle.update(ctx, |dropdown, ctx| {
             dropdown.set_menu_position(
-                warpui::elements::PositionedElementAnchor::TopLeft,
-                warpui::elements::ChildAnchor::BottomLeft,
+                uncaged_ui::elements::PositionedElementAnchor::TopLeft,
+                uncaged_ui::elements::ChildAnchor::BottomLeft,
                 ctx,
             );
         });
@@ -740,9 +741,9 @@ impl View for RunAgentsCardView {
                 OffsetPositioning::offset_from_save_position_element(
                     Self::get_position_id_for_accept_split_button(&self.position_id_prefix),
                     vec2f(0., 8.),
-                    warpui::elements::PositionedElementOffsetBounds::WindowByPosition,
-                    warpui::elements::PositionedElementAnchor::BottomRight,
-                    warpui::elements::ChildAnchor::TopRight,
+                    uncaged_ui::elements::PositionedElementOffsetBounds::WindowByPosition,
+                    uncaged_ui::elements::PositionedElementAnchor::BottomRight,
+                    uncaged_ui::elements::ChildAnchor::TopRight,
                 ),
             );
         }
@@ -1070,7 +1071,7 @@ fn render_editor(
     handles: &RunAgentsCardHandles,
     app: &AppContext,
 ) -> Box<dyn Element> {
-    use warpui::elements::ConstrainedBox;
+    use uncaged_ui::elements::ConstrainedBox;
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
     let mut column = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);

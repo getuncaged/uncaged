@@ -2,23 +2,23 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 use string_offset::CharOffset;
-use warp_core::features::FeatureFlag;
-use warp_core::settings::Setting;
-use warp_core::ui::radius;
-use warpui::color::ColorU;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::settings::Setting;
+use uncaged_core::ui::radius;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::{
     self, Align, Border, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, CrossAxisAlignment, DropShadow, Flex, Highlight, Icon, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, ParentElement, Rect, Shrinkable, Stack, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::geometry::vector::Vector2F;
-use warpui::keymap::Keystroke;
-use warpui::presenter::ChildView;
-use warpui::text_layout::{ClipConfig, TextStyle};
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::geometry::vector::Vector2F;
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::text_layout::{ClipConfig, TextStyle};
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, EventContext, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -263,7 +263,7 @@ impl WorkflowsMoreInfoView {
             icons::Icon::Rename,
             Some(label.to_owned()),
             self.button_mouse_states.edit_cloud_workflow.clone(),
-            move |ctx: &mut warpui::EventContext<'_>, _, _| {
+            move |ctx: &mut uncaged_ui::EventContext<'_>, _, _| {
                 ctx.dispatch_typed_action(TerminalAction::OpenWorkflowModalWithCloudWorkflow(
                     workflow.id,
                 ))

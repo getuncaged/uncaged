@@ -4,20 +4,20 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use warp_util::path::LineAndColumnArg;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, Border, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
     Container, Dismiss, DispatchEventResult, Empty, EventHandler, Fill, Flex, ParentElement,
     SavePosition, Shrinkable,
 };
-use warpui::event::KeyState;
-use warpui::keymap::BindingId;
-use warpui::platform::keyboard::KeyCode;
-use warpui::units::{IntoPixels, Pixels};
-use warpui::{
+use uncaged_ui::event::KeyState;
+use uncaged_ui::keymap::BindingId;
+use uncaged_ui::platform::keyboard::KeyCode;
+use uncaged_ui::units::{IntoPixels, Pixels};
+use uncaged_ui::{
     AppContext, Element, Entity, EntityId, FocusContext, ModelHandle, SingletonEntity,
     TypedActionView, ViewContext, ViewHandle, WindowId,
 };
+use uncaged_util::path::LineAndColumnArg;
 
 use super::super::palette_styles as styles;
 use super::CommandPaletteMixer;
@@ -156,7 +156,7 @@ impl TypedActionView for View {
     }
 }
 
-impl warpui::View for View {
+impl uncaged_ui::View for View {
     fn ui_name() -> &'static str {
         "CommandPaletteView"
     }
@@ -188,7 +188,7 @@ impl warpui::View for View {
                             .finish(),
                     )
                     .with_background(theme.surface_2())
-                    .with_corner_radius(warp_core::ui::radius::large())
+                    .with_corner_radius(uncaged_core::ui::radius::large())
                     .with_border(Border::all(1.0).with_border_fill(theme.outline()))
                     .with_margin_top(117.)
                     .with_padding_bottom(10.)
@@ -969,11 +969,11 @@ impl View {
         self.close(ctx, Some(result_action.result_type()));
     }
 
-    /// Dispatches `action` to the correct window and [`warpui::View`] by using the current state of
+    /// Dispatches `action` to the correct window and [`uncaged_ui::View`] by using the current state of
     /// the [`BindingSource`] model.
     fn dispatch_typed_action_on_view(
         &self,
-        action: &dyn warpui::Action,
+        action: &dyn uncaged_ui::Action,
         ctx: &mut ViewContext<Self>,
     ) {
         let (window_id, view_id) = match self.binding_source.as_ref(ctx) {

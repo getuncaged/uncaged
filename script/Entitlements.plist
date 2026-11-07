@@ -25,7 +25,7 @@
 	  distribute under our own name, and it could never resolve anyway because
 	  Uncaged is ad-hoc signed with no Apple Developer Team.
 
-	  Nothing is lost. `warp_core::paths` returns `None` for the shared container
+	  Nothing is lost. `uncaged_core::paths` returns `None` for the shared container
 	  on `Channel::Oss` before it ever looks the group up, so every caller already
 	  falls back to the local state directory (~/.uncaged).
 	-->

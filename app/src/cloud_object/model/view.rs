@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use chrono::{Duration, Utc};
 use cloud_objects::time::ServerTimestamp;
 use cloud_objects::UserUid;
-use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{CloudObject, CloudObjectLocation, Space};

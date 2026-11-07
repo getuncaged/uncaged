@@ -6,11 +6,11 @@ use itertools::Itertools;
 use palette::Srgba;
 use pathfinder_color::ColorU;
 use plist::{Dictionary, Value};
-use warp_core::ui::theme::{AnsiColors, TerminalColors, WarpTheme};
-use warpui::fonts::FontInfo;
-use warpui::keymap::Keystroke;
-use warpui::platform::mac::utils::unicode_char_to_key;
-use warpui::DisplayIdx;
+use uncaged_core::ui::theme::{AnsiColors, TerminalColors, WarpTheme};
+use uncaged_ui::fonts::FontInfo;
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::mac::utils::unicode_char_to_key;
+use uncaged_ui::DisplayIdx;
 
 use super::config::{
     calculate_accent_color, Config, ConfigError, GlobalHotkey, ImportableSetting, ImportedFont,

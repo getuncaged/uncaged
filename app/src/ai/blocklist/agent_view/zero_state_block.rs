@@ -6,16 +6,16 @@ use std::sync::Arc;
 use itertools::Itertools as _;
 use markdown_parser::parse_markdown_cached;
 use parking_lot::FairMutex;
-use warp_core::ui::Icon;
-use warpui::elements::{
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::{
     Container, CornerRadius, CrossAxisAlignment, Flex, FormattedTextElement, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::Keystroke;
-use warpui::prelude::{ConstrainedBox, Cursor, Empty, Hoverable, SavePosition};
-use warpui::scene::Border;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::prelude::{ConstrainedBox, Cursor, Empty, Hoverable, SavePosition};
+use uncaged_ui::scene::Border;
+use uncaged_ui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
@@ -340,7 +340,7 @@ impl View for AgentViewZeroStateBlock {
             .with_horizontal_padding(*terminal::view::PADDING_LEFT - 6.)
             .with_vertical_padding(styles::CONTAINER_VERTICAL_PADDING)
             .with_border(Border::all(1.).with_border_fill(theme.outline()))
-            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_corner_radius(uncaged_core::ui::radius::medium())
             .with_horizontal_margin(6.)
             .with_vertical_margin(6.)
             .finish();
@@ -598,7 +598,7 @@ fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn E
                             .into_solid_bias_right_color(),
                     )
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )))
                     .with_vertical_padding(4.)
                     .with_horizontal_padding(4.)
@@ -763,7 +763,7 @@ fn render_recent_conversations_section(
 }
 
 mod styles {
-    use warp_core::ui::appearance::Appearance;
+    use uncaged_core::ui::appearance::Appearance;
 
     pub const CONTAINER_VERTICAL_PADDING: f32 = 16.;
     pub const TITLE_MARGIN_BOTTOM: f32 = 8.;

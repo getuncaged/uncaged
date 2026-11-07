@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use super::AIQuerySearchResultItem;
 use crate::ai::blocklist::BlocklistAIHistoryModel;

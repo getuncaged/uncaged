@@ -92,7 +92,7 @@ confidence we'll ever get. They arrived at the same answers on:
   `APPLE_TEAM_ID=2BBY89MBSN` (Warp's own team id) and their CoC still says
   `warp-coc@warp.dev` — those are rename bugs. If we adapt their CI, parameterize
   the team id and fix every contact string.
-  (We had the same bug: `warp_core::macos::APPLE_TEAM_ID` carried Warp's team id
+  (We had the same bug: `uncaged_core::macos::APPLE_TEAM_ID` carried Warp's team id
   and `script/Entitlements.plist` declared the `<team>.dev.warp` app group, so we
   were shipping another company's signing identity in a bundle we distribute.
   Both are fixed — the constant is empty, since Uncaged is ad-hoc signed, and the
@@ -106,7 +106,7 @@ confidence we'll ever get. They arrived at the same answers on:
 1. **Move API keys to the OS keychain.** *(security — highest priority)*
    Verified regression: `uncaged_engine/src/connections.rs` writes keys to
    plaintext `~/.uncaged/connections.json`. Plan: store secrets as one JSON blob
-   under a single keychain item via the existing `warpui_extras` `secure_storage`
+   under a single keychain item via the existing `uncaged_ui_extras` `secure_storage`
    (`security-framework` on macOS, `secret-service` on Linux); keep only
    non-secret metadata (base_url/model/kind) on disk; migrate-and-scrub any
    existing plaintext key on first read; fall back to file if the keychain is

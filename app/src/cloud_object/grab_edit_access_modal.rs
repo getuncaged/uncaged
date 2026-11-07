@@ -1,9 +1,9 @@
-use warpui::elements::{Container, Element, MouseStateHandle, Text};
-use warpui::fonts::{Properties, Style, Weight};
-use warpui::platform::Cursor;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::UiComponent;
-use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use uncaged_ui::elements::{Container, Element, MouseStateHandle, Text};
+use uncaged_ui::fonts::{Properties, Style, Weight};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::appearance::Appearance;
 use crate::ui_components::buttons::close_button;

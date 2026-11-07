@@ -9,8 +9,8 @@ use std::sync::Arc;
 #[cfg(feature = "local_tty")]
 use settings::Setting as _;
 #[cfg(feature = "local_tty")]
-use warpui::{AppContext, ModelContext};
-use warpui::{Entity, SingletonEntity};
+use uncaged_ui::{AppContext, ModelContext};
+use uncaged_ui::{Entity, SingletonEntity};
 
 use super::session_settings::{NewSessionShell, StartupShell};
 use super::shell::ShellType;
@@ -590,7 +590,7 @@ impl AvailableShells {
         value: AvailableShell,
         ctx: &mut ModelContext<Self>,
     ) -> anyhow::Result<()> {
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
 
         use super::session_settings::SessionSettings;
         SessionSettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -610,7 +610,7 @@ impl AvailableShells {
         paths_to_search: &[PathBuf],
         fallback_path: Option<&Path>,
     ) -> Vec<AvailableShell> {
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
 
         if !FeatureFlag::ShellSelector.is_enabled() {
             return vec![
@@ -708,7 +708,7 @@ impl AvailableShells {
     fn locate_msys2_executables() -> Vec<PathBuf> {
         use std::env;
 
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
 
         let mut paths = Vec::new();
 
@@ -968,7 +968,7 @@ impl Entity for AvailableShells {
 impl SingletonEntity for AvailableShells {}
 
 #[cfg(feature = "local_tty")]
-pub fn register(app: &mut impl warpui::AddSingletonModel) {
+pub fn register(app: &mut impl uncaged_ui::AddSingletonModel) {
     #[cfg(windows)]
     app.add_singleton_model(super::wsl::WslInfo::new);
     app.add_singleton_model(AvailableShells::new);

@@ -1,7 +1,7 @@
 use chrono::{Duration, Utc};
 use cloud_object_models::ServerNotebook;
 use settings::manager::SettingsManager;
-use warpui::{App, SingletonEntity};
+use uncaged_ui::{App, SingletonEntity};
 
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::model::view::CloudViewModel;

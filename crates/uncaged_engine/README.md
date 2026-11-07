@@ -26,7 +26,7 @@ with a "connect a model" message. There is no server path.
 | File | Responsibility |
 |---|---|
 | `config.rs` | Load/save `~/.uncaged/engine.json` + env overrides; `active()` decides if the engine is on. |
-| `proto.rs` | `api` alias for `warp_multi_agent_api`; JSON ↔ `prost_types::Struct`. |
+| `proto.rs` | `api` alias for `uncaged_agent_api`; JSON ↔ `prost_types::Struct`. |
 | `model.rs` | Provider-neutral `Conversation` / `NeutralMsg` / `ToolUse` / `ToolResult`. |
 | `request_parse.rs` | Lower a `Request` into neutral messages (history + new input), deduped. |
 | `tools.rs` | JSON Schemas for built-in tools; encode model tool-use → Warp `ToolCall`; decode `ToolCallResult` → text; MCP passthrough. |
@@ -49,7 +49,7 @@ with a "connect a model" message. There is no server path.
 
 ## Assumptions worth verifying when iterating
 
-- `proto.rs` assumes `warp_multi_agent_api` maps `google.protobuf.*` well-known
+- `proto.rs` assumes `uncaged_agent_api` maps `google.protobuf.*` well-known
   types to the `prost_types` crate (`Struct`, `Value`, `FieldMask`). If the proto
   crate vendors its own well-known types, adjust `proto.rs` and `wire.rs`
   accordingly.

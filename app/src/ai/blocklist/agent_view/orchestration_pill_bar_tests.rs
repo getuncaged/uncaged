@@ -18,8 +18,8 @@ use super::*;
 #[test]
 fn pill_bar_data_layer_finds_restored_children_before_pane_creation() {
     use chrono::Utc;
+    use uncaged_ui::App;
     use uuid::Uuid;
-    use warpui::App;
 
     use crate::ai::blocklist::orchestration_topology::descendant_conversation_ids_in_spawn_order;
     use crate::ai::blocklist::BlocklistAIHistoryModel;
@@ -59,15 +59,15 @@ fn pill_bar_data_layer_finds_restored_children_before_pane_creation() {
                     .expect("child conversation data should serialize"),
                     last_modified_at: now,
                 },
-                tasks: vec![warp_multi_agent_api::Task {
+                tasks: vec![uncaged_agent_api::Task {
                     id: format!("task-{child_id}"),
-                    messages: vec![warp_multi_agent_api::Message {
+                    messages: vec![uncaged_agent_api::Message {
                         id: "child-msg".to_string(),
                         task_id: format!("task-{child_id}"),
                         server_message_data: String::new(),
                         citations: vec![],
-                        message: Some(warp_multi_agent_api::message::Message::UserQuery(
-                            warp_multi_agent_api::message::UserQuery {
+                        message: Some(uncaged_agent_api::message::Message::UserQuery(
+                            uncaged_agent_api::message::UserQuery {
                                 query: "Child query".to_string(),
                                 context: None,
                                 referenced_attachments: Default::default(),
@@ -108,15 +108,15 @@ fn pill_bar_data_layer_finds_restored_children_before_pane_creation() {
                     .expect("parent conversation data should serialize"),
                     last_modified_at: now - chrono::Duration::seconds(1),
                 },
-                tasks: vec![warp_multi_agent_api::Task {
+                tasks: vec![uncaged_agent_api::Task {
                     id: format!("task-{parent_id}"),
-                    messages: vec![warp_multi_agent_api::Message {
+                    messages: vec![uncaged_agent_api::Message {
                         id: "parent-msg".to_string(),
                         task_id: format!("task-{parent_id}"),
                         server_message_data: String::new(),
                         citations: vec![],
-                        message: Some(warp_multi_agent_api::message::Message::UserQuery(
-                            warp_multi_agent_api::message::UserQuery {
+                        message: Some(uncaged_agent_api::message::Message::UserQuery(
+                            uncaged_agent_api::message::UserQuery {
                                 query: "Parent query".to_string(),
                                 context: None,
                                 referenced_attachments: Default::default(),

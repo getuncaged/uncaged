@@ -3,17 +3,17 @@ use std::sync::Arc;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::theme::{Fill, WarpTheme};
-use warpui::elements::{
+use uncaged_core::ui::theme::{Fill, WarpTheme};
+use uncaged_ui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Expanded,
     Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Stack, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::geometry::vector::Vector2F;
-use warpui::platform::Cursor;
-use warpui::ui_components::components::UiComponent;
-use warpui::{Element, EventContext};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::geometry::vector::Vector2F;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{Element, EventContext};
 
 use crate::appearance::Appearance;
 use crate::tab_configs::session_config::SessionType;
@@ -155,7 +155,7 @@ where
             .with_horizontal_padding(12.)
             .with_vertical_padding(8.)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_border(Border::all(1.).with_border_color(border_color));
 
@@ -239,9 +239,11 @@ where
 
     let home_dir = dirs::home_dir();
     let raw_path = selected_directory.to_string_lossy();
-    let dir_display =
-        warp_util::path::user_friendly_path(&raw_path, home_dir.as_ref().and_then(|h| h.to_str()))
-            .into_owned();
+    let dir_display = uncaged_util::path::user_friendly_path(
+        &raw_path,
+        home_dir.as_ref().and_then(|h| h.to_str()),
+    )
+    .into_owned();
 
     let dir_text = Text::new_inline(dir_display, appearance.ui_font_family(), 14.)
         .with_color(if on_accent_bg {
@@ -267,7 +269,7 @@ where
         Container::new(ConstrainedBox::new(content_row).with_height(30.).finish())
             .with_horizontal_padding(12.)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_border(Border::all(1.).with_border_color(border_color))
             .finish()
@@ -321,7 +323,7 @@ pub fn render_worktree_checkbox_with_background<F>(
     appearance: &Appearance,
 ) -> Box<dyn Element>
 where
-    F: Fn(&mut warpui::EventContext, warpui::geometry::vector::Vector2F) + 'static,
+    F: Fn(&mut uncaged_ui::EventContext, uncaged_ui::geometry::vector::Vector2F) + 'static,
 {
     let disabled = !is_git_repo;
     let on_accent_bg = bg.is_some();
@@ -370,7 +372,7 @@ where
                 .with_horizontal_padding(14.)
                 .with_vertical_padding(6.)
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .with_border(Border::all(1.).with_border_fill(theme.outline()))
                 .with_background_color(theme.tooltip_background())
@@ -505,7 +507,7 @@ where
                 .with_horizontal_padding(14.)
                 .with_vertical_padding(6.)
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .with_border(Border::all(1.).with_border_fill(theme.outline()))
                 .with_background_color(theme.tooltip_background())

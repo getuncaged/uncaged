@@ -4,8 +4,8 @@ mod search_item;
 mod view;
 
 use ai::document::AIDocumentId;
+use uncaged_ui::keymap::Keystroke;
 pub use view::{InlinePlanMenuEvent, InlinePlanMenuView};
-use warpui::keymap::Keystroke;
 
 use crate::ai::document::ai_document_model::AIDocumentVersion;
 use crate::terminal::input::inline_menu::{

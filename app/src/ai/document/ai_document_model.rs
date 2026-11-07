@@ -11,12 +11,14 @@ use ai::diff_validation::DiffDelta;
 pub use ai::document::{AIDocumentId, AIDocumentVersion};
 use chrono::{DateTime, Local, Utc};
 use itertools::Itertools;
+use uncaged_agent_api as maa_api;
+use uncaged_editor::model::RichTextEditorModel;
+use uncaged_editor::render::model::RichTextStyles;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::{
+    AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WindowId,
+};
 use uuid::Uuid;
-use warp_editor::model::RichTextEditorModel;
-use warp_editor::render::model::RichTextStyles;
-use warp_multi_agent_api as maa_api;
-use warpui::color::ColorU;
-use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity, WindowId};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::AIAgentActionId;
@@ -781,7 +783,7 @@ impl AIDocumentModel {
     pub fn get_document_content(
         &self,
         id: &AIDocumentId,
-        ctx: &warpui::AppContext,
+        ctx: &uncaged_ui::AppContext,
     ) -> Option<String> {
         let doc = self.documents.get(id)?;
         Some(doc.editor.as_ref(ctx).markdown_unescaped(ctx))
@@ -1391,7 +1393,7 @@ impl AIDocumentModel {
 }
 
 impl AIDocumentEarlierVersion {
-    pub fn get_content(&self, ctx: &warpui::AppContext) -> String {
+    pub fn get_content(&self, ctx: &uncaged_ui::AppContext) -> String {
         self.editor.as_ref(ctx).markdown_unescaped(ctx)
     }
 }

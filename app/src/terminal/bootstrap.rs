@@ -4,8 +4,8 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use memo_map::MemoMap;
 use rand::Rng;
-use warp_core::session_id::SessionId;
-use warpui::{AppContext, AssetProvider, SingletonEntity};
+use uncaged_core::session_id::SessionId;
+use uncaged_ui::{AppContext, AssetProvider, SingletonEntity};
 
 #[cfg(feature = "local_fs")]
 use super::{

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use warpui_core::geometry::vector::{Vector2F, vec2f};
-use warpui_core::text_layout::Line;
-use warpui_core::{AppContext, LayoutContext};
+use uncaged_ui_core::geometry::vector::{Vector2F, vec2f};
+use uncaged_ui_core::text_layout::Line;
+use uncaged_ui_core::{AppContext, LayoutContext};
 
 use super::{CursorData, RenderContext};
 use crate::content::text::BufferBlockStyle;

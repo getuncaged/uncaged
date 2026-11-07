@@ -2,19 +2,19 @@ use std::rc::Rc;
 
 use pathfinder_geometry::vector::vec2f;
 use serde::Serialize;
-use warp_core::channel::ChannelState;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::theme::color::internal_colors::{neutral_2, neutral_3};
-use warpui::elements::{
+use uncaged_core::channel::ChannelState;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::theme::color::internal_colors::{neutral_2, neutral_3};
+use uncaged_ui::elements::{
     ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Fill, Flex, HighlightedHyperlink, Hoverable, Icon, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
     Shrinkable, Stack, Text,
 };
-use warpui::keymap::Keystroke;
-use warpui::platform::Cursor;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, EventContext, ModelHandle, SingletonEntity, View, ViewContext,
     ViewHandle,
 };
@@ -199,7 +199,7 @@ fn render_button(
                 height: Some(20.),
 
                 border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 ))),
                 padding: Some(Coords::uniform(3.)),
                 margin: Some(Coords::default().left(KEYBOARD_SHORTCUT_MARGIN)),
@@ -223,7 +223,7 @@ fn render_button(
         let mut container = Container::new(flex.finish())
             .with_background(background_fill)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_padding_right(INLINE_BANNER_BUTTON_PADDING);
 
@@ -380,7 +380,7 @@ impl View for PromptSuggestionsView {
                     0,
                     keybinding_name_to_keystroke(ACCEPT_PROMPT_SUGGESTION_KEYBINDING, app),
                     banner_state.accept_button_mouse_state.clone(),
-                    Rc::new(move |ctx: &mut warpui::EventContext<'_>| {
+                    Rc::new(move |ctx: &mut uncaged_ui::EventContext<'_>| {
                         if open_unavailable_modal {
                             ctx.dispatch_typed_action(
                                 WorkspaceAction::OpenPromptSuggestionsUnavailableModal,

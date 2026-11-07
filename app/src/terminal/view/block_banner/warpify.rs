@@ -1,12 +1,12 @@
 use pathfinder_color::ColorU;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, Container, CrossAxisAlignment, Flex, MouseStateHandle, ParentElement, Shrinkable,
 };
-use warpui::fonts::Weight;
-use warpui::keymap::Keystroke;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::Element;
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::Element;
 
 use super::render_block_banner;
 use crate::appearance::Appearance;

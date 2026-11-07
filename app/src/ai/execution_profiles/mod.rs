@@ -4,8 +4,8 @@ pub use cloud_object_models::{
     PROFILE_NAME_MAX_LENGTH,
 };
 use markdown_parser::{FormattedTextFragment, FormattedTextInline};
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use super::llms::{LLMContextWindow, LLMInfo, LLMPreferences, LLMProvider};
 use crate::cloud_object::model::generic_string_model::StringModel;

@@ -1,13 +1,13 @@
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{
     Border, Container, CornerRadius, CrossAxisAlignment, Expanded, Flex, FormattedTextElement,
     MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
     DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::ui_components::button::{Button, ButtonVariant};
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, SingletonEntity, ViewHandle};
+use uncaged_ui::ui_components::button::{Button, ButtonVariant};
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{AppContext, Element, SingletonEntity, ViewHandle};
 
 use super::compact_agent_input::CompactAgentInput;
 use crate::context_chips::spacing;
@@ -39,7 +39,7 @@ fn render_number_badge(
     .with_vertical_padding(NUMBER_BADGE_VERTICAL_PADDING)
     .with_border(Border::all(NUMBER_BADGE_BORDER_WIDTH).with_border_color(badge_border_color))
     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-        warp_core::ui::radius::SMALL,
+        uncaged_core::ui::radius::SMALL,
     )))
     .with_background(badge_background)
     .finish()
@@ -58,7 +58,7 @@ pub(super) fn render_recommended_badge(appearance: &Appearance) -> Box<dyn Eleme
     )
     .with_background(internal_colors::fg_overlay_2(theme))
     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-        warp_core::ui::radius::SMALL,
+        uncaged_core::ui::radius::SMALL,
     )))
     .with_vertical_padding(spacing::UDI_CHIP_VERTICAL_PADDING)
     .with_horizontal_padding(spacing::UDI_CHIP_HORIZONTAL_PADDING)
@@ -197,5 +197,5 @@ pub(super) fn build_text_button_content(
 pub(super) fn build_inline_input_content(
     input_view: &ViewHandle<CompactAgentInput>,
 ) -> Box<dyn Element> {
-    warpui::presenter::ChildView::new(input_view).finish()
+    uncaged_ui::presenter::ChildView::new(input_view).finish()
 }

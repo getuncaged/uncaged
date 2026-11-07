@@ -14,8 +14,8 @@ use std::time::Duration;
 
 use anyhow::{bail, Context as _, Result};
 use serde::Deserialize;
-use warp_core::ui::theme::WarpTheme;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_core::ui::theme::WarpTheme;
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use crate::brand;
 use crate::themes::theme::{ThemeGroup, COMMUNITY_SUBFOLDER};
@@ -177,7 +177,7 @@ pub async fn fetch_index() -> Result<GalleryIndex> {
 
 /// Where the last good catalogue is kept between runs.
 pub fn cached_index_path() -> PathBuf {
-    warp_core::paths::cache_dir()
+    uncaged_core::paths::cache_dir()
         .join("theme-gallery")
         .join("index.json")
 }

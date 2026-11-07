@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
-use warp_cli::WorkerCommand;
-use warp_core::channel::{Channel, ChannelConfig, ChannelState, WarpServerConfig};
-use warp_core::AppId;
+use uncaged_cli::WorkerCommand;
+use uncaged_core::channel::{Channel, ChannelConfig, ChannelState, WarpServerConfig};
+use uncaged_core::AppId;
 
 #[derive(Debug, Default, Parser, Clone)]
 #[command(name = "warp-integration")]
@@ -46,7 +46,7 @@ pub fn main() -> Result<()> {
                 // GUI application), do so.  This must occur before init_logging, as the
                 // terminal server sets up its own logger, and attempting to set a second
                 // logger leads to a panic.
-                warp::terminal::local_tty::server::run_terminal_server(args);
+                uncaged::terminal::local_tty::server::run_terminal_server(args);
                 return Ok(());
             }
             // This is a catch-all to handle the plugin host, which the integration test crate doesn't have a feature flag for.
@@ -55,5 +55,5 @@ pub fn main() -> Result<()> {
         }
     }
 
-    warp::run()
+    uncaged::run()
 }

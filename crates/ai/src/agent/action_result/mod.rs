@@ -7,9 +7,9 @@ use std::time::SystemTime;
 use chrono::{DateTime, Local};
 use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
-use warp_core::command::ExitCode;
-use warp_multi_agent_api::apply_file_diffs_result::success::UpdatedFileContent;
-use warp_terminal::model::BlockId;
+use uncaged_agent_api::apply_file_diffs_result::success::UpdatedFileContent;
+use uncaged_core::command::ExitCode;
+use uncaged_terminal::model::BlockId;
 
 use crate::agent::FileLocations;
 use crate::document::{AIDocumentId, AIDocumentVersion};
@@ -665,7 +665,7 @@ impl From<UpdatedFileContext> for Vec<UpdatedFileContent> {
     fn from(value: UpdatedFileContext) -> Self {
         // Note: This method only makes sense for FileContexts that have a string content.
         // TODO: How do we gracefully fail binary files here?
-        let file_content: Vec<warp_multi_agent_api::FileContent> = value.file_context.into();
+        let file_content: Vec<uncaged_agent_api::FileContent> = value.file_context.into();
 
         file_content
             .into_iter()

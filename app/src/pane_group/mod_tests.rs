@@ -10,12 +10,12 @@ use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
 #[cfg(feature = "local_fs")]
 use repo_metadata::RepoMetadataModel;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::platform::{WindowBounds, WindowStyle};
+use uncaged_ui::windowing::state::ApplicationStage;
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{App, ModelHandle};
 use uuid::Uuid;
-use warp_core::features::FeatureFlag;
-use warpui::platform::{WindowBounds, WindowStyle};
-use warpui::windowing::state::ApplicationStage;
-use warpui::windowing::WindowManager;
-use warpui::{App, ModelHandle};
 use watcher::HomeDirectoryWatcher;
 
 use super::child_agent::{

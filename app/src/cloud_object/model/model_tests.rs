@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use cloud_object_models::{ServerNotebook, ServerWorkflow};
 use cloud_objects::time::ServerTimestamp;
 use cloud_objects::UserUid;
-use warpui::{App, ModelHandle};
+use uncaged_ui::{App, ModelHandle};
 
 use super::*;
 use crate::cloud_object::model::actions::ObjectActions;

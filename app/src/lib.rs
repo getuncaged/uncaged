@@ -98,7 +98,7 @@ mod workspaces;
 //
 // If you feel the need to export a module so that a type or function within it
 // can be used by an integration test, you should define a new assertion function
-// in the warp::integration_testing::assertions module (or a sub-module).  These
+// in the uncaged::integration_testing::assertions module (or a sub-module).  These
 // functions will allow us to keep types internal to this crate and expose a
 // simpler API for integration tests to consume.
 pub mod ai_assistant;
@@ -185,20 +185,20 @@ use server::shared_http_client::SharedHttpClient;
 use settings::{ExtraMetaKeys, PrivacySettings};
 use terminal::input;
 use terminal::session_settings::SessionSettings;
-use url::Url;
-pub use warp_core::errors::{report_error, report_if_error};
-use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
+pub use uncaged_core::errors::{report_error, report_if_error};
+use uncaged_core::execution_mode::{AppExecutionMode, ExecutionMode};
 // Re-export the debounce function to simplify imports.
-pub use warp_core::r#async::debounce;
+pub use uncaged_core::r#async::debounce;
 // Re-export the safe logging macros at the crate root level for backwards compatibility
-pub use warp_core::{safe_debug, safe_error, safe_info, safe_warn};
+pub use uncaged_core::{safe_debug, safe_error, safe_info, safe_warn};
 #[cfg(feature = "local_fs")]
-use warp_files::FileModel;
-use warpui::integration::TestDriver;
-use warpui::platform::app::{ApproveTerminateResult, TerminationRequestSource};
-use warpui::platform::TerminationMode;
-use warpui::windowing::state::ApplicationStage;
-use warpui::{App, AppContext, Event, SingletonEntity, WindowId};
+use uncaged_files::FileModel;
+use uncaged_ui::integration::TestDriver;
+use uncaged_ui::platform::app::{ApproveTerminateResult, TerminationRequestSource};
+use uncaged_ui::platform::TerminationMode;
+use uncaged_ui::windowing::state::ApplicationStage;
+use uncaged_ui::{App, AppContext, Event, SingletonEntity, WindowId};
+use url::Url;
 use window_settings::WindowSettings;
 use workflows::manager::WorkflowManager;
 use workspace::sync_inputs::SyncedInputState;
@@ -268,13 +268,13 @@ use crate::workspace::{
 use crate::workspaces::user_profiles::UserProfiles;
 
 /// Our embedded application assets.
-pub static ASSETS: warp_assets::Assets = warp_assets::Assets;
+pub static ASSETS: uncaged_assets::Assets = uncaged_assets::Assets;
 
 /// Launch mode for how to start up Warp.
 #[allow(clippy::large_enum_variant)]
 pub enum LaunchMode {
     /// Run the regular GUI application.
-    App { args: warp_cli::AppArgs },
+    App { args: uncaged_cli::AppArgs },
 
     /// Run a test - this may be an integration test or an eval.
     Test {
@@ -284,10 +284,10 @@ pub enum LaunchMode {
 }
 
 impl LaunchMode {
-    fn args(&self) -> Cow<'_, warp_cli::AppArgs> {
+    fn args(&self) -> Cow<'_, uncaged_cli::AppArgs> {
         match self {
             LaunchMode::App { args, .. } => Cow::Borrowed(args),
-            LaunchMode::Test { .. } => Cow::Owned(warp_cli::AppArgs::default()),
+            LaunchMode::Test { .. } => Cow::Owned(uncaged_cli::AppArgs::default()),
         }
     }
 
@@ -385,17 +385,17 @@ pub fn run() -> Result<()> {
     features::init_feature_flags();
 
     // Parse command-line arguments.
-    let args = warp_cli::Args::from_env();
+    let args = uncaged_cli::Args::from_env();
 
     if let Some(command) = args.command() {
         #[cfg(windows)]
         if command.prints_to_stdout() {
             // We attach a console to ensure that all standard output gets printed correctly.
-            warp_util::windows::attach_to_parent_console();
+            uncaged_util::windows::attach_to_parent_console();
         }
         match command {
             #[cfg(all(feature = "local_tty", unix))]
-            warp_cli::Command::Worker(warp_cli::WorkerCommand::TerminalServer(args)) => {
+            uncaged_cli::Command::Worker(uncaged_cli::WorkerCommand::TerminalServer(args)) => {
                 // If we were asked to run as a terminal server (as opposed to the main
                 // GUI application), do so immediately.  Ideally, the terminal server would
                 // be a separate binary, but it's much easier to distribute a single binary,
@@ -405,18 +405,18 @@ pub fn run() -> Result<()> {
                 return Ok(());
             }
             #[cfg(feature = "plugin_host")]
-            warp_cli::Command::Worker(warp_cli::WorkerCommand::PluginHost { .. }) => {
+            uncaged_cli::Command::Worker(uncaged_cli::WorkerCommand::PluginHost { .. }) => {
                 return crate::run_plugin_host();
             }
             #[cfg(not(target_family = "wasm"))]
-            warp_cli::Command::Worker(warp_cli::WorkerCommand::RipgrepSearch {
+            uncaged_cli::Command::Worker(uncaged_cli::WorkerCommand::RipgrepSearch {
                 parent,
                 ignore_case,
                 multiline,
                 pattern,
                 paths,
             }) => {
-                warp_ripgrep::search::run_search_subprocess(
+                uncaged_ripgrep::search::run_search_subprocess(
                     std::slice::from_ref(pattern),
                     paths.clone(),
                     *ignore_case,
@@ -431,18 +431,18 @@ pub fn run() -> Result<()> {
                 feature = "plugin_host",
                 not(target_family = "wasm")
             )))]
-            warp_cli::Command::Worker(worker) => {
+            uncaged_cli::Command::Worker(worker) => {
                 // Need this case to handle platforms where there are no enum variants in
-                // warp_cli::WorkerCommand, as we still need to check Command::Worker.
+                // uncaged_cli::WorkerCommand, as we still need to check Command::Worker.
 
                 // On wasm, specifically, we should fail spectacularly if we get here.
                 #[cfg(target_family = "wasm")]
                 panic!("Worker process not supported on WASM: {worker:?}")
             }
-            warp_cli::Command::Completions { shell } => {
-                return warp_cli::completions::generate_to_stdout(*shell);
+            uncaged_cli::Command::Completions { shell } => {
+                return uncaged_cli::completions::generate_to_stdout(*shell);
             }
-            warp_cli::Command::DumpDebugInfo => {
+            uncaged_cli::Command::DumpDebugInfo => {
                 return debug_dump::run();
             }
         }
@@ -494,12 +494,12 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     cfg_if::cfg_if! {
         if #[cfg(enable_crash_recovery)] {
             if crash_recovery::is_crash_recovery_process(launch_mode.args().as_ref()) {
-                warp_logging::init_for_crash_recovery_process()?;
+                uncaged_logging::init_for_crash_recovery_process()?;
             } else {
-                warp_logging::init(warp_logging::LogConfig::default())?;
+                uncaged_logging::init(uncaged_logging::LogConfig::default())?;
             }
         } else {
-            warp_logging::init(warp_logging::LogConfig::default())?;
+            uncaged_logging::init(uncaged_logging::LogConfig::default())?;
         }
     }
 
@@ -595,7 +595,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         )),
         expect(unused)
     )]
-    let prefs_for_public_settings: &dyn warpui_extras::user_preferences::UserPreferences =
+    let prefs_for_public_settings: &dyn uncaged_ui_extras::user_preferences::UserPreferences =
         if FeatureFlag::SettingsFile.is_enabled() {
             public_preferences.as_ref()
         } else {
@@ -615,7 +615,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         terminal::local_tty::spawner::PtySpawner::new().context("Failed to create pty spawner")?;
     mark_startup_sub_interval("pty_spawner");
 
-    let mut app_builder = warpui::platform::AppBuilder::new(
+    let mut app_builder = uncaged_ui::platform::AppBuilder::new(
         app_callbacks(launch_mode.is_integration_test()),
         Box::new(ASSETS),
         launch_mode.take_test_driver(),
@@ -624,8 +624,8 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
 
     #[cfg(target_os = "macos")]
     {
-        use warpui::platform::mac::AppExt;
-        use warpui::AssetProvider as _;
+        use uncaged_ui::platform::mac::AppExt;
+        use uncaged_ui::AssetProvider as _;
 
         let activate_on_launch = !launch_mode.is_integration_test()
             || std::env::var("WARPUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS").is_ok();
@@ -645,7 +645,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
 
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
-        use warpui::platform::linux::{self, AppBuilderExt};
+        use uncaged_ui::platform::linux::{self, AppBuilderExt};
 
         use crate::settings::ForceX11;
 
@@ -660,7 +660,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
 
     #[cfg(target_os = "windows")]
     {
-        use warpui::platform::windows::AppBuilderExt;
+        use uncaged_ui::platform::windows::AppBuilderExt;
         app_builder.set_app_user_model_id(ChannelState::app_id().to_string());
 
         // Only use DXC for DirectX shader compilation if we're not running in a Parallels VM
@@ -668,7 +668,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         let is_parallels_vm = crate::util::vm_detection::is_running_in_windows_parallels_vm();
         if !is_parallels_vm {
             log::info!("Using DXC for DirectX shader compilation");
-            use warpui::platform::windows::DXCPath;
+            use uncaged_ui::platform::windows::DXCPath;
 
             app_builder.use_dxc_for_directx_shader_compilation(DXCPath {
                 dxc_path: "dxcompiler.dll".to_string(),
@@ -701,7 +701,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         #[cfg(not(target_family = "wasm"))]
         // Rotate the log files in the background.
         ctx.background_executor()
-            .spawn(warp_logging::rotate_log_files())
+            .spawn(uncaged_logging::rotate_log_files())
             .detach();
 
         ctx.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
@@ -746,24 +746,24 @@ pub struct UpdateQuakeModeEventArg {
 #[::tracing::instrument(skip_all, fields(tags.cloud_agent = true))]
 pub(crate) fn initialize_app(
     mut timer: IntervalTimer,
-    startup_toml_parse_error: Option<warpui_extras::user_preferences::Error>,
-    ctx: &mut warpui::AppContext,
+    startup_toml_parse_error: Option<uncaged_ui_extras::user_preferences::Error>,
+    ctx: &mut uncaged_ui::AppContext,
 ) -> Option<AppState> {
     let data_domain = ChannelState::data_domain();
 
     // Register an implementation of the secure storage service.
     cfg_if::cfg_if! {
         if #[cfg(feature = "integration_tests")] {
-            warpui_extras::secure_storage::register_noop(&data_domain, ctx);
+            uncaged_ui_extras::secure_storage::register_noop(&data_domain, ctx);
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            warpui_extras::secure_storage::register_with_fallback(&data_domain, warp_core::paths::state_dir(), ctx)
+            uncaged_ui_extras::secure_storage::register_with_fallback(&data_domain, uncaged_core::paths::state_dir(), ctx)
         } else if #[cfg(target_os = "windows")] {
-            warpui_extras::secure_storage::register_with_dir(&data_domain, warp_core::paths::state_dir(), ctx)
+            uncaged_ui_extras::secure_storage::register_with_dir(&data_domain, uncaged_core::paths::state_dir(), ctx)
         } else {
             // Uncaged: on macOS this is file-backed rather than the login keychain --
             // see `secure_storage/mac.rs` for why, and for what to restore if Uncaged
             // ever gets a signing identity.
-            warpui_extras::secure_storage::register(&data_domain, ctx);
+            uncaged_ui_extras::secure_storage::register(&data_domain, ctx);
         }
     }
     mark_startup_sub_interval("secure_storage");
@@ -1153,7 +1153,7 @@ pub(crate) fn initialize_app(
     mark_startup_sub_interval("conversation_models");
     ctx.add_singleton_model(RepoOutlines::new);
     ctx.add_singleton_model(|ctx| {
-        warp_core::sync_queue::SyncQueue::<SyncTask>::new_with_rate_limit(
+        uncaged_core::sync_queue::SyncQueue::<SyncTask>::new_with_rate_limit(
             &ctx.background_executor(),
             Some(DEFAULT_SYNC_REQUESTS_PER_MIN),
         )
@@ -1324,8 +1324,8 @@ pub(crate) fn initialize_app(
     app_state
 }
 
-pub(crate) fn app_callbacks(is_integration_test: bool) -> warpui::platform::AppCallbacks {
-    warpui::platform::AppCallbacks {
+pub(crate) fn app_callbacks(is_integration_test: bool) -> uncaged_ui::platform::AppCallbacks {
+    uncaged_ui::platform::AppCallbacks {
         on_internet_reachability_changed: Some(Box::new(move |reachable, ctx| {
             NetworkStatus::handle(ctx)
                 .update(ctx, move |me, ctx| me.reachability_changed(reachable, ctx));
@@ -1671,7 +1671,7 @@ fn on_close_window_cancelled(
 }
 
 #[::tracing::instrument(skip_all, fields(tags.cloud_agent = true))]
-fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode: LaunchMode) {
+fn launch(ctx: &mut uncaged_ui::AppContext, app_state: Option<AppState>, launch_mode: LaunchMode) {
     IntervalTimer::handle(ctx).update(ctx, |timer, _ctx| {
         timer.mark_interval_end("APP_LAUNCHED");
     });
@@ -1731,5 +1731,5 @@ fn launch(ctx: &mut warpui::AppContext, app_state: Option<AppState>, launch_mode
 #[cfg(test)]
 fn init_logging_for_unit_tests_glue() {
     // Initialize terminal-friendly logging for tests from the shared logger crate.
-    warp_logging::init_logging_for_unit_tests();
+    uncaged_logging::init_logging_for_unit_tests();
 }

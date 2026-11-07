@@ -11,22 +11,22 @@ use std::collections::HashMap;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::new_scrollable::{NewScrollable, ScrollableAppearance, SingleAxisConfig};
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DragAxis, Draggable, DraggableState, Empty, Expanded, Fill,
     Flex, Hoverable, MinSize, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, SavePosition, ScrollbarWidth, Shrinkable, Stack, Text,
     DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::fonts::{Properties, Style, Weight};
-use warpui::keymap::Keystroke;
-use warpui::platform::Cursor;
-use warpui::text_layout::ClipConfig;
-use warpui::ui_components::components::UiComponent;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Style, Weight};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{
     AppContext, BlurContext, Element, Entity, EntityId, FocusContext, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewContext, ViewHandle,
 };
@@ -848,7 +848,7 @@ impl View for QueuedPromptsPanelView {
             .with_border(
                 Border::all(1.).with_border_fill(Appearance::as_ref(app).theme().outline()),
             )
-            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_corner_radius(uncaged_core::ui::radius::medium())
             .with_horizontal_margin(6.)
             .with_margin_bottom(4.)
             .finish()
@@ -983,7 +983,7 @@ fn render_header(
         let row = row.finish();
         // Uncaged: the panel itself is a rounded card (see `render`); the header rounds with
         // its top edge instead of sitting under a full-width rule.
-        let inner_radius = Radius::Pixels(warp_core::ui::radius::MEDIUM - 1.);
+        let inner_radius = Radius::Pixels(uncaged_core::ui::radius::MEDIUM - 1.);
         Container::new(row)
             .with_horizontal_padding(16.)
             .with_vertical_padding(8.)
@@ -1080,7 +1080,7 @@ fn render_row(props: RenderRowProps<'_>, app: &AppContext) -> Box<dyn Element> {
                 Container::new(editor_viewport)
                     .with_border(Border::all(1.).with_border_fill(theme.outline()))
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )))
                     .with_horizontal_padding(4.)
                     .finish(),
@@ -1226,7 +1226,7 @@ fn render_row(props: RenderRowProps<'_>, app: &AppContext) -> Box<dyn Element> {
             .with_horizontal_padding(8.)
             .with_vertical_padding(4.)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )));
         if is_being_dragged || state.is_hovered() {
             container = container.with_background(theme.surface_overlay_1());

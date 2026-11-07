@@ -1,7 +1,7 @@
 //! Errors from AI requests, shared by the local engine's response stream and the agent UI.
 
 use serde::Deserialize;
-use warp_core::errors::{register_error, AnyhowErrorExt, ErrorExt};
+use uncaged_core::errors::{register_error, AnyhowErrorExt, ErrorExt};
 
 /// We use a special error code header `X-Warp-Error-Code` to allow the server to send
 /// more specific error code information, so that the client can discern between different

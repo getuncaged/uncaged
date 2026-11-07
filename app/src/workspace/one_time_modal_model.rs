@@ -1,8 +1,8 @@
 use std::future::Future;
 
 use settings::Setting as _;
-use warp_util::sync::Condition;
-use warpui::{Entity, ModelContext, SingletonEntity, WindowId};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity, WindowId};
+use uncaged_util::sync::Condition;
 
 use crate::channel::{Channel, ChannelState};
 use crate::settings::AISettings;

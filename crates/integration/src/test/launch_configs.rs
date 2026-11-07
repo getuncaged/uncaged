@@ -1,22 +1,22 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use warp::features::FeatureFlag;
-use warp::integration_testing::pane_group::assert_focused_pane_index;
-use warp::integration_testing::settings::set_window_custom_size;
-use warp::integration_testing::step::new_step_with_default_assertions;
-use warp::integration_testing::terminal::{
+use uncaged::features::FeatureFlag;
+use uncaged::integration_testing::pane_group::assert_focused_pane_index;
+use uncaged::integration_testing::settings::set_window_custom_size;
+use uncaged::integration_testing::step::new_step_with_default_assertions;
+use uncaged::integration_testing::terminal::{
     validate_block_output, wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::integration_testing::window::assert_num_windows_open;
-use warp::integration_testing::workspace::{assert_focused_tab_index, assert_tab_count};
-use warp::integration_testing::{self};
-use warp::search::command_palette::launch_config;
-use warp::search::data_source::Query;
-use warp::search::SyncDataSource;
-use warp::workspace::NEW_TAB_BUTTON_POSITION_ID;
-use warpui_core::integration::{AssertionOutcome, TestStep};
-use warpui_core::{async_assert, ModelHandle};
+use uncaged::integration_testing::window::assert_num_windows_open;
+use uncaged::integration_testing::workspace::{assert_focused_tab_index, assert_tab_count};
+use uncaged::integration_testing::{self};
+use uncaged::search::command_palette::launch_config;
+use uncaged::search::data_source::Query;
+use uncaged::search::SyncDataSource;
+use uncaged::workspace::NEW_TAB_BUTTON_POSITION_ID;
+use uncaged_ui_core::integration::{AssertionOutcome, TestStep};
+use uncaged_ui_core::{async_assert, ModelHandle};
 
 use super::{assert_approx_eq, new_builder, TEST_ONLY_ASSETS};
 use crate::Builder;
@@ -97,9 +97,9 @@ pub fn test_with_launch_config() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        warp::root_view::OpenLaunchConfigArg {
+                        uncaged::root_view::OpenLaunchConfigArg {
                             launch_config:
-                                warp::launch_configs::launch_config::make_mock_single_window_launch_config(),
+                                uncaged::launch_configs::launch_config::make_mock_single_window_launch_config(),
                             open_in_active_window: false,
                         },
                     );
@@ -156,10 +156,10 @@ pub fn test_open_launch_config_from_add_tab_menu_legacy() -> Builder {
 }
 
 pub fn test_launch_config_single_child_branch() -> Builder {
-    use warp::launch_configs::launch_config::{
+    use uncaged::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, SplitDirection, TabTemplate, WindowTemplate,
     };
-    use warpui_core::actions::StandardAction;
+    use uncaged_ui_core::actions::StandardAction;
 
     /// Create a launch config that has a branch with a single child
     fn create_launch_config() -> LaunchConfig {
@@ -193,7 +193,7 @@ pub fn test_launch_config_single_child_branch() -> Builder {
                 .with_action(move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        warp::root_view::OpenLaunchConfigArg {
+                        uncaged::root_view::OpenLaunchConfigArg {
                             launch_config: create_launch_config(),
                             open_in_active_window: false,
                         },
@@ -224,9 +224,9 @@ pub fn test_open_launch_config_with_custom_size() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        warp::root_view::OpenLaunchConfigArg {
+                        uncaged::root_view::OpenLaunchConfigArg {
                             launch_config:
-                                warp::launch_configs::launch_config::make_mock_single_window_launch_config(),
+                                uncaged::launch_configs::launch_config::make_mock_single_window_launch_config(),
                             open_in_active_window: false,
                         },
                     )
@@ -263,9 +263,9 @@ pub fn test_open_launch_config_in_active_window() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        warp::root_view::OpenLaunchConfigArg {
+                        uncaged::root_view::OpenLaunchConfigArg {
                             launch_config:
-                                warp::launch_configs::launch_config::make_mock_single_window_launch_config(),
+                                uncaged::launch_configs::launch_config::make_mock_single_window_launch_config(),
                             open_in_active_window: true,
                         },
                     )
@@ -283,7 +283,7 @@ pub fn test_open_launch_config_in_active_window() -> Builder {
 }
 
 pub fn test_with_launch_config_with_active_tab_index() -> Builder {
-    use warp::launch_configs::launch_config::{
+    use uncaged::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, SplitDirection, TabTemplate, WindowTemplate,
     };
 
@@ -325,7 +325,7 @@ pub fn test_with_launch_config_with_active_tab_index() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        warp::root_view::OpenLaunchConfigArg {
+                        uncaged::root_view::OpenLaunchConfigArg {
                             launch_config: create_launch_config(),
                             open_in_active_window: false,
                         },
@@ -341,7 +341,7 @@ pub fn test_with_launch_config_with_active_tab_index() -> Builder {
 }
 
 pub fn test_with_launch_config_with_active_pane() -> Builder {
-    use warp::launch_configs::launch_config::{
+    use uncaged::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, SplitDirection, TabTemplate, WindowTemplate,
     };
 
@@ -401,7 +401,7 @@ pub fn test_with_launch_config_with_active_pane() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        warp::root_view::OpenLaunchConfigArg {
+                        uncaged::root_view::OpenLaunchConfigArg {
                             launch_config: create_launch_config(),
                             open_in_active_window: false,
                         },
@@ -418,7 +418,7 @@ pub fn test_with_launch_config_with_active_pane() -> Builder {
 }
 
 pub fn test_with_launch_config_with_no_active_pane() -> Builder {
-    use warp::launch_configs::launch_config::{
+    use uncaged::launch_configs::launch_config::{
         LaunchConfig, PaneMode, PaneTemplateType, SplitDirection, TabTemplate, WindowTemplate,
     };
 
@@ -478,7 +478,7 @@ pub fn test_with_launch_config_with_no_active_pane() -> Builder {
                 move |app, _, _| {
                     app.dispatch_global_action(
                         "root_view:open_launch_config",
-                        warp::root_view::OpenLaunchConfigArg {
+                        uncaged::root_view::OpenLaunchConfigArg {
                             launch_config: create_launch_config(),
                             open_in_active_window: false,
                         },

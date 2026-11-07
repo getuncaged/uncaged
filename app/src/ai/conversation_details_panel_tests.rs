@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use chrono::{Local, Utc};
 use cloud_objects::UserUid;
 use persistence::model::{AgentConversationData, ConversationUsageMetadata};
-use warp_cli::agent::Harness;
-use warp_multi_agent_api as api;
-use warpui::{App, EntityId, SingletonEntity};
+use uncaged_agent_api as api;
+use uncaged_cli::agent::Harness;
+use uncaged_ui::{App, EntityId, SingletonEntity};
 
 use super::{ConversationDetailsData, PanelMode};
 use crate::ai::agent::api::ServerConversationToken;

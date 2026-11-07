@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use warp_core::channel::ChannelState;
-pub use warp_core::features::*;
+use uncaged_core::channel::ChannelState;
+pub use uncaged_core::features::*;
 
 /// Mark all features which should be enabled on the current channel as enabled.
 /// This sets global feature flag state and should never be called in a unit test.

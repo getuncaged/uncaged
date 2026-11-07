@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use warpui::Entity;
+use uncaged_ui::Entity;
 
 #[derive(
     Debug,

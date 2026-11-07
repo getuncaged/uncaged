@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use ui_components::lightbox;
-use warp_util::path::LineAndColumnArg;
-use warpui::accessibility::AccessibilityVerbosity;
-use warpui::geometry::rect::RectF;
-use warpui::geometry::vector::Vector2F;
-use warpui::platform::{Cursor, SystemTheme};
-use warpui::{EntityId, WindowId};
+use uncaged_ui::accessibility::AccessibilityVerbosity;
+use uncaged_ui::geometry::rect::RectF;
+use uncaged_ui::geometry::vector::Vector2F;
+use uncaged_ui::platform::{Cursor, SystemTheme};
+use uncaged_ui::{EntityId, WindowId};
+use uncaged_util::path::LineAndColumnArg;
 
 use super::global_actions::{ForkFromExchange, ForkedConversationDestination};
 use super::tab_settings::{

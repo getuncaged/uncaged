@@ -6,8 +6,8 @@ mod search_item;
 mod view;
 
 pub use data_source::SelectRewindPoint;
+use uncaged_ui::keymap::Keystroke;
 pub use view::{RewindMenuEvent, RewindMenuView};
-use warpui::keymap::Keystroke;
 
 use crate::terminal::input::inline_menu::{
     default_navigation_message_items, InlineMenuAction, InlineMenuMessageArgs, InlineMenuType,

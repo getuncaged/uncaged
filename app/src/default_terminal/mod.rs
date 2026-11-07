@@ -1,5 +1,5 @@
-use warpui::windowing::{StateEvent, WindowManager};
-use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_ui::windowing::{StateEvent, WindowManager};
+use uncaged_ui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
 #[cfg(target_os = "macos")]
 mod mac;

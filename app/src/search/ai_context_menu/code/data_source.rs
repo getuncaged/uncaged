@@ -15,13 +15,13 @@ use instant::Instant;
 use itertools::Itertools;
 #[cfg(not(target_family = "wasm"))]
 use repo_metadata::repositories::DetectedRepositories;
+use uncaged_ui::AppContext;
 #[cfg(not(target_family = "wasm"))]
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::AppContext;
+use uncaged_ui::ModelSpawner;
 #[cfg(not(target_family = "wasm"))]
-use warpui::ModelSpawner;
+use uncaged_ui::SingletonEntity;
 #[cfg(not(target_family = "wasm"))]
-use warpui::SingletonEntity;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 #[cfg(not(target_family = "wasm"))]
 use super::search_item::CodeSearchItem;
@@ -73,13 +73,13 @@ pub struct CodeSymbolCache {
     spawner: ModelSpawner<Self>,
 }
 
-impl warpui::Entity for CodeSymbolCache {
+impl uncaged_ui::Entity for CodeSymbolCache {
     type Event = ();
 }
 
 impl CodeSymbolCache {
     #[cfg(not(target_family = "wasm"))]
-    pub fn new(ctx: &mut warpui::ModelContext<Self>) -> Self {
+    pub fn new(ctx: &mut uncaged_ui::ModelContext<Self>) -> Self {
         let spawner = ctx.spawner();
         let cache = Self {
             symbol_cache: RefCell::new(HashMap::new()),

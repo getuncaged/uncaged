@@ -16,7 +16,7 @@
 //! To serialize input/deserialize output, callers are expected to use `bincode`.
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use warp_js::{JsFunctionId, SerializedJsValue};
+use uncaged_js::{JsFunctionId, SerializedJsValue};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct CallJsFunctionRequest {
@@ -39,4 +39,9 @@ pub struct CallJsFunctionService {}
 impl ipc::Service for CallJsFunctionService {
     type Request = CallJsFunctionRequest;
     type Response = CallJsFunctionResponse;
+
+    /// The ID this service had before the crate rename; kept so it stays stable on the wire.
+    fn id() -> &'static str {
+        "warp::plugin::service::call_js_function::CallJsFunctionService"
+    }
 }

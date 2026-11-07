@@ -1,4 +1,4 @@
-use warpui::{Entity, ModelContext, ModelHandle};
+use uncaged_ui::{Entity, ModelContext, ModelHandle};
 
 use crate::ai::blocklist::agent_view::{AgentViewController, AgentViewControllerEvent};
 use crate::terminal::input::buffer_model::InputBufferModel;

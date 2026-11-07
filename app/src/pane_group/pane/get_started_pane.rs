@@ -1,4 +1,4 @@
-use warpui::{AppContext, ModelHandle, View, ViewContext, ViewHandle};
+use uncaged_ui::{AppContext, ModelHandle, View, ViewContext, ViewHandle};
 
 use super::PaneId;
 use crate::app_state::LeafContents;

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use cloud_objects::time::ServerTimestamp;
 use serde::{Deserialize, Serialize};
-use warpui::{Entity, SingletonEntity};
+use uncaged_ui::{Entity, SingletonEntity};
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum RequestLimitRefreshDuration {

@@ -3,14 +3,14 @@ use std::path::{Path, PathBuf};
 
 use ai::skills::{parse_bundled_skill, ParsedSkill, SkillPathOrigin, SkillReference};
 use futures::TryStreamExt;
-use warp_core::channel::ChannelState;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::icons::Icon;
-use warp_core::{report_error, safe_warn};
-use warp_util::host_id::HostId;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::remote_path::RemotePath;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_core::channel::ChannelState;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::icons::Icon;
+use uncaged_core::{report_error, safe_warn};
+use uncaged_ui::{AppContext, SingletonEntity};
+use uncaged_util::host_id::HostId;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::remote_path::RemotePath;
 
 use super::SkillDescriptor;
 use crate::ai::mcp::{McpIntegration, TemplatableMCPServerManager};
@@ -179,7 +179,7 @@ pub struct BundledSkill {
 impl BundledSkill {
     /// Detect all skill definitions bundled with Warp for the local host.
     pub async fn detect() -> Self {
-        let Some(resources_dir) = warp_core::paths::bundled_resources_dir() else {
+        let Some(resources_dir) = uncaged_core::paths::bundled_resources_dir() else {
             return Self::default();
         };
         Self::detect_in_resources_dir(resources_dir).await

@@ -2,22 +2,22 @@
 // Adding this file level gate as some of the code around editability is not used in WASM yet.
 
 use pathfinder_color::ColorU;
-use warp_editor::editor::NavigationKey;
-use warp_editor::search::{SearchEvent, Searcher};
-pub use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
-use warpui::elements::{
+use uncaged_editor::editor::NavigationKey;
+use uncaged_editor::search::{SearchEvent, Searcher};
+pub use uncaged_ui::accessibility::{AccessibilityContent, WarpA11yRole};
+use uncaged_ui::elements::{
     Align, Border, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DropShadow, Element, Flex, Hoverable, MainAxisAlignment, MouseStateHandle,
     OffsetPositioning, ParentAnchor, ParentOffsetBounds, Radius, Rect, SavePosition, Shrinkable,
     Text,
 };
-pub use warpui::elements::{ParentElement as _, Stack};
-pub use warpui::geometry::vector::vec2f;
-use warpui::keymap::EditableBinding;
-use warpui::presenter::ChildView;
-use warpui::ui_components::components::UiComponent;
-pub use warpui::AppContext;
-use warpui::{
+pub use uncaged_ui::elements::{ParentElement as _, Stack};
+pub use uncaged_ui::geometry::vector::vec2f;
+use uncaged_ui::keymap::EditableBinding;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::ui_components::components::UiComponent;
+pub use uncaged_ui::AppContext;
+use uncaged_ui::{
     Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -102,7 +102,7 @@ pub enum FindAction {
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
     app.register_editable_bindings([
         EditableBinding::new(
             "find:find_next_occurrence",
@@ -948,7 +948,7 @@ impl View for CodeEditorFind {
         }
     }
 
-    fn on_blur(&mut self, _blur_ctx: &warpui::BlurContext, ctx: &mut ViewContext<Self>) {
+    fn on_blur(&mut self, _blur_ctx: &uncaged_ui::BlurContext, ctx: &mut ViewContext<Self>) {
         // Check if the currently focused view is one of our child components
         let focused_view_id = ctx.focused_view_id(ctx.window_id());
         let is_focus_within_find_bar = [

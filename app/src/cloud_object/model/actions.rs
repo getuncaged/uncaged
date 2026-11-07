@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Duration, Utc};
 pub use cloud_objects::cloud_object::{ObjectAction, ObjectActionSubtype, ObjectActionType};
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use crate::server::ids::{HashedSqliteId, ObjectUid};
 

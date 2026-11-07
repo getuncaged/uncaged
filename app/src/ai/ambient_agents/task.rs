@@ -5,10 +5,10 @@ use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use iso8601_duration::Duration as Iso8601Duration;
 use serde::{Deserialize, Serialize};
 use session_sharing_protocol::common::SessionId;
+use uncaged_core::report_error;
+use uncaged_core::ui::theme::WarpTheme;
+use uncaged_ui::color::ColorU;
 use url::Url;
-use warp_core::report_error;
-use warp_core::ui::theme::WarpTheme;
-use warpui::color::ColorU;
 
 pub use super::agent_config::AgentConfigSnapshot;
 use super::AmbientAgentTaskId;

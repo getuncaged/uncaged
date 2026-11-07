@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use ipc::ServiceCaller;
-use warp_completer::completer::{JsExecutionContext, JsExecutionError};
-use warp_js::{JsFunctionId, SerializedJsValue};
+use uncaged_completer::completer::{JsExecutionContext, JsExecutionError};
+use uncaged_js::{JsFunctionId, SerializedJsValue};
 
 use crate::plugin::service::{
     CallJsFunctionRequest, CallJsFunctionResponse, CallJsFunctionService,

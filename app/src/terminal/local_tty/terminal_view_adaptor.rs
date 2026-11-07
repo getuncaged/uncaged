@@ -3,7 +3,7 @@ use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use warpui::{AppContext, SingletonEntity, ViewHandle, WindowId};
+use uncaged_ui::{AppContext, SingletonEntity, ViewHandle, WindowId};
 
 use super::terminal_manager::{TerminalManager, TerminalSurfaceInit, TerminalSurfaceResult};
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
@@ -171,7 +171,7 @@ impl TerminalManagerTrait for TerminalManager<TerminalView> {
 /// cleaned up before the main thread exits.
 #[cfg(windows)]
 pub fn shutdown_all_pty_event_loops(ctx: &mut AppContext) {
-    use warpui::ModelHandle;
+    use uncaged_ui::ModelHandle;
 
     let terminal_managers: Vec<ModelHandle<Box<dyn TerminalManagerTrait>>> = ctx.models_of_type();
     terminal_managers.into_iter().for_each(|terminal_manager| {

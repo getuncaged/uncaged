@@ -25,6 +25,12 @@ pub use selections::{
     SelectionMode,
 };
 use string_offset::{ByteOffset, CharOffset};
+use uncaged_ui::accessibility::{AccessibilityContent, WarpA11yRole};
+use uncaged_ui::text::point::Point;
+use uncaged_ui::text::word_boundaries::WordBoundariesPolicy;
+use uncaged_ui::text::TextBuffer;
+use uncaged_ui::text_layout::TextStyle;
+use uncaged_ui::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity};
 use vec1::{vec1, Vec1};
 use vim::vim::{
     BracketChar, CharacterMotion, Direction, FindCharMotion, FirstNonWhitespaceMotion, LineMotion,
@@ -35,12 +41,6 @@ use vim::{
     vim_a_quote, vim_a_word, vim_find_char_on_line, vim_find_matching_bracket, vim_inner_block,
     vim_inner_paragraph, vim_inner_quote, vim_inner_word, vim_word_iterator_from_offset,
 };
-use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
-use warpui::text::point::Point;
-use warpui::text::word_boundaries::WordBoundariesPolicy;
-use warpui::text::TextBuffer;
-use warpui::text_layout::TextStyle;
-use warpui::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity};
 
 use self::buffer::Peer;
 use super::{movement, PlainTextEditorViewAction, SelectionInsertion, ValidInputType};

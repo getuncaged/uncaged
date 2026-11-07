@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use warpui::integration::TestStep;
-use warpui::windowing::WindowManager;
-use warpui::{async_assert, SingletonEntity, WindowId};
+use uncaged_ui::integration::TestStep;
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{async_assert, SingletonEntity, WindowId};
 
 use crate::ai::facts::view::AIFactPage;
 use crate::ai::facts::AIMemory;

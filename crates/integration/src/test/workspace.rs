@@ -6,35 +6,35 @@ use std::time::Duration;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use settings::Setting as _;
-use warp::cmd_or_ctrl_shift;
-use warp::features::FeatureFlag;
-use warp::integration_testing::clipboard::assert_clipboard_contains_string;
-use warp::integration_testing::pane_group::assert_focused_pane_index;
-use warp::integration_testing::step::new_step_with_default_assertions;
-use warp::integration_testing::terminal::util::{
+use uncaged::cmd_or_ctrl_shift;
+use uncaged::features::FeatureFlag;
+use uncaged::integration_testing::clipboard::assert_clipboard_contains_string;
+use uncaged::integration_testing::pane_group::assert_focused_pane_index;
+use uncaged::integration_testing::step::new_step_with_default_assertions;
+use uncaged::integration_testing::terminal::util::{
     current_shell_starter_and_version, ExpectedExitStatus,
 };
-use warp::integration_testing::terminal::{
+use uncaged::integration_testing::terminal::{
     assert_active_session_local_path, assert_command_executed_for_single_terminal_in_tab,
     assert_focused_editor_in_tab, assert_long_running_block_executing_for_single_terminal_in_tab,
     execute_command, execute_command_for_single_terminal_in_tab, wait_until_bootstrapped_pane,
     wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::integration_testing::view_getters::{terminal_view, workspace_view};
-use warp::integration_testing::window::{
+use uncaged::integration_testing::view_getters::{terminal_view, workspace_view};
+use uncaged::integration_testing::window::{
     add_and_save_window, assert_num_windows_open, save_active_window_id,
 };
-use warp::integration_testing::workspace::{
+use uncaged::integration_testing::workspace::{
     assert_focused_tab_index, assert_tab_count, press_native_modal_button,
 };
-use warp::settings::PaneSettings;
-use warp::terminal::shell::ShellType;
-use warp::workspace::tab_settings::{TabSettings, VerticalTabsDisplayGranularity};
-use warp::workspace::{WorkspaceAction, NEW_TAB_BUTTON_POSITION_ID};
-use warpui_core::event::{Event, ModifiersState};
-use warpui_core::integration::{AssertionCallback, AssertionOutcome, StepDataMap, TestStep};
-use warpui_core::windowing::WindowManager;
-use warpui_core::{async_assert, async_assert_eq, SingletonEntity, TypedActionView, WindowId};
+use uncaged::settings::PaneSettings;
+use uncaged::terminal::shell::ShellType;
+use uncaged::workspace::tab_settings::{TabSettings, VerticalTabsDisplayGranularity};
+use uncaged::workspace::{WorkspaceAction, NEW_TAB_BUTTON_POSITION_ID};
+use uncaged_ui_core::event::{Event, ModifiersState};
+use uncaged_ui_core::integration::{AssertionCallback, AssertionOutcome, StepDataMap, TestStep};
+use uncaged_ui_core::windowing::WindowManager;
+use uncaged_ui_core::{async_assert, async_assert_eq, SingletonEntity, TypedActionView, WindowId};
 
 use super::new_builder;
 use crate::util::skip_if_powershell_core_2303;
@@ -54,7 +54,10 @@ fn tab_position_id(tab_index: usize) -> String {
     format!("tab_position_{tab_index}")
 }
 
-fn vertical_tab_pane_row_position_id(app: &mut warpui_core::App, window_id: WindowId) -> String {
+fn vertical_tab_pane_row_position_id(
+    app: &mut uncaged_ui_core::App,
+    window_id: WindowId,
+) -> String {
     let workspace = workspace_view(app, window_id);
     let pane_group = workspace.read(app, |workspace, _ctx| {
         workspace
@@ -70,7 +73,7 @@ fn vertical_tab_pane_row_position_id(app: &mut warpui_core::App, window_id: Wind
 }
 
 fn vertical_tab_pane_row_position_id_for_pane_index(
-    app: &mut warpui_core::App,
+    app: &mut uncaged_ui_core::App,
     window_id: WindowId,
     pane_index: usize,
 ) -> String {
@@ -91,7 +94,7 @@ fn vertical_tab_pane_row_position_id_for_pane_index(
 }
 
 fn first_vertical_tab_pane_row_position_id(
-    app: &mut warpui_core::App,
+    app: &mut uncaged_ui_core::App,
     window_id: WindowId,
 ) -> String {
     vertical_tab_pane_row_position_id_for_pane_index(app, window_id, 0)
@@ -371,7 +374,7 @@ fn focus_other_window(other_window_key: &'static str, known_window_key: &'static
     })
 }
 
-fn dispatch_mouse_event(app: &mut warpui_core::App, window_id: WindowId, event: Event) {
+fn dispatch_mouse_event(app: &mut uncaged_ui_core::App, window_id: WindowId, event: Event) {
     let window = app.read(|ctx| {
         ctx.windows()
             .platform_window(window_id)
@@ -382,7 +385,7 @@ fn dispatch_mouse_event(app: &mut warpui_core::App, window_id: WindowId, event: 
     });
 }
 
-fn tab_bounds(app: &mut warpui_core::App, window_id: WindowId, tab_index: usize) -> RectF {
+fn tab_bounds(app: &mut uncaged_ui_core::App, window_id: WindowId, tab_index: usize) -> RectF {
     let presenter = app.presenter(window_id).expect("presenter should exist");
     let bounds = presenter
         .borrow()
@@ -392,12 +395,12 @@ fn tab_bounds(app: &mut warpui_core::App, window_id: WindowId, tab_index: usize)
     bounds
 }
 
-fn tab_center(app: &mut warpui_core::App, window_id: WindowId, tab_index: usize) -> Vector2F {
+fn tab_center(app: &mut uncaged_ui_core::App, window_id: WindowId, tab_index: usize) -> Vector2F {
     tab_bounds(app, window_id, tab_index).center()
 }
 
 fn source_local_point_for_screen_point(
-    app: &mut warpui_core::App,
+    app: &mut uncaged_ui_core::App,
     source_window_id: WindowId,
     screen_point: Vector2F,
 ) -> Vector2F {
@@ -408,7 +411,7 @@ fn source_local_point_for_screen_point(
 }
 
 fn tab_screen_point(
-    app: &mut warpui_core::App,
+    app: &mut uncaged_ui_core::App,
     window_id: WindowId,
     tab_index: usize,
     x_offset: f32,
@@ -449,7 +452,7 @@ fn set_saved_window_origin(window_key: &'static str, origin: Vector2F) -> TestSt
 
 fn assert_total_tab_count(
     expected_total_tab_count: usize,
-) -> impl FnMut(&mut warpui_core::App, WindowId) -> AssertionOutcome {
+) -> impl FnMut(&mut uncaged_ui_core::App, WindowId) -> AssertionOutcome {
     move |app, _| {
         let total_tab_count = app
             .window_ids()
@@ -1157,7 +1160,7 @@ pub fn test_multi_tab_drag_back_to_source_and_out_again() -> Builder {
 /// Dispatches a drag event whose cursor lands on the target window's tab bar,
 /// addressed to the source window (which owns the active drag gesture).
 fn drag_over_target_tab_bar(
-    app: &mut warpui_core::App,
+    app: &mut uncaged_ui_core::App,
     _window_id: WindowId,
     data: &mut StepDataMap,
 ) {
@@ -1190,7 +1193,7 @@ fn drag_over_target_tab_bar(
 /// Dispatches a drag event whose cursor lands back on the source window's own
 /// tab bar (the put-back case), addressed to the source window.
 fn drag_over_source_tab_bar(
-    app: &mut warpui_core::App,
+    app: &mut uncaged_ui_core::App,
     _window_id: WindowId,
     data: &mut StepDataMap,
 ) {

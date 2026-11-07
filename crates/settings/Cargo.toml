@@ -14,14 +14,14 @@ schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 settings_value = { workspace = true, features = ["derive"] }
-warp_features.workspace = true
-warpui_core = { workspace = true, features = ["settings_value"] }
-warpui_extras = { workspace = true, features = ["default"] }
+uncaged_features.workspace = true
+uncaged_ui_core = { workspace = true, features = ["settings_value"] }
+uncaged_ui_extras = { workspace = true, features = ["default"] }
 
 [dev-dependencies]
 tempfile.workspace = true
-warp_features = { workspace = true, features = ["test-util"] }
-warpui_extras = { workspace = true, features = ["user_preferences-toml"] }
+uncaged_features = { workspace = true, features = ["test-util"] }
+uncaged_ui_extras = { workspace = true, features = ["user_preferences-toml"] }
 
 [features]
 integration_tests = []

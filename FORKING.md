@@ -59,12 +59,12 @@ new *protocol* needs engine code (see MODIFYING.md §3).
 These make the OS treat it as a distinct app (own prefs, own config dir, own URL
 scheme) so it never collides with Warp or with Uncaged:
 
-- `crates/warp_core/src/channel/state.rs` — `AppId::new("dev","uncaged","WarpOss")`.
-- `crates/warp_core/src/paths.rs` — the `.uncaged` home-config dir name.
-- `crates/warp_core/src/channel/mod.rs` — CLI command names + URL scheme.
+- `crates/uncaged_core/src/channel/state.rs` — `AppId::new("dev","uncaged","WarpOss")`.
+- `crates/uncaged_core/src/paths.rs` — the `.uncaged` home-config dir name.
+- `crates/uncaged_core/src/channel/mod.rs` — CLI command names + URL scheme.
 - `app/Cargo.toml` `[package.metadata.bundle.bin.warp-oss]` + `app/src/bin/oss.rs`
   embedded plist — bundle id, display name, scheme, copyright.
-- `crates/warp_core/src/channel/config.rs` — `uncaged_sentinel()` (the fail-closed
+- `crates/uncaged_core/src/channel/config.rs` — `uncaged_sentinel()` (the fail-closed
   Warp URLs); no change needed unless you rename the constructors.
 
 ### 5. Docs & legal
@@ -76,11 +76,11 @@ scheme) so it never collides with Warp or with Uncaged:
 
 ## What you get for free — do NOT rebrand these
 
-- **The internal `warp_*` crates** (`warp_core`, `warpui`, `warp_multi_agent_*`,
-  ~27 packages). They're the upstream engine; renaming them is ~2,000 files of
-  churn for zero user benefit and it breaks every upstream merge. Leave them.
-  (Zap, the other major fork, made the same call.) The product layer and the code
-  layer are intentionally separate.
+- **Internal Rust identifiers** (`WarpDrive`, `WarpAction`, `warp_drive` modules,
+  `FeatureFlag` names, setting TOML keys). The workspace crates themselves are
+  already `uncaged_*` (`uncaged_core`, `uncaged_ui`, `uncaged_agent_api`, …), but
+  the names inside them stay: they're numerous and some are persisted. The
+  product layer and the code layer are intentionally separate.
 - **The privacy gates** — the fail-closed egress sentinel, disabled autoupdate,
   refused login, no-telemetry defaults, and the local-only agent seam all keep
   working for your fork automatically. See MODIFYING.md §6 to audit them after an
@@ -135,7 +135,7 @@ doesn't have to:
   (`ai/agent_sdk/{ambient,driver}.rs`) — unreachable in Uncaged.
 - One **config-template comment** (`user_config/mod.rs`).
 - **Test fixtures** (`*_tests.rs`) that use the URL as sample link-detection data.
-- Four **lower-crate** references (`warp_cli`, `onboarding`, `warpui`) that can't
+- Four **lower-crate** references (`uncaged_cli`, `onboarding`, `uncaged_ui`) that can't
   import the app's `brand` module — 2 doc comments, a CLI `--help` line, and a
   `TOS_URL` const in onboarding. Update these by hand if you want a spotless tree.
 

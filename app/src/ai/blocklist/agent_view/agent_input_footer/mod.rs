@@ -19,22 +19,22 @@ use settings::{Setting, ToggleableSetting};
 #[cfg(not(target_family = "wasm"))]
 use tokio::fs;
 use toolbar_item::AgentToolbarItemKind;
-use warp_core::report_if_error;
-use warp_core::ui::color::blend::Blend;
-use warp_core::ui::color::contrast::MinimumAllowedContrast;
-use warp_core::ui::color::ContrastingColor;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::{AnsiColorIdentifier, Fill};
-use warpui::elements::{
+use uncaged_core::report_if_error;
+use uncaged_core::ui::color::blend::Blend;
+use uncaged_core::ui::color::contrast::MinimumAllowedContrast;
+use uncaged_core::ui::color::ContrastingColor;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::{AnsiColorIdentifier, Fill};
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DispatchEventResult, Element, Empty, EventHandler, Expanded, Flex,
     MainAxisAlignment, MainAxisSize, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Shrinkable,
     Stack, Text, Wrap, WrapFill, WrapFillEntireRun, DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::ui_components::segmented_control::SegmentedControl;
-use warpui::{
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::ui_components::segmented_control::SegmentedControl;
+use uncaged_ui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
@@ -696,7 +696,7 @@ impl AgentInputFooter {
     fn select_cli_file(&mut self, ctx: &mut ViewContext<Self>) {
         let window_id = ctx.window_id();
         let view_id = ctx.view_id();
-        let file_picker_config = warpui::platform::FilePickerConfiguration::new();
+        let file_picker_config = uncaged_ui::platform::FilePickerConfiguration::new();
 
         ctx.open_file_picker(
             move |result, ctx| match result {
@@ -1506,7 +1506,7 @@ impl View for AgentInputFooter {
         "AgentViewFooter"
     }
 
-    fn render(&self, app: &warpui::AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &uncaged_ui::AppContext) -> Box<dyn uncaged_ui::Element> {
         // When a CLI agent session is active, render the CLI agent toolbar instead.
         if self.is_cli_agent_session_active(app) {
             return self.render_cli_mode_footer(app);
@@ -1734,7 +1734,7 @@ pub enum AgentInputFooterAction {
 impl TypedActionView for AgentInputFooter {
     type Action = AgentInputFooterAction;
 
-    fn handle_action(&mut self, action: &Self::Action, ctx: &mut warpui::ViewContext<Self>) {
+    fn handle_action(&mut self, action: &Self::Action, ctx: &mut uncaged_ui::ViewContext<Self>) {
         match action {
             AgentInputFooterAction::SelectFile => {
                 // Fork based on CLI agent session: in CLI mode, open a file

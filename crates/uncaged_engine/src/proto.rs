@@ -1,4 +1,4 @@
-//! Thin helpers over the generated `warp_multi_agent_api` protobuf types.
+//! Thin helpers over the generated `uncaged_agent_api` protobuf types.
 //!
 //! Two things live here: a short `api` alias used throughout the crate, and
 //! conversions between `serde_json::Value` (how providers express tool args)
@@ -7,7 +7,7 @@
 use prost_types::value::Kind;
 use prost_types::{Struct as ProtoStruct, Value as ProtoValue};
 use serde_json::{Map, Value as JsonValue};
-pub use warp_multi_agent_api as api;
+pub use uncaged_agent_api as api;
 
 /// Convert a JSON object into a protobuf `Struct`. Non-object inputs are
 /// wrapped under a single `value` key so nothing is silently dropped.

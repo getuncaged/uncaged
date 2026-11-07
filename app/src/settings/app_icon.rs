@@ -1,8 +1,8 @@
 use enum_iterator::Sequence;
 use serde::{Deserialize, Serialize};
-use warp_core::channel::{Channel, ChannelState};
-use warp_core::settings::macros::define_settings_group;
-use warp_core::settings::SupportedPlatforms;
+use uncaged_core::channel::{Channel, ChannelState};
+use uncaged_core::settings::macros::define_settings_group;
+use uncaged_core::settings::SupportedPlatforms;
 
 /// The app icon to use (mac-only).
 ///

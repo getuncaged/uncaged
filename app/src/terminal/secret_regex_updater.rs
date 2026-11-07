@@ -1,4 +1,4 @@
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use crate::settings::{CustomSecretRegex, PrivacySettings, PrivacySettingsChangedEvent};
 use crate::terminal::model::set_user_and_enterprise_secret_regexes;

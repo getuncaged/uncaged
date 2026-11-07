@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use uncaged_ui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 use url::Url;
-use warpui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 
 use super::super::{DefaultSessionModeBehavior, Direction};
 use super::view::PaneView;

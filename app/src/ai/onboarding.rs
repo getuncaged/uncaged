@@ -2,7 +2,7 @@
 
 use ai::LLMId;
 use onboarding::slides::OnboardingModelInfo;
-use warp_core::ui::icons::Icon;
+use uncaged_core::ui::icons::Icon;
 
 use super::llms::{LLMInfo, LLMPreferences};
 

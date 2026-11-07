@@ -1,12 +1,12 @@
 use std::time::Duration;
 
 use settings::{Setting, ToggleableSetting};
-use warpui::elements::{
+use uncaged_ui::elements::{
     Container, CrossAxisAlignment, Flex, MainAxisAlignment, ParentElement, Text,
 };
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::switch::SwitchStateHandle;
-use warpui::{
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::switch::SwitchStateHandle;
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -197,7 +197,7 @@ impl View for UndoCloseView {
 impl TypedActionView for UndoCloseView {
     type Action = Action;
 
-    fn handle_action(&mut self, action: &Self::Action, ctx: &mut warpui::ViewContext<Self>) {
+    fn handle_action(&mut self, action: &Self::Action, ctx: &mut uncaged_ui::ViewContext<Self>) {
         match action {
             Action::ToggleUndoCloseEnabled => {
                 UndoCloseSettings::handle(ctx).update(ctx, |settings, ctx| {

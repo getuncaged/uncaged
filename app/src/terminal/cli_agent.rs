@@ -12,12 +12,12 @@ use markdown_parser::parse_markdown;
 use pathfinder_color::ColorU;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
-use warp_cli::agent::Harness;
-use warp_completer::parsers::simple::top_level_command;
-use warp_editor::content::buffer::Buffer;
-use warp_editor::content::markdown::MarkdownStyle;
-use warp_util::path::EscapeChar;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_cli::agent::Harness;
+use uncaged_completer::parsers::simple::top_level_command;
+use uncaged_editor::content::buffer::Buffer;
+use uncaged_editor::content::markdown::MarkdownStyle;
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
+use uncaged_util::path::EscapeChar;
 
 use crate::ai::agent::{AgentReviewCommentBatch, DiffSetHunk};
 use crate::ai::blocklist::CLAUDE_ORANGE;
@@ -581,7 +581,7 @@ struct HiddenCliAgentsFile {
 }
 
 fn hidden_cli_agents_path() -> PathBuf {
-    warp_core::paths::data_dir().join(HIDDEN_CLI_AGENTS_FILE)
+    uncaged_core::paths::data_dir().join(HIDDEN_CLI_AGENTS_FILE)
 }
 
 fn load_hidden_cli_agents() -> HashSet<CLIAgent> {

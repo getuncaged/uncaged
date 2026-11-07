@@ -6,7 +6,7 @@ pub mod theme_creator_body;
 pub mod theme_explorer_body;
 pub mod theme_gallery;
 
-use warp_core::ui::theme::WarpTheme;
+use uncaged_core::ui::theme::WarpTheme;
 
 pub fn onboarding_theme_picker_themes() -> [WarpTheme; 5] {
     [

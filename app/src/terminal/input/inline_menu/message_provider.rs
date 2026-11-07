@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 use std::sync::LazyLock;
 
-use warpui::keymap::Keystroke;
-use warpui::AppContext;
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::AppContext;
 
 use crate::editor::{SELECT_DOWN_ACTION_NAME, SELECT_UP_ACTION_NAME};
 use crate::terminal::input::inline_menu::{

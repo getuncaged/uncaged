@@ -225,7 +225,7 @@ async fn run_oauth_flow(listener: TcpListener, pkce: PkceParams) -> anyhow::Resu
         .spawn(move || {
             // `send_blocking` is disallowed (no wasm support); block this
             // dedicated thread on the async `send` instead.
-            let _ = warpui_core::r#async::block_on(
+            let _ = uncaged_ui_core::r#async::block_on(
                 tx.send(wait_for_callback(&listener, CALLBACK_TIMEOUT)),
             );
         })

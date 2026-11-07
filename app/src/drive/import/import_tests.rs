@@ -1,7 +1,7 @@
 use std::env::current_dir;
 
-use warp_core::ui::appearance::Appearance;
-use warpui::App;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::App;
 
 use super::expand_dirs;
 use crate::cloud_object::model::persistence::CloudModel;
@@ -30,6 +30,6 @@ fn test_expand_directories() {
             .join("integration");
 
         // Open a folder and verify we could expand it into the correct folder tree structure.
-        assert_eq!(warpui::r#async::block_on(expand_dirs([directory].into_iter().collect())).debug_print(), "(integration(tests(INTEGRATION_TESTING, data(test, test_launch_config, test_theme, test_theme_with_name, test_workflow))))");
+        assert_eq!(uncaged_ui::r#async::block_on(expand_dirs([directory].into_iter().collect())).debug_print(), "(integration(tests(INTEGRATION_TESTING, data(test, test_launch_config, test_theme, test_theme_with_name, test_workflow))))");
     });
 }

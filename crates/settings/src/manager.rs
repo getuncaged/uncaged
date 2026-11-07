@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use anyhow::{Result, anyhow};
-use warp_features::FeatureFlag;
-use warpui_core::{AppContext, Entity, SingletonEntity};
-use warpui_extras::user_preferences::UserPreferences;
+use uncaged_features::FeatureFlag;
+use uncaged_ui_core::{AppContext, Entity, SingletonEntity};
+use uncaged_ui_extras::user_preferences::UserPreferences;
 
 use super::{PrivatePreferences, SupportedPlatforms};
 

@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use fuzzy_match::FuzzyMatchResult;
 use ordered_float::OrderedFloat;
-use warpui::elements::{ConstrainedBox, Container, Icon};
-use warpui::{AppContext, Element};
+use uncaged_ui::elements::{ConstrainedBox, Container, Icon};
+use uncaged_ui::{AppContext, Element};
 
 use crate::appearance::Appearance;
 use crate::search::ai_context_menu::mixer::AIContextMenuSearchableAction;

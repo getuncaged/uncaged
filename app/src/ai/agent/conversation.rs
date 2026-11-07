@@ -7,20 +7,20 @@ use ai::skills::SkillPathOrigin;
 use chrono::{DateTime, Local, TimeZone};
 use itertools::Itertools as _;
 use serde::{Deserialize, Serialize};
+use uncaged_agent_api::response_event::stream_finished;
+use uncaged_agent_api::response_event::stream_finished::TokenUsage;
+use uncaged_agent_api::{self as api};
+use uncaged_cli::agent::Harness;
+use uncaged_core::command::ExitCode;
+use uncaged_core::execution_mode::AppExecutionMode;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::WarpTheme;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::{AppContext, EntityId, ModelContext, SingletonEntity};
 use uuid::Uuid;
 use vec1::{Size0Error, Vec1};
-use warp_cli::agent::Harness;
-use warp_core::command::ExitCode;
-use warp_core::execution_mode::AppExecutionMode;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::WarpTheme;
-use warp_multi_agent_api::response_event::stream_finished;
-use warp_multi_agent_api::response_event::stream_finished::TokenUsage;
-use warp_multi_agent_api::{self as api};
-use warpui::color::ColorU;
-use warpui::{AppContext, EntityId, ModelContext, SingletonEntity};
 
 use super::api::ServerConversationToken;
 use super::task::helper::*;
@@ -1198,11 +1198,11 @@ impl AIConversation {
     ///
     /// This filters the full task list using DFS linearization to determine
     /// which tasks have open subagent tool calls without corresponding results.
-    pub fn compute_active_tasks(&self) -> Vec<warp_multi_agent_api::Task> {
+    pub fn compute_active_tasks(&self) -> Vec<uncaged_agent_api::Task> {
         use std::collections::HashMap;
 
         let root_task_id = self.get_root_task_id().to_string();
-        let all_tasks: HashMap<&str, &warp_multi_agent_api::Task> = self
+        let all_tasks: HashMap<&str, &uncaged_agent_api::Task> = self
             .all_tasks()
             .filter_map(|task| {
                 let source = task.source()?;
@@ -1846,7 +1846,7 @@ impl AIConversation {
     pub fn initialize_output_for_response_stream(
         &mut self,
         stream_id: &ResponseStreamId,
-        init_event: warp_multi_agent_api::response_event::StreamInit,
+        init_event: uncaged_agent_api::response_event::StreamInit,
         terminal_view_id: EntityId,
         ctx: &mut ModelContext<BlocklistAIHistoryModel>,
     ) -> Result<(), UpdateConversationError> {
@@ -2321,11 +2321,11 @@ impl AIConversation {
         &mut self,
         response_stream_id: &ResponseStreamId,
         terminal_view_id: EntityId,
-        action: warp_multi_agent_api::client_action::Action,
+        action: uncaged_agent_api::client_action::Action,
         skill_path_origin: &SkillPathOrigin,
         ctx: &mut ModelContext<BlocklistAIHistoryModel>,
     ) -> Result<(), UpdateConversationError> {
-        use warp_multi_agent_api::client_action::*;
+        use uncaged_agent_api::client_action::*;
         match action {
             Action::BeginTransaction(_) => {
                 self.begin_transaction();
@@ -4203,7 +4203,7 @@ impl std::fmt::Display for ConversationStatus {
 }
 
 impl ConversationStatus {
-    pub fn render_icon(&self, appearance: &Appearance) -> warpui::elements::Icon {
+    pub fn render_icon(&self, appearance: &Appearance) -> uncaged_ui::elements::Icon {
         match self {
             ConversationStatus::InProgress => in_progress_icon(appearance),
             ConversationStatus::Success => succeeded_icon(appearance),

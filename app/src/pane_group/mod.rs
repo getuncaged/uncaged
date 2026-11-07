@@ -15,25 +15,25 @@ use serde::{Deserialize, Serialize};
 use settings::Setting as _;
 use tree::DEFAULT_FLEX_VALUE;
 use typed_path::TypedPath;
-use uuid::Uuid;
-use warp_core::command::ExitCode;
-use warp_core::context_flag::ContextFlag;
-use warp_terminal::shell::{ShellName, ShellType};
-use warp_util::path::convert_wsl_to_windows_host_path;
-#[cfg(feature = "local_fs")]
-use warp_util::path::LineAndColumnArg;
-use warp_util::remote_path::RemotePath;
-use warpui::elements::{
+use uncaged_core::command::ExitCode;
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_terminal::shell::{ShellName, ShellType};
+use uncaged_ui::elements::{
     ChildView, CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Flex, MainAxisSize,
     ParentElement, Shrinkable, Stack,
 };
-use warpui::keymap::{Context, EditableBinding, FixedBinding};
-use warpui::notification::NotificationSendError;
-use warpui::windowing::WindowManager;
-use warpui::{
+use uncaged_ui::keymap::{Context, EditableBinding, FixedBinding};
+use uncaged_ui::notification::NotificationSendError;
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle, WindowId,
 };
+use uncaged_util::path::convert_wsl_to_windows_host_path;
+#[cfg(feature = "local_fs")]
+use uncaged_util::path::LineAndColumnArg;
+use uncaged_util::remote_path::RemotePath;
+use uuid::Uuid;
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::conversation::{AIConversation, AIConversationId};
@@ -266,7 +266,7 @@ enum PaneRemovalReason {
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
     app.register_binding_validator::<PaneGroup>(is_binding_pty_compliant);
 
     self::pane::init(app);

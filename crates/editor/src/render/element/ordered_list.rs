@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use warpui_core::elements::ListIndentLevel;
-use warpui_core::geometry::vector::vec2f;
-use warpui_core::text_layout::TextFrame;
+use uncaged_ui_core::elements::ListIndentLevel;
+use uncaged_ui_core::geometry::vector::vec2f;
+use uncaged_ui_core::text_layout::TextFrame;
 
 use super::RenderableBlock;
 use super::paint::RenderContext;
@@ -40,8 +40,8 @@ impl RenderableBlock for RenderableOrderedListItem {
     fn layout(
         &mut self,
         model: &RenderState,
-        ctx: &mut warpui_core::LayoutContext,
-        app: &warpui_core::AppContext,
+        ctx: &mut uncaged_ui_core::LayoutContext,
+        app: &uncaged_ui_core::AppContext,
     ) {
         let text_layout = TextLayout::from_layout_context(ctx, app, model);
         let block_style = BufferBlockStyle::OrderedList {
@@ -75,7 +75,7 @@ impl RenderableBlock for RenderableOrderedListItem {
         &mut self,
         model: &RenderState,
         ctx: &mut RenderContext,
-        _app: &warpui_core::AppContext,
+        _app: &uncaged_ui_core::AppContext,
     ) {
         let content = model.content();
         let paragraph = extract_block!(self.viewport_item, content, (block, BlockItem::OrderedList{ paragraph: inner, ..}) => block.ordered_list(inner));

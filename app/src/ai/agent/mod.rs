@@ -32,11 +32,11 @@ use markdown_parser::{parse_markdown, FormattedTable, FormattedText, FormattedTe
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use task::TaskId;
+use uncaged_agent_api::{diff_hunk as diff_hunk_api, AgentEvent, AgentType};
+use uncaged_core::channel::ChannelState;
+use uncaged_core::features::FeatureFlag;
+use uncaged_editor::render::model::LineCount;
 use uuid::Uuid;
-use warp_core::channel::ChannelState;
-use warp_core::features::FeatureFlag;
-use warp_editor::render::model::LineCount;
-use warp_multi_agent_api::{diff_hunk as diff_hunk_api, AgentEvent, AgentType};
 
 pub use self::api::{MaybeAIAgentOutputMessage, MessageToAIAgentOutputMessageError};
 use super::llms::LLMId;
@@ -2312,15 +2312,15 @@ impl CurrentHead {
     }
 }
 
-impl From<CurrentHead> for warp_multi_agent_api::CurrentRef {
+impl From<CurrentHead> for uncaged_agent_api::CurrentRef {
     fn from(value: CurrentHead) -> Self {
         Self {
             r#ref: Some(match value {
                 CurrentHead::BranchName(name) => {
-                    warp_multi_agent_api::current_ref::Ref::BranchName(name)
+                    uncaged_agent_api::current_ref::Ref::BranchName(name)
                 }
                 CurrentHead::HeadlessCommitSha(sha) => {
-                    warp_multi_agent_api::current_ref::Ref::HeadlessCommitSha(sha)
+                    uncaged_agent_api::current_ref::Ref::HeadlessCommitSha(sha)
                 }
             }),
         }
@@ -2345,16 +2345,16 @@ pub enum DiffBase {
     UncommittedChanges,
 }
 
-impl From<DiffBase> for warp_multi_agent_api::BaseRef {
+impl From<DiffBase> for uncaged_agent_api::BaseRef {
     fn from(value: DiffBase) -> Self {
         Self {
             r#ref: Some(match value {
-                DiffBase::BranchName(name) => warp_multi_agent_api::base_ref::Ref::BranchName(name),
+                DiffBase::BranchName(name) => uncaged_agent_api::base_ref::Ref::BranchName(name),
                 DiffBase::HeadlessCommitSha(sha) => {
-                    warp_multi_agent_api::base_ref::Ref::HeadlessCommitSha(sha)
+                    uncaged_agent_api::base_ref::Ref::HeadlessCommitSha(sha)
                 }
                 DiffBase::UncommittedChanges => {
-                    warp_multi_agent_api::base_ref::Ref::UncommittedChanges(())
+                    uncaged_agent_api::base_ref::Ref::UncommittedChanges(())
                 }
             }),
         }
@@ -2385,10 +2385,10 @@ pub struct DiffSetHunk {
 }
 
 impl DiffSetHunk {
-    pub fn convert_to_api(self, file_path: String) -> warp_multi_agent_api::diff_set::DiffHunk {
-        warp_multi_agent_api::diff_set::DiffHunk {
+    pub fn convert_to_api(self, file_path: String) -> uncaged_agent_api::diff_set::DiffHunk {
+        uncaged_agent_api::diff_set::DiffHunk {
             file_path,
-            line_range: Some(warp_multi_agent_api::FileContentLineRange {
+            line_range: Some(uncaged_agent_api::FileContentLineRange {
                 start: self.line_range.start.as_usize() as u32,
                 end: self.line_range.end.as_usize() as u32,
             }),

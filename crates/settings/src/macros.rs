@@ -87,9 +87,9 @@
 //! # use settings::macros::*;
 //! # use settings::manager::SettingsManager;
 //! # use settings::*;
-//! # use warpui_core::prelude::*;
-//! # use warpui_core::{elements, App};
-//! # use warpui_extras::user_preferences;
+//! # use uncaged_ui_core::prelude::*;
+//! # use uncaged_ui_core::{elements, App};
+//! # use uncaged_ui_extras::user_preferences;
 //! define_settings_group!(ExampleGroup, settings: [
 //!     bool_setting: BoolSetting {
 //!         type: bool,
@@ -283,7 +283,7 @@ macro_rules! define_setting {
 
             fn clear_value(
                 &mut self,
-                ctx: &mut $crate::warpui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::uncaged_ui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 use $crate::ChangeEventReason;
                 Self::clear_from_preferences(Self::preferences_for_setting(ctx))?;
@@ -298,7 +298,7 @@ macro_rules! define_setting {
             fn set_value(
                 &mut self,
                 new_value: Self::Value,
-                ctx: &mut $crate::warpui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::uncaged_ui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 use $crate::ChangeEventReason;
                 let changed_in_storage =
@@ -317,7 +317,7 @@ macro_rules! define_setting {
                 &mut self,
                 new_value: Self::Value,
                 explicitly_set: bool,
-                ctx: &mut $crate::warpui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::uncaged_ui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 use $crate::ChangeEventReason;
                 let validated = self.validate(new_value);
@@ -525,7 +525,7 @@ macro_rules! implement_setting_for_enum {
 
             fn clear_value(
                 &mut self,
-                ctx: &mut $crate::warpui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::uncaged_ui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 use $crate::ChangeEventReason;
                 Self::clear_from_preferences(Self::preferences_for_setting(ctx))?;
@@ -539,7 +539,7 @@ macro_rules! implement_setting_for_enum {
             fn set_value(
                 &mut self,
                 new_value: Self::Value,
-                ctx: &mut $crate::warpui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::uncaged_ui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 use $crate::ChangeEventReason;
                 let changed_in_storage =
@@ -557,7 +557,7 @@ macro_rules! implement_setting_for_enum {
                 &mut self,
                 new_value: Self::Value,
                 _explicitly_set: bool,
-                ctx: &mut $crate::warpui_core::ModelContext<Self::Group>,
+                ctx: &mut $crate::uncaged_ui_core::ModelContext<Self::Group>,
             ) -> anyhow::Result<()> {
                 use $crate::ChangeEventReason;
                 let validated = self.validate(new_value);
@@ -640,7 +640,7 @@ macro_rules! define_settings_group {
 
         impl $group {
             #[allow(dead_code)]
-            fn new_from_storage(ctx: &mut $crate::warpui_core::ModelContext<Self>) -> Self {
+            fn new_from_storage(ctx: &mut $crate::uncaged_ui_core::ModelContext<Self>) -> Self {
                 use $crate::Setting;
                 Self {
                     $(
@@ -651,7 +651,7 @@ macro_rules! define_settings_group {
 
             #[cfg(any(test, feature = "integration_tests"))]
             #[allow(dead_code)]
-            pub fn new_with_defaults(_ctx: &mut $crate::warpui_core::ModelContext<Self>) -> Self {
+            pub fn new_with_defaults(_ctx: &mut $crate::uncaged_ui_core::ModelContext<Self>) -> Self {
                 use $crate::Setting;
                 Self {
                     $(
@@ -661,7 +661,7 @@ macro_rules! define_settings_group {
             }
 
             #[allow(dead_code)]
-            pub fn register(ctx: &mut (impl $crate::warpui_core::GetSingletonModelHandle + $crate::warpui_core::AddSingletonModel + $crate::warpui_core::UpdateModel)) -> $crate::warpui_core::ModelHandle<Self> {
+            pub fn register(ctx: &mut (impl $crate::uncaged_ui_core::GetSingletonModelHandle + $crate::uncaged_ui_core::AddSingletonModel + $crate::uncaged_ui_core::UpdateModel)) -> $crate::uncaged_ui_core::ModelHandle<Self> {
                 let settings_group = ctx.add_singleton_model(|ctx| {
                     Self::new_from_storage(ctx)
                 });
@@ -707,12 +707,12 @@ macro_rules! define_settings_group {
                 )*
             }
 
-            impl $crate::warpui_core::Entity for $group {
+            impl $crate::uncaged_ui_core::Entity for $group {
                 type Event = EventName;
             }
         });
 
-        impl $crate::warpui_core::SingletonEntity for $group {}
+        impl $crate::uncaged_ui_core::SingletonEntity for $group {}
     };
 }
 pub use define_settings_group;
@@ -742,18 +742,18 @@ macro_rules! generate_settings_event_fn {
             #[allow(dead_code)]
             #[allow(non_snake_case)]
             fn fn_name(
-                settings_group: $crate::warpui_core::ModelHandle<$group>,
+                settings_group: $crate::uncaged_ui_core::ModelHandle<$group>,
                 ctx: &mut (
-                         impl $crate::warpui_core::GetSingletonModelHandle
-                         + $crate::warpui_core::AddSingletonModel
-                         + $crate::warpui_core::UpdateModel
+                         impl $crate::uncaged_ui_core::GetSingletonModelHandle
+                         + $crate::uncaged_ui_core::AddSingletonModel
+                         + $crate::uncaged_ui_core::UpdateModel
                      ),
             ) {
                 use anyhow::anyhow;
                 use serde_json;
                 use $crate::Setting as _;
                 use $crate::manager::{SettingsEvent, SettingsManager};
-                use $crate::warpui_core::SingletonEntity;
+                use $crate::uncaged_ui_core::SingletonEntity;
                 SettingsManager::handle(ctx).update(ctx, |manager, ctx| {
                     // Propagate per settings change events through the SettingsManager
                     ctx.subscribe_to_model(&settings_group, |_manager, _, _, ctx| {

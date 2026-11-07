@@ -73,7 +73,7 @@ pub fn is_active() -> bool {
 /// Convenience used at the seam: if the local engine is active, run the turn
 /// locally and return its event stream; otherwise return `None` so the caller
 /// uses Warp's server.
-pub fn run_if_active(request: &warp_multi_agent_api::Request) -> Option<EngineStream> {
+pub fn run_if_active(request: &uncaged_agent_api::Request) -> Option<EngineStream> {
     let config = config::active()?;
     Some(engine::run_turn(&config, request))
 }

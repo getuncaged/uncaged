@@ -6,9 +6,9 @@ use itertools::Itertools;
 use typed_path::TypedPathBuf;
 #[cfg(windows)]
 use typed_path::{UnixComponent, WindowsComponent, WindowsPrefix};
-use warp_completer::completer::{CompletionContext, EngineDirEntry, PathCompletionContext};
-use warp_completer::signatures::CommandRegistry;
-use warpui::App;
+use uncaged_completer::completer::{CompletionContext, EngineDirEntry, PathCompletionContext};
+use uncaged_completer::signatures::CommandRegistry;
+use uncaged_ui::App;
 
 use crate::completer::SessionContext;
 use crate::terminal::model::session::command_executor::testing::TestCommandExecutor;
@@ -117,7 +117,7 @@ pub fn test_session_context_top_level_commands_includes_external_commands() {
             SessionInfo::new_for_test(),
             Arc::new(TestCommandExecutor::default()),
         );
-        warpui::r#async::block_on(session.load_external_commands());
+        uncaged_ui::r#async::block_on(session.load_external_commands());
 
         let ctx = test_session_context(session, working_directory(), &app);
 
@@ -169,7 +169,7 @@ pub fn test_session_context_lists_directory_entries_locally() {
 
                 assert_eq!(
                     HashSet::<EngineDirEntry>::from_iter(Arc::unwrap_or_clone(
-                        warpui::r#async::block_on(ctx.list_directory_entries(tests_dir))
+                        uncaged_ui::r#async::block_on(ctx.list_directory_entries(tests_dir))
                     )),
                     HashSet::from_iter([
                         EngineDirEntry::test_dir(".hidden"),
@@ -253,7 +253,7 @@ pub fn test_session_context_lists_directory_entries_remotely() {
                 let ctx = test_session_context(Session::test_remote(), cwd.clone(), &app);
 
                 let mut entries = HashSet::<EngineDirEntry>::from_iter(Arc::unwrap_or_clone(
-                    warpui::r#async::block_on(ctx.list_directory_entries(cwd)),
+                    uncaged_ui::r#async::block_on(ctx.list_directory_entries(cwd)),
                 ));
                 // TODO(CORE-2000): The ls script we use to list entries in remote
                 // sessions adds a spurious "." directory when run in the VirtualFS.
@@ -319,7 +319,7 @@ fn perform_special_characters_in_path_test(session: Session, file_names: Vec<&st
                 let ctx = test_session_context(session, test_dir.clone(), &app);
 
                 let mut entries = HashSet::<EngineDirEntry>::from_iter(Arc::unwrap_or_clone(
-                    warpui::r#async::block_on(ctx.list_directory_entries(test_dir)),
+                    uncaged_ui::r#async::block_on(ctx.list_directory_entries(test_dir)),
                 ));
                 // TODO(CORE-2000): The ls script we use to list entries in remote
                 // sessions adds a spurious "." directory when run in the VirtualFS.
@@ -382,7 +382,7 @@ pub fn test_session_context_refresh_directory_entries_bypasses_cache() {
                 let ctx = test_session_context(Session::test(), tests_dir.clone(), &app);
 
                 // Prime the shared cache with the directory's initial contents.
-                let cached = warpui::r#async::block_on(
+                let cached = uncaged_ui::r#async::block_on(
                     ctx.path_completion_context()
                         .expect("Path completion context should exist with active session")
                         .list_directory_entries(tests_dir.clone()),
@@ -396,7 +396,7 @@ pub fn test_session_context_refresh_directory_entries_bypasses_cache() {
                 sandbox.touch(vec![Stub::EmptyFile("second.txt")]);
 
                 // `list_directory_entries` keeps returning the stale cached listing.
-                let stale = warpui::r#async::block_on(
+                let stale = uncaged_ui::r#async::block_on(
                     ctx.path_completion_context()
                         .expect("Path completion context should exist with active session")
                         .list_directory_entries(tests_dir.clone()),
@@ -408,7 +408,7 @@ pub fn test_session_context_refresh_directory_entries_bypasses_cache() {
 
                 // `refresh_directory_entries` re-reads from disk and overwrites the cached entry.
                 let refreshed =
-                    warpui::r#async::block_on(ctx.refresh_directory_entries(tests_dir.clone()));
+                    uncaged_ui::r#async::block_on(ctx.refresh_directory_entries(tests_dir.clone()));
                 assert_eq!(
                     HashSet::<EngineDirEntry>::from_iter(Arc::unwrap_or_clone(refreshed)),
                     HashSet::from_iter([
@@ -418,7 +418,7 @@ pub fn test_session_context_refresh_directory_entries_bypasses_cache() {
                 );
 
                 // Subsequent cached reads now observe the refreshed listing.
-                let after_refresh = warpui::r#async::block_on(
+                let after_refresh = uncaged_ui::r#async::block_on(
                     ctx.path_completion_context()
                         .expect("Path completion context should exist with active session")
                         .list_directory_entries(tests_dir),

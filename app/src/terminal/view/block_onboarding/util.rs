@@ -1,15 +1,15 @@
 use pathfinder_color::ColorU;
-use warp_core::ui::theme::Fill;
-use warpui::elements::{
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, MouseStateHandle,
     ParentElement, Radius, Shrinkable,
 };
-use warpui::fonts::Weight;
-use warpui::platform::Cursor;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::text_input::TextInput;
-use warpui::{Action, AppContext, Element, SingletonEntity, ViewHandle};
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::text_input::TextInput;
+use uncaged_ui::{Action, AppContext, Element, SingletonEntity, ViewHandle};
 
 use crate::appearance::Appearance;
 use crate::editor::EditorView;
@@ -73,7 +73,7 @@ pub fn render_input_row<A: Action + Clone>(
     let chip_editor_style = UiComponentStyles::default()
         .set_background(background_color.into())
         .set_border_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .set_border_width(1.)
         .set_border_color(appearance.theme().foreground().with_opacity(20).into())
@@ -84,7 +84,7 @@ pub fn render_input_row<A: Action + Clone>(
             .with_style(UiComponentStyles {
                 width: Some(350.),
                 border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 ))),
                 border_width: Some(1.),
                 border_color: Some(font_color.into()),

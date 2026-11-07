@@ -7,8 +7,8 @@ use chrono::Utc;
 use cloud_objects::time::ServerTimestamp;
 use lazy_static::lazy_static;
 use regex::Regex;
-use warp_util::sync::Condition;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
+use uncaged_util::sync::Condition;
 
 use crate::ai::execution_profiles::{AIExecutionProfile, CloudAIExecutionProfileModel};
 use crate::ai::facts::{AIFact, CloudAIFactModel};

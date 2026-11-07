@@ -12,16 +12,16 @@ use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
 use repo_metadata::RepoMetadataModel;
 use smol_str::SmolStr;
-use unindent::Unindent;
-use warp_completer::completer::{
+use uncaged_completer::completer::{
     EngineFileType, Match, MatchStrategy, MatchedSuggestion, Priority, Suggestion,
     SuggestionResults, SuggestionType,
 };
-use warp_completer::meta::Span;
-use warp_util::user_input::UserInput;
-use warpui::platform::WindowStyle;
-use warpui::text::SelectionType;
-use warpui::{App, ReadModel, UpdateView, WindowId};
+use uncaged_completer::meta::Span;
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::text::SelectionType;
+use uncaged_ui::{App, ReadModel, UpdateView, WindowId};
+use uncaged_util::user_input::UserInput;
+use unindent::Unindent;
 use watcher::HomeDirectoryWatcher;
 use workflows::workflow::{Argument, ArgumentType, Workflow};
 
@@ -7397,9 +7397,9 @@ fn test_custom_terminal_page_scroll_binding_applies_when_prompt_is_focused() {
         app.update(|ctx| {
             ctx.set_custom_trigger(
                 "terminal:scroll_up_one_page".to_owned(),
-                warpui::keymap::Trigger::Keystrokes(
-                    vec![Keystroke::parse("shift-pageup").unwrap()],
-                ),
+                uncaged_ui::keymap::Trigger::Keystrokes(vec![
+                    Keystroke::parse("shift-pageup").unwrap()
+                ]),
             );
         });
 

@@ -4,21 +4,21 @@ use std::sync::Arc;
 use num_traits::Float as _;
 use parking_lot::FairMutex;
 use pathfinder_geometry::vector::vec2f;
-use vec1::Vec1;
-use warp_core::features::FeatureFlag;
-use warp_util::user_input::UserInput;
-use warpui::elements::Point as UiPoint;
-use warpui::event::{DispatchedEvent, InBoundsExt, KeyState, ModifiersState};
-use warpui::fonts::Properties;
-use warpui::geometry::rect::RectF;
-use warpui::geometry::vector::Vector2F;
-use warpui::text::SelectionType;
-use warpui::units::{IntoLines, IntoPixels, Lines, Pixels};
-use warpui::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::elements::Point as UiPoint;
+use uncaged_ui::event::{DispatchedEvent, InBoundsExt, KeyState, ModifiersState};
+use uncaged_ui::fonts::Properties;
+use uncaged_ui::geometry::rect::RectF;
+use uncaged_ui::geometry::vector::Vector2F;
+use uncaged_ui::text::SelectionType;
+use uncaged_ui::units::{IntoLines, IntoPixels, Lines, Pixels};
+use uncaged_ui::{
     end_trace, record_trace_event, start_trace, AfterLayoutContext, AppContext, ClipBounds,
     Element, EntityId, Event, EventContext, LayoutContext, ModelHandle, PaintContext,
     SizeConstraint,
 };
+use uncaged_util::user_input::UserInput;
+use vec1::Vec1;
 
 use super::{should_intercept_mouse, should_intercept_scroll};
 use crate::appearance::Appearance;
@@ -224,7 +224,7 @@ impl AltScreenElement {
         ctx.dispatch_typed_action(TerminalAction::Focus);
 
         // On mobile, request soft keyboard so users can input.
-        if warpui::platform::is_mobile_device() {
+        if uncaged_ui::platform::is_mobile_device() {
             ctx.request_soft_keyboard();
         }
 

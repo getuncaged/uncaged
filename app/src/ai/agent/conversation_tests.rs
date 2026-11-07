@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use ai::api_keys::ApiKeyManager;
-use warp_core::features::FeatureFlag;
-use warp_multi_agent_api as api;
-use warpui::{App, SingletonEntity};
+use uncaged_agent_api as api;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{App, SingletonEntity};
 
 use super::{
     artifact_from_fork_proto, footer_model_token_usage, AIConversation,

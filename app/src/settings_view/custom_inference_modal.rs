@@ -1,18 +1,18 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use ::ai::api_keys::CustomEndpoint;
-use url::Url;
-use warp_editor::editor::NavigationKey;
-use warpui::elements::{
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::elements::{
     Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty,
     Expanded, Flex, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
 };
-use warpui::fonts::FamilyId;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::FamilyId;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
+use url::Url;
 
 use crate::appearance::{Appearance, AppearanceEvent};
 use crate::editor::{
@@ -772,7 +772,7 @@ impl View for CustomEndpointModal {
             )
             .with_border(Border::all(1.).with_border_fill(url_border_fill))
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_margin_bottom(16.)
             .finish(),

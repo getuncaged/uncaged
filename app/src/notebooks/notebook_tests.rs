@@ -4,12 +4,12 @@ use chrono::Utc;
 use cloud_object_models::ServerNotebook;
 use cloud_objects::UserUid;
 use futures_util::future::BoxFuture;
-use warp_core::ui::appearance::Appearance;
-use warp_editor::editor::EditorView;
-use warpui::platform::WindowStyle;
-use warpui::presenter::ChildView;
-use warpui::r#async::Timer;
-use warpui::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_editor::editor::EditorView;
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::r#async::Timer;
+use uncaged_ui::{
     AddSingletonModel, App, AppContext, Element, Entity, SingletonEntity, TypedActionView, View,
     ViewHandle, WindowId,
 };

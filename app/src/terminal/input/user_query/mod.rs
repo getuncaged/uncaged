@@ -6,9 +6,9 @@ mod search_item;
 mod view;
 
 pub use data_source::SelectUserQuery;
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::OperatingSystem;
 pub use view::{UserQueryMenuEvent, UserQueryMenuView};
-use warpui::keymap::Keystroke;
-use warpui::platform::OperatingSystem;
 
 use crate::terminal::input::inline_menu::{
     default_navigation_message_items, InlineMenuAction, InlineMenuMessageArgs, InlineMenuRowAction,

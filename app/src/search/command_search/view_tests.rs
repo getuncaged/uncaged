@@ -1,5 +1,5 @@
-use warpui::platform::WindowStyle;
-use warpui::App;
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::App;
 
 use super::*;
 use crate::cloud_object::model::persistence::CloudModel;

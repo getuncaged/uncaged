@@ -1,4 +1,4 @@
-use warpui_core::{App, ModelHandle};
+use uncaged_ui_core::{App, ModelHandle};
 
 use super::Searcher;
 use crate::content::buffer::{

@@ -14,16 +14,16 @@ cfg_if::cfg_if! {
         use crate::index::{is_git_internal_path, matches_gitignores};
         use ignore::gitignore::Gitignore;
         use notify_debouncer_full::notify::{RecursiveMode, WatchFilter};
-        use warp_core::features::FeatureFlag;
+        use uncaged_core::features::FeatureFlag;
         use watcher::{BulkFilesystemWatcher, BulkFilesystemWatcherEvent};
-        use warpui_core::r#async::Timer;
-        use warp_core::report_if_error;
-        use warp_core::channel::ChannelState;
-        use warp_core::safe_warn;
+        use uncaged_ui_core::r#async::Timer;
+        use uncaged_core::report_if_error;
+        use uncaged_core::channel::ChannelState;
+        use uncaged_core::safe_warn;
     }
 }
-use warp_core::safe_anyhow;
-use warpui_core::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::safe_anyhow;
+use uncaged_ui_core::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::codebase_index::{CodebaseIndexEvent, RetrievalID, SyncProgress};
 use super::fragment_metadata::FragmentMetadata;
@@ -905,7 +905,7 @@ impl CodebaseIndexManager {
         };
 
         let standardized_path =
-            match warp_util::standardized_path::StandardizedPath::from_local_canonicalized(
+            match uncaged_util::standardized_path::StandardizedPath::from_local_canonicalized(
                 repo_path,
             ) {
                 Ok(path) => path,

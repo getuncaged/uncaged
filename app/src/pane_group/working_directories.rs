@@ -11,10 +11,10 @@ use indexmap::IndexSet;
 #[cfg(feature = "local_fs")]
 use repo_metadata::repositories::DetectedRepositories;
 #[cfg(feature = "local_fs")]
-use warp_util::remote_path::RemotePath;
+use uncaged_ui::{AppContext, SingletonEntity as _};
+use uncaged_ui::{Entity, EntityId, ModelContext, ModelHandle, ViewHandle};
 #[cfg(feature = "local_fs")]
-use warpui::{AppContext, SingletonEntity as _};
-use warpui::{Entity, EntityId, ModelContext, ModelHandle, ViewHandle};
+use uncaged_util::remote_path::RemotePath;
 
 use crate::code::buffer_location::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]

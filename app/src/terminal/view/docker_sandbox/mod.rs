@@ -6,12 +6,12 @@ use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 
 #[cfg(feature = "local_tty")]
-use warpui::geometry::vector::Vector2F;
+use uncaged_ui::geometry::vector::Vector2F;
 #[cfg(feature = "local_tty")]
-use warpui::ModelHandle;
-use warpui::ViewContext;
+use uncaged_ui::ModelHandle;
+use uncaged_ui::ViewContext;
 #[cfg(feature = "local_tty")]
-use warpui::ViewHandle;
+use uncaged_ui::ViewHandle;
 
 use super::TerminalView;
 #[cfg(feature = "local_tty")]

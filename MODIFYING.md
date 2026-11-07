@@ -63,8 +63,8 @@ all stock Warp. Only the model call moved onto your machine.
 | ↳ system prompt + tool schemas | `uncaged_engine/src/system_prompt.rs`, `tools.rs` |
 | **Brand: name, URL, palette, logo paths** | `app/src/brand.rs` (single source of truth) |
 | **Logo art** | `app/assets/bundled/svg/brand/uncaged-mark.svg` (in-app mono), `uncaged-icon.svg` (color app-icon master) |
-| **App identity** (channel, bundle id, binary, scheme) | `crates/warp_core/src/channel/state.rs` + `mod.rs` |
-| **The fail-closed server config** (sentinel URLs) | `crates/warp_core/src/channel/config.rs` |
+| **App identity** (channel, bundle id, binary, scheme) | `crates/uncaged_core/src/channel/state.rs` + `mod.rs` |
+| **The fail-closed server config** (sentinel URLs) | `crates/uncaged_core/src/channel/config.rs` |
 | **The "Connect a model" Settings UI** | `app/src/settings_view/ai_page.rs` |
 | **Terminal setup helper** | `script/uncaged-setup` |
 | **Bundle / DMG pipeline** | `script/macos/bundle`, `script/bundle` |
@@ -91,7 +91,7 @@ only add a **gallery preset** so it shows up in Settings → AI Models:
    *Connect with an API key* / *Run a model locally*), default `base_url`,
    default model(s), and `Wire::OpenAiCompatible`.
 3. (Optional) add a brand icon: drop an SVG in `app/assets/bundled/svg/` and add
-   an `Icon` enum entry in `crates/warp_core/src/ui/icons.rs`, then reference it
+   an `Icon` enum entry in `crates/uncaged_core/src/ui/icons.rs`, then reference it
    from the preset.
 
 That's it — the user picks it in the gallery, pastes a key (or not, for local),
@@ -159,10 +159,10 @@ known edit — **do not scatter literals**, always reach for these:
    `channel/state.rs` url scheme, and the `[package.metadata.bundle.bin.warp-oss]`
    block + `app/src/bin/oss.rs` plist in `app/Cargo.toml`.
 
-**Do NOT rename the internal `warp_*` crates or the `warp`/`warp-oss` package
-names.** That's ~2,000 files of churn for zero user benefit and it breaks every
-upstream merge. The sibling project (Zap) independently made the same call. The
-product/identity layer and the code layer are intentionally separate.
+The workspace crates are named `uncaged_*` (the app package is `uncaged`); the
+`warp-oss` binary name and the identifiers inside the crates (`WarpDrive`,
+`FeatureFlag` names, setting keys) are unchanged, since some of them are persisted.
+The product/identity layer and the code layer are intentionally separate.
 
 ---
 
@@ -189,7 +189,7 @@ configure."** That's enforced in code, not by trust. Each gate and where it live
 | Egress | Where it's cut |
 |---|---|
 | Agent Mode → Warp servers | `app/src/ai/agent/api/impl.rs` — the local engine is the only inference path; no model connected is a hard failure |
-| **All Warp URLs (defense-in-depth)** | `warp_core/src/channel/config.rs` — `uncaged_sentinel()` points every endpoint at the unroutable `192.0.2.0:9`; wired in `state.rs::init()` |
+| **All Warp URLs (defense-in-depth)** | `uncaged_core/src/channel/config.rs` — `uncaged_sentinel()` points every endpoint at the unroutable `192.0.2.0:9`; wired in `state.rs::init()` |
 | Autoupdate poll / version check | `app/src/autoupdate/mod.rs` + `channel_versions.rs` — gated off for Oss |
 | Login / accounts | `app/src/auth/auth_manager.rs` — refuses auth on Oss (so every account-gated call is unreachable) |
 | Telemetry (Rudderstack) | default off (`app/src/settings/privacy.rs`), and `telemetry_config: None` for Oss |
@@ -248,7 +248,7 @@ Env overrides beat the files for quick experiments:
 
 > Security note: API keys currently live in `connections.json` in plaintext.
 > Moving them to the OS keychain is a tracked follow-up (DIRECTION.md → backlog);
-> the infra (`warpui_extras` `secure_storage` / `security-framework`) is already
+> the infra (`uncaged_ui_extras` `secure_storage` / `security-framework`) is already
 > in the tree.
 
 ---

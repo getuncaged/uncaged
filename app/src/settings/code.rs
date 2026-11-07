@@ -1,6 +1,6 @@
 use settings::macros::define_settings_group;
 use settings::{Setting as _, SupportedPlatforms};
-use warpui::{AppContext, SingletonEntity as _};
+use uncaged_ui::{AppContext, SingletonEntity as _};
 
 use super::AISettings;
 

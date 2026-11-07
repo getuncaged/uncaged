@@ -17,10 +17,10 @@ use mcp::TemplatableMCPServerInfo;
 pub use native::McpIntegration;
 #[cfg(not(target_family = "wasm"))]
 use parking_lot::Mutex;
-use uuid::Uuid;
 #[cfg(not(target_family = "wasm"))]
-use warpui::ModelSpawner;
-use warpui::{Entity, SingletonEntity};
+use uncaged_ui::ModelSpawner;
+use uncaged_ui::{Entity, SingletonEntity};
+use uuid::Uuid;
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::mcp::templatable::CloudTemplatableMCPServer;
@@ -263,7 +263,7 @@ impl TemplatableMCPServerManager {
     pub fn get_active_file_based_servers(
         &self,
         cwd: &std::path::Path,
-        app: &warpui::AppContext,
+        app: &uncaged_ui::AppContext,
     ) -> HashMap<Uuid, &TemplatableMCPServerInfo> {
         FileBasedMCPManager::as_ref(app)
             .get_servers_for_working_directory(cwd, app)

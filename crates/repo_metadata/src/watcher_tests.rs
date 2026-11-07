@@ -7,10 +7,10 @@ use std::time::Duration;
 
 use futures::channel::mpsc;
 use futures::{FutureExt as _, StreamExt as _};
+use uncaged_ui_core::r#async::Timer;
+use uncaged_ui_core::{App, ModelContext, ModelHandle};
+use uncaged_util::standardized_path::StandardizedPath;
 use virtual_fs::{Stub, VirtualFS};
-use warp_util::standardized_path::StandardizedPath;
-use warpui_core::r#async::Timer;
-use warpui_core::{App, ModelContext, ModelHandle};
 
 use crate::repositories::stub_git_repository;
 use crate::repository::{RepositorySubscriber, TrackedRemoteRef};

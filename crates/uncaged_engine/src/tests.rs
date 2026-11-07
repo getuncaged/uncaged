@@ -1,5 +1,5 @@
 //! Behavioral tests for the Uncaged engine. These run against the real
-//! generated `warp_multi_agent_api` types, so they validate both the protocol
+//! generated `uncaged_agent_api` types, so they validate both the protocol
 //! mapping and the conversation logic.
 
 use serde_json::json;

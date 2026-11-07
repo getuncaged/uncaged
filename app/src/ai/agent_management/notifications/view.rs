@@ -1,19 +1,21 @@
-use warp_core::ui::radius;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
-use warpui::elements::{
+use uncaged_core::ui::radius;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
+use uncaged_ui::elements::{
     Border, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Dismiss, DispatchEventResult, Element, Empty, EventHandler,
     Fill as ElementFill, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     NewScrollable, Padding, ParentElement, Radius, SavePosition, ScrollTarget,
     ScrollToPositionMode, ScrollbarWidth, Shrinkable,
 };
-use warpui::fonts::Weight;
-use warpui::keymap::macros::id;
-use warpui::keymap::FixedBinding;
-use warpui::platform::Cursor;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::keymap::macros::id;
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use crate::ai::agent_management::notifications::item::NotificationFilter;
 use crate::ai::agent_management::notifications::item_rendering::{
@@ -57,7 +59,9 @@ impl Entity for NotificationMailboxView {
 
 #[derive(Debug, Clone)]
 pub enum NotificationMailboxViewEvent {
-    NavigateToTerminal { terminal_view_id: warpui::EntityId },
+    NavigateToTerminal {
+        terminal_view_id: uncaged_ui::EntityId,
+    },
     Dismissed,
 }
 
@@ -500,7 +504,7 @@ impl NotificationMailboxView {
                     )
                     .with_padding(Padding::default().with_vertical(4.).with_horizontal(8.))
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )));
 
                     if let Some(bg) = bg {

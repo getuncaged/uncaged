@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use warp_util::standardized_path::StandardizedPath;
-use warpui::r#async::FutureExt as AsyncFutureExt;
-use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_ui::r#async::FutureExt as AsyncFutureExt;
+use uncaged_ui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_util::standardized_path::StandardizedPath;
 
 use super::{
     is_file_path, is_git_repository, ActionExecution, AnyActionExecution, ExecuteActionInput,
@@ -316,7 +316,7 @@ async fn run_grep(
 #[cfg(not(target_family = "wasm"))]
 async fn run_ripgrep(queries: &[String], absolute_path: String) -> Result<GrepResult, GrepError> {
     let path = PathBuf::from(absolute_path);
-    let result = warp_ripgrep::search::search(queries, &[path], false, false).await;
+    let result = uncaged_ripgrep::search::search(queries, &[path], false, false).await;
 
     match result {
         Ok(matches) => {

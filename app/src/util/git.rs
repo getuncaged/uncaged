@@ -2,10 +2,10 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
-use warp_core::safe_warn;
-use warp_util::git::run_git_command;
+use uncaged_core::safe_warn;
+use uncaged_util::git::run_git_command;
 #[cfg(feature = "local_fs")]
-use warp_util::git::run_git_command_with_env;
+use uncaged_util::git::run_git_command_with_env;
 
 #[cfg(test)]
 #[path = "git_tests.rs"]
@@ -1035,7 +1035,7 @@ fn count_lines_if_text_file(path: &Path) -> u32 {
         return 0;
     };
     let check_len = content.len().min(BINARY_CHECK_SIZE);
-    if warp_util::file_type::is_buffer_binary(&content[..check_len]) {
+    if uncaged_util::file_type::is_buffer_binary(&content[..check_len]) {
         return 0;
     }
     bytecount::count(&content, b'\n') as u32

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
-use warp_core::command::ExitCode;
+use uncaged_core::command::ExitCode;
 
 use crate::terminal::model::terminal_model::BlockIndex;
 

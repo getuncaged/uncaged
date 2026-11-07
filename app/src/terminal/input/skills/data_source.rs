@@ -1,19 +1,19 @@
 use ai::skills::{SkillProvider, SkillReference, SkillScope};
 use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
 use ordered_float::OrderedFloat;
-use warp_core::ui::icons::Icon;
-use warp_core::ui::theme::Fill;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::elements::{
+use uncaged_core::ui::icons::Icon;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, Highlight, ParentElement, Shrinkable, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::Keystroke;
-use warpui::scene::{CornerRadius, Radius};
-use warpui::text_layout::ClipConfig;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::scene::{CornerRadius, Radius};
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::{
     AppContext, Element, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _,
 };
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use crate::ai::skills::SkillManager;
 use crate::appearance::Appearance;
@@ -360,7 +360,7 @@ impl SearchItem for SkillSearchItem {
                 .with_vertical_padding(2.0)
                 .with_background(theme.surface_overlay_1())
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .with_margin_left(8.0)
                 .finish();

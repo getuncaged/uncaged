@@ -1,5 +1,5 @@
-use warpui::elements::Element;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_ui::elements::Element;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use crate::ai::blocklist::agent_view::orchestration_pill_bar::{
     render_agent_avatar_disc, render_orchestrator_avatar_disc,

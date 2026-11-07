@@ -1,7 +1,7 @@
 use ordered_float::OrderedFloat;
-use warp_core::ui::builder;
-use warpui::elements::{ConstrainedBox, Container, Text};
-use warpui::{AppContext, Element, SingletonEntity};
+use uncaged_core::ui::builder;
+use uncaged_ui::elements::{ConstrainedBox, Container, Text};
+use uncaged_ui::{AppContext, Element, SingletonEntity};
 
 use crate::ai_assistant::AI_ASSISTANT_LOGO_COLOR;
 use crate::appearance::Appearance;

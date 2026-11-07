@@ -8,13 +8,13 @@
 
 use std::path::PathBuf;
 
-use warp_core::ui::radius;
-use warpui::elements::{
+use uncaged_core::ui::radius;
+use uncaged_ui::elements::{
     ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, CrossAxisAlignment,
     Element, Fill, Flex, Hoverable, MainAxisSize, MouseStateHandle, ParentElement, ScrollbarWidth,
     Text,
 };
-use warpui::platform::Cursor;
+use uncaged_ui::platform::Cursor;
 
 use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;

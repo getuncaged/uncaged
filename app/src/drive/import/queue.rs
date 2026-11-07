@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use super::nodes::{self, FileId};
 use crate::cloud_object::Owner;

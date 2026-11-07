@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use warp_util::host_id::HostId;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::remote_path::RemotePath;
-use warp_util::standardized_path::StandardizedPath;
+use uncaged_util::host_id::HostId;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::remote_path::RemotePath;
+use uncaged_util::standardized_path::StandardizedPath;
 
 fn local_path(path: &str) -> LocalOrRemotePath {
     LocalOrRemotePath::Local(PathBuf::from(path))
@@ -402,7 +402,7 @@ fn test_remote_standing_results_preserve_host_qualified_rule_paths() {
 }
 
 // Helper for global-rules tests: inserts a synthetic global rule directly into
-// the model. Bypasses the watcher infrastructure (which requires the warpui
+// the model. Bypasses the watcher infrastructure (which requires the uncaged_ui
 // runtime) so we can exercise `find_applicable_rules`'s layering logic.
 fn insert_global_rule(model: &mut ProjectContextModel, path: &Path, content: &str) {
     model.global_rules.rules.insert(

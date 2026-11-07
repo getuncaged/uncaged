@@ -1,5 +1,5 @@
 //! Module for test-only convenience methods on `TerminalView`.
-use warpui::ModelHandle;
+use uncaged_ui::ModelHandle;
 
 use crate::terminal::find::TerminalFindModel;
 cfg_if::cfg_if! {
@@ -7,7 +7,7 @@ cfg_if::cfg_if! {
         use std::sync::Arc;
 
         use parking_lot::FairMutex;
-        use warpui::{ViewContext};
+        use uncaged_ui::{ViewContext};
 
         use crate::{
             ai::blocklist::SerializedBlockListItem, pane_group::TerminalViewResources,
@@ -33,7 +33,7 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) -> Self {
         use pathfinder_geometry::vector::vec2f;
-        use warpui::units::{IntoPixels as _, Pixels};
+        use uncaged_ui::units::{IntoPixels as _, Pixels};
 
         use crate::terminal::event_listener::ChannelEventListener;
         use crate::terminal::model::block::BlockSize;

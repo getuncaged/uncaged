@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use warp_core::settings::macros::define_settings_group;
-use warp_core::settings::SupportedPlatforms;
+use uncaged_core::settings::macros::define_settings_group;
+use uncaged_core::settings::SupportedPlatforms;
 
 use crate::banner::BannerState;
 use crate::resource_center::Tip;

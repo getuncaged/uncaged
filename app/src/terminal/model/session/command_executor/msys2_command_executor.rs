@@ -8,8 +8,8 @@ use async_trait::async_trait;
 use command::r#async::Command;
 use itertools::Itertools;
 use typed_path::{TypedPath, WindowsPath};
-use warp_completer::completer::CommandOutput;
-use warp_util::path::{convert_msys2_to_windows_native_path, msys2_exe_to_root};
+use uncaged_completer::completer::CommandOutput;
+use uncaged_util::path::{convert_msys2_to_windows_native_path, msys2_exe_to_root};
 
 use super::{CommandExecutor, ExecuteCommandOptions};
 use crate::safe_warn;

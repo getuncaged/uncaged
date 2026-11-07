@@ -1,6 +1,6 @@
 use settings::macros::define_settings_group;
 use settings::{Setting, SupportedPlatforms};
-use warpui::{AppContext, SingletonEntity};
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use crate::features::FeatureFlag;
 

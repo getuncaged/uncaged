@@ -1,4 +1,4 @@
-use warpui::App;
+use uncaged_ui::App;
 
 use super::{NetworkLogItem, NetworkLogModel, NETWORK_LOGGING_MAX_ITEMS};
 

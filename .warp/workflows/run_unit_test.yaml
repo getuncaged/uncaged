@@ -1,6 +1,6 @@
 ---
 name: "Run unit test"
-command: "cargo test --package warp --lib -- {{module_and_test}} --exact --nocapture"
+command: "cargo test --package uncaged --lib -- {{module_and_test}} --exact --nocapture"
 description: "Run a specific unit test. This is much faster than running cargo test when this is all you need."
 arguments:
   - name: module_and_test

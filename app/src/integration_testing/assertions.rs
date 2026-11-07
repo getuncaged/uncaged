@@ -1,5 +1,5 @@
-use warpui::integration::TestStep;
-use warpui::{async_assert, async_assert_eq, SingletonEntity};
+use uncaged_ui::integration::TestStep;
+use uncaged_ui::{async_assert, async_assert_eq, SingletonEntity};
 
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{CloudObjectLocation, Owner, Space};

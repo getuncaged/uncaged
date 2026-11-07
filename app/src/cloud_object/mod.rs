@@ -8,9 +8,9 @@ use cloud_objects::UserUid;
 use derivative::Derivative;
 use lazy_static::lazy_static;
 use regex::Regex;
-use warp_core::channel::Channel;
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_core::channel::Channel;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use self::breadcrumbs::ContainingObject;
 use self::model::generic_string_model::{

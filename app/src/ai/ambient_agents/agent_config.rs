@@ -1,7 +1,7 @@
 //! Runtime agent configuration carried by cloud agent tasks.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use warp_cli::agent::Harness;
+use uncaged_cli::agent::Harness;
 
 /// Runtime configuration snapshot for agent execution.
 ///

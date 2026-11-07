@@ -1,8 +1,8 @@
 use ai::agent::action_result::StartAgentVersion;
-use warp_cli::agent::Harness;
-use warp_core::ui::appearance::Appearance;
-use warpui::elements::MouseStateHandle;
-use warpui::{App, EntityId};
+use uncaged_cli::agent::Harness;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::elements::MouseStateHandle;
+use uncaged_ui::{App, EntityId};
 
 use super::{
     agent_display_name_from_id, child_conversation_card_data_for_result, participant_for_agent_id,
@@ -303,15 +303,15 @@ fn participant_for_restored_child_run_id_resolves_to_agent_name() {
                 .expect("child conversation data should serialize"),
                 last_modified_at: now,
             },
-            tasks: vec![warp_multi_agent_api::Task {
+            tasks: vec![uncaged_agent_api::Task {
                 id: format!("task-{child_id}"),
-                messages: vec![warp_multi_agent_api::Message {
+                messages: vec![uncaged_agent_api::Message {
                     id: "child-msg".to_string(),
                     task_id: format!("task-{child_id}"),
                     server_message_data: String::new(),
                     citations: vec![],
-                    message: Some(warp_multi_agent_api::message::Message::UserQuery(
-                        warp_multi_agent_api::message::UserQuery {
+                    message: Some(uncaged_agent_api::message::Message::UserQuery(
+                        uncaged_agent_api::message::UserQuery {
                             query: "Child query".to_string(),
                             context: None,
                             referenced_attachments: Default::default(),
@@ -355,15 +355,15 @@ fn participant_for_restored_child_run_id_resolves_to_agent_name() {
                 .expect("parent conversation data should serialize"),
                 last_modified_at: now - chrono::Duration::seconds(1),
             },
-            tasks: vec![warp_multi_agent_api::Task {
+            tasks: vec![uncaged_agent_api::Task {
                 id: format!("task-{parent_id}"),
-                messages: vec![warp_multi_agent_api::Message {
+                messages: vec![uncaged_agent_api::Message {
                     id: "parent-msg".to_string(),
                     task_id: format!("task-{parent_id}"),
                     server_message_data: String::new(),
                     citations: vec![],
-                    message: Some(warp_multi_agent_api::message::Message::UserQuery(
-                        warp_multi_agent_api::message::UserQuery {
+                    message: Some(uncaged_agent_api::message::Message::UserQuery(
+                        uncaged_agent_api::message::UserQuery {
                             query: "Parent query".to_string(),
                             context: None,
                             referenced_attachments: Default::default(),

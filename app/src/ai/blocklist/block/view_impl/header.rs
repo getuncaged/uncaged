@@ -1,14 +1,14 @@
 //! Renders the AI block "header", which includes a version of the AI "prompt" as it was rendered
 //! when the query was submitted.
-use warp_core::features::FeatureFlag;
-use warp_util::path::user_friendly_path;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::elements::{
     ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable,
     Icon as ElementIcon, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius,
     SavePosition, Text,
 };
-use warpui::platform::Cursor;
-use warpui::{AppContext, Element, EntityId, SingletonEntity, ViewHandle};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::{AppContext, Element, EntityId, SingletonEntity, ViewHandle};
+use uncaged_util::path::user_friendly_path;
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::AIAgentExchangeId;
@@ -182,7 +182,7 @@ fn render_attached_context_chip(
             )
             .with_background(theme.surface_3())
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_vertical_overdraw(2.)
             .with_horizontal_padding(8.)

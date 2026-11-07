@@ -8,19 +8,19 @@ use std::ops::{Range, RangeInclusive};
 
 use lazy_static::lazy_static;
 use num_traits::Float as _;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::assets::asset_cache::{AssetCache, AssetSource, AssetState};
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::{Border, CornerRadius, Fill, DEFAULT_UI_LINE_HEIGHT_RATIO};
+use uncaged_ui::fonts::{FamilyId, FontId, Properties, Style, Weight};
+use uncaged_ui::geometry::rect::RectF;
+use uncaged_ui::geometry::vector::{vec2f, Vector2F};
+use uncaged_ui::image_cache::{AnimatedImageBehavior, CacheOption, FitType, Image, ImageCache};
+use uncaged_ui::platform::LineStyle;
+use uncaged_ui::text_layout::{Line, StyleAndFont, TextStyle, DEFAULT_TOP_BOTTOM_RATIO};
+use uncaged_ui::units::{IntoLines as _, Lines, Pixels};
+use uncaged_ui::{AppContext, Element, EntityId, PaintContext, Scene, SingletonEntity};
 use unicode_width::UnicodeWidthChar;
-use warp_core::features::FeatureFlag;
-use warpui::assets::asset_cache::{AssetCache, AssetSource, AssetState};
-use warpui::color::ColorU;
-use warpui::elements::{Border, CornerRadius, Fill, DEFAULT_UI_LINE_HEIGHT_RATIO};
-use warpui::fonts::{FamilyId, FontId, Properties, Style, Weight};
-use warpui::geometry::rect::RectF;
-use warpui::geometry::vector::{vec2f, Vector2F};
-use warpui::image_cache::{AnimatedImageBehavior, CacheOption, FitType, Image, ImageCache};
-use warpui::platform::LineStyle;
-use warpui::text_layout::{Line, StyleAndFont, TextStyle, DEFAULT_TOP_BOTTOM_RATIO};
-use warpui::units::{IntoLines as _, Lines, Pixels};
-use warpui::{AppContext, Element, EntityId, PaintContext, Scene, SingletonEntity};
 
 pub use self::cell_glyph_cache::CellGlyphCache;
 use self::cell_type::{CellType, IsFocused, Secret};
@@ -577,7 +577,7 @@ fn render_grid_without_ligatures<'a>(
         }
 
         if !foreground_image_ids.is_empty() {
-            ctx.scene.start_layer(warpui::ClipBounds::ActiveLayer);
+            ctx.scene.start_layer(uncaged_ui::ClipBounds::ActiveLayer);
             for image_placement in foreground_image_ids {
                 if let Some((image_metadata, image_placement_data)) = image_metadata
                     .get(&image_placement.image_id)
@@ -1076,7 +1076,7 @@ fn render_grid_with_ligatures<'a>(
         }
 
         if !foreground_image_ids.is_empty() {
-            ctx.scene.start_layer(warpui::ClipBounds::ActiveLayer);
+            ctx.scene.start_layer(uncaged_ui::ClipBounds::ActiveLayer);
             for image_placement in foreground_image_ids {
                 if let Some((image_metadata, image_placement_data)) = image_metadata
                     .get(&image_placement.image_id)

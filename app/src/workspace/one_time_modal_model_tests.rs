@@ -1,5 +1,5 @@
 use futures::FutureExt;
-use warpui::{App, SingletonEntity};
+use uncaged_ui::{App, SingletonEntity};
 
 use super::OneTimeModalModel;
 use crate::test_util::terminal::{add_window_with_terminal, initialize_app_for_terminal_view};

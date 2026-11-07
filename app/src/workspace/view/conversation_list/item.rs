@@ -1,22 +1,22 @@
 use chrono::{DateTime, Utc};
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::radius;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::WarpTheme;
-use warp_util::path::user_friendly_path;
-use warpui::color::ColorU;
-use warpui::elements::{
+use uncaged_core::ui::radius;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::WarpTheme;
+use uncaged_ui::color::ColorU;
+use uncaged_ui::elements::{
     ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
     Element, Empty, EventHandler, Expanded, Fill as ElementFill, Flex, Highlight, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseInBehavior, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition, Stack, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::platform::Cursor;
-use warpui::text_layout::TextStyle;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::ui_components::text_input::TextInput;
-use warpui::{AppContext, SingletonEntity, ViewHandle};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::text_layout::TextStyle;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::text_input::TextInput;
+use uncaged_ui::{AppContext, SingletonEntity, ViewHandle};
+use uncaged_util::path::user_friendly_path;
 
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::conversation::ConversationStatus;

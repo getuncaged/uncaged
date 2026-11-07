@@ -10,7 +10,7 @@ use std::{
 use is_executable::IsExecutable as _;
 #[cfg(not(target_family = "wasm"))]
 use itertools::Itertools as _;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 /// Label used for the host of a `RemotePath`.
 const UNKNOWN_HOST_LABEL: &str = "Remote host";

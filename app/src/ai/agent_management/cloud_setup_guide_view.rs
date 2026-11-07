@@ -2,23 +2,27 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 use string_offset::CharCounter;
-use warp_completer::signatures::CommandRegistry;
-use warp_completer::util::parse_current_commands_and_tokens;
-use warp_completer::ParsedTokensSnapshot;
-use warp_core::report_error;
-use warp_core::ui::theme::{AnsiColorIdentifier, AnsiColors};
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::new_scrollable::{ClippedAxisConfiguration, DualAxisConfig, NewScrollable};
-use warpui::elements::{
+use uncaged_completer::signatures::CommandRegistry;
+use uncaged_completer::util::parse_current_commands_and_tokens;
+use uncaged_completer::ParsedTokensSnapshot;
+use uncaged_core::report_error;
+use uncaged_core::ui::theme::{AnsiColorIdentifier, AnsiColors};
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::new_scrollable::{
+    ClippedAxisConfiguration, DualAxisConfig, NewScrollable,
+};
+use uncaged_ui::elements::{
     Align, Border, ClippedScrollStateHandle, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Element, Empty, Expanded, Flex, Highlight, HighlightedRange,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::prelude::ChildView;
-use warpui::text_layout::TextStyle;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::prelude::ChildView;
+use uncaged_ui::text_layout::TextStyle;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use crate::ai::blocklist::code_block::{
     render_code_block_plain, CodeBlockOptions, CodeSnippetButtonHandles,
@@ -593,7 +597,7 @@ impl View for CloudSetupGuideView {
             },
             theme.nonactive_ui_detail().into(),
             theme.active_ui_detail().into(),
-            warpui::elements::Fill::None,
+            uncaged_ui::elements::Fill::None,
         )
         .finish();
 

@@ -1,4 +1,4 @@
-use warpui::{EntityId, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_ui::{EntityId, ModelContext, ModelHandle, SingletonEntity};
 
 use super::{CLIAgentEvent, CLIAgentSessionsModel};
 use crate::features::FeatureFlag;
@@ -165,7 +165,7 @@ pub struct CLIAgentSessionListener {
     inner: Box<dyn CLIAgentSessionHandler>,
 }
 
-impl warpui::Entity for CLIAgentSessionListener {
+impl uncaged_ui::Entity for CLIAgentSessionListener {
     type Event = ();
 }
 

@@ -9,10 +9,10 @@ use rmcp::transport::auth::{
 use rmcp::transport::{AuthError, AuthorizationSession};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use uncaged_core::channel::ChannelState;
+use uncaged_ui_extras::secure_storage::AppContextExt as _;
 use url::Url;
 use uuid::Uuid;
-use warp_core::channel::ChannelState;
-use warpui_extras::secure_storage::AppContextExt as _;
 
 pub const TEMPLATABLE_MCP_CREDENTIALS_KEY: &str = "TemplatableMcpCredentials";
 pub const FILE_BASED_MCP_CREDENTIALS_KEY: &str = "FileBasedMcpCredentials";
@@ -361,13 +361,13 @@ pub async fn make_authenticated_client(
 
 /// Loads credentials from secure storage at the provided key.
 pub fn load_credentials_from_secure_storage<T: DeserializeOwned + Default>(
-    app: &mut warpui::AppContext,
+    app: &mut uncaged_ui::AppContext,
     key: &str,
 ) -> T {
     app.secure_storage()
         .read_value(key)
         .inspect_err(|err| {
-            if !matches!(err, warpui_extras::secure_storage::Error::NotFound) {
+            if !matches!(err, uncaged_ui_extras::secure_storage::Error::NotFound) {
                 log::warn!("Failed to read MCP credentials from secure storage: {err:#}");
             }
         })
@@ -378,7 +378,7 @@ pub fn load_credentials_from_secure_storage<T: DeserializeOwned + Default>(
 
 /// Writes credentials to secure storage at the provided key.
 pub fn write_to_secure_storage<T: Serialize>(
-    app: &mut warpui::AppContext,
+    app: &mut uncaged_ui::AppContext,
     key: &str,
     credentials: &T,
 ) {

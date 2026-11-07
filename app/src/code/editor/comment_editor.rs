@@ -2,17 +2,17 @@ use std::cell::RefCell;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::Fill;
-use warp_editor::render::element::VerticalExpansionBehavior;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::Fill;
+use uncaged_editor::render::element::VerticalExpansionBehavior;
+use uncaged_ui::elements::{
     Border, ChildView, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex,
     MainAxisAlignment, MainAxisSize, ParentElement, Radius, Shrinkable, Text,
 };
-use warpui::keymap::Keystroke;
-use warpui::text_layout::ClipConfig;
-use warpui::units::Pixels;
-use warpui::{
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::units::Pixels;
+use uncaged_ui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };

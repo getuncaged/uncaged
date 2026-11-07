@@ -1,8 +1,8 @@
 use float_cmp::{approx_eq, assert_approx_eq};
-use warp_core::features::FeatureFlag;
-use warpui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
-use warpui::units::IntoLines;
-use warpui::App;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
+use uncaged_ui::units::IntoLines;
+use uncaged_ui::App;
 
 use super::*;
 use crate::ai::agent::AIAgentActionId;

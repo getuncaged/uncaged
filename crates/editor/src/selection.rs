@@ -2,11 +2,11 @@ use std::ops::Range;
 
 use num_traits::SaturatingSub;
 use string_offset::CharOffset;
+use uncaged_ui_core::text::TextBuffer;
+use uncaged_ui_core::text::point::Point;
+use uncaged_ui_core::text::word_boundaries::WordBoundariesPolicy;
+use uncaged_ui_core::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle};
 use vec1::Vec1;
-use warpui_core::text::TextBuffer;
-use warpui_core::text::point::Point;
-use warpui_core::text::word_boundaries::WordBoundariesPolicy;
-use warpui_core::{AppContext, Entity, ModelAsRef, ModelContext, ModelHandle};
 
 use crate::content::buffer::{
     AutoScrollBehavior, Buffer, BufferEvent, BufferSelectAction, SelectionOffsets,

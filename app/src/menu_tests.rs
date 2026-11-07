@@ -1,6 +1,6 @@
-use warp_core::ui::appearance::Appearance;
-use warpui::platform::WindowStyle;
-use warpui::{App, TypedActionView};
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::{App, TypedActionView};
 
 use super::{Menu, MenuAction, MenuItem, MenuItemFields, SelectAction, SubMenu};
 

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use ::settings::ToggleableSetting;
-use warp_core::execution_mode::AppExecutionMode;
-use warpui::windowing::WindowManager;
-use warpui::{AppContext, SingletonEntity, TypedActionView};
+use uncaged_core::execution_mode::AppExecutionMode;
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{AppContext, SingletonEntity, TypedActionView};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::AIAgentExchangeId;

@@ -1,5 +1,5 @@
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui_core::ModelContext;
+use uncaged_ui_core::ModelContext;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::model::{ProjectContextModel, ProjectRule};
 

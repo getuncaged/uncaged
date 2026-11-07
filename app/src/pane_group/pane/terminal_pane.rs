@@ -1,9 +1,9 @@
 //! Implementation of terminal panes.
 use std::sync::mpsc::SyncSender;
 
-use warp_core::execution_mode::AppExecutionMode;
-use warp_core::features::FeatureFlag;
-use warpui::{
+use uncaged_core::execution_mode::AppExecutionMode;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{
     AppContext, EntityId, ModelHandle, SingletonEntity, ViewContext, ViewHandle, WindowId,
 };
 

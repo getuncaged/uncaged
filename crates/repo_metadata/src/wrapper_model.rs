@@ -8,9 +8,9 @@
 #[cfg(feature = "local_fs")]
 use std::path::Path;
 
-use warp_core::HostId;
-use warp_util::standardized_path::StandardizedPath;
-use warpui_core::{AppContext, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::HostId;
+use uncaged_ui_core::{AppContext, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_util::standardized_path::StandardizedPath;
 
 use crate::file_tree_store::FileTreeState;
 use crate::file_tree_update::{MetadataUpdateType, RepoMetadataUpdate};
@@ -466,7 +466,7 @@ impl RepoMetadataModel {
     }
 }
 
-impl warpui_core::Entity for RepoMetadataModel {
+impl uncaged_ui_core::Entity for RepoMetadataModel {
     type Event = RepoMetadataEvent;
 }
 

@@ -452,8 +452,8 @@ fn make_client_info() -> rmcp::model::ClientInfo {
     rmcp::model::ClientInfo::new(
         Default::default(),
         rmcp::model::Implementation::new(
-            warp_core::channel::ChannelState::app_id().to_string(),
-            warp_core::channel::ChannelState::app_version()
+            uncaged_core::channel::ChannelState::app_id().to_string(),
+            uncaged_core::channel::ChannelState::app_version()
                 .map(|v| v.to_string())
                 .unwrap_or_default(),
         ),

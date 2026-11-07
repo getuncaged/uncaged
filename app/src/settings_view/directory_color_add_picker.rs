@@ -5,16 +5,16 @@ use ai::index::full_source_code_embedding::manager::{
     CodebaseIndexManager, CodebaseIndexManagerEvent,
 };
 use settings::Setting;
-use warp_core::ui::radius;
-use warp_util::path::user_friendly_path;
-use warpui::elements::{
+use uncaged_core::ui::radius;
+use uncaged_ui::elements::{
     Border, ChildView, ConstrainedBox, Container, CrossAxisAlignment, Flex, Hoverable,
     MainAxisSize, MouseStateHandle, ParentElement, Text,
 };
-use warpui::platform::Cursor;
-use warpui::{
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
+use uncaged_util::path::user_friendly_path;
 
 use crate::ai::persisted_workspace::{PersistedWorkspace, PersistedWorkspaceEvent};
 use crate::appearance::Appearance;

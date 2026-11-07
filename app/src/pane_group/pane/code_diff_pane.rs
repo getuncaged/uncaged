@@ -1,4 +1,4 @@
-use warpui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
+use uncaged_ui::{AppContext, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 
 use super::code_diff_pane_model::CodeDiffPaneModel;
 use super::{

@@ -15,23 +15,23 @@ use itertools::Itertools;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::channel::ChannelState;
-use warp_core::ui::theme::color::internal_colors;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::elements::new_scrollable::SingleAxisConfig;
-use warpui::elements::{
+use uncaged_core::channel::ChannelState;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::new_scrollable::SingleAxisConfig;
+use uncaged_ui::elements::{
     Align, Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Empty, Expanded, Fill, Flex, FormattedTextElement, Hoverable,
     MainAxisAlignment, MainAxisSize, NewScrollable, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, Shrinkable, Stack, Text, Wrap,
 };
-use warpui::keymap::Keystroke;
-use warpui::platform::{Cursor, OperatingSystem};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::radio_buttons::{RadioButtonItem, RadioButtonLayout};
-use warpui::{
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::platform::{Cursor, OperatingSystem};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::radio_buttons::{RadioButtonItem, RadioButtonLayout};
+use uncaged_ui::{
     Action, AppContext, Element, EntityId, ModelHandle, SingletonEntity, View, ViewHandle,
 };
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::common::{
     format_elapsed_seconds, render_debug_footer, render_failed_output, render_informational_footer,
@@ -2023,7 +2023,7 @@ fn render_stopped_output(props: Props, app: &AppContext) -> Box<dyn Element> {
 
         let button_styles = UiComponentStyles::default()
             .set_border_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .set_border_width(1.)
             .set_border_color(internal_colors::neutral_4(theme).into())
@@ -2044,7 +2044,7 @@ fn render_stopped_output(props: Props, app: &AppContext) -> Box<dyn Element> {
                 .set_background(internal_colors::fg_overlay_3(theme).into()),
         );
 
-        let resume_button = warpui::ui_components::button::Button::new(
+        let resume_button = uncaged_ui::ui_components::button::Button::new(
             props.state_handles.resume_conversation_handle.clone(),
             button_styles,
             Some(hovered_styles),
@@ -2231,7 +2231,7 @@ fn render_suggest_new_conversation(
             ),
             SuggestNewConversationResult::Rejected => (
                 "Continuing current conversation",
-                warpui::elements::Icon::new(
+                uncaged_ui::elements::Icon::new(
                     Icon::FlipForward.into(),
                     internal_colors::neutral_6(theme),
                 )
@@ -3138,7 +3138,7 @@ fn render_usage_button(props: Props, app: &AppContext) -> Box<dyn Element> {
                     content
                         .with_background(background)
                         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                            warp_core::ui::radius::SMALL,
+                            uncaged_core::ui::radius::SMALL,
                         )));
 
                 // Show tooltip on hover or while clicked
@@ -3175,7 +3175,7 @@ pub fn action_icon<V: View>(
     action_model: &ModelHandle<BlocklistAIActionModel>,
     ai_block_model: &dyn AIBlockModel<View = V>,
     app: &AppContext,
-) -> warpui::elements::Icon {
+) -> uncaged_ui::elements::Icon {
     let appearance = Appearance::as_ref(app);
     let status = action_model.as_ref(app).get_action_status(action_id);
     match status {

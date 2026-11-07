@@ -1,9 +1,11 @@
 use settings::{Setting, ToggleableSetting};
-use warp_core::features::FeatureFlag;
-use warpui::elements::{Flex, MouseStateHandle, ParentElement};
-use warpui::ui_components::components::UiComponent;
-use warpui::ui_components::switch::SwitchStateHandle;
-use warpui::{Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::elements::{Flex, MouseStateHandle, ParentElement};
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::ui_components::switch::SwitchStateHandle;
+use uncaged_ui::{
+    Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 use crate::appearance::Appearance;
 use crate::report_if_error;
@@ -221,7 +223,7 @@ impl View for ExternalEditorView {
         "ExternalEditorView"
     }
 
-    fn render(&self, app: &warpui::AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &uncaged_ui::AppContext) -> Box<dyn uncaged_ui::Element> {
         let appearance = Appearance::as_ref(app);
 
         let default_editor = render_dropdown_item(

@@ -4,26 +4,26 @@ use std::path::PathBuf;
 
 use ::settings::{Setting, SettingSection, ToggleableSetting};
 use enum_iterator::all;
-use warp_core::ui::theme::color::internal_colors;
-use warp_util::path::user_friendly_path;
-use warpui::elements::{
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{
     Align, Border, ChildView, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Dismiss, Element, Empty, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, Shrinkable, Text, Wrap, DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use warpui::fonts::{FamilyId, FontInfo, Properties, Weight};
-use warpui::keymap::{ContextPredicate, FixedBinding};
-use warpui::platform::{Cursor, FilePickerConfiguration, GraphicsBackend, SystemTheme};
-use warpui::rendering::ThinStrokes;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::slider::SliderStateHandle;
-use warpui::ui_components::switch::SwitchStateHandle;
-use warpui::units::IntoPixels;
-use warpui::{
+use uncaged_ui::fonts::{FamilyId, FontInfo, Properties, Weight};
+use uncaged_ui::keymap::{ContextPredicate, FixedBinding};
+use uncaged_ui::platform::{Cursor, FilePickerConfiguration, GraphicsBackend, SystemTheme};
+use uncaged_ui::rendering::ThinStrokes;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::slider::SliderStateHandle;
+use uncaged_ui::ui_components::switch::SwitchStateHandle;
+use uncaged_ui::units::IntoPixels;
+use uncaged_ui::{
     id, Action, AppContext, Entity, ModelHandle, SingletonEntity, TypedActionView, UpdateModel,
     View, ViewContext, ViewHandle, WindowId,
 };
+use uncaged_util::path::user_friendly_path;
 
 use super::directory_color_add_picker::{DirectoryColorAddPicker, DirectoryColorAddPickerEvent};
 use super::settings_page::{
@@ -1976,7 +1976,7 @@ impl AppearanceSettingsPageView {
                 return;
             }
             self.system_fonts_requested = true;
-            let all_system_fonts = warpui::fonts::Cache::handle(ctx)
+            let all_system_fonts = uncaged_ui::fonts::Cache::handle(ctx)
                 .update(ctx, |font_cache, ctx| font_cache.all_system_fonts(ctx));
             ctx.spawn(all_system_fonts, Self::set_system_fonts);
         }
@@ -2689,7 +2689,7 @@ impl SettingsWidget for CurrentThemeWidget {
             appearance.monospace_font_family(),
             Some(CURRENT_THEME_PREVIEW_SCALE),
         ))
-        .with_corner_radius(warp_core::ui::radius::small())
+        .with_corner_radius(uncaged_core::ui::radius::small())
         .with_margin_right(12.)
         .finish();
 
@@ -2883,7 +2883,7 @@ fn system_theme_tile(
                 appearance.monospace_font_family(),
                 Some(SYSTEM_THEME_PREVIEW_SCALE),
             ))
-            .with_corner_radius(warp_core::ui::radius::small())
+            .with_corner_radius(uncaged_core::ui::radius::small())
             .finish(),
         )
         .with_child(Container::new(footer).with_margin_top(8.).finish())
@@ -2893,7 +2893,7 @@ fn system_theme_tile(
         Container::new(content)
             .with_uniform_padding(SYSTEM_THEME_TILE_PADDING)
             .with_background(theme.surface_2())
-            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_corner_radius(uncaged_core::ui::radius::medium())
             .finish(),
     )
     .with_width(SYSTEM_THEME_TILE_WIDTH)
@@ -4522,7 +4522,7 @@ impl SettingsWidget for DirectoryTabColorsWidget {
                     .with_vertical_padding(8.)
                     .with_background(theme.surface_1())
                     .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                        warp_core::ui::radius::SMALL,
+                        uncaged_core::ui::radius::SMALL,
                     )))
                     .finish(),
             );

@@ -5,12 +5,10 @@ use futures::Future;
 use itertools::Itertools;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
-use url::Url;
-use warp_core::context_flag::ContextFlag;
-use warp_core::settings::Setting;
-use warp_util::sync::Condition;
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::{
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_core::settings::Setting;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::{
     Align, AnchorPair, Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dash, DropTarget, DropTargetData,
     Empty, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
@@ -18,16 +16,18 @@ use warpui::elements::{
     PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition, ScrollTarget,
     ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, XAxisAnchor, YAxisAnchor,
 };
-use warpui::fonts::Weight;
-use warpui::keymap::FixedBinding;
-use warpui::platform::{Cursor, OperatingSystem};
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::units::IntoPixels;
-use warpui::{
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::platform::{Cursor, OperatingSystem};
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::units::IntoPixels;
+use uncaged_ui::{
     AppContext, BlurContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView,
     UpdateView, View, ViewContext, ViewHandle, WindowId,
 };
+use uncaged_util::sync::Condition;
+use url::Url;
 
 use super::cloud_object_naming_dialog::CloudObjectNamingDialog;
 use super::empty_trash_confirmation_dialog::{
@@ -451,7 +451,7 @@ pub struct DriveIndex {
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_fixed_bindings(vec![
         FixedBinding::new("up", DriveIndexAction::FocusPreviousItem, id!("DriveIndex")),
@@ -571,7 +571,7 @@ impl DriveIndex {
         // "welcome/starter" objects (Starter prompts/workflows, "Getting started
         // with Warp") aren't ours — hide them so the Drive is a clean personal store.
         let hide_welcome =
-            warp_core::channel::ChannelState::channel() == warp_core::channel::Channel::Oss;
+            uncaged_core::channel::ChannelState::channel() == uncaged_core::channel::Channel::Oss;
         let item_iter = match (self.index_variant, location) {
             // Nothing is shared directly with Uncaged's local user.
             (DriveIndexVariant::MainIndex, CloudObjectLocation::Space(Space::Shared)) => {
@@ -1117,7 +1117,7 @@ impl DriveIndex {
         )
         // Add some styling to the entire row: rounded edges and a small margin between the row and the border
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )));
 
         // If the space is focused, set background
@@ -1126,7 +1126,9 @@ impl DriveIndex {
         if let Some(focused_index) = self.focused_index {
             if Some(&WarpDriveItemId::Space(space)) == self.ordered_items.get(focused_index) {
                 container = container.with_background(
-                    warp_core::ui::theme::color::internal_colors::fg_overlay_4(appearance.theme()),
+                    uncaged_core::ui::theme::color::internal_colors::fg_overlay_4(
+                        appearance.theme(),
+                    ),
                 );
                 is_focused = true;
             }
@@ -1138,7 +1140,7 @@ impl DriveIndex {
                     // If the item is hovered, set a hover background that matches the hover state of warp drive items.
                     if mouse_state.is_hovered() && !is_focused || section_state.menu_open {
                         container = container.with_background(
-                            warp_core::ui::theme::color::internal_colors::fg_overlay_2(
+                            uncaged_core::ui::theme::color::internal_colors::fg_overlay_2(
                                 appearance.theme(),
                             ),
                         );
@@ -1232,7 +1234,7 @@ impl DriveIndex {
             font_color: Some(empty_trash_default_font_color),
             font_size: Some(14.),
             font_family_id: Some(appearance.ui_font_family()),
-            font_weight: Some(warpui::fonts::Weight::Semibold),
+            font_weight: Some(uncaged_ui::fonts::Weight::Semibold),
             padding: Some(Coords::uniform(6.)),
             border_radius: Some(CornerRadius::with_all(Radius::Pixels(6.))),
             ..Default::default()
@@ -1319,7 +1321,7 @@ impl DriveIndex {
         )
         // Add some styling to the entire row: rounded edges and a small margin between the row and the border
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )));
 
         // If the space is focused, set background
@@ -1328,7 +1330,9 @@ impl DriveIndex {
         if let Some(focused_index) = self.focused_index {
             if Some(&WarpDriveItemId::Space(space)) == self.ordered_items.get(focused_index) {
                 container = container.with_background(
-                    warp_core::ui::theme::color::internal_colors::fg_overlay_4(appearance.theme()),
+                    uncaged_core::ui::theme::color::internal_colors::fg_overlay_4(
+                        appearance.theme(),
+                    ),
                 );
                 is_focused = true;
             }
@@ -1340,7 +1344,7 @@ impl DriveIndex {
                 // If the item is hovered, set a hover background that matches the hover state of warp drive items.
                 if mouse_state.is_hovered() && !is_focused || section_state.menu_open {
                     container = container.with_background(
-                        warp_core::ui::theme::color::internal_colors::fg_overlay_2(
+                        uncaged_core::ui::theme::color::internal_colors::fg_overlay_2(
                             appearance.theme(),
                         ),
                     );
@@ -1482,7 +1486,7 @@ impl DriveIndex {
                 .finish(),
         )
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )));
 
         // If the trash row is focused, set background
@@ -1490,7 +1494,9 @@ impl DriveIndex {
         if let Some(focused_index) = self.focused_index {
             if Some(&WarpDriveItemId::Trash) == self.ordered_items.get(focused_index) {
                 container = container.with_background(
-                    warp_core::ui::theme::color::internal_colors::fg_overlay_4(appearance.theme()),
+                    uncaged_core::ui::theme::color::internal_colors::fg_overlay_4(
+                        appearance.theme(),
+                    ),
                 );
                 is_focused = true;
             }
@@ -1503,7 +1509,7 @@ impl DriveIndex {
                 if mouse_state.is_hovered() && !is_focused {
                     container
                         .with_background(
-                            warp_core::ui::theme::color::internal_colors::fg_overlay_2(
+                            uncaged_core::ui::theme::color::internal_colors::fg_overlay_2(
                                 appearance.theme(),
                             ),
                         )
@@ -1704,7 +1710,7 @@ impl DriveIndex {
         .with_padding_bottom(ITEM_INTERNAL_PADDING)
         .with_margin_bottom(2. * ITEM_INTERNAL_PADDING)
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .with_background_color(coloru_with_opacity(
             appearance.theme().surface_2().into(),
@@ -2320,7 +2326,7 @@ impl DriveIndex {
         section: DriveIndexSection,
         is_collapsed: bool,
         appearance: &Appearance,
-    ) -> Box<dyn warpui::Element> {
+    ) -> Box<dyn uncaged_ui::Element> {
         let icon = if is_collapsed {
             Icon::ListCollapsed
         } else {
@@ -2352,7 +2358,10 @@ impl DriveIndex {
         .finish()
     }
 
-    fn render_warp_drive_loading_icon(&self, appearance: &Appearance) -> Box<dyn warpui::Element> {
+    fn render_warp_drive_loading_icon(
+        &self,
+        appearance: &Appearance,
+    ) -> Box<dyn uncaged_ui::Element> {
         // Use same padding as icon_button (4px) to center the icon within ICON_DIMENSIONS
         let icon_button_padding = (ICON_DIMENSIONS - LOADING_ICON_WIDTH) / 2.;
         let loading_icon = Container::new(
@@ -2401,7 +2410,7 @@ impl DriveIndex {
         hoverable.finish()
     }
 
-    fn render_sorting_button(&self, appearance: &Appearance) -> Box<dyn warpui::Element> {
+    fn render_sorting_button(&self, appearance: &Appearance) -> Box<dyn uncaged_ui::Element> {
         let mut button = icon_button_with_context_menu(
             Icon::Sort,
             move |ctx, _, _| ctx.dispatch_typed_action(DriveIndexAction::ToggleSortingMenu),
@@ -2445,7 +2454,7 @@ impl DriveIndex {
         space: Space,
         state: &DriveIndexSectionState,
         app: &AppContext,
-    ) -> Box<dyn warpui::Element> {
+    ) -> Box<dyn uncaged_ui::Element> {
         let mut button;
         // Set color contrast correctly when focused
         if self.focused_index.is_some()
@@ -3022,8 +3031,8 @@ impl DriveIndex {
             // folder menu (create sub-items, rename, import, collapse) locally —
             // every one of those actions persists to SQLite offline.
             let folder_actions_allowed = matches!(
-                warp_core::channel::ChannelState::channel(),
-                warp_core::channel::Channel::Oss
+                uncaged_core::channel::ChannelState::channel(),
+                uncaged_core::channel::Channel::Oss
             ) || matches!(folder_id, SyncId::ServerId(_));
             if folder_actions_allowed {
                 if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
@@ -3236,7 +3245,7 @@ impl DriveIndex {
                     | ObjectType::GenericStringObject(GenericStringObjectFormat::Json(
                         JsonObjectType::EnvVarCollection,
                     )) => {
-                        if !warpui::platform::is_mobile_device()
+                        if !uncaged_ui::platform::is_mobile_device()
                             && !ContextFlag::HideOpenOnDesktopButton.is_enabled()
                             && *UserAppInstallDetectionSettings::as_ref(app)
                                 .user_app_installation_detected
@@ -3561,7 +3570,7 @@ impl View for DriveIndex {
         }
     }
 
-    fn keymap_context(&self, _ctx: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, _ctx: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         // Disable WD Vim keybindings when a dialog is open
@@ -3573,7 +3582,7 @@ impl View for DriveIndex {
         context
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn uncaged_ui::Element> {
         let appearance = Appearance::as_ref(app);
 
         // The content of the index is all spaces rendered into a flex column.

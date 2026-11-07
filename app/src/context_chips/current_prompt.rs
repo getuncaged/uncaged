@@ -5,11 +5,11 @@ use std::time::Duration;
 
 use futures::{pin_mut, FutureExt as _};
 use itertools::Itertools;
-use warp_completer::completer::CommandExitStatus;
-use warp_core::r#async::debounce;
-use warp_core::user_preferences::GetUserPreferences;
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::{
+use uncaged_completer::completer::CommandExitStatus;
+use uncaged_core::r#async::debounce;
+use uncaged_core::user_preferences::GetUserPreferences;
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::{
     AppContext, Entity, ModelAsRef, ModelContext, ModelHandle, SingletonEntity, ViewHandle,
     WeakModelHandle,
 };
@@ -584,7 +584,7 @@ impl CurrentPrompt {
         current_dir_path: Option<String>,
         environment_variables: Option<HashMap<String, String>>,
         timeout: Option<Duration>,
-    ) -> (Option<warp_completer::completer::CommandOutput>, bool) {
+    ) -> (Option<uncaged_completer::completer::CommandOutput>, bool) {
         let command_future = session
             .execute_command(
                 &command,
@@ -1184,7 +1184,7 @@ impl CurrentPrompt {
     #[cfg(test)]
     pub fn await_generators(
         &self,
-        ctx: &mut warpui::AppContext,
+        ctx: &mut uncaged_ui::AppContext,
     ) -> futures_util::future::BoxFuture<'static, ()> {
         use futures_util::FutureExt;
         use itertools::Itertools;

@@ -1,10 +1,10 @@
-use warp_editor::editor::NavigationKey;
-use warpui::elements::{
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::elements::{
     Align, ConstrainedBox, Container, Flex, ParentElement, SavePosition, Shrinkable, Stack,
 };
-use warpui::fonts::FamilyId;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, ViewContext, ViewHandle};
+use uncaged_ui::fonts::FamilyId;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{AppContext, Element, ViewContext, ViewHandle};
 
 use crate::editor::{
     EditOrigin, EditorOptions, EditorView, Event as EditorEvent, InteractionState,

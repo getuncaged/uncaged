@@ -4,11 +4,11 @@
 //! with expandable per-file stats. On confirm, spawns `create_pr` and shows
 //! a toast with a clickable "Open PR" link.
 
-use warp_core::ui::appearance::Appearance;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::elements::{
     ClippedScrollStateHandle, Container, Element, Flex, MouseStateHandle, ParentElement, Text,
 };
-use warpui::{SingletonEntity, ViewContext};
+use uncaged_ui::{SingletonEntity, ViewContext};
 
 use crate::code_review::git_dialog::{
     render_branch_section, render_file_changes_box, show_toast, user_facing_git_error, GitDialog,

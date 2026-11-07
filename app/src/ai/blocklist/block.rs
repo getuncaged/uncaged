@@ -40,32 +40,32 @@ pub use pending_user_query_block::{PendingUserQueryBlock, PendingUserQueryBlockE
 use repo_metadata::repositories::DetectedRepositories;
 use secret_redaction::*;
 use settings::Setting as _;
-use warp_core::features::FeatureFlag;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill;
-use warp_editor::content::buffer::InitialBufferState;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill;
+use uncaged_editor::content::buffer::InitialBufferState;
 #[cfg(feature = "local_fs")]
-use warp_editor::content::edit::resolve_asset_source_relative_to_directory;
-use warp_editor::render::element::VerticalExpansionBehavior;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::path::ShellFamily;
-use warpui::assets::asset_cache::AssetCache;
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::{
+use uncaged_editor::content::edit::resolve_asset_source_relative_to_directory;
+use uncaged_editor::render::element::VerticalExpansionBehavior;
+use uncaged_ui::assets::asset_cache::AssetCache;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::{
     get_rich_content_position_id, ClippedScrollStateHandle, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, SecretRange, SelectionBound, SelectionHandle, TableStateHandle,
 };
-use warpui::image_cache::ImageType;
-use warpui::keymap::FixedBinding;
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::text::SelectionType;
-use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::ui_components::radio_buttons::RadioButtonStateHandle;
-use warpui::{
+use uncaged_ui::image_cache::ImageType;
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::text::SelectionType;
+use uncaged_ui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::radio_buttons::RadioButtonStateHandle;
+use uncaged_ui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle, WindowId,
 };
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::path::ShellFamily;
 
 #[cfg(feature = "agent_mode_debug")]
 use self::code_diff_view::FileDiff;
@@ -269,7 +269,7 @@ fn user_avatar_info_for_ai_block(
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -867,7 +867,7 @@ pub struct AIBlock {
     controller: ModelHandle<BlocklistAIController>,
     active_session: ModelHandle<ActiveSession>,
     terminal_view_id: EntityId,
-    window_id: warpui::WindowId,
+    window_id: uncaged_ui::WindowId,
 
     /// The current working directory at the time the AI block was created. Note that this
     /// is different from `directory_context`, which represents the directory-related contexts
@@ -5581,7 +5581,7 @@ pub enum AIBlockEvent {
     #[cfg(feature = "local_fs")]
     OpenDetectedFilePath {
         absolute_path: PathBuf,
-        line_and_column_num: Option<warp_util::path::LineAndColumnArg>,
+        line_and_column_num: Option<uncaged_util::path::LineAndColumnArg>,
         target_override: Option<FileTarget>,
     },
     ShowLinkTooltip(RichContentLinkTooltipInfo),
@@ -5743,7 +5743,7 @@ pub enum AIBlockAction {
         server_output_id: Option<ServerOutputId>,
     },
     /// Clear the selections of all other views **except** for the source view that dispatched the event.
-    /// The `source_view_id` will be `None` if the event is dispatched by the [`warpui::elements::SelectableArea`]
+    /// The `source_view_id` will be `None` if the event is dispatched by the [`uncaged_ui::elements::SelectableArea`]
     /// instead of a nested view (i.e. code block, requested command, etc.), which means all nested views
     /// should have their selections cleared.
     ClearOtherSelections {
@@ -6312,7 +6312,7 @@ impl TypedActionView for AIBlock {
                     }
                     images.push(ui_components::lightbox::LightboxImage {
                         source: ui_components::lightbox::LightboxImageSource::Resolved {
-                            asset_source: warpui::assets::asset_cache::AssetSource::Raw {
+                            asset_source: uncaged_ui::assets::asset_cache::AssetSource::Raw {
                                 id: asset_id,
                             },
                         },

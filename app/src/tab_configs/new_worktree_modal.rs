@@ -1,21 +1,23 @@
 use std::path::PathBuf;
 
-use warpui::elements::{
+use uncaged_ui::elements::{
     Border, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Element,
     Fill as ElementFill, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, Padding,
     ParentElement, Radius, Shrinkable, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::FixedBinding;
-use warpui::platform::Cursor;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::checkbox::Checkbox;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle};
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::checkbox::Checkbox;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
+    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+};
 
 /// Registers keybindings for the new-worktree modal (ESC to close).
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
     app.register_fixed_bindings(vec![FixedBinding::new(
         "escape",
         NewWorktreeModalAction::Escape,
@@ -23,7 +25,7 @@ pub fn init(app: &mut AppContext) {
     )]);
 }
 
-use warp_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::color::internal_colors;
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::appearance::Appearance;
@@ -57,11 +59,11 @@ const FOOTER_BUTTON_HORIZONTAL_PADDING: f32 = 12.;
 /// Gap between Cancel and Open buttons (Figma: gap-8).
 const FOOTER_BUTTON_GAP: f32 = 8.;
 /// Corner radius for footer buttons (Figma: rounded-4).
-const FOOTER_BUTTON_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
+const FOOTER_BUTTON_RADIUS: Radius = Radius::Pixels(uncaged_core::ui::radius::SMALL);
 /// Size of the ESC keyboard shortcut badge (Figma: 14px tall, 10px font).
 const ESC_BADGE_HEIGHT: f32 = 14.;
 const ESC_BADGE_FONT_SIZE: f32 = 10.;
-const ESC_BADGE_CORNER_RADIUS: Radius = Radius::Pixels(warp_core::ui::radius::SMALL);
+const ESC_BADGE_CORNER_RADIUS: Radius = Radius::Pixels(uncaged_core::ui::radius::SMALL);
 /// Size of the close (X) icon in the header.
 const CLOSE_ICON_SIZE: f32 = 14.;
 /// Font size for inline validation error messages.
@@ -356,7 +358,7 @@ impl View for NewWorktreeModal {
 
             // X close icon
             let close_icon = ConstrainedBox::new(
-                warp_core::ui::Icon::X
+                uncaged_core::ui::Icon::X
                     .to_warpui_icon(theme.sub_text_color(theme.background()))
                     .finish(),
             )
@@ -371,7 +373,7 @@ impl View for NewWorktreeModal {
                 .with_child(esc_badge)
                 .finish();
 
-            let close_hoverable = warpui::elements::Hoverable::new(
+            let close_hoverable = uncaged_ui::elements::Hoverable::new(
                 self.close_button_mouse_state.clone(),
                 move |_state| close_button,
             )

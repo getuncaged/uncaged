@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 use similar::DiffableStr;
-use warpui::elements::{MouseStateHandle, PartialClickableElement, SecretRange};
-use warpui::platform::Cursor;
+use uncaged_ui::elements::{MouseStateHandle, PartialClickableElement, SecretRange};
+use uncaged_ui::platform::Cursor;
 
 use super::{AIBlockAction, TextLocation};
 use crate::ai::agent::{AIAgentOutput, AIAgentTextSection, AgentOutputText};

@@ -6,8 +6,8 @@ mod view;
 
 use std::path::PathBuf;
 
+use uncaged_ui::keymap::Keystroke;
 pub use view::{InlineReposMenuEvent, InlineReposMenuView};
-use warpui::keymap::Keystroke;
 
 use crate::terminal::input::inline_menu::{
     default_navigation_message_items, InlineMenuAction, InlineMenuMessageArgs, InlineMenuRowAction,

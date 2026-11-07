@@ -1,7 +1,7 @@
 use ai::agent::action_result::FetchConversationResult;
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
 use crate::ai::agent::api::ServerConversationToken;
@@ -76,7 +76,7 @@ fn materialize_conversation(
         ));
     };
 
-    let tasks: Vec<warp_multi_agent_api::Task> = conversation
+    let tasks: Vec<uncaged_agent_api::Task> = conversation
         .all_tasks()
         .filter_map(|task| task.source().cloned())
         .collect();

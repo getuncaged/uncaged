@@ -1,4 +1,6 @@
-use warpui::{AppContext, ModelHandle, SingletonEntity, View, ViewContext, ViewHandle, WindowId};
+use uncaged_ui::{
+    AppContext, ModelHandle, SingletonEntity, View, ViewContext, ViewHandle, WindowId,
+};
 
 use super::view::PaneView;
 use super::{

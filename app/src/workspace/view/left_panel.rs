@@ -1,20 +1,20 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::Icon;
-use warp_util::path::LineAndColumnArg;
-use warpui::elements::{
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::{
     resizable_state_handle, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CrossAxisAlignment, DragBarSide, Element, Empty, Flex, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Resizable, ResizableStateHandle, Shrinkable,
 };
-use warpui::platform::Cursor;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WeakViewHandle,
 };
+use uncaged_util::path::LineAndColumnArg;
 
 use super::{config_panel, skills_panel, ssh_panel};
 use crate::ai::agent::conversation::AIConversationId;
@@ -96,7 +96,7 @@ pub enum LeftPanelEvent {
     ShowDeleteConfirmationDialog {
         conversation_id: AIConversationId,
         conversation_title: String,
-        terminal_view_id: Option<warpui::EntityId>,
+        terminal_view_id: Option<uncaged_ui::EntityId>,
     },
 }
 
@@ -114,7 +114,7 @@ pub enum ToolPanelView {
 /// Encapsulates the active view state to enforce that all mutations go through
 /// `active_view_state::set`, which handles necessary side effects.
 mod active_view_state {
-    use warpui::ViewContext;
+    use uncaged_ui::ViewContext;
 
     use super::ToolPanelView;
 
@@ -144,9 +144,9 @@ mod active_view_state {
 }
 
 pub struct ToolbeltButtonConfig {
-    pub icon: warp_core::ui::Icon,
+    pub icon: uncaged_core::ui::Icon,
     /// Optional icon to use when the given toolbelt option is in an active state.
-    pub active_icon: Option<warp_core::ui::Icon>,
+    pub active_icon: Option<uncaged_core::ui::Icon>,
     pub tooltip_text: String,
     pub action: LeftPanelAction,
     /// Whether the button should be rendered with an "active" state.
@@ -539,7 +539,7 @@ impl LeftPanelView {
 
     fn get_or_create_global_search_view_for_pane_group(
         &mut self,
-        pane_group_id: warpui::EntityId,
+        pane_group_id: uncaged_ui::EntityId,
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<GlobalSearchView> {
         if let Some(view) = self
@@ -565,7 +565,7 @@ impl LeftPanelView {
 
     fn get_or_create_file_tree_view_for_pane_group(
         &mut self,
-        pane_group_id: warpui::EntityId,
+        pane_group_id: uncaged_ui::EntityId,
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<FileTreeView> {
         if let Some(view) = self
@@ -1108,7 +1108,7 @@ impl LeftPanelView {
 
     fn deactivate_file_tree_view_for_pane_group(
         &self,
-        pane_group_id: warpui::EntityId,
+        pane_group_id: uncaged_ui::EntityId,
         ctx: &mut ViewContext<Self>,
     ) {
         if let Some(view) = self
@@ -1321,7 +1321,7 @@ impl View for LeftPanelView {
         })
         .finish();
 
-        if warpui::platform::is_mobile_device() {
+        if uncaged_ui::platform::is_mobile_device() {
             return panel_content;
         }
         let panel_content = super::rounded_panel(panel_content, None, appearance);

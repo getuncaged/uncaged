@@ -44,7 +44,7 @@ pub(crate) mod skills;
 pub(crate) mod uncaged_code_search;
 pub use agent_tips::*;
 pub use request_usage_model::*;
-use warpui::AppContext;
+use uncaged_ui::AppContext;
 pub mod cloud_agent_settings;
 pub mod execution_profiles;
 pub mod facts;

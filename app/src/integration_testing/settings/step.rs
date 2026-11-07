@@ -1,7 +1,7 @@
 use settings::{Setting, ToggleableSetting as _};
-use warpui::integration::TestStep;
-use warpui::windowing::WindowManager;
-use warpui::{async_assert, SingletonEntity};
+use uncaged_ui::integration::TestStep;
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{async_assert, SingletonEntity};
 
 use crate::integration_testing::step::new_step_with_default_assertions;
 use crate::settings_view::SettingsAction;

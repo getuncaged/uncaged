@@ -1,7 +1,7 @@
 use regex::Regex;
 use serial_test::serial;
-use warpui::elements::Text;
-use warpui::fonts::FamilyId;
+use uncaged_ui::elements::Text;
+use uncaged_ui::fonts::FamilyId;
 
 use super::*;
 use crate::terminal::model::secrets::{self, SecretLevel};

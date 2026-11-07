@@ -2,17 +2,17 @@ use std::fmt::Debug;
 
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
-use warp_core::features::FeatureFlag;
-use warp_core::settings::Setting;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::settings::Setting;
+use uncaged_ui::elements::{
     AcceptedByDropTarget, Align, Border, ChildAnchor, Clipped, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, Draggable, DraggableState, Empty, Flex, Hoverable,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
     ParentElement, ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds,
     Radius, Rect, SavePosition, Shrinkable, Stack, Text,
 };
-use warpui::presenter::ChildView;
-use warpui::{
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::{
     AppContext, Element, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -686,7 +686,7 @@ impl<P: BackingView> View for PaneHeader<P> {
                 .expect("lock acquired")
                 .is_hovered()
                 || self.open_overlay != OpenOverlay::None
-                || warpui::platform::is_mobile_device(),
+                || uncaged_ui::platform::is_mobile_device(),
         };
         let header_content = self
             .pane_stack
@@ -710,7 +710,7 @@ impl<P: BackingView> View for PaneHeader<P> {
         let element = match header_content {
             HeaderContent::Standard(mut header) => {
                 // On mobile devices, always show icons since hover effects don't work with touch
-                if warpui::platform::is_mobile_device() {
+                if uncaged_ui::platform::is_mobile_device() {
                     header.options.always_show_icons = true;
                 }
                 self.render_standard_header(header, app)

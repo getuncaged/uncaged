@@ -9,11 +9,11 @@ use std::io::Write;
 
 pub use assertions::*;
 pub use step::*;
+use uncaged_ui::integration::PersistedDataMap;
+pub use uncaged_ui::integration::RUNTIME_TAG_FAILURE_REASON;
+use uncaged_ui::{App, SingletonEntity as _, WindowId};
 pub use user_defaults::*;
 pub use util::*;
-use warpui::integration::PersistedDataMap;
-pub use warpui::integration::RUNTIME_TAG_FAILURE_REASON;
-use warpui::{App, SingletonEntity as _, WindowId};
 
 use crate::ai::agent::{AIAgentActionType, AIAgentOutputStatus, FinishedAIAgentOutput};
 pub use crate::ai::blocklist::agent_view::AgentViewState;

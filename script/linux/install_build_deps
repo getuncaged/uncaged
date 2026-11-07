@@ -33,7 +33,7 @@ if [[ "$(source /etc/os-release; echo $ID $ID_LIKE)" = *"debian"* ]]; then
     jq
     # Needed for compressing web bundles
     brotli
-    # Needed by bindgen (used by minimp4-sys, pulled in by warpui_core's
+    # Needed by bindgen (used by minimp4-sys, pulled in by uncaged_ui_core's
     # integration_tests feature) — pulls in libclang-common-*-dev which
     # provides clang's resource-dir builtin headers.
     libclang-dev

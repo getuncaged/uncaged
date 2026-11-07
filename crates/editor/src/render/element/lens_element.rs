@@ -1,11 +1,11 @@
 use std::ops::Range;
 
-use warpui_core::elements::Point;
-use warpui_core::event::DispatchedEvent;
-use warpui_core::geometry::rect::RectF;
-use warpui_core::geometry::vector::Vector2F;
-use warpui_core::units::IntoPixels;
-use warpui_core::{
+use uncaged_ui_core::elements::Point;
+use uncaged_ui_core::event::DispatchedEvent;
+use uncaged_ui_core::geometry::rect::RectF;
+use uncaged_ui_core::geometry::vector::Vector2F;
+use uncaged_ui_core::units::IntoPixels;
+use uncaged_ui_core::{
     AfterLayoutContext, AppContext, Element, EventContext, LayoutContext, ModelHandle,
     PaintContext, SizeConstraint, WeakViewHandle,
 };

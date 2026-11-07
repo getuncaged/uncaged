@@ -3,30 +3,30 @@ use std::time::Duration;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use uuid::Uuid;
-use warp_core::ui::builder::UiBuilder;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{
+use uncaged_core::ui::builder::UiBuilder;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DispatchEventResult, EventHandler, Flex, Hoverable, Icon, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, SavePosition, Shrinkable, Stack,
 };
-use warpui::fonts::Weight;
-use warpui::keymap::Keystroke;
-use warpui::r#async::{SpawnedFutureHandle, Timer};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::keymap::Keystroke;
+use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     Action, AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
 };
+use uuid::Uuid;
 
 use super::action_button::ActionButton;
 use crate::appearance::Appearance;
 use crate::themes::theme::Fill;
 
 const TOAST_WIDTH: f32 = 464.;
-const TOAST_CORNER_RADIUS: f32 = warp_core::ui::radius::MEDIUM;
+const TOAST_CORNER_RADIUS: f32 = uncaged_core::ui::radius::MEDIUM;
 const TEXT_MARGIN: f32 = 16.;
 const VERTICAL_PADDING: f32 = 8.;
 const HORIZONTAL_PADDING: f32 = 12.;
@@ -453,16 +453,16 @@ impl<A: Action + Clone> DismissibleToast<A> {
 
         let is_clickable = self.is_clickable();
         // On mobile devices, always show close button since hover effects don't work with touch
-        let is_mobile = warpui::platform::is_mobile_device();
+        let is_mobile = uncaged_ui::platform::is_mobile_device();
 
         Hoverable::new(self.close_button_hover_state.clone(), move |mouse_state| {
             let toast_container = Container::new(row.finish())
                 .with_vertical_padding(VERTICAL_PADDING)
                 .with_horizontal_padding(HORIZONTAL_PADDING)
                 .with_background(self.flavor.bg_color(appearance))
-                .with_corner_radius(warpui::elements::CornerRadius::with_all(Radius::Pixels(
-                    TOAST_CORNER_RADIUS,
-                )))
+                .with_corner_radius(uncaged_ui::elements::CornerRadius::with_all(
+                    Radius::Pixels(TOAST_CORNER_RADIUS),
+                ))
                 .with_border(Border::all(1.).with_border_fill(self.flavor.border_color(appearance)))
                 .finish();
 

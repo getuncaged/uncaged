@@ -10,9 +10,9 @@ Modifications for Uncaged Copyright (C) 2026 the Uncaged contributors.
 Licensing
 ---------
 The application and most crates are licensed under the GNU Affero General
-Public License v3.0 (see LICENSE-AGPL). The UI framework crates `warpui` and
-`warpui_core` are licensed under the MIT License (see LICENSE-MIT). Uncaged is
-distributed under these same licenses.
+Public License v3.0 (see LICENSE-AGPL). The UI framework crates `uncaged_ui` and
+`uncaged_ui_core` (Warp's `warpui` and `warpui_core`) are licensed under the MIT
+License (see LICENSE-MIT). Uncaged is distributed under these same licenses.
 
 Trademarks
 ----------

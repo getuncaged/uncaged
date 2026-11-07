@@ -5,7 +5,7 @@ use std::{fs, io};
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
 use repo_metadata::RepositoryUpdate;
-use warpui::{ModelContext, ModelHandle, SingletonEntity};
+use uncaged_ui::{ModelContext, ModelHandle, SingletonEntity};
 
 use super::util::{
     for_each_dir_entry, has_name, is_config_file, parse_model_config_dir_entry,

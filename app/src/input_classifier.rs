@@ -25,7 +25,7 @@ use input_classifier::{HeuristicClassifier, InputClassifier};
 ))]
 use input_classifier::{OnnxClassifier, OnnxModel};
 use once_cell::sync::OnceCell;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 pub struct InputClassifierModel {
     /// Built on first request. `OnceCell` rather than a plain `Option` so `classifier()` can

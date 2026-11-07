@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use warp_multi_agent_api as api;
+use uncaged_agent_api as api;
 
 /// A citation listed in an AI response.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

@@ -8,9 +8,9 @@ use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::watcher::DirectoryWatcher;
 use repo_metadata::RepoMetadataModel;
 use tempfile::TempDir;
-use warp_core::features::FeatureFlag;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::{App, ModelHandle};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{App, ModelHandle};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 use watcher::HomeDirectoryWatcher;
 
 use super::*;

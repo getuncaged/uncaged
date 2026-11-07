@@ -2,7 +2,7 @@
 //!
 //! Warp's protocol and each LLM provider speak different dialects. Rather than
 //! translate N protocols × M providers, everything funnels through these
-//! neutral types: the request parser lowers a `warp_multi_agent_api::Request`
+//! neutral types: the request parser lowers a `uncaged_agent_api::Request`
 //! into a `Conversation`, and each provider raises a `Conversation` into its
 //! own wire format. The result events go the other way.
 

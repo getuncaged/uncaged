@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use warp_core::ui::icons::Icon;
-use warp_core::ui::theme::AnsiColorIdentifier;
-use warpui::elements::{ChildView, Element, Empty, ParentElement, Wrap};
-use warpui::{AppContext, Entity, TypedActionView, View, ViewContext, ViewHandle};
+use uncaged_core::ui::icons::Icon;
+use uncaged_core::ui::theme::AnsiColorIdentifier;
+use uncaged_ui::elements::{ChildView, Element, Empty, ParentElement, Wrap};
+use uncaged_ui::{AppContext, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use super::Artifact;
 use crate::notebooks::NotebookId;

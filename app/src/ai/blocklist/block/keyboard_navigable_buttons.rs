@@ -1,13 +1,15 @@
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Empty, Flex, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, ParentElement, Radius, Shrinkable, Text,
 };
-use warpui::keymap::FixedBinding;
-use warpui::ui_components::button::{Button, ButtonVariant};
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::ui_components::button::{Button, ButtonVariant};
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
+    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
+};
 
 use super::numbered_button::render_recommended_badge;
 use crate::ui_components::icons::Icon;
@@ -16,7 +18,7 @@ const MARGIN_BETWEEN_BUTTONS: f32 = 4.;
 const HAS_OPTIONS: &str = "HasOptions";
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_fixed_bindings([
         FixedBinding::new(
@@ -54,7 +56,7 @@ pub enum KeyboardNavigableButtonsAction {
 
 pub enum KeyboardNavigableButtonsEvent {}
 
-pub type ButtonBuilder = Box<dyn Fn(bool, &warpui::AppContext) -> Button>;
+pub type ButtonBuilder = Box<dyn Fn(bool, &uncaged_ui::AppContext) -> Button>;
 pub type OnButtonClickFn = Box<dyn Fn(&mut ViewContext<KeyboardNavigableButtons>)>;
 
 pub struct KeyboardNavigableButtonBuilder {
@@ -65,7 +67,7 @@ pub struct KeyboardNavigableButtonBuilder {
 
 impl KeyboardNavigableButtonBuilder {
     pub fn new(
-        button_builder: impl Fn(bool, &warpui::AppContext) -> Button + 'static,
+        button_builder: impl Fn(bool, &uncaged_ui::AppContext) -> Button + 'static,
         on_selected: impl Fn(&mut ViewContext<KeyboardNavigableButtons>) + 'static,
     ) -> Self {
         Self {
@@ -78,7 +80,7 @@ impl KeyboardNavigableButtonBuilder {
 /// Creates a simple navigation button with standard styling.
 /// This is a convenience function for the common case of a text-only button
 /// that dispatches an action when clicked.
-pub fn simple_navigation_button<A: warpui::Action + Clone + 'static>(
+pub fn simple_navigation_button<A: uncaged_ui::Action + Clone + 'static>(
     text_label: String,
     mouse_state: MouseStateHandle,
     action: A,
@@ -201,7 +203,7 @@ fn build_rich_navigation_label(
             .with_uniform_padding(ENTER_KEY_PADDING)
             .with_background(internal_colors::fg_overlay_1(theme))
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .finish()
     } else {
@@ -224,7 +226,7 @@ fn build_rich_navigation_label(
 /// Creates a keyboard-navigable button with a rich two-line label: a title
 /// (with an optional trailing "Recommended" badge) plus an optional muted
 /// sub-label underneath.
-pub fn rich_navigation_button<A: warpui::Action + Clone + 'static>(
+pub fn rich_navigation_button<A: uncaged_ui::Action + Clone + 'static>(
     text_label: String,
     sub_label: Option<String>,
     recommended: bool,
@@ -240,7 +242,7 @@ pub fn rich_navigation_button<A: warpui::Action + Clone + 'static>(
             let base_style = UiComponentStyles {
                 font_size: Some(font_size),
                 border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 ))),
                 ..UiComponentStyles::default()
             };
@@ -305,7 +307,7 @@ impl View for KeyboardNavigableButtons {
         "KeyboardNavigableButtons"
     }
 
-    fn render(&self, app: &warpui::AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &uncaged_ui::AppContext) -> Box<dyn uncaged_ui::Element> {
         let mut content = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
         for (index, button_builder) in self.button_builders.iter().enumerate() {
             let is_selected = index == self.selected_button_index();
@@ -335,7 +337,7 @@ impl View for KeyboardNavigableButtons {
         content.finish()
     }
 
-    fn keymap_context(&self, _app: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, _app: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
         if !self.button_builders.is_empty() {
             context.set.insert(HAS_OPTIONS);

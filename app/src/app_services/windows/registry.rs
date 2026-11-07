@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 
-use warp_core::channel::ChannelState;
+use uncaged_core::channel::ChannelState;
 use windows_registry::{CURRENT_USER, HSTRING};
 
 pub(super) fn register_uri_handler() {

@@ -19,8 +19,8 @@ pub mod oauth;
 
 use std::time::{Duration, SystemTime};
 
-use warpui_core::r#async::Timer;
-use warpui_core::ModelContext;
+use uncaged_ui_core::r#async::Timer;
+use uncaged_ui_core::ModelContext;
 
 use self::oauth::TokenResponse;
 use crate::api_keys::{ApiKeyManager, GrokTokens};

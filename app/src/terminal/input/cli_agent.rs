@@ -1,12 +1,12 @@
-use warp_core::ui::color::contrast::MinimumAllowedContrast;
-use warp_core::ui::color::ContrastingColor;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{
+use uncaged_core::ui::color::contrast::MinimumAllowedContrast;
+use uncaged_core::ui::color::ContrastingColor;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{
     Border, Clipped, ConstrainedBox, Container, DispatchEventResult, DropTarget, Element,
     EventHandler, Flex, Hoverable, ParentElement, SavePosition, Stack,
 };
-use warpui::presenter::ChildView;
-use warpui::{AppContext, SingletonEntity as _, ViewContext};
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::{AppContext, SingletonEntity as _, ViewContext};
 
 use super::common::{
     add_input_suggestions_overlays, wrap_input_with_terminal_padding_and_focus_handler,
@@ -101,7 +101,7 @@ impl Input {
                 Border::all(1.0)
                     .with_border_fill(internal_colors::fg_overlay_2(appearance.theme())),
             )
-            .with_corner_radius(warp_core::ui::radius::medium())
+            .with_corner_radius(uncaged_core::ui::radius::medium())
             .with_uniform_margin(6.);
 
         // When an alt screen CLI agent (e.g. OpenCode) is running, match

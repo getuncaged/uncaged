@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use warp_cli::agent::Harness;
-use warp_core::features::FeatureFlag;
-use warp_core::user_preferences::GetUserPreferences;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_cli::agent::Harness;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::user_preferences::GetUserPreferences;
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use crate::ai::harness_display;
 

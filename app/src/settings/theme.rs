@@ -1,7 +1,7 @@
 use settings::macros::define_settings_group;
 use settings::{Setting, SupportedPlatforms};
-use warpui::platform::SystemTheme;
-use warpui::AppContext;
+use uncaged_ui::platform::SystemTheme;
+use uncaged_ui::AppContext;
 
 use crate::themes::theme::{RespectSystemTheme, SelectedSystemThemes, ThemeKind};
 

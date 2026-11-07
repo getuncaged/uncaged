@@ -1,6 +1,6 @@
 use settings::Setting as _;
-use warp_core::features::FeatureFlag;
-use warpui::{App, EntityId, ModelHandle, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{App, EntityId, ModelHandle, SingletonEntity};
 
 use super::AgentNotificationsModel;
 use crate::ai::active_agent_views_model::ActiveAgentViewsModel;

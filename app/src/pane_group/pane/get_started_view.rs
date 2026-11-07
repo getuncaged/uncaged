@@ -1,16 +1,16 @@
 use pathfinder_geometry::vector::vec2f;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::color::blend::Blend as _;
-use warp_core::ui::{self};
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::color::blend::Blend as _;
+use uncaged_core::ui::{self};
+use uncaged_ui::elements::{
     Align, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon,
     MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement as _, Radius,
 };
-use warpui::keymap::EditableBinding;
-use warpui::platform::Cursor;
-use warpui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::keymap::EditableBinding;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -27,7 +27,7 @@ use crate::view_components::DismissibleToast;
 use crate::workspace::{ToastStack, Workspace, WorkspaceAction};
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_editable_bindings([EditableBinding::new(
         "workspace:new_tab",
@@ -259,7 +259,7 @@ impl GetStartedView {
                     })
                     .with_hovered_styles(UiComponentStyles {
                         border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                            warp_core::ui::radius::SMALL,
+                            uncaged_core::ui::radius::SMALL,
                         ))),
                         background: Some(
                             theme.background().blend(&theme.surface_overlay_1()).into(),

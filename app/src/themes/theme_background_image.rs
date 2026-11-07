@@ -114,7 +114,7 @@ fn cached_thumbnail_path(full_image: &Path) -> Result<PathBuf> {
     if let Ok(modified) = metadata.modified() {
         modified.hash(&mut hasher);
     }
-    Ok(warp_core::paths::cache_dir()
+    Ok(uncaged_core::paths::cache_dir()
         .join("theme-thumbnails")
         .join(format!("{:016x}.{IMPORTED_EXTENSION}", hasher.finish())))
 }

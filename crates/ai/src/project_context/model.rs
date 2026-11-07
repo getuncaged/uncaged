@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use futures::future::BoxFuture;
-use warp_util::host_id::HostId;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui_core::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui_core::{Entity, ModelContext, SingletonEntity};
+use uncaged_util::host_id::HostId;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::GlobalRules;
 
@@ -14,8 +14,8 @@ cfg_if::cfg_if! {
         use repo_metadata::{
             RepoMetadataEvent, RepoMetadataModel, RepositoryIdentifier, StandingQueryContent,
         };
-        use warp_util::remote_path::RemotePath;
-        use warp_util::standardized_path::StandardizedPath;
+        use uncaged_util::remote_path::RemotePath;
+        use uncaged_util::standardized_path::StandardizedPath;
     }
 }
 

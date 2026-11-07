@@ -1,7 +1,7 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-use warp_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 /// An unique reference to a skill.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -21,14 +21,14 @@ impl fmt::Display for SkillReference {
     }
 }
 
-impl From<SkillReference> for warp_multi_agent_api::skill_descriptor::SkillReference {
+impl From<SkillReference> for uncaged_agent_api::skill_descriptor::SkillReference {
     fn from(reference: SkillReference) -> Self {
         match reference {
             SkillReference::Path(path) => {
-                warp_multi_agent_api::skill_descriptor::SkillReference::Path(path.display_path())
+                uncaged_agent_api::skill_descriptor::SkillReference::Path(path.display_path())
             }
             SkillReference::BundledSkillId(id) => {
-                warp_multi_agent_api::skill_descriptor::SkillReference::BundledSkillId(id)
+                uncaged_agent_api::skill_descriptor::SkillReference::BundledSkillId(id)
             }
         }
     }

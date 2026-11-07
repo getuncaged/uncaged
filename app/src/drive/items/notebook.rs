@@ -1,7 +1,7 @@
-use warpui::elements::{Flex, ParentElement};
-use warpui::fonts::Weight;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element};
+use uncaged_ui::elements::{Flex, ParentElement};
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{AppContext, Element};
 
 use super::{WarpDriveItem, WarpDriveItemId};
 use crate::appearance::Appearance;

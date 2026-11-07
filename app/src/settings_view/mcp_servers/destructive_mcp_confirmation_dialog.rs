@@ -1,6 +1,6 @@
-use warpui::elements::{ChildView, Container, Dismiss, Empty};
-use warpui::ui_components::components::UiComponent;
-use warpui::{
+use uncaged_ui::elements::{ChildView, Container, Dismiss, Empty};
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 

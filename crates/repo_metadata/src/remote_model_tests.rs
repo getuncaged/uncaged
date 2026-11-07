@@ -1,5 +1,5 @@
-use warp_util::standardized_path::StandardizedPath;
-use warpui_core::App;
+use uncaged_ui_core::App;
+use uncaged_util::standardized_path::StandardizedPath;
 
 use super::*;
 use crate::StandingQueryContent;

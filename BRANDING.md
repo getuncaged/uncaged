@@ -39,7 +39,7 @@ Two SVGs, one mark:
   what becomes the dock / Finder icon.
 
 Both are wired through `Icon::Oz` / `Icon::OzCloud` in
-[`crates/warp_core/src/ui/icons.rs`](crates/warp_core/src/ui/icons.rs) — so
+[`crates/uncaged_core/src/ui/icons.rs`](crates/uncaged_core/src/ui/icons.rs) — so
 repointing those two lines swaps the in-app glyph everywhere at once.
 
 ### Regenerating the platform app icons
@@ -62,7 +62,7 @@ rsvg-convert -w 512 -h 512 app/assets/bundled/svg/brand/uncaged-icon.svg > app/c
 
 > **Asset embedding:** bundled SVGs are embedded at **compile time** (`rust-embed`
 > `debug-embed`). After changing any file under `app/assets/bundled/`, run
-> `touch crates/warp_assets/src/lib.rs` before building so the change is picked up.
+> `touch crates/uncaged_assets/src/lib.rs` before building so the change is picked up.
 
 ---
 
@@ -72,7 +72,7 @@ The "Connect a model" gallery, the providers, their brand icons, default models,
 and setup copy are all defined by the `Preset` catalog here. Add, remove, or
 re-order providers in one place. Provider brand SVGs live alongside the logo in
 [`app/assets/bundled/svg/`](app/assets/bundled/svg/) and are mapped to `Icon`
-variants in [`crates/warp_core/src/ui/icons.rs`](crates/warp_core/src/ui/icons.rs).
+variants in [`crates/uncaged_core/src/ui/icons.rs`](crates/uncaged_core/src/ui/icons.rs).
 
 ---
 
@@ -80,7 +80,7 @@ variants in [`crates/warp_core/src/ui/icons.rs`](crates/warp_core/src/ui/icons.r
 
 ```sh
 source "$HOME/.cargo/env"
-touch crates/warp_assets/src/lib.rs           # if any bundled asset changed
+touch crates/uncaged_assets/src/lib.rs           # if any bundled asset changed
 CARGO_INCREMENTAL=0 cargo build --bin warp-oss
 
 # Deploy into the signed app bundle, then RE-SIGN (required — AMFI kills an

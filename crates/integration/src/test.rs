@@ -76,41 +76,39 @@ use sum_tree::SeekBias;
 pub use sync_inputs::*;
 use sysinfo::{Pid, ProcessesToUpdate, System};
 pub use typeahead::*;
-use version_compare::Cmp;
-pub use video_recording::*;
-use warp::appearance::Appearance;
-use warp::cmd_or_ctrl_shift;
-use warp::features::FeatureFlag;
-use warp::integration_testing::assertions::assert_binding_display_string;
-use warp::integration_testing::block::{
+use uncaged::appearance::Appearance;
+use uncaged::cmd_or_ctrl_shift;
+use uncaged::features::FeatureFlag;
+use uncaged::integration_testing::assertions::assert_binding_display_string;
+use uncaged::integration_testing::block::{
     assert_block_visible, assert_bottom_of_block_approx_at, assert_num_blocks_in_model,
     BlockPosition, LinePosition,
 };
-use warp::integration_testing::clipboard::assert_clipboard_contains_string;
-use warp::integration_testing::command_palette::{
+use uncaged::integration_testing::clipboard::assert_clipboard_contains_string;
+use uncaged::integration_testing::command_palette::{
     close_command_palette, open_command_palette, open_command_palette_and_run_action, TestStepsExt,
 };
-use warp::integration_testing::context_chips::assert_working_dir_is_present;
-use warp::integration_testing::find::{Find, FindWithinBlockState};
-use warp::integration_testing::input::{
+use uncaged::integration_testing::context_chips::assert_working_dir_is_present;
+use uncaged::integration_testing::find::{Find, FindWithinBlockState};
+use uncaged::integration_testing::input::{
     input_contains_string, input_is_empty, open_input_context_menu,
 };
-use warp::integration_testing::navigation_palette::{
+use uncaged::integration_testing::navigation_palette::{
     check_recency, navigate_to_other_session_step, open_navigation_palette_step, RecentSession,
 };
-use warp::integration_testing::pane_group::assert_focused_pane_index;
-use warp::integration_testing::settings::{
+use uncaged::integration_testing::pane_group::assert_focused_pane_index;
+use uncaged::integration_testing::settings::{
     assert_installed_themes_contain, set_window_custom_size, toggle_setting,
 };
-use warp::integration_testing::step::{
+use uncaged::integration_testing::step::{
     assert_no_pending_model_events, new_step_with_default_assertions,
     new_step_with_default_assertions_for_pane,
 };
-use warp::integration_testing::tab::{assert_pane_title, assert_tab_title, tab_title_step};
-use warp::integration_testing::terminal::util::{
+use uncaged::integration_testing::tab::{assert_pane_title, assert_tab_title, tab_title_step};
+use uncaged::integration_testing::terminal::util::{
     current_shell_starter_and_version, ExactLine, ExpectedExitStatus,
 };
-use warp::integration_testing::terminal::{
+use uncaged::integration_testing::terminal::{
     assert_active_block_output, assert_active_block_output_for_single_terminal_in_tab,
     assert_active_block_received_precmd, assert_alt_grid_active, assert_alt_screen_output,
     assert_command_executed_for_single_terminal_in_tab, assert_context_menu_is_open,
@@ -129,56 +127,58 @@ use warp::integration_testing::terminal::{
     open_context_menu_for_selected_block, performance_test, run_alt_grid_program, run_completer,
     validate_git_branch, wait_until_bootstrapped_pane, wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::integration_testing::view_getters::{
+use uncaged::integration_testing::view_getters::{
     pane_group_view, single_input_suggestions_view_for_tab, single_input_view_for_tab,
     single_terminal_pane_view_for_tab, single_terminal_view, single_terminal_view_for_tab,
     workspace_view,
 };
-use warp::integration_testing::warp_drive::assert_is_left_panel_open;
-use warp::integration_testing::window::{
+use uncaged::integration_testing::warp_drive::assert_is_left_panel_open;
+use uncaged::integration_testing::window::{
     add_and_save_window, add_window, add_window_and_check_bounds, close_window,
     save_active_window_id,
 };
-use warp::integration_testing::workspace::assert_tab_count;
-use warp::integration_testing::{self, view_of_type};
-use warp::pane_group::AGENT_MODE_PANE_DEFAULT_MINIMUM_WIDTH;
-use warp::settings::{
+use uncaged::integration_testing::workspace::assert_tab_count;
+use uncaged::integration_testing::{self, view_of_type};
+use uncaged::pane_group::AGENT_MODE_PANE_DEFAULT_MINIMUM_WIDTH;
+use uncaged::settings::{
     CompletionsOpenWhileTyping, CtrlTabBehavior, MonospaceFontSize, TabBehavior, INPUT_MODE,
 };
-use warp::settings_view::keybindings::KeybindingsView;
-use warp::settings_view::{FeaturesPageAction, SettingsAction, SettingsSection, SettingsView};
-use warp::terminal::alt_screen_reporting::MouseReportingEnabled;
-use warp::terminal::available_shells::AvailableShells;
-use warp::terminal::block_list_viewport::{InputMode, ScrollLines, ScrollPosition};
-use warp::terminal::find::TerminalFindModel;
-use warp::terminal::input::{Input, InputSuggestionsMode};
-use warp::terminal::keys_settings::KeysSettings;
-use warp::terminal::local_tty::TerminalManager as LocalTtyTerminalManager;
-use warp::terminal::model::ansi::{Handler, InitShellValue};
-use warp::terminal::model::blocks::{BlockHeightItem, BlockHeightSummary, TotalIndex};
-use warp::terminal::model::grid::grid_handler::TermMode;
-use warp::terminal::model::grid::Dimensions;
-use warp::terminal::model::terminal_model::BlockIndex;
-use warp::terminal::session_settings::{HonorPS1, SessionSettings, StartupShellOverride};
-use warp::terminal::view::{
+use uncaged::settings_view::keybindings::KeybindingsView;
+use uncaged::settings_view::{FeaturesPageAction, SettingsAction, SettingsSection, SettingsView};
+use uncaged::terminal::alt_screen_reporting::MouseReportingEnabled;
+use uncaged::terminal::available_shells::AvailableShells;
+use uncaged::terminal::block_list_viewport::{InputMode, ScrollLines, ScrollPosition};
+use uncaged::terminal::find::TerminalFindModel;
+use uncaged::terminal::input::{Input, InputSuggestionsMode};
+use uncaged::terminal::keys_settings::KeysSettings;
+use uncaged::terminal::local_tty::TerminalManager as LocalTtyTerminalManager;
+use uncaged::terminal::model::ansi::{Handler, InitShellValue};
+use uncaged::terminal::model::blocks::{BlockHeightItem, BlockHeightSummary, TotalIndex};
+use uncaged::terminal::model::grid::grid_handler::TermMode;
+use uncaged::terminal::model::grid::Dimensions;
+use uncaged::terminal::model::terminal_model::BlockIndex;
+use uncaged::terminal::session_settings::{HonorPS1, SessionSettings, StartupShellOverride};
+use uncaged::terminal::view::{
     BlockVisibilityMode, TerminalAction, TerminalViewState, ALIAS_EXPANSION_BANNER_SEEN_KEY,
 };
-use warp::terminal::{shell, TerminalView};
-use warp::util::bindings::CustomAction;
-use warp::workflows::categories::CategoriesView;
-use warp::workspace::{
+use uncaged::terminal::{shell, TerminalView};
+use uncaged::util::bindings::CustomAction;
+use uncaged::workflows::categories::CategoriesView;
+use uncaged::workspace::{
     Workspace, WorkspaceAction, NEW_SESSION_MENU_BUTTON_POSITION_ID, NEW_TAB_BUTTON_POSITION_ID,
 };
-use warpui_core::event::KeyState;
-use warpui_core::integration::{AssertionOutcome, StepData, TestStep};
-use warpui_core::keymap::{Keystroke, PerPlatformKeystroke, Trigger};
-use warpui_core::platform::keyboard::KeyCode;
-use warpui_core::platform::{OperatingSystem, TerminationMode};
-use warpui_core::units::Lines;
-use warpui_core::windowing::WindowManager;
-use warpui_core::{
+use uncaged_ui_core::event::KeyState;
+use uncaged_ui_core::integration::{AssertionOutcome, StepData, TestStep};
+use uncaged_ui_core::keymap::{Keystroke, PerPlatformKeystroke, Trigger};
+use uncaged_ui_core::platform::keyboard::KeyCode;
+use uncaged_ui_core::platform::{OperatingSystem, TerminationMode};
+use uncaged_ui_core::units::Lines;
+use uncaged_ui_core::windowing::WindowManager;
+use uncaged_ui_core::{
     async_assert, async_assert_eq, AssetProvider, Event, SingletonEntity, UpdateView, ViewHandle,
 };
+use version_compare::Cmp;
+pub use video_recording::*;
 pub use workflows::*;
 pub use workspace::*;
 

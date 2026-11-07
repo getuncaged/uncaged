@@ -1,10 +1,10 @@
-use warp_core::ui::appearance::Appearance;
-use warp_editor::render::element::VerticalExpansionBehavior;
-use warp_util::user_input::UserInput;
-use warpui::elements::new_scrollable::ScrollableAppearance;
-use warpui::elements::ScrollbarWidth;
-use warpui::platform::WindowStyle;
-use warpui::{App, TypedActionView, ViewHandle, WindowId};
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_editor::render::element::VerticalExpansionBehavior;
+use uncaged_ui::elements::new_scrollable::ScrollableAppearance;
+use uncaged_ui::elements::ScrollbarWidth;
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::{App, TypedActionView, ViewHandle, WindowId};
+use uncaged_util::user_input::UserInput;
 
 use super::{CodeEditorRenderOptions, CodeEditorView, CodeEditorViewAction};
 use crate::cloud_object::model::persistence::CloudModel;

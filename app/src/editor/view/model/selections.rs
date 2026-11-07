@@ -5,9 +5,9 @@ use std::ops::Range;
 use pathfinder_geometry::vector::Vector2F;
 use serde::{Deserialize, Serialize};
 use string_offset::{ByteOffset, CharOffset};
+use uncaged_ui::text::point::Point;
+use uncaged_ui::AppContext;
 use vec1::Vec1;
-use warpui::text::point::Point;
-use warpui::AppContext;
 
 use super::buffer::{Anchor, Buffer, LamportValue, ToBufferOffset, ToCharOffset, ToPoint};
 use super::display_map::{DisplayMap, ToDisplayPoint};

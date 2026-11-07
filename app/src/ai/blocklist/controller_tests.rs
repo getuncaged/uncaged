@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
+use uncaged_ui::{App, SingletonEntity};
 use uuid::Uuid;
-use warpui::{App, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::task::TaskId;

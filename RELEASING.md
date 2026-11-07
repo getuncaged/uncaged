@@ -128,8 +128,8 @@ gh release edit vX.Y.Z --notes-file docs/releases/vX.Y.Z.md
   (each set compiles code the other doesn't; `--all-features` needs `corepack enable`
   for the command-signatures JS build):
   ```bash
-  cargo clippy -p warp -p uncaged_engine --all-targets --tests -- -D warnings -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
-  cargo clippy -p warp -p uncaged_engine --all-targets --all-features --tests -- -D warnings -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
+  cargo clippy -p uncaged -p uncaged_engine --all-targets --tests -- -D warnings -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
+  cargo clippy -p uncaged -p uncaged_engine --all-targets --all-features --tests -- -D warnings -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
   ```
 - The latest Uncaged CI run on `uncaged-0.3` is green, including the Linux and Windows
   jobs (best-effort, so they don't block, but a red one there is a platform-only break).

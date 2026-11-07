@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use warp_core::context_flag::ContextFlag;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use super::network_logging::NetworkLogModel;
 use crate::brand;

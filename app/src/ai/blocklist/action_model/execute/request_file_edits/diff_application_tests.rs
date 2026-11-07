@@ -3,8 +3,8 @@ use std::io::Write as _;
 use ai::diff_validation::{DiffDelta, ParsedDiff, V4AHunk};
 use async_io::block_on;
 use tempfile::NamedTempFile;
+use uncaged_ui::App;
 use vec1::vec1;
-use warpui::App;
 
 use super::*;
 use crate::ai::agent::FileEdit;

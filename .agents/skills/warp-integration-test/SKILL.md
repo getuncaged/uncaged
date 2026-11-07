@@ -32,9 +32,9 @@ The core pieces are:
 - `crates/integration/src/builder.rs`
   - Warp-specific wrapper around the lower-level WarpUI integration builder.
   - Sets default timeout, hermetic home directory, shell rc files, user prefs, and real-display mode when requested.
-- `crates/warpui_core/src/integration/driver.rs`
+- `crates/uncaged_ui_core/src/integration/driver.rs`
   - Executes steps, handles retries, precondition reruns, screenshots, video capture, artifact export, and `on_finish`.
-- `crates/warpui_core/src/integration/step.rs`
+- `crates/uncaged_ui_core/src/integration/step.rs`
   - Defines `TestStep`, input/event APIs, assertion polling, step-to-step data passing, and screenshot/recording hooks.
 - `app/src/integration_testing/`
   - High-level helpers and assertions for common Warp behaviors.
@@ -111,7 +111,7 @@ pub fn test_example() -> Builder {
             new_step_with_default_assertions("Assert some UI state")
                 .add_named_assertion("specific assertion name", |app, window_id| {
                     // inspect app state and return AssertionOutcome
-                    warpui::integration::AssertionOutcome::Success
+                    uncaged_ui::integration::AssertionOutcome::Success
                 }),
         )
 }

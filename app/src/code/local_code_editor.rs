@@ -25,37 +25,37 @@ use pathfinder_geometry::vector::Vector2F;
 #[cfg(feature = "local_fs")]
 use repo_metadata::repositories::DetectedRepositories;
 use string_offset::CharOffset;
-use vec1::Vec1;
-use vim::vim::{MotionType, VimMode};
-use warp_core::features::FeatureFlag;
-use warp_core::r#async::debounce;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::icons::Icon;
-use warp_editor::content::buffer::InitialBufferState;
-use warp_editor::content::text::IndentUnit;
-use warp_editor::render::model::{Decoration, LineCount};
-use warp_util::content_version::ContentVersion;
-use warp_util::file::{FileId, FileLoadError, FileSaveError};
-#[cfg(feature = "local_fs")]
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::path::to_relative_path;
-use warp_util::sync::Condition;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::r#async::debounce;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::icons::Icon;
+use uncaged_editor::content::buffer::InitialBufferState;
+use uncaged_editor::content::text::IndentUnit;
+use uncaged_editor::render::model::{Decoration, LineCount};
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, ClippedScrollStateHandle, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, DropShadow, Flex, Hoverable, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement, ParentOffsetBounds, Radius,
     Rect, Shrinkable, Stack, Text,
 };
-use warpui::keymap::macros::*;
-use warpui::keymap::FixedBinding;
-use warpui::platform::SaveFilePickerConfiguration;
-use warpui::text::point::Point;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::keymap::macros::*;
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::platform::SaveFilePickerConfiguration;
+use uncaged_ui::text::point::Point;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WindowId,
 };
+use uncaged_util::content_version::ContentVersion;
+use uncaged_util::file::{FileId, FileLoadError, FileSaveError};
+#[cfg(feature = "local_fs")]
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::path::to_relative_path;
+use uncaged_util::sync::Condition;
+use vec1::Vec1;
+use vim::vim::{MotionType, VimMode};
 
 use crate::ai::persisted_workspace::{PersistedWorkspace, PersistedWorkspaceEvent};
 use crate::code::buffer_location::LocalOrRemotePath as BufferFileLocation;
@@ -641,7 +641,8 @@ impl LocalCodeEditorView {
                 let window_id = ctx.window_id();
 
                 // Create the on-click action based on whether we have a definition
-                let on_click: Box<dyn Fn(&mut warpui::AppContext)> = if has_different_definition {
+                let on_click: Box<dyn Fn(&mut uncaged_ui::AppContext)> = if has_different_definition
+                {
                     let target_location = definition_locations.first().unwrap().target.clone();
                     Box::new(move |app| {
                         app.dispatch_typed_action_for_view(
@@ -1836,7 +1837,7 @@ impl LocalCodeEditorView {
                                 .with_padding_top(4.)
                                 .with_padding_bottom(4.)
                                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                                    warp_core::ui::radius::SMALL,
+                                    uncaged_core::ui::radius::SMALL,
                                 )))
                                 .with_border(Border::all(1.5).with_border_fill(theme.surface_2()))
                                 .with_drop_shadow(DropShadow::new_with_standard_offset_and_spread(
@@ -2085,13 +2086,13 @@ impl View for LocalCodeEditorView {
         "LocalCodeEditorView"
     }
 
-    fn on_focus(&mut self, focus_ctx: &warpui::FocusContext, ctx: &mut ViewContext<Self>) {
+    fn on_focus(&mut self, focus_ctx: &uncaged_ui::FocusContext, ctx: &mut ViewContext<Self>) {
         if focus_ctx.is_self_focused() {
             self.editor.update(ctx, |editor, ctx| editor.focus(ctx));
         }
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn uncaged_ui::Element> {
         // Rendering the version conflict banner.
         let base: Box<dyn Element> = if self.has_version_conflicts(app) {
             let appearance = Appearance::as_ref(app);

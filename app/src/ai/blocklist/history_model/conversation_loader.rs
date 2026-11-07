@@ -95,9 +95,9 @@ pub fn convert_persisted_conversation_to_ai_conversation_with_metadata(
 
 /// Boxes a future with the right type for the platform.
 /// On WASM, futures must not implement Send.
-fn box_future<F>(f: F) -> warpui::r#async::BoxFuture<'static, Option<CloudConversationData>>
+fn box_future<F>(f: F) -> uncaged_ui::r#async::BoxFuture<'static, Option<CloudConversationData>>
 where
-    F: Future<Output = Option<CloudConversationData>> + warpui::r#async::Spawnable,
+    F: Future<Output = Option<CloudConversationData>> + uncaged_ui::r#async::Spawnable,
 {
     cfg_if::cfg_if! {
         if #[cfg(target_family = "wasm")] {
@@ -136,7 +136,7 @@ impl BlocklistAIHistoryModel {
     pub fn load_conversation_data(
         &self,
         conversation_id: AIConversationId,
-    ) -> warpui::r#async::BoxFuture<'static, Option<CloudConversationData>> {
+    ) -> uncaged_ui::r#async::BoxFuture<'static, Option<CloudConversationData>> {
         // First check if the conversation is already in memory
         if let Some(conversation) = self.conversations_by_id.get(&conversation_id) {
             return box_future(futures::future::ready(Some(CloudConversationData::Oz(
@@ -178,7 +178,7 @@ impl BlocklistAIHistoryModel {
     pub fn load_conversation_by_server_token(
         &mut self,
         server_token: &ServerConversationToken,
-    ) -> warpui::r#async::BoxFuture<'static, Option<CloudConversationData>> {
+    ) -> uncaged_ui::r#async::BoxFuture<'static, Option<CloudConversationData>> {
         let conversation_id =
             self.get_or_set_canonical_conversation_id_for_server_token(server_token);
         if self.conversations_by_id.contains_key(&conversation_id)
@@ -463,12 +463,12 @@ impl BlocklistAIHistoryModel {
                 for task in &agent_conversation.tasks {
                     for message in &task.messages {
                         match &message.message {
-                            Some(warp_multi_agent_api::message::Message::UserQuery(_)) => {
+                            Some(uncaged_agent_api::message::Message::UserQuery(_)) => {
                                 has_user_query = true;
                             }
-                            Some(warp_multi_agent_api::message::Message::SystemQuery(sys)) => {
+                            Some(uncaged_agent_api::message::Message::SystemQuery(sys)) => {
                                 if let Some(
-                                    warp_multi_agent_api::message::system_query::Type::AutoCodeDiff(_),
+                                    uncaged_agent_api::message::system_query::Type::AutoCodeDiff(_),
                                 ) = &sys.r#type
                                 {
                                     has_autocodediff = true;
@@ -494,17 +494,17 @@ impl BlocklistAIHistoryModel {
                         task.messages
                             .iter()
                             .find_map(|msg| match &msg.message {
-                                Some(warp_multi_agent_api::message::Message::UserQuery(
+                                Some(uncaged_agent_api::message::Message::UserQuery(
                                     user_query,
                                 )) => Some(user_query.query.clone()),
-                                Some(warp_multi_agent_api::message::Message::ToolCall(
+                                Some(uncaged_agent_api::message::Message::ToolCall(
                                     tool_call,
                                 )) => {
                                     let Some(tool) = &tool_call.tool else {
                                         return None;
                                     };
 
-                                    if let warp_multi_agent_api::message::tool_call::Tool::ApplyFileDiffs(diff_suggestion) = tool
+                                    if let uncaged_agent_api::message::tool_call::Tool::ApplyFileDiffs(diff_suggestion) = tool
                                     {
                                         Some(diff_suggestion.summary.clone())
                                     } else {

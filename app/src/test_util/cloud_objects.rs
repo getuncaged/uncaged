@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use warpui::ModelContext;
+use uncaged_ui::ModelContext;
 
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{CloudModelType, GenericCloudObject, GenericServerObject};

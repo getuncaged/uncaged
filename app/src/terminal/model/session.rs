@@ -17,16 +17,16 @@ use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use smol_str::SmolStr;
 use typed_path::{TypedPath, TypedPathBuf, WindowsPath};
-use version_compare::Version;
-use warp_completer::completer::{
+use uncaged_completer::completer::{
     CommandExitStatus, CommandOutput, PathSeparators, TopLevelCommandCaseSensitivity,
 };
-use warp_util::path::{
+use uncaged_ui::platform::OperatingSystem;
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
+use uncaged_util::path::{
     convert_msys2_to_windows_native_path, convert_wsl_to_windows_host_path, msys2_exe_to_root,
     ShellFamily,
 };
-use warpui::platform::OperatingSystem;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use version_compare::Version;
 
 use super::ansi::{BootstrappedValue, InitShellValue, SSHValue};
 use super::terminal_model::{HistoryEntry, SubshellInitializationInfo};
@@ -56,8 +56,8 @@ pub enum ReadHistoryContentsError {
     AsyncFsError(std::io::Error),
 }
 
-// SessionId is defined in warp_core and re-exported here for backward compatibility.
-pub use warp_core::SessionId;
+// SessionId is defined in uncaged_core and re-exported here for backward compatibility.
+pub use uncaged_core::SessionId;
 
 /// Information about the sessions within a given terminal pane/top-level
 /// shell.
@@ -795,7 +795,7 @@ impl Session {
 
     pub fn home_dir(&self) -> Option<&str> {
         if cfg!(test) {
-            return warp_util::path::TEST_SESSION_HOME_DIR.as_deref();
+            return uncaged_util::path::TEST_SESSION_HOME_DIR.as_deref();
         }
 
         self.info.home_dir.as_deref()
@@ -845,9 +845,9 @@ impl Session {
     /// representation, or `None` when no conversion is appropriate.
     pub fn windows_path_converter(&self) -> Option<fn(&str) -> String> {
         if self.is_wsl() {
-            Some(warp_util::path::convert_windows_path_to_wsl)
+            Some(uncaged_util::path::convert_windows_path_to_wsl)
         } else if self.is_msys2() {
-            Some(warp_util::path::convert_windows_path_to_msys2)
+            Some(uncaged_util::path::convert_windows_path_to_msys2)
         } else {
             None
         }

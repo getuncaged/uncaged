@@ -4,7 +4,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use settings::macros::{define_settings_group, maybe_define_setting, register_settings_events};
 use settings::{Setting, SupportedPlatforms};
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 pub trait RegexDisplayInfo {
     fn pattern(&self) -> &str;

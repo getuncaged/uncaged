@@ -3,23 +3,23 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 use pathfinder_geometry::vector::{vec2f, Vector2F};
-use warp_core::features::FeatureFlag;
-use warp_core::ui::Icon;
-use warp_editor::editor::NavigationKey;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::Icon;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, Element, Fill, Flex, FormattedTextElement, Hoverable, MainAxisAlignment,
     MainAxisSize, MouseStateHandle, OffsetPositioning, Padding, ParentAnchor, ParentElement,
     ParentOffsetBounds, Radius, SavePosition, ScrollStateHandle, Scrollable, ScrollableElement,
     ScrollbarWidth, Shrinkable, Stack, Text, UniformList, UniformListState,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::macros::*;
-use warpui::keymap::FixedBinding;
-use warpui::platform::Cursor;
-use warpui::text_layout::TextAlignment;
-use warpui::ui_components::components::UiComponent;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::macros::*;
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::text_layout::TextAlignment;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{
     AppContext, BlurContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WindowId,
 };
@@ -784,7 +784,7 @@ fn render_zero_state(
                 .with_padding(Padding::uniform(0.).with_left(8.).with_right(8.))
                 .with_border(Border::all(1.).with_border_fill(theme.surface_3()))
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )));
             if mouse_state.is_hovered() {
                 container = container.with_background(theme.surface_3());
@@ -837,7 +837,7 @@ fn render_search_box(
         .with_padding(Padding::uniform(6.).with_left(12.).with_right(12.))
         .with_border(Border::all(1.).with_border_fill(theme.surface_3()))
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )))
         .finish();
 
@@ -855,7 +855,7 @@ fn render_search_box(
         .with_uniform_padding(7.)
         .with_border(Border::all(1.).with_border_fill(theme.surface_3()))
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         )));
         if state.is_hovered() {
             button = button.with_background(theme.surface_3());

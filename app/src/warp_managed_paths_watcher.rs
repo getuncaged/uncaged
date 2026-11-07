@@ -9,8 +9,8 @@ use repo_metadata::RepositoryUpdate;
 #[cfg(any(not(target_family = "wasm"), test))]
 use repo_metadata::TargetFile;
 #[cfg(not(target_family = "wasm"))]
-use warpui::ModelHandle;
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::ModelHandle;
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 #[cfg(not(target_family = "wasm"))]
 use watcher::{BulkFilesystemWatcher, BulkFilesystemWatcherEvent};
 
@@ -25,7 +25,7 @@ use watcher::{BulkFilesystemWatcher, BulkFilesystemWatcherEvent};
 const WARP_MANAGED_PATHS_WATCHER_DEBOUNCE_MILLI_SECS: u64 = 2000;
 
 pub(crate) fn warp_data_dir() -> PathBuf {
-    warp_core::paths::data_dir()
+    uncaged_core::paths::data_dir()
 }
 
 #[cfg(target_family = "wasm")]
@@ -41,7 +41,7 @@ pub(crate) fn ensure_warp_watch_roots_exist() {
         );
     }
 
-    let config_local_dir = warp_core::paths::config_local_dir();
+    let config_local_dir = uncaged_core::paths::config_local_dir();
     if config_local_dir != data_dir {
         if let Err(err) = fs::create_dir_all(&config_local_dir) {
             log::warn!(
@@ -54,17 +54,17 @@ pub(crate) fn ensure_warp_watch_roots_exist() {
 
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
 pub(crate) fn warp_home_config_dir() -> Option<PathBuf> {
-    warp_core::paths::warp_home_config_dir()
+    uncaged_core::paths::warp_home_config_dir()
 }
 
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
 pub(crate) fn warp_home_skills_dir() -> Option<PathBuf> {
-    warp_core::paths::warp_home_skills_dir()
+    uncaged_core::paths::warp_home_skills_dir()
 }
 
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
 pub(crate) fn warp_home_mcp_config_file_path() -> Option<PathBuf> {
-    warp_core::paths::warp_home_mcp_config_file_path()
+    uncaged_core::paths::warp_home_mcp_config_file_path()
 }
 
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
@@ -251,7 +251,7 @@ impl WarpManagedPathsWatcher {
 
         if should_register_watcher {
             let data_dir = warp_data_dir();
-            let config_local_dir = warp_core::paths::config_local_dir();
+            let config_local_dir = uncaged_core::paths::config_local_dir();
             let should_register_config_local_dir = config_local_dir != data_dir;
             let worktrees_dir = data_dir.join("worktrees");
             // Safe to use for both directory registration and event emission.

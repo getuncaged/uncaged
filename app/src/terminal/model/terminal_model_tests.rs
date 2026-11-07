@@ -2,10 +2,10 @@ use std::fs;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chrono::{DateTime, Local};
+use uncaged_core::command::ExitCode;
+use uncaged_terminal::model::ansi::ClearMode;
+use uncaged_ui::text::{str_to_byte_vec, SelectionType};
 use vec1::vec1;
-use warp_core::command::ExitCode;
-use warp_terminal::model::ansi::ClearMode;
-use warpui::text::{str_to_byte_vec, SelectionType};
 
 use super::*;
 use crate::terminal::event_listener::ChannelEventListener;

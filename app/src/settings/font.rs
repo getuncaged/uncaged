@@ -1,10 +1,10 @@
 use settings::macros::define_settings_group;
 use settings::{Setting, SupportedPlatforms};
-use warp_core::ui::builder::MIN_FONT_SIZE;
-use warpui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
-use warpui::fonts::Weight;
-use warpui::rendering::ThinStrokes;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_core::ui::builder::MIN_FONT_SIZE;
+use uncaged_ui::elements::DEFAULT_UI_LINE_HEIGHT_RATIO;
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::rendering::ThinStrokes;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use super::EnforceMinimumContrast as EnforceMinimumContrastEnum;
 

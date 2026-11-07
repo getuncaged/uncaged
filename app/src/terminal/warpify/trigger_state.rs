@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use parking_lot::FairMutex;
-use warp_core::ui::appearance::Appearance;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{EntityId, SingletonEntity as _, ViewContext, ViewHandle};
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{EntityId, SingletonEntity as _, ViewContext, ViewHandle};
 
 use super::success_block::WarpifySuccessBlock;
 use crate::terminal::model::block::BlockId;

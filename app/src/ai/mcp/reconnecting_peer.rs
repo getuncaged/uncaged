@@ -2,8 +2,8 @@
 
 use std::future::Future;
 
+use uncaged_ui::ModelSpawner;
 use uuid::Uuid;
-use warpui::ModelSpawner;
 
 use super::TemplatableMCPServerManager;
 

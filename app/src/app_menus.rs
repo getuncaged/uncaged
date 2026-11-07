@@ -8,15 +8,15 @@ use enclose::enclose;
 use itertools::Itertools;
 use settings::manager::SettingsManager;
 use settings::Setting as _;
-use warp_core::context_flag::ContextFlag;
-use warp_util::path::user_friendly_path;
-use warpui::actions::StandardAction;
-use warpui::keymap::{Keystroke, Trigger};
-use warpui::platform::menu::{
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_ui::actions::StandardAction;
+use uncaged_ui::keymap::{Keystroke, Trigger};
+use uncaged_ui::platform::menu::{
     CustomMenuItem, Menu, MenuBar, MenuItem, MenuItemProperties, MenuItemPropertyChanges,
 };
-use warpui::windowing::WindowManager;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{AppContext, SingletonEntity};
+use uncaged_util::path::user_friendly_path;
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::default_terminal::DefaultTerminal;

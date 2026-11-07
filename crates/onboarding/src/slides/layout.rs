@@ -1,12 +1,12 @@
 use pathfinder_geometry::vector::{vec2f, Vector2F};
-use warpui_core::assets::asset_cache::AssetSource;
-use warpui_core::elements::{
+use uncaged_ui_core::assets::asset_cache::AssetSource;
+use uncaged_ui_core::elements::{
     Align, CacheOption, Clipped, ConstrainedBox, Container, CrossAxisAlignment, Empty, Expanded,
     Flex, Image, MainAxisSize, ParentElement, Point, Shrinkable, SizeConstraintCondition,
     SizeConstraintSwitch, Stack,
 };
-use warpui_core::event::DispatchedEvent;
-use warpui_core::{
+use uncaged_ui_core::event::DispatchedEvent;
+use uncaged_ui_core::{
     AfterLayoutContext, AppContext, Element, EventContext, LayoutContext, PaintContext,
     SizeConstraint,
 };
@@ -53,8 +53,8 @@ pub fn static_left(
     // appears. Slides that render an on-brand drawn mock call
     // `static_left_two_column` directly to keep their preview.
     if matches!(
-        warp_core::channel::ChannelState::channel(),
-        warp_core::channel::Channel::Oss
+        uncaged_core::channel::ChannelState::channel(),
+        uncaged_core::channel::Channel::Oss
     ) {
         return Align::new(
             ConstrainedBox::new(left())

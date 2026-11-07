@@ -1,8 +1,8 @@
 use onboarding::slides::{AgentAutonomy, AgentDevelopmentSettings};
 use onboarding::{SelectedSettings, SessionDefault, UICustomizationSettings};
 use settings::Setting as _;
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, SingletonEntity as _};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, SingletonEntity as _};
 
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::execution_profiles::{ActionPermission, WriteToPtyPermission};

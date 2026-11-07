@@ -7,14 +7,14 @@ use std::path::PathBuf;
 
 use ai::skills::SkillReference;
 pub use data_source::*;
-pub use view::{CloseReason, InlineSlashCommandView, SlashCommandsEvent};
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::AnsiColorIdentifier;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::AnsiColorIdentifier;
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::{AppContext, SingletonEntity, ViewContext};
 #[cfg(feature = "local_fs")]
-use warp_util::path::{CleanPathResult, LineAndColumnArg};
-use warpui::clipboard::ClipboardContent;
-use warpui::{AppContext, SingletonEntity, ViewContext};
+use uncaged_util::path::{CleanPathResult, LineAndColumnArg};
+pub use view::{CloseReason, InlineSlashCommandView, SlashCommandsEvent};
 
 use crate::ai::blocklist::agent_view::{
     AgentViewEntryOrigin, DismissalStrategy, EphemeralMessage, ENTER_OR_EXIT_CONFIRMATION_WINDOW,

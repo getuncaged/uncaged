@@ -1,24 +1,24 @@
 use std::time::Duration;
 
-use warp::features::FeatureFlag;
-use warp::integration_testing::clipboard::write_to_clipboard;
-use warp::integration_testing::input::{
+use uncaged::features::FeatureFlag;
+use uncaged::integration_testing::clipboard::write_to_clipboard;
+use uncaged::integration_testing::input::{
     assert_autosuggestion_state, input_contains_string, open_inline_model_selector_from_chip,
     tab_completions_menu_is_open, toggle_inline_model_selector_from_chip, AutosuggestionState,
 };
-use warp::integration_testing::step::new_step_with_default_assertions;
-use warp::integration_testing::terminal::util::{
+use uncaged::integration_testing::step::new_step_with_default_assertions;
+use uncaged::integration_testing::terminal::util::{
     current_shell_starter_and_version, ExpectedExitStatus,
 };
-use warp::integration_testing::terminal::{
+use uncaged::integration_testing::terminal::{
     execute_command_for_single_terminal_in_tab, wait_until_bootstrapped_single_pane_for_tab,
 };
-use warp::integration_testing::view_getters::{
+use uncaged::integration_testing::view_getters::{
     single_input_view_for_tab, single_terminal_view_for_tab,
 };
-use warp::terminal::shell::ShellType;
-use warpui_core::integration::TestStep;
-use warpui_core::{async_assert_eq, Event};
+use uncaged::terminal::shell::ShellType;
+use uncaged_ui_core::integration::TestStep;
+use uncaged_ui_core::{async_assert_eq, Event};
 
 use super::new_builder;
 use crate::Builder;

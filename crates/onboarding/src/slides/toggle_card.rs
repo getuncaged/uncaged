@@ -1,18 +1,18 @@
 use pathfinder_geometry::vector::Vector2F;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::Fill;
-use warpui_core::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::Fill;
+use uncaged_ui_core::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex,
     FormattedTextElement, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, Shrinkable, Text, Wrap,
 };
-use warpui_core::fonts::Weight;
-use warpui_core::platform::Cursor;
-use warpui_core::prelude::Align;
-use warpui_core::presenter::EventContext;
-use warpui_core::text_layout::TextAlignment;
-use warpui_core::{AppContext, Element};
+use uncaged_ui_core::fonts::Weight;
+use uncaged_ui_core::platform::Cursor;
+use uncaged_ui_core::prelude::Align;
+use uncaged_ui_core::presenter::EventContext;
+use uncaged_ui_core::text_layout::TextAlignment;
+use uncaged_ui_core::{AppContext, Element};
 
 pub(super) type ClickCallback = Box<dyn FnMut(&mut EventContext, &AppContext, Vector2F) + 'static>;
 pub(super) type HoverCallback =
@@ -205,7 +205,7 @@ pub(super) fn render_inline_segmented_control(
                 .with_padding_left(8.)
                 .with_padding_right(8.)
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )));
 
             if is_selected {
@@ -283,7 +283,7 @@ fn render_chip(appearance: &Appearance, mut chip: ChipSpec) -> Box<dyn Element> 
             .with_padding_left(12.)
             .with_padding_right(12.)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )));
 
         if let Some(bg) = bg {

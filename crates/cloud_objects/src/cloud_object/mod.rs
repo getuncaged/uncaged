@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
-use warp_core::features::FeatureFlag;
+use uncaged_core::features::FeatureFlag;
 
 use crate::auth::UserUid;
 use crate::drive::sharing::{SharingAccessLevel, Subject, TeamKind, UserKind};

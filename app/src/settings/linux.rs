@@ -1,6 +1,6 @@
 use settings::macros::define_settings_group;
 use settings::SupportedPlatforms;
-use warpui::platform::linux;
+use uncaged_ui::platform::linux;
 
 define_settings_group!(LinuxAppConfiguration,
     settings: [

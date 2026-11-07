@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use settings::macros::define_settings_group;
 use settings::SupportedPlatforms;
-use warp_core::features::FeatureFlag;
-use warpui::units::Pixels;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::units::Pixels;
+use uncaged_ui::{AppContext, SingletonEntity};
 
 use crate::settings::{AISettings, InputSettings, TerminalSpacing};
 

@@ -11,14 +11,14 @@ use mcp::oauth::{
 use mcp::runtime::{error_to_user_message, spawn_server};
 use parking_lot::Mutex;
 use simple_logger::manager::LogManager;
+use uncaged_core::execution_mode::AppExecutionMode;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::safe_error;
+use uncaged_core::settings::Setting as _;
+use uncaged_ui::windowing::WindowManager;
+use uncaged_ui::{AppContext, ModelContext, SingletonEntity};
 use url::Url;
 use uuid::Uuid;
-use warp_core::execution_mode::AppExecutionMode;
-use warp_core::features::FeatureFlag;
-use warp_core::safe_error;
-use warp_core::settings::Setting as _;
-use warpui::windowing::WindowManager;
-use warpui::{AppContext, ModelContext, SingletonEntity};
 
 use super::{
     MCPServerState, SpawnedServerInfo, TemplatableMCPServerInfo, TemplatableMCPServerManager,
@@ -154,7 +154,7 @@ impl TemplatableMCPServerManager {
             anyhow::bail!("No spawned server found for uuid={server_uuid}");
         };
 
-        warpui::r#async::block_on(server_info.oauth_result_tx.send(result)).map_err(|_| {
+        uncaged_ui::r#async::block_on(server_info.oauth_result_tx.send(result)).map_err(|_| {
             anyhow::anyhow!(
                 "Failed to send OAuth result to server {server_uuid} - receiver dropped"
             )
@@ -166,7 +166,7 @@ impl TemplatableMCPServerManager {
 
     fn save_credentials_to_secure_storage(
         &mut self,
-        app: &mut warpui::AppContext,
+        app: &mut uncaged_ui::AppContext,
         installation_uuid: Uuid,
         credentials: PersistedCredentials,
     ) {
@@ -197,7 +197,7 @@ impl TemplatableMCPServerManager {
     pub fn delete_credentials_from_secure_storage(
         &mut self,
         installation_uuid: Uuid,
-        app: &mut warpui::AppContext,
+        app: &mut uncaged_ui::AppContext,
     ) {
         if let Some(template_uuid) = self.get_template_uuid(installation_uuid) {
             self.server_credentials.remove(&template_uuid);

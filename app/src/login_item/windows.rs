@@ -9,8 +9,8 @@
 use std::path::{Path, PathBuf};
 
 use ::settings::Setting;
-use warp_core::channel::ChannelState;
-use warpui::{AppContext, SingletonEntity};
+use uncaged_core::channel::ChannelState;
+use uncaged_ui::{AppContext, SingletonEntity};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
 use winreg::RegKey;
 

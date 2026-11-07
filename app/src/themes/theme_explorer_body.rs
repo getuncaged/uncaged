@@ -11,17 +11,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use settings::Setting as _;
-use warp_core::ui::theme::WarpTheme;
-use warpui::assets::asset_cache::AssetSource;
-use warpui::elements::{
+use uncaged_core::ui::theme::WarpTheme;
+use uncaged_ui::assets::asset_cache::AssetSource;
+use uncaged_ui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
     Element, EventHandler, Fill, Flex, Icon, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     ParentElement, Radius, Shrinkable, Text, Wrap,
 };
-use warpui::platform::{Cursor, SystemTheme};
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::platform::{Cursor, SystemTheme};
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, Entity, SingletonEntity, TypedActionView, UpdateModel, View, ViewContext,
     ViewHandle,
 };
@@ -1031,8 +1031,8 @@ impl ThemeExplorerBody {
 /// A small filled label.
 fn pill(
     label: &str,
-    background: warp_core::ui::theme::Fill,
-    text: warpui::color::ColorU,
+    background: uncaged_core::ui::theme::Fill,
+    text: uncaged_ui::color::ColorU,
     appearance: &Appearance,
 ) -> Box<dyn Element> {
     Container::new(

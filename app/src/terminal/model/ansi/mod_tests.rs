@@ -3,8 +3,8 @@ use std::io;
 use std::path::PathBuf;
 
 use hex;
-use warp_core::command::ExitCode;
-use warpui::color::ColorU;
+use uncaged_core::command::ExitCode;
+use uncaged_ui::color::ColorU;
 
 use super::*;
 use crate::terminal::model::ansi::InputBufferValue;

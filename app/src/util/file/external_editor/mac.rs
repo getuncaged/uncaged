@@ -6,9 +6,9 @@ use instant::Instant;
 use objc2::rc::{autoreleasepool, Retained};
 use objc2_app_kit::NSWorkspace;
 use objc2_foundation::{NSBundle, NSString, NSURL};
-use warp_core::channel::ChannelState;
-use warp_core::AppId;
-use warpui::ApplicationBundleInfo;
+use uncaged_core::channel::ChannelState;
+use uncaged_core::AppId;
+use uncaged_ui::ApplicationBundleInfo;
 
 use super::*;
 

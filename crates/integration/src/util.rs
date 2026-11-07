@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 use itertools::Itertools as _;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use version_compare::Version;
-use warp::integration_testing::terminal::util::{
+use uncaged::integration_testing::terminal::util::{
     current_shell_starter_and_version, default_histfile_directory, ExpectedOutput,
 };
-use warp::integration_testing::view_getters;
-use warp::terminal::shell;
-use warp::terminal::shell::ShellType;
-use warpui_core::{App, WindowId};
+use uncaged::integration_testing::view_getters;
+use uncaged::terminal::shell;
+use uncaged::terminal::shell::ShellType;
+use uncaged_ui_core::{App, WindowId};
+use version_compare::Version;
 
 use crate::builder::cargo_target_tmpdir;
 

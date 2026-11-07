@@ -3,14 +3,14 @@ use std::ops::Range;
 
 use string_offset::CharOffset;
 #[cfg(not(target_family = "wasm"))]
-use warp_core::channel::ChannelState;
+use uncaged_core::channel::ChannelState;
 #[cfg(not(target_family = "wasm"))]
-use warp_editor::content::find::SearchConfig;
+use uncaged_editor::content::find::SearchConfig;
 #[cfg(not(target_family = "wasm"))]
-use warp_editor::search::Searcher;
-use warp_editor::search::{RestorableSearchResults, SelectedResult};
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{AppContext, Entity, EntityId, ModelContext, ViewHandle, WeakViewHandle};
+use uncaged_editor::search::Searcher;
+use uncaged_editor::search::{RestorableSearchResults, SelectedResult};
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{AppContext, Entity, EntityId, ModelContext, ViewHandle, WeakViewHandle};
 
 use crate::code::local_code_editor::LocalCodeEditorView;
 use crate::code_review::code_review_view::CodeReviewView;
@@ -204,7 +204,7 @@ impl CodeReviewFindModel {
         &self,
         editor_id: EntityId,
         ctx: &AppContext,
-    ) -> Option<warpui::ModelHandle<Searcher>> {
+    ) -> Option<uncaged_ui::ModelHandle<Searcher>> {
         let view = self.weak_view_handle.upgrade(ctx);
         if view.is_none() {
             if ChannelState::enable_debug_features() {

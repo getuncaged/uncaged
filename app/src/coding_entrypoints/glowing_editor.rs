@@ -1,14 +1,16 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::Vector2F;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::Icon;
-use warpui::elements::{
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::Icon;
+use uncaged_ui::elements::{
     Align, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DropShadow, Flex,
     MainAxisAlignment, ParentElement as _, Radius, Shrinkable,
 };
-use warpui::fonts::Weight;
-use warpui::ui_components::components::{BorderStyle, Coords, UiComponent as _, UiComponentStyles};
-use warpui::{
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::ui_components::components::{
+    BorderStyle, Coords, UiComponent as _, UiComponentStyles,
+};
+use uncaged_ui::{
     AppContext, Element, Entity, FocusContext, SingletonEntity as _, TypedActionView, View,
     ViewContext, ViewHandle,
 };
@@ -193,7 +195,7 @@ impl View for GlowingEditor {
         Container::new(editor_content.finish())
             .with_border(border_fill)
             .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             )))
             .with_drop_shadow(
                 DropShadow::new_with_standard_offset_and_spread(shadow_color)

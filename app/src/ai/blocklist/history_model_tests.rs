@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use chrono::{DateTime, Local, Utc};
 use itertools::Itertools;
+use uncaged_cli::agent::Harness;
+use uncaged_ui::{App, EntityId};
 use uuid::Uuid;
-use warp_cli::agent::Harness;
-use warpui::{App, EntityId};
 
 use super::{
     convert_persisted_conversation_to_ai_conversation_with_metadata, AIConversationMetadata,
@@ -68,14 +68,14 @@ fn create_user_query_message(
     task_id: &str,
     request_id: &str,
     query: &str,
-) -> warp_multi_agent_api::Message {
-    warp_multi_agent_api::Message {
+) -> uncaged_agent_api::Message {
+    uncaged_agent_api::Message {
         id: id.to_string(),
         task_id: task_id.to_string(),
         server_message_data: String::new(),
         citations: vec![],
-        message: Some(warp_multi_agent_api::message::Message::UserQuery(
-            warp_multi_agent_api::message::UserQuery {
+        message: Some(uncaged_agent_api::message::Message::UserQuery(
+            uncaged_agent_api::message::UserQuery {
                 query: query.to_string(),
                 context: None,
                 referenced_attachments: HashMap::new(),
@@ -97,7 +97,7 @@ fn persisted_agent_conversation(
     let task_id = format!("task-{conversation_id}");
     let tasks = initial_query
         .map(|query| {
-            vec![warp_multi_agent_api::Task {
+            vec![uncaged_agent_api::Task {
                 id: task_id.clone(),
                 messages: vec![create_user_query_message(
                     "message-1",
@@ -191,7 +191,7 @@ fn rename_conversation_updates_title_and_cached_metadata() {
         let conversation_id = AIConversationId::new();
         let conversation = AIConversation::new_restored(
             conversation_id,
-            vec![warp_multi_agent_api::Task {
+            vec![uncaged_agent_api::Task {
                 id: "root-task".to_string(),
                 messages: vec![],
                 dependencies: None,
@@ -440,7 +440,7 @@ fn test_initialize_historical_conversations_uses_root_task_description_title() {
                 .expect("conversation data should serialize"),
                 last_modified_at: now,
             },
-            tasks: vec![warp_multi_agent_api::Task {
+            tasks: vec![uncaged_agent_api::Task {
                 id: task_id.clone(),
                 messages: vec![create_user_query_message(
                     "message-1",
@@ -2322,7 +2322,7 @@ fn test_initialize_output_for_response_stream_persists_updated_conversation_stat
                 &stream_id,
                 conversation_id,
                 terminal_view_id,
-                warp_multi_agent_api::response_event::StreamInit {
+                uncaged_agent_api::response_event::StreamInit {
                     request_id: "request-1".to_string(),
                     conversation_id: server_token.clone(),
                     run_id: run_id.clone(),
@@ -2582,7 +2582,7 @@ fn test_find_by_token_after_initialize_output_for_response_stream() {
                 &stream_id,
                 conversation_id,
                 terminal_view_id,
-                warp_multi_agent_api::response_event::StreamInit {
+                uncaged_agent_api::response_event::StreamInit {
                     request_id: String::new(),
                     conversation_id: server_token_str.clone(),
                     run_id: String::new(),
@@ -2664,7 +2664,7 @@ fn test_find_by_token_after_insert_forked_conversation_from_tasks() {
             last_event_sequence: None,
             pinned: false,
         };
-        let tasks = vec![warp_multi_agent_api::Task {
+        let tasks = vec![uncaged_agent_api::Task {
             id: "root-task".to_string(),
             messages: vec![],
             dependencies: None,
@@ -3200,7 +3200,7 @@ fn test_fork_conversation_preserves_task_ids_when_requested() {
                 .fork_conversation(&source, "[Fork] ", true, None, ctx)
                 .expect("fork must succeed when sqlite sender is wired up");
 
-            let forked_tasks: Vec<&warp_multi_agent_api::Task> =
+            let forked_tasks: Vec<&uncaged_agent_api::Task> =
                 forked.all_tasks().filter_map(|t| t.source()).collect();
             let forked_root = forked_tasks
                 .iter()

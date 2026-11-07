@@ -1,4 +1,4 @@
-use warpui::{SingletonEntity, UpdateView};
+use uncaged_ui::{SingletonEntity, UpdateView};
 
 use super::{
     fork_label_for_query, mark_feature_used_and_write_to_user_defaults, AIAgentExchangeId,

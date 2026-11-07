@@ -1,8 +1,8 @@
 use std::ops::Deref;
 
 use serde::{Serialize, Serializer};
-use warpui::platform::Cursor;
-use warpui::ViewContext;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ViewContext;
 
 use crate::terminal::model::grid::grid_handler::Link;
 use crate::terminal::model::index::Point;
@@ -19,8 +19,8 @@ cfg_if::cfg_if! {
             util::openable_file_type::FileTarget,
         };
         use std::path::PathBuf;
-        use warp_util::path::CleanPathResult;
-        use warp_util::path::LineAndColumnArg;
+        use uncaged_util::path::CleanPathResult;
+        use uncaged_util::path::LineAndColumnArg;
     }
 }
 

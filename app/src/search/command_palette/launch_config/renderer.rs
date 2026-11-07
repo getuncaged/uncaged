@@ -1,11 +1,11 @@
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, Flex, Highlight, ParentElement, Radius,
     Shrinkable, Text,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::text::Span;
-use warpui::Element;
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::text::Span;
+use uncaged_ui::Element;
 
 use crate::appearance::Appearance;
 use crate::launch_configs::launch_config::LaunchConfig;
@@ -59,7 +59,7 @@ impl LaunchConfig {
                     .into_solid(),
             ),
             border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             ))),
             background: Some(appearance.theme().background().into()),
             height: Some(24.),

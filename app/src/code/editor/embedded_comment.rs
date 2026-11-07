@@ -5,19 +5,19 @@ use std::sync::Arc;
 
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use serde_yaml::Mapping;
-use uuid::Uuid;
-use warp_editor::content::markdown::MarkdownStyle;
-use warp_editor::editor::EmbeddedItemModel;
-use warp_editor::render::element::{RenderContext, RenderableBlock};
-use warp_editor::render::layout::TextLayout;
-use warp_editor::render::model::viewport::ViewportItem;
-use warp_editor::render::model::{
+use uncaged_editor::content::markdown::MarkdownStyle;
+use uncaged_editor::editor::EmbeddedItemModel;
+use uncaged_editor::render::element::{RenderContext, RenderableBlock};
+use uncaged_editor::render::layout::TextLayout;
+use uncaged_editor::render::model::viewport::ViewportItem;
+use uncaged_editor::render::model::{
     BlockSpacing, EmbeddedItem, EmbeddedItemHTMLRepresentation, EmbeddedItemRichFormat,
     LaidOutEmbeddedItem, RenderState,
 };
-use warpui::event::DispatchedEvent;
-use warpui::units::Pixels;
-use warpui::{AppContext, EntityId, EventContext, LayoutContext, ViewHandle, WindowId};
+use uncaged_ui::event::DispatchedEvent;
+use uncaged_ui::units::Pixels;
+use uncaged_ui::{AppContext, EntityId, EventContext, LayoutContext, ViewHandle, WindowId};
+use uuid::Uuid;
 
 use crate::code::editor::comment_editor::CommentEditor;
 use crate::code_review::comments::CommentId;

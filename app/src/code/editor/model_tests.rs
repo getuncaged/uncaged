@@ -1,11 +1,11 @@
 use std::path::Path;
 
 use futures::channel::oneshot;
+use uncaged_editor::content::buffer::{InitialBufferState, SelectionOffsets};
+use uncaged_editor::multiline::MultilineString;
+use uncaged_ui::App;
+use uncaged_util::content_version::ContentVersion;
 use vec1::vec1;
-use warp_editor::content::buffer::{InitialBufferState, SelectionOffsets};
-use warp_editor::multiline::MultilineString;
-use warp_util::content_version::ContentVersion;
-use warpui::App;
 
 use super::*;
 use crate::code::editor::line::EditorLineLocation;

@@ -1,5 +1,5 @@
 use chrono::Duration;
-use warpui::{App, ModelHandle};
+use uncaged_ui::{App, ModelHandle};
 
 use super::*;
 

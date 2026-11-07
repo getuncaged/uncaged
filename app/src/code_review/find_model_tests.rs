@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use repo_metadata::repositories::DetectedRepositories;
 use string_offset::CharOffset;
-use warp_core::ui::appearance::Appearance;
-use warp_editor::content::buffer::InitialBufferState;
-use warp_editor::render::element::VerticalExpansionBehavior;
-use warpui::elements::Empty;
-use warpui::platform::WindowStyle;
-use warpui::{App, Element as _, ModelHandle, ViewHandle};
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_editor::content::buffer::InitialBufferState;
+use uncaged_editor::render::element::VerticalExpansionBehavior;
+use uncaged_ui::elements::Empty;
+use uncaged_ui::platform::WindowStyle;
+use uncaged_ui::{App, Element as _, ModelHandle, ViewHandle};
 
 use super::*;
 use crate::ai::request_usage_model::AIRequestUsageModel;
@@ -30,12 +30,12 @@ use crate::NotebookKeybindings;
 #[derive(Default)]
 struct TestView;
 
-impl warpui::Entity for TestView {
+impl uncaged_ui::Entity for TestView {
     type Event = ();
 }
 
-impl warpui::View for TestView {
-    fn render(&self, _: &warpui::AppContext) -> Box<dyn warpui::Element> {
+impl uncaged_ui::View for TestView {
+    fn render(&self, _: &uncaged_ui::AppContext) -> Box<dyn uncaged_ui::Element> {
         Empty::new().finish()
     }
 
@@ -44,7 +44,7 @@ impl warpui::View for TestView {
     }
 }
 
-impl warpui::TypedActionView for TestView {
+impl uncaged_ui::TypedActionView for TestView {
     type Action = ();
 }
 

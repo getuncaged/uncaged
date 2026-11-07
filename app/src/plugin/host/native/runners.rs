@@ -4,8 +4,8 @@ use std::sync::Arc;
 use async_channel::Receiver;
 use futures::channel::oneshot;
 use parking_lot::Mutex;
-use warp_js::JsFunctionId;
-use warpui::r#async::executor::Background;
+use uncaged_js::JsFunctionId;
+use uncaged_ui::r#async::executor::Background;
 
 use super::plugin::{AppServiceCallers, PluginRequest, PluginResponse};
 use super::plugin_ref::PluginRef;

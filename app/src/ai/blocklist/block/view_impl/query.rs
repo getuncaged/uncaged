@@ -2,16 +2,16 @@
 //!
 //! Queries are not rendered in blocks corresponding to requested command or requested action responses.
 
-use warp_core::features::FeatureFlag;
-use warp_core::ui::theme::color::internal_colors;
-use warpui::elements::{
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui::elements::{
     Container, CornerRadius, DispatchEventResult, EventHandler, Flex, MainAxisAlignment,
     MainAxisSize, ParentElement, Radius, Shrinkable, Wrap,
 };
-use warpui::fonts::{Properties, Style, Weight};
-use warpui::ui_components::chip::Chip;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, SingletonEntity};
+use uncaged_ui::fonts::{Properties, Style, Weight};
+use uncaged_ui::ui_components::chip::Chip;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::{AppContext, Element, SingletonEntity};
 
 use super::common::{render_query_text, render_user_avatar, FindContext};
 use crate::ai::blocklist::block::view_impl::common::UserQueryProps;
@@ -106,7 +106,7 @@ pub(crate) fn render_query(
     }
 
     Flex::row()
-        .with_cross_axis_alignment(warpui::elements::CrossAxisAlignment::Start)
+        .with_cross_axis_alignment(uncaged_ui::elements::CrossAxisAlignment::Start)
         .with_child(avatar)
         .with_child(Shrinkable::new(1., query.finish()).finish())
         .finish()
@@ -140,7 +140,7 @@ fn render_attachments(
                 border_width: Some(1.),
                 border_color: Some(internal_colors::neutral_4(appearance.theme()).into()),
                 border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 ))),
                 ..Default::default()
             },

@@ -8,15 +8,14 @@ use std::time::Duration;
 use async_channel::Sender;
 use pathfinder_geometry::vector::vec2f;
 use string_offset::{ByteOffset, CharCounter};
-use warp_core::r#async::debounce;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warp_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
-use warp_core::ui::Icon;
-use warp_editor::editor::NavigationKey;
-use warp_ripgrep::search::Submatch;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::elements::{
+use uncaged_core::r#async::debounce;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
+use uncaged_core::ui::Icon;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_ripgrep::search::Submatch;
+use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DispatchEventResult, Empty, EventHandler, Fill, Flex, FormattedTextElement,
     Highlight, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
@@ -24,16 +23,17 @@ use warpui::elements::{
     Scrollable, ScrollableElement, ScrollbarWidth, Shrinkable, Stack, Text, UniformList,
     UniformListState,
 };
-use warpui::fonts::{Properties, Weight};
-use warpui::keymap::FixedBinding;
-use warpui::platform::Cursor;
-use warpui::text_layout::{TextAlignment, TextStyle};
-use warpui::ui_components::components::{UiComponent as _, UiComponentStyles};
-use warpui::ui_components::text::Span;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Weight};
+use uncaged_ui::keymap::FixedBinding;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::text_layout::{TextAlignment, TextStyle};
+use uncaged_ui::ui_components::components::{UiComponent as _, UiComponentStyles};
+use uncaged_ui::ui_components::text::Span;
+use uncaged_ui::{
     AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle, WeakViewHandle,
 };
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use crate::code::icon_from_file_path;
 use crate::coding_panel_enablement_state::CodingPanelEnablementState;
@@ -590,7 +590,7 @@ impl GlobalSearchView {
     }
 
     pub fn init(app: &mut AppContext) {
-        use warpui::keymap::macros::*;
+        use uncaged_ui::keymap::macros::*;
 
         app.register_fixed_bindings([
             FixedBinding::new(
@@ -992,7 +992,7 @@ impl GlobalSearchView {
             .iter()
             .filter_map(|root| root.to_local_path().map(Path::to_path_buf))
             .collect();
-        let deduped_local = warp_util::path::group_roots_by_common_ancestor(&local_roots).roots;
+        let deduped_local = uncaged_util::path::group_roots_by_common_ancestor(&local_roots).roots;
 
         self.search_roots = deduped_local
             .into_iter()
@@ -1087,7 +1087,7 @@ impl GlobalSearchView {
         directory_path: &LocalOrRemotePath,
         matched_path: &MatchedPath,
         appearance: &Appearance,
-        theme: &warp_core::ui::theme::WarpTheme,
+        theme: &uncaged_core::ui::theme::WarpTheme,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let is_selected = self.is_row_at_index_selected(index);
@@ -1161,7 +1161,7 @@ impl GlobalSearchView {
                 .with_vertical_padding(1.)
                 .with_background_color(theme.terminal_colors().normal.yellow.into())
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .finish();
 
@@ -1208,7 +1208,7 @@ impl GlobalSearchView {
 
             if let Some(background_fill) = list_highlight_state.background_color(appearance) {
                 let corner_radius = list_highlight_state.corner_radius().unwrap_or_else(|| {
-                    CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
+                    CornerRadius::with_all(Radius::Pixels(uncaged_core::ui::radius::SMALL))
                 });
                 row_with_padding = row_with_padding
                     .with_background(background_fill)
@@ -1264,7 +1264,7 @@ impl GlobalSearchView {
         matched: &Match,
         match_index: usize,
         appearance: &Appearance,
-        theme: &warp_core::ui::theme::WarpTheme,
+        theme: &uncaged_core::ui::theme::WarpTheme,
     ) -> Box<dyn Element> {
         let is_selected = self.is_row_at_index_selected(index);
         let line_number = matched.line_number;
@@ -1315,7 +1315,7 @@ impl GlobalSearchView {
 
             if let Some(background_fill) = list_highlight_state.background_color(appearance) {
                 let corner_radius = list_highlight_state.corner_radius().unwrap_or_else(|| {
-                    CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
+                    CornerRadius::with_all(Radius::Pixels(uncaged_core::ui::radius::SMALL))
                 });
                 row = row
                     .with_background(background_fill)
@@ -1866,7 +1866,7 @@ impl GlobalSearchView {
         index: usize,
         dir_entry: &DirectoryEntry,
         appearance: &Appearance,
-        theme: &warp_core::ui::theme::WarpTheme,
+        theme: &uncaged_core::ui::theme::WarpTheme,
     ) -> Box<dyn Element> {
         let is_selected = self.is_row_at_index_selected(index);
         let mouse_state = dir_entry.mouse_state.clone();
@@ -1935,7 +1935,7 @@ impl GlobalSearchView {
                 .with_vertical_padding(1.)
                 .with_background_color(theme.terminal_colors().normal.yellow.into())
                 .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    warp_core::ui::radius::SMALL,
+                    uncaged_core::ui::radius::SMALL,
                 )))
                 .finish();
 
@@ -1959,7 +1959,7 @@ impl GlobalSearchView {
 
             if let Some(background_fill) = list_highlight_state.background_color(appearance) {
                 let corner_radius = list_highlight_state.corner_radius().unwrap_or_else(|| {
-                    CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::SMALL))
+                    CornerRadius::with_all(Radius::Pixels(uncaged_core::ui::radius::SMALL))
                 });
                 row_with_padding = row_with_padding
                     .with_background(background_fill)

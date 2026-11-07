@@ -1,13 +1,13 @@
 //! Shared styles for notebooks.
 
-use warpui::elements::{
+use uncaged_ui::elements::{
     Container, CrossAxisAlignment, Flex, Hoverable, MainAxisAlignment, MouseStateHandle,
     ParentElement,
 };
-use warpui::platform::Cursor;
-use warpui::ui_components::components::UiComponent as _;
-use warpui::units::{IntoPixels, Pixels};
-use warpui::{fonts, Element};
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::UiComponent as _;
+use uncaged_ui::units::{IntoPixels, Pixels};
+use uncaged_ui::{fonts, Element};
 
 use crate::appearance::Appearance;
 use crate::settings::{derived_notebook_font_size, FontSettings};

@@ -1,12 +1,12 @@
 use instant::Duration;
 use settings::{PrivatePreferences, PublicPreferences, Setting, SettingsManager};
 use settings_value::SettingsValue;
-use warp_core::features::FeatureFlag;
-use warp_core::settings::macros::define_settings_group;
-use warp_core::settings::SupportedPlatforms;
-use warp_core::user_preferences::GetUserPreferences as _;
-use warpui::SingletonEntity;
-use warpui_extras::user_preferences;
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::settings::macros::define_settings_group;
+use uncaged_core::settings::SupportedPlatforms;
+use uncaged_core::user_preferences::GetUserPreferences as _;
+use uncaged_ui::SingletonEntity;
+use uncaged_ui_extras::user_preferences;
 
 use super::{
     migrate_native_settings_to_settings_file, needs_settings_file_migration_for_path,
@@ -41,7 +41,7 @@ define_settings_group!(MigrationTestSettings, settings: [
 
 /// Registers separate InMemoryPreferences singletons for public and private
 /// stores, then adds a SettingsManager and the test settings group.
-fn init_test_app(ctx: &mut warpui::AppContext) {
+fn init_test_app(ctx: &mut uncaged_ui::AppContext) {
     ctx.add_singleton_model(move |_| {
         PublicPreferences::new(Box::<user_preferences::in_memory::InMemoryPreferences>::default())
     });
@@ -54,7 +54,7 @@ fn init_test_app(ctx: &mut warpui::AppContext) {
 
 #[test]
 fn test_migration_copies_public_settings_from_native_store() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         // Enable the settings file so `preferences_for_setting` routes
         // public setting writes to the Model singleton (not the private store).
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
@@ -117,7 +117,7 @@ fn test_migration_copies_public_settings_from_native_store() {
 
 #[test]
 fn test_migration_writes_marker_to_native_store() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         app.update(init_test_app);
 
         // No marker before migration.
@@ -146,7 +146,7 @@ fn test_migration_writes_marker_to_native_store() {
 
 #[test]
 fn test_migration_skips_settings_absent_from_native_store() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
         app.update(init_test_app);
 
@@ -188,7 +188,7 @@ fn test_migration_skips_settings_absent_from_native_store() {
 
 #[test]
 fn test_migration_handles_string_setting() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         app.update(init_test_app);
 
         // Seed a JSON-encoded string value in the native store.
@@ -216,7 +216,7 @@ fn test_migration_handles_string_setting() {
 
 #[test]
 fn test_migration_does_not_rerun_when_marker_present() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
         let temp_dir = tempfile::tempdir().unwrap();
         let settings_file_path = temp_dir.path().join("settings.toml");
@@ -256,7 +256,7 @@ fn test_migration_does_not_rerun_when_marker_present() {
 
 #[test]
 fn test_migration_not_needed_when_settings_file_exists() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
         let temp_dir = tempfile::tempdir().unwrap();
         let settings_file_path = temp_dir.path().join("settings.toml");
@@ -275,7 +275,7 @@ fn test_migration_not_needed_when_settings_file_exists() {
 
 #[test]
 fn test_migration_with_multiple_setting_types() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
 
         app.update(init_test_app);
@@ -370,9 +370,9 @@ fn test_migration_with_multiple_setting_types() {
 
 mod notifications_migration {
     use settings::{PrivatePreferences, PublicPreferences, SettingsManager};
-    use warp_core::settings::macros::define_settings_group;
-    use warp_core::settings::SupportedPlatforms;
-    use warpui_extras::user_preferences;
+    use uncaged_core::settings::macros::define_settings_group;
+    use uncaged_core::settings::SupportedPlatforms;
+    use uncaged_ui_extras::user_preferences;
 
     use crate::terminal::session_settings::NotificationsSettings;
 
@@ -387,7 +387,7 @@ mod notifications_migration {
         },
     ]);
 
-    pub fn init_notifications_migration_test_app(ctx: &mut warpui::AppContext) {
+    pub fn init_notifications_migration_test_app(ctx: &mut uncaged_ui::AppContext) {
         ctx.add_singleton_model(move |_| {
             PublicPreferences::new(
                 Box::<user_preferences::in_memory::InMemoryPreferences>::default(),
@@ -453,7 +453,7 @@ fn test_notifications_from_file_value_rejects_serde_format_duration() {
 
 #[test]
 fn test_migration_preserves_notifications_mode() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
 
         app.update(init_notifications_migration_test_app);
@@ -490,7 +490,7 @@ fn test_migration_preserves_notifications_mode() {
 
 #[test]
 fn test_migration_preserves_custom_long_running_threshold() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
 
         app.update(init_notifications_migration_test_app);
@@ -542,7 +542,7 @@ fn test_migration_preserves_custom_long_running_threshold() {
 
 #[test]
 fn test_uncaged_autodetection_reset_clears_persisted_true_values() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
         app.update(init_test_app);
         app.update(crate::settings::AISettings::register);
@@ -582,7 +582,7 @@ fn test_uncaged_autodetection_reset_clears_persisted_true_values() {
 
 #[test]
 fn test_uncaged_autodetection_reset_does_not_override_a_later_choice() {
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         let _guard = FeatureFlag::SettingsFile.override_enabled(true);
         app.update(init_test_app);
         app.update(crate::settings::AISettings::register);
@@ -614,9 +614,9 @@ fn test_uncaged_autodetection_reset_does_not_override_a_later_choice() {
 /// in-memory private preferences.
 fn register_all_settings_over(
     public_prefs: Box<dyn user_preferences::UserPreferences>,
-    ctx: &mut warpui::AppContext,
+    ctx: &mut uncaged_ui::AppContext,
 ) {
-    use warp_core::execution_mode::{AppExecutionMode, ExecutionMode};
+    use uncaged_core::execution_mode::{AppExecutionMode, ExecutionMode};
 
     ctx.add_singleton_model(|ctx| AppExecutionMode::new(ExecutionMode::App, false, ctx));
     ctx.add_singleton_model(move |_| PublicPreferences::new(public_prefs));
@@ -625,7 +625,7 @@ fn register_all_settings_over(
     });
     ctx.add_singleton_model(|_| SettingsManager::default());
     ctx.add_singleton_model(crate::user_config::WarpConfig::mock);
-    warpui_extras::secure_storage::register_noop("test", ctx);
+    uncaged_ui_extras::secure_storage::register_noop("test", ctx);
     super::register_all_settings(ctx);
 }
 
@@ -633,8 +633,8 @@ fn register_all_settings_over(
 /// marks every key as present and leaves the file byte-for-byte unchanged.
 #[test]
 fn test_settings_file_with_every_key_round_trips() {
-    use warpui_extras::user_preferences::toml_backed::TomlBackedUserPreferences;
-    use warpui_extras::user_preferences::UserPreferences as _;
+    use uncaged_ui_extras::user_preferences::toml_backed::TomlBackedUserPreferences;
+    use uncaged_ui_extras::user_preferences::UserPreferences as _;
 
     let dir = tempfile::tempdir().expect("temp dir");
     let path = dir.path().join("settings.toml");
@@ -643,7 +643,7 @@ fn test_settings_file_with_every_key_round_trips() {
     type Entry = (String, String, Option<&'static str>, Option<u32>);
     let collected: std::sync::Arc<std::sync::Mutex<Vec<Entry>>> = Default::default();
     let collected_in_app = collected.clone();
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         app.update(|ctx| {
             register_all_settings_over(
                 Box::<user_preferences::in_memory::InMemoryPreferences>::default(),
@@ -674,7 +674,7 @@ fn test_settings_file_with_every_key_round_trips() {
     }
     let written = std::fs::read_to_string(&path).expect("settings file written");
 
-    warpui::App::test((), |mut app| async move {
+    uncaged_ui::App::test((), |mut app| async move {
         let path_for_load = path.clone();
         app.update(|ctx| {
             let (prefs, error) = TomlBackedUserPreferences::new(path_for_load);

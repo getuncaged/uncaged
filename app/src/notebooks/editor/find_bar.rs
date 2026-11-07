@@ -3,21 +3,21 @@ use std::time::Duration;
 
 use async_channel::Sender;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::r#async::debounce;
-use warp_editor::render::model::{AutoScrollMode, Decoration};
-use warp_editor::search::{SearchEvent, Searcher};
-use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
-use warpui::elements::{
+use uncaged_core::r#async::debounce;
+use uncaged_editor::render::model::{AutoScrollMode, Decoration};
+use uncaged_editor::search::{SearchEvent, Searcher};
+use uncaged_ui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
+use uncaged_ui::elements::{
     Border, ChildAnchor, Clipped, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Empty, Flex, MouseStateHandle, OffsetPositioning, ParentElement, PositionedElementAnchor,
     PositionedElementOffsetBounds, Radius, Rect, Shrinkable, Stack,
 };
-use warpui::platform::Cursor;
-use warpui::presenter::ChildView;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
-use warpui::ui_components::toggle_button::ToggleButton;
-use warpui::{
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::ui_components::toggle_button::ToggleButton;
+use uncaged_ui::{
     AppContext, BlurContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity,
     TypedActionView, View, ViewContext, ViewHandle,
 };
@@ -329,7 +329,7 @@ impl FindBar {
             width: Some(size),
             height: Some(size),
             border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-                warp_core::ui::radius::SMALL,
+                uncaged_core::ui::radius::SMALL,
             ))),
             border_width: Some(1.),
             padding: Some(Coords::uniform(7.)),
@@ -350,7 +350,7 @@ impl View for FindBar {
         "FindBar"
     }
 
-    fn render(&self, app: &warpui::AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &uncaged_ui::AppContext) -> Box<dyn uncaged_ui::Element> {
         let appearance = Appearance::as_ref(app);
         let searcher = self.searcher.as_ref(app);
         let theme = appearance.theme();

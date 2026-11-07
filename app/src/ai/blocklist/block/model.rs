@@ -4,8 +4,8 @@ mod model_impl;
 use chrono::TimeDelta;
 pub use helper::AIBlockModelHelper;
 pub use model_impl::*;
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, ViewContext};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, ViewContext};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{
@@ -211,7 +211,7 @@ pub trait AIBlockModel {
 
 #[cfg(any(test, feature = "integration_tests"))]
 pub mod testing {
-    use warpui::{AppContext, ViewContext};
+    use uncaged_ui::{AppContext, ViewContext};
 
     use super::{AIBlockModel, AIBlockOutputStatus, OutputStatusUpdateCallback};
     use crate::ai::agent::conversation::AIConversationId;

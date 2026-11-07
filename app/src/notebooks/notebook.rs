@@ -6,25 +6,25 @@ use async_channel::Sender;
 use lazy_static::lazy_static;
 use regex::Regex;
 use settings::Setting as _;
-use url::Url;
-use warp_core::context_flag::ContextFlag;
-use warp_editor::editor::NavigationKey;
-use warp_editor::model::CoreEditorModel;
-use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
-use warpui::elements::{
+use uncaged_core::context_flag::ContextFlag;
+use uncaged_editor::editor::NavigationKey;
+use uncaged_editor::model::CoreEditorModel;
+use uncaged_ui::accessibility::{AccessibilityContent, WarpA11yRole};
+use uncaged_ui::elements::{
     Align, Clipped, ConstrainedBox, Container, CrossAxisAlignment, DispatchEventResult, Empty,
     EventHandler, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
     SavePosition, Shrinkable, Stack,
 };
-use warpui::keymap::{EditableBinding, FixedBinding};
-use warpui::presenter::ChildView;
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{
+use uncaged_ui::keymap::{EditableBinding, FixedBinding};
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
     AppContext, BlurContext, Element, Entity, FocusContext, ModelAsRef, ModelHandle,
     SingletonEntity, TypedActionView, View, ViewContext, ViewHandle, WindowId,
 };
+use url::Url;
 
 use self::details_bar::DetailsBar;
 use super::active_notebook_data::{
@@ -101,7 +101,7 @@ lazy_static! {
 }
 
 pub fn init(app: &mut AppContext) {
-    use warpui::keymap::macros::*;
+    use uncaged_ui::keymap::macros::*;
 
     app.register_editable_bindings([
         EditableBinding::new(
@@ -1106,7 +1106,7 @@ impl NotebookView {
             );
         }
 
-        if !warpui::platform::is_mobile_device()
+        if !uncaged_ui::platform::is_mobile_device()
             && !ContextFlag::HideOpenOnDesktopButton.is_enabled()
             && *UserAppInstallDetectionSettings::as_ref(ctx)
                 .user_app_installation_detected
@@ -1634,7 +1634,7 @@ impl View for NotebookView {
         }
     }
 
-    fn render(&self, app: &AppContext) -> Box<dyn warpui::Element> {
+    fn render(&self, app: &AppContext) -> Box<dyn uncaged_ui::Element> {
         let mut content = Flex::column();
         content.extend(self.render_trash_banner(app));
         content.add_child(self.render_title(app));
@@ -1672,7 +1672,7 @@ impl View for NotebookView {
         SavePosition::new(stack.finish(), &self.view_position_id).finish()
     }
 
-    fn keymap_context(&self, app: &AppContext) -> warpui::keymap::Context {
+    fn keymap_context(&self, app: &AppContext) -> uncaged_ui::keymap::Context {
         let mut context = Self::default_keymap_context();
 
         match self.mode_app_ctx(app) {

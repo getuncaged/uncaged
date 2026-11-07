@@ -1,4 +1,4 @@
-use warpui::App;
+use uncaged_ui::App;
 
 use super::*;
 use crate::server::shared_http_client::SharedHttpClient;

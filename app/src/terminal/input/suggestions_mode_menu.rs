@@ -6,13 +6,13 @@
 //! - StaticWorkflowEnumSuggestions
 //! - DynamicWorkflowEnumSuggestions
 
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DragBarSide,
     DropShadow, Element, Empty, Flex, ParentElement, Radius, Resizable, Shrinkable,
     SizeConstraintCondition, SizeConstraintSwitch, Text,
 };
-use warpui::presenter::ChildView;
-use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use super::{
     DynamicEnumSuggestionStatus, Input, InputAction, MenuPositioning, DYNAMIC_ENUM_FAILURE_MESSAGE,
@@ -42,7 +42,8 @@ impl Input {
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
         // Uncaged: rounded on every side, floating just clear of the input, like the other menus.
-        let corner_radius = CornerRadius::with_all(Radius::Pixels(warp_core::ui::radius::MEDIUM));
+        let corner_radius =
+            CornerRadius::with_all(Radius::Pixels(uncaged_core::ui::radius::MEDIUM));
 
         let input_suggestions_border = 2.0;
         let margin =

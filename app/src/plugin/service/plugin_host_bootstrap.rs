@@ -20,4 +20,9 @@ pub struct PluginHostBootstrapService {}
 impl ipc::Service for PluginHostBootstrapService {
     type Request = PluginHostBootstrapRequest;
     type Response = PluginHostBootstrapResponse;
+
+    /// The ID this service had before the crate rename; kept so it stays stable on the wire.
+    fn id() -> &'static str {
+        "warp::plugin::service::plugin_host_bootstrap::PluginHostBootstrapService"
+    }
 }

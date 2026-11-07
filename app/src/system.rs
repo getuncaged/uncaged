@@ -6,7 +6,7 @@ cfg_if::cfg_if! {
     }
 }
 
-use warpui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 #[derive(Clone, Copy, Default, PartialEq)]
 pub struct SystemStats;

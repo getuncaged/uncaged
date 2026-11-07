@@ -5,31 +5,31 @@ use lsp::LspManagerModel;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::vec2f;
-use warp_core::channel::{Channel, ChannelState};
-use warp_core::features::FeatureFlag;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::icons::ICON_DIMENSIONS;
-use warp_editor::render::element::VerticalExpansionBehavior;
-use warp_util::path::LineAndColumnArg;
+use uncaged_core::channel::{Channel, ChannelState};
+use uncaged_core::features::FeatureFlag;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::icons::ICON_DIMENSIONS;
+use uncaged_editor::render::element::VerticalExpansionBehavior;
 #[cfg(feature = "local_fs")]
-use warpui::clipboard::ClipboardContent;
-use warpui::elements::{
+use uncaged_ui::clipboard::ClipboardContent;
+use uncaged_ui::elements::{
     AcceptedByDropTarget, Align, Border, ChildAnchor, ChildView, Clipped, ConstrainedBox,
     Container, CornerRadius, CrossAxisAlignment, Draggable, DraggableState, DropTarget, Empty,
     Expanded, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle,
     OffsetPositioning, Padding, ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Rect,
     SavePosition, Shrinkable, Stack, Text,
 };
-use warpui::fonts::{Properties, Style, Weight};
-use warpui::keymap::EditableBinding;
-use warpui::text::point::Point;
-use warpui::text_layout::ClipConfig;
-use warpui::ui_components::button::ButtonVariant;
-use warpui::ui_components::components::UiComponent;
-use warpui::{
+use uncaged_ui::fonts::{Properties, Style, Weight};
+use uncaged_ui::keymap::EditableBinding;
+use uncaged_ui::text::point::Point;
+use uncaged_ui::text_layout::ClipConfig;
+use uncaged_ui::ui_components::button::ButtonVariant;
+use uncaged_ui::ui_components::components::UiComponent;
+use uncaged_ui::{
     id, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WindowId,
 };
+use uncaged_util::path::LineAndColumnArg;
 
 use super::buffer_location::LocalOrRemotePath;
 use super::diff_viewer::DiffViewer;
@@ -383,8 +383,8 @@ impl CodeView {
                             ctx,
                         )
                         .with_horizontal_scrollbar_appearance(
-                            warpui::elements::new_scrollable::ScrollableAppearance::new(
-                                warpui::elements::ScrollbarWidth::Auto,
+                            uncaged_ui::elements::new_scrollable::ScrollableAppearance::new(
+                                uncaged_ui::elements::ScrollbarWidth::Auto,
                                 true,
                             ),
                         )
@@ -427,8 +427,8 @@ impl CodeView {
                 ctx,
             )
             .with_horizontal_scrollbar_appearance(
-                warpui::elements::new_scrollable::ScrollableAppearance::new(
-                    warpui::elements::ScrollbarWidth::Auto,
+                uncaged_ui::elements::new_scrollable::ScrollableAppearance::new(
+                    uncaged_ui::elements::ScrollbarWidth::Auto,
                     true,
                 ),
             )
@@ -1689,14 +1689,14 @@ impl CodeView {
                     )
                     // Uncaged: rounded tabs, filled when active and tinted on hover, instead of
                     // boxes fenced by rules on their right and bottom edges.
-                    .with_corner_radius(warp_core::ui::radius::small())
+                    .with_corner_radius(uncaged_core::ui::radius::small())
                     .with_vertical_margin(TAB_PADDING)
                     .with_horizontal_margin(1.);
                     let container = if is_active {
                         container.with_background(theme.surface_overlay_1())
                     } else if tab_handle.is_hovered() {
                         container.with_background(
-                            warp_core::ui::theme::color::internal_colors::fg_overlay_1(theme),
+                            uncaged_core::ui::theme::color::internal_colors::fg_overlay_1(theme),
                         )
                     } else {
                         container

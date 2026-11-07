@@ -1,10 +1,10 @@
-use warpui::elements::{CornerRadius, Fill as UiFill, Radius};
-use warpui::presenter::ChildView;
-use warpui::ui_components::components::UiComponentStyles;
-use warpui::ui_components::segmented_control::{
+use uncaged_ui::elements::{CornerRadius, Fill as UiFill, Radius};
+use uncaged_ui::presenter::ChildView;
+use uncaged_ui::ui_components::components::UiComponentStyles;
+use uncaged_ui::ui_components::segmented_control::{
     LabelConfig, RenderableOptionConfig, SegmentedControl, SegmentedControlEvent,
 };
-use warpui::{
+use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
@@ -110,14 +110,14 @@ fn markdown_toggle_styles(app: &AppContext) -> UiComponentStyles {
         font_family_id: Some(appearance.ui_font_family()),
         font_size: Some(appearance.ui_font_size()),
         border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
+            uncaged_core::ui::radius::SMALL,
         ))),
         border_width: Some(1.0),
         border_color: Some(UiFill::Solid(theme.surface_3().into())),
         background: Some(UiFill::Solid(theme.background().into())),
         height: Some(20.0),
-        padding: Some(warpui::ui_components::components::Coords::uniform(0.0)),
-        margin: Some(warpui::ui_components::components::Coords {
+        padding: Some(uncaged_ui::ui_components::components::Coords::uniform(0.0)),
+        margin: Some(uncaged_ui::ui_components::components::Coords {
             top: 0.0,
             bottom: 0.0,
             left: 0.0,

@@ -9,9 +9,9 @@ use num_traits::SaturatingSub;
 use pathfinder_color::ColorU;
 use rangemap::{RangeMap, RangeSet};
 use string_offset::CharOffset;
-use warpui_core::elements::Border;
-use warpui_core::text_layout::PaintStyleOverride;
-use warpui_core::{Action, AppContext, Element, TypedActionView, View};
+use uncaged_ui_core::elements::Border;
+use uncaged_ui_core::text_layout::PaintStyleOverride;
+use uncaged_ui_core::{Action, AppContext, Element, TypedActionView, View};
 
 use crate::content::version::BufferVersion;
 use crate::render::element::RichTextAction;

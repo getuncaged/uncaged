@@ -1,5 +1,5 @@
 use anyhow::Result;
-use warpui::{Entity, SingletonEntity};
+use uncaged_ui::{Entity, SingletonEntity};
 #[cfg(unix)]
 use {
     crate::report_error, crate::terminal::local_tty::server::TerminalServer, anyhow::bail,

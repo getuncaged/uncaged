@@ -16,9 +16,9 @@ use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
 use settings::{define_settings_group, Setting, SupportedPlatforms};
 use strum_macros::EnumIter;
-use warp_core::execution_mode::AppExecutionMode;
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
+use uncaged_core::execution_mode::AppExecutionMode;
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 
 use crate::report_if_error;
 use crate::settings::PrivacySettings;
@@ -1080,7 +1080,7 @@ define_settings_group!(AISettings, settings: [
     // This setting is only used when the AI autonomy setting is AlwaysAsk or not set.
     cloud_agent_computer_use_enabled: CloudAgentComputerUseEnabled {
         type: bool,
-        default: warp_core::channel::ChannelState::channel().is_dogfood(),
+        default: uncaged_core::channel::ChannelState::channel().is_dogfood(),
         supported_platforms: SupportedPlatforms::DESKTOP,
         private: false,
         toml_path: "agents.warp_agent.other.cloud_agent_computer_use_enabled",
@@ -1310,29 +1310,29 @@ impl AISettings {
             .cloned()
     }
 
-    pub fn is_active_ai_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_active_ai_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_any_ai_enabled(app)
             && *self.is_active_ai_enabled_internal
             && AppExecutionMode::as_ref(app).allows_active_ai()
     }
 
-    pub fn is_prompt_suggestions_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_prompt_suggestions_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.prompt_suggestions_enabled_internal
     }
 
-    pub fn is_rule_suggestions_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_rule_suggestions_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.rule_suggestions_enabled_internal
     }
 
-    pub fn is_code_suggestions_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_code_suggestions_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.code_suggestions_enabled_internal
     }
 
-    pub fn is_shared_block_title_generation_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_shared_block_title_generation_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.shared_block_title_generation_enabled_internal
     }
 
-    pub fn is_intelligent_autosuggestions_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_intelligent_autosuggestions_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.intelligent_autosuggestions_enabled_internal
     }
 
@@ -1340,7 +1340,7 @@ impl AISettings {
     ///
     /// If `FeatureFlag::AgentView` is enabled, this specifically gates NLD enablement in the agent
     /// view only.
-    pub fn is_ai_autodetection_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_ai_autodetection_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_any_ai_enabled(app) && *self.ai_autodetection_enabled_internal
     }
 
@@ -1349,19 +1349,19 @@ impl AISettings {
     /// This is only used when `FeatureFlag::AgentView` is enabled.
     /// If the user has not explicitly set this setting, it defaults to the value of
     /// `ai_autodetection_enabled_internal`.
-    pub fn is_nld_in_terminal_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_nld_in_terminal_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_any_ai_enabled(app) && *self.nld_in_terminal_enabled_internal
     }
 
-    pub fn is_memory_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_memory_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_any_ai_enabled(app) && *self.memory_enabled
     }
 
-    pub fn is_warp_drive_context_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_warp_drive_context_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_any_ai_enabled(app) && *self.warp_drive_context_enabled
     }
 
-    pub fn is_file_based_mcp_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_file_based_mcp_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         if !FeatureFlag::FileBasedMcp.is_enabled() || !self.is_any_ai_enabled(app) {
             return false;
         }
@@ -1376,14 +1376,14 @@ impl AISettings {
         *self.file_based_mcp_enabled
     }
 
-    pub fn is_orchestration_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_orchestration_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_any_ai_enabled(app)
     }
 
     /// Returns true when local-to-cloud handoff is effectively enabled.
     /// False when the user/org has disabled it, cloud conversations are off,
     /// or AI is globally off.
-    pub fn is_cloud_handoff_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_cloud_handoff_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         if !self.is_any_ai_enabled(app) || *self.should_force_disable_cloud_handoff {
             return false;
         }
@@ -1395,11 +1395,11 @@ impl AISettings {
         }
         PrivacySettings::as_ref(app).is_cloud_conversation_storage_enabled
     }
-    pub fn is_ampersand_handoff_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_ampersand_handoff_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_cloud_handoff_enabled(app) && !*self.should_force_disable_ampersand_handoff
     }
 
-    pub fn is_auto_handoff_on_sleep_enabled(&self, app: &warpui::AppContext) -> bool {
+    pub fn is_auto_handoff_on_sleep_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_cloud_handoff_enabled(app)
             && self
                 .auto_handoff_on_sleep_enabled

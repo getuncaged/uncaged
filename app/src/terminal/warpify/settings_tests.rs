@@ -1,5 +1,5 @@
 use settings::Setting;
-use warpui::{App, SingletonEntity};
+use uncaged_ui::{App, SingletonEntity};
 
 use super::WarpifySettings;
 use crate::test_util::settings::initialize_settings_for_tests;

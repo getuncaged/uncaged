@@ -1,17 +1,17 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use warp_core::ui::Icon;
-use warp_core::ui::appearance::Appearance;
-use warp_core::ui::theme::color::internal_colors;
-use warpui_core::elements::{
+use uncaged_core::ui::Icon;
+use uncaged_core::ui::appearance::Appearance;
+use uncaged_core::ui::theme::color::internal_colors;
+use uncaged_ui_core::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Dismiss, Element, Flex,
     ParentElement, Radius, Shrinkable,
 };
-use warpui_core::fonts::{Properties, Weight};
-use warpui_core::keymap::Keystroke;
-use warpui_core::prelude::{MainAxisAlignment, MainAxisSize, Text};
-use warpui_core::{AppContext, EventContext};
+use uncaged_ui_core::fonts::{Properties, Weight};
+use uncaged_ui_core::keymap::Keystroke;
+use uncaged_ui_core::prelude::{MainAxisAlignment, MainAxisSize, Text};
+use uncaged_ui_core::{AppContext, EventContext};
 
 use crate::{Component, Options as _, Renderable, button};
 

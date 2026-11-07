@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
 use thiserror::Error;
-use warp_multi_agent_api as api;
-use warp_util::host_id::HostId;
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::remote_path::RemotePath;
-use warp_util::standardized_path::StandardizedPath;
+use uncaged_agent_api as api;
+use uncaged_util::host_id::HostId;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::remote_path::RemotePath;
+use uncaged_util::standardized_path::StandardizedPath;
 
 use crate::agent::action_result::{AnyFileContent, FileContext};
 use crate::skills::{ParsedSkill, SkillProvider, SkillReference, SkillScope};

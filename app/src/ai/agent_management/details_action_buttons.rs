@@ -1,7 +1,7 @@
 //! Action buttons row for conversation details panel.
 
-use warpui::elements::{ChildView, CrossAxisAlignment, Empty, Flex, ParentElement};
-use warpui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
+use uncaged_ui::elements::{ChildView, CrossAxisAlignment, Empty, Flex, ParentElement};
+use uncaged_ui::{AppContext, Element, Entity, TypedActionView, View, ViewContext, ViewHandle};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent_conversations_model::AgentConversationEntryId;
@@ -212,7 +212,7 @@ impl TypedActionView for ConversationActionButtonsRow {
                     let duration = COPY_FEEDBACK_DURATION;
                     ctx.spawn(
                         async move {
-                            warpui::r#async::Timer::after(duration).await;
+                            uncaged_ui::r#async::Timer::after(duration).await;
                         },
                         |me, _, ctx| {
                             me.copy_link_button.update(ctx, |button, ctx| {

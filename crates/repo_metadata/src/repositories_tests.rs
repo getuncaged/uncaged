@@ -1,9 +1,9 @@
 use std::fs;
 
+use uncaged_ui_core::App;
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
+use uncaged_util::standardized_path::StandardizedPath;
 use virtual_fs::{Stub, VirtualFS};
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::standardized_path::StandardizedPath;
-use warpui_core::App;
 
 use crate::repositories::{stub_git_repository, DetectedRepositories, RepoDetectionSource};
 use crate::watcher::DirectoryWatcher;

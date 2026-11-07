@@ -9,8 +9,8 @@ encoded `Task` messages).
 Vendored from Warp's `warp-proto-apis` repository
 (<https://github.com/warpdotdev/warp-proto-apis>), directory
 `apis/multi_agent/v1/`, at rev `ac1af7303d2931b0fb485be650a1fbc8b80d5667`, where
-it was the `warp_multi_agent_api` crate. The library keeps that crate name
-(`[lib] name`), so callers still `use warp_multi_agent_api as api;`.
+it was the `warp_multi_agent_api` crate. Callers import it as
+`use uncaged_agent_api as api;`.
 
 The protobuf package name (`warp.multi_agent.v1`) and every field number are
 unchanged, so conversations saved by earlier builds still decode. Change a

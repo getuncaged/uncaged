@@ -7,10 +7,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures_util::future::Either;
+use uncaged_ui::r#async::SpawnedFutureHandle;
+use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
+use uncaged_util::path::{CleanPathResult, LineAndColumnArg};
 use url::Url;
-use warp_util::path::{CleanPathResult, LineAndColumnArg};
-use warpui::r#async::SpawnedFutureHandle;
-use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity, WindowId};
 
 use super::file::is_markdown_file;
 use crate::terminal::model::session::Session;

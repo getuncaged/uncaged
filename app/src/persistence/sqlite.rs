@@ -38,9 +38,9 @@ use num_traits::FromPrimitive;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
 use persistence::model::AMBIENT_AGENT_PANE_KIND;
+use uncaged_ui::platform::FullscreenState;
+use uncaged_ui::windowing::{MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH};
 use uuid::Uuid;
-use warpui::platform::FullscreenState;
-use warpui::windowing::{MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH};
 
 use super::agent::{delete_agent_conversations, upsert_agent_conversation};
 use super::block_list::{
@@ -276,7 +276,7 @@ pub(super) fn init_db(scope: &PersistenceScope) -> Result<SqliteConnection> {
 }
 
 fn migrate_old_sqlite_into_secure_container_if_needed(db_path: &Path) {
-    let old_db_path = warp_core::paths::state_dir().join(WARP_SQLITE_FILE_NAME);
+    let old_db_path = uncaged_core::paths::state_dir().join(WARP_SQLITE_FILE_NAME);
     if old_db_path == db_path || !old_db_path.exists() || db_path.exists() {
         return;
     }
@@ -349,8 +349,8 @@ pub fn database_file_path_for_scope(scope: &PersistenceScope) -> PathBuf {
 }
 
 fn app_database_file_path() -> PathBuf {
-    warp_core::paths::secure_state_dir()
-        .unwrap_or_else(warp_core::paths::state_dir)
+    uncaged_core::paths::secure_state_dir()
+        .unwrap_or_else(uncaged_core::paths::state_dir)
         .join(WARP_SQLITE_FILE_NAME)
 }
 
@@ -2214,7 +2214,7 @@ fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error>
 
     // Uncaged one-history: the turn_index-driven read, with the legacy
     // heuristic byte-identical behind the kill-switch.
-    let restored_blocks = if warp_core::features::FeatureFlag::OneHistory.is_enabled() {
+    let restored_blocks = if uncaged_core::features::FeatureFlag::OneHistory.is_enabled() {
         get_all_restored_blocks_v2(conn)?
     } else {
         get_all_restored_blocks(conn)?

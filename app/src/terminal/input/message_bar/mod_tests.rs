@@ -1,6 +1,6 @@
-use warp_core::ui::Icon;
-use warpui::assets::asset_cache::AssetSource;
-use warpui::elements::MouseStateHandle;
+use uncaged_core::ui::Icon;
+use uncaged_ui::assets::asset_cache::AssetSource;
+use uncaged_ui::elements::MouseStateHandle;
 
 use super::{ChipHorizontalAlignment, MessageItem};
 

@@ -13,14 +13,14 @@ Create a one-time launch modal — the feature-announcement design used for laun
 
 ## Checklist
 
-- [ ] Feature flag in `warp_features/src/lib.rs`
+- [ ] Feature flag in `uncaged_features/src/lib.rs`
 - [ ] Settings field in `app/src/settings/ai.rs`
 - [ ] Trigger logic in `app/src/workspace/one_time_modal_model.rs`
 - [ ] View files under `app/src/workspace/view/<name>_launch_modal/`
 - [ ] Workspace wiring in `app/src/workspace/view.rs` and `app/src/workspace/mod.rs`
 - [ ] Debug actions in `app/src/workspace/action.rs`
 - [ ] Hero image at `app/assets/async/png/onboarding/<name>_launch_banner.png`
-- [ ] Any custom icons added to `crates/warp_core/src/ui/icons.rs` + SVG in `app/assets/bundled/svg/`
+- [ ] Any custom icons added to `crates/uncaged_core/src/ui/icons.rs` + SVG in `app/assets/bundled/svg/`
 
 ---
 
@@ -28,7 +28,7 @@ Create a one-time launch modal — the feature-announcement design used for laun
 
 If the modal uses icons not yet in the `Icon` enum, add them before writing the view.
 
-In `crates/warp_core/src/ui/icons.rs`:
+In `crates/uncaged_core/src/ui/icons.rs`:
 
 ```rust
 // Add to enum
@@ -44,7 +44,7 @@ Drop the SVG file at `app/assets/bundled/svg/your-icon-name.svg`. Use the same 2
 
 ## Step 1 – Feature flag
 
-Add to `crates/warp_features/src/lib.rs`:
+Add to `crates/uncaged_features/src/lib.rs`:
 
 ```rust
 /// Enables the <name> launch modal.

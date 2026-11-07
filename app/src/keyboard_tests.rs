@@ -1,6 +1,6 @@
 use anyhow::{Ok, Result};
+use uncaged_ui::keymap::Keystroke;
 use vec1::vec1;
-use warpui::keymap::Keystroke;
 
 use crate::keyboard::{PersistedTrigger, UserDefinedKeybinding, REMOVED_KEYBINDING_SERIALIZATION};
 

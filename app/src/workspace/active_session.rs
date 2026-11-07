@@ -4,8 +4,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 
-use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui::{Entity, EntityId, ModelContext, SingletonEntity, WindowId};
+use uncaged_ui::{Entity, EntityId, ModelContext, SingletonEntity, WindowId};
+use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use crate::terminal::model::session::Session;
 

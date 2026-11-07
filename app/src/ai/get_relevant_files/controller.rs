@@ -11,8 +11,8 @@ use ai::index::locations::CodeContextLocation;
 use ai::index::FileSymbols;
 use anyhow::anyhow;
 use futures_util::stream::AbortHandle;
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use crate::ai::agent::{AIAgentActionId, SearchCodebaseResult};
 use crate::ai::outline::{OutlineStatus, RepoOutlines};

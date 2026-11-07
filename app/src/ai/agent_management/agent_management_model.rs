@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
-use warp_core::features::FeatureFlag;
-use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, ViewHandle, WindowId};
+use uncaged_core::features::FeatureFlag;
+use uncaged_ui::{
+    AppContext, Entity, EntityId, ModelContext, SingletonEntity, ViewHandle, WindowId,
+};
 
 use crate::ai::active_agent_views_model::{ActiveAgentViewsEvent, ActiveAgentViewsModel};
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};

@@ -1,14 +1,16 @@
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use settings::Setting as _;
-use warpui::elements::{
+use uncaged_ui::elements::{
     Align, Border, Clipped, ConstrainedBox, Container, CornerRadius, Flex, FormattedTextElement,
     HighlightedHyperlink, Hoverable, HyperlinkUrl, MainAxisAlignment, MainAxisSize,
     MouseStateHandle, ParentElement, Radius, Shrinkable, Text, Wrap,
 };
-use warpui::fonts::Weight;
-use warpui::platform::Cursor;
-use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use uncaged_ui::fonts::Weight;
+use uncaged_ui::platform::Cursor;
+use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
+use uncaged_ui::{
+    AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
+};
 
 use crate::appearance::Appearance;
 use crate::context_chips::prompt::Prompt;
@@ -104,7 +106,7 @@ impl OnboardingPromptBlock {
         let mut confirm_button = appearance
             .ui_builder()
             .button(
-                warpui::ui_components::button::ButtonVariant::Accent,
+                uncaged_ui::ui_components::button::ButtonVariant::Accent,
                 self.mouse_state_handle_confirm.clone(),
             )
             .with_style(UiComponentStyles {

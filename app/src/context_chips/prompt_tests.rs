@@ -1,5 +1,5 @@
 use serde_json::Value;
-use warpui::{App, SingletonEntity};
+use uncaged_ui::{App, SingletonEntity};
 
 use super::Prompt;
 use crate::context_chips::prompt::{PromptConfiguration, PromptSelection};

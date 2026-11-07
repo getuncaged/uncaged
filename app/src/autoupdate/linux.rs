@@ -4,9 +4,9 @@ use std::path::PathBuf;
 use anyhow::{bail, Context as _, Result};
 use channel_versions::VersionInfo;
 use instant::Duration;
-use warp_core::channel::{Channel, ChannelState};
-use warp_terminal::shell::ShellType;
-use warpui::ViewContext;
+use uncaged_core::channel::{Channel, ChannelState};
+use uncaged_terminal::shell::ShellType;
+use uncaged_ui::ViewContext;
 
 use super::{release_assets_directory_url, DownloadReady, ReadyForRelaunch};
 use crate::workspace::Workspace;
@@ -169,7 +169,7 @@ mod appimage {
         let mut command = command::blocking::Command::new(appimage_path);
         // Pass a flag to the app to let it know it was restarted as part of the
         // autoupdate process.
-        command.arg(warp_cli::finish_update_flag());
+        command.arg(uncaged_cli::finish_update_flag());
 
         log::info!("Relaunching warp for update...");
         command.spawn()?;
@@ -181,8 +181,8 @@ mod package_manager {
     use markdown_parser::{
         FormattedText, FormattedTextFragment, FormattedTextHeader, FormattedTextLine,
     };
-    use warpui::elements::{Container, FormattedTextElement, HighlightedHyperlink};
-    use warpui::{Element, SingletonEntity as _};
+    use uncaged_ui::elements::{Container, FormattedTextElement, HighlightedHyperlink};
+    use uncaged_ui::{Element, SingletonEntity as _};
 
     use super::*;
     use crate::appearance::Appearance;
@@ -201,16 +201,16 @@ mod package_manager {
         }
     }
 
-    impl warpui::Entity for AutoupdateContextBlock {
+    impl uncaged_ui::Entity for AutoupdateContextBlock {
         type Event = ();
     }
 
-    impl warpui::View for AutoupdateContextBlock {
+    impl uncaged_ui::View for AutoupdateContextBlock {
         fn ui_name() -> &'static str {
             "AutoupdateContextBlock"
         }
 
-        fn render(&self, app: &warpui::AppContext) -> Box<dyn warpui::Element> {
+        fn render(&self, app: &uncaged_ui::AppContext) -> Box<dyn uncaged_ui::Element> {
             let appearance = Appearance::as_ref(app);
             let theme = appearance.theme();
             let package_manager_name = self.package_manager.to_string();
@@ -303,7 +303,7 @@ mod package_manager {
         // Add any arguments that were passed to warp, skipping the first
         // argument (the name of the executable) and dropping the flag for
         // finishing an update.
-        let finish_update_flag = warp_cli::finish_update_flag();
+        let finish_update_flag = uncaged_cli::finish_update_flag();
         command.args(
             std::env::args()
                 .skip(1)
@@ -401,7 +401,7 @@ impl PackageManager {
                 is_signing_key_configured,
             } => {
                 let repo_prefix = if !is_repo_configured {
-                    let cache_dir = warp_core::paths::cache_dir();
+                    let cache_dir = uncaged_core::paths::cache_dir();
                     let cache_dir_str = cache_dir.display();
                     // Back up the existing pacman.conf file just in case
                     // anything goes wrong, then add the repository config.

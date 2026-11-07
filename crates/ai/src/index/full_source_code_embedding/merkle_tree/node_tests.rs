@@ -18,8 +18,10 @@ fn test_node_hash_for_directory_is_sorted() {
             sandbox.with_files(vec![Stub::FileWithContent("bar", "bar")]);
 
             let mut directory_entry = DirectoryEntry {
-                path: warp_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
-                    .unwrap(),
+                path: uncaged_util::standardized_path::StandardizedPath::try_from_local(
+                    dirs.tests(),
+                )
+                .unwrap(),
                 children: vec![],
                 ignored: false,
                 loaded: false,
@@ -65,7 +67,7 @@ fn test_merkle_node_upsert_file() {
         )]);
 
         let mut directory_entry = DirectoryEntry {
-            path: warp_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
+            path: uncaged_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
                 .unwrap(),
             children: vec![],
             ignored: false,
@@ -274,7 +276,7 @@ fn test_merkle_node_upsert_file() {
 
         // Create a new MerkleTree with the expected structure manually
         let mut expected_directory_entry = DirectoryEntry {
-            path: warp_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
+            path: uncaged_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
                 .unwrap(),
             children: vec![],
             ignored: false,
@@ -290,7 +292,7 @@ fn test_merkle_node_upsert_file() {
 
         // Create a subdirectory entry for 'a'
         let mut subdirectory_entry = DirectoryEntry {
-            path: warp_util::standardized_path::StandardizedPath::try_from_local(
+            path: uncaged_util::standardized_path::StandardizedPath::try_from_local(
                 &dirs.tests().join("a"),
             )
             .unwrap(),
@@ -335,7 +337,7 @@ fn test_merkle_node_remove_file() {
         ]);
 
         let mut directory_entry = DirectoryEntry {
-            path: warp_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
+            path: uncaged_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
                 .unwrap(),
             children: vec![],
             ignored: false,
@@ -419,7 +421,7 @@ fn test_merkle_node_remove_file() {
 
         // Create a new MerkleNode with only the remaining files
         let mut directory_entry_after_remove = DirectoryEntry {
-            path: warp_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
+            path: uncaged_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
                 .unwrap(),
             children: vec![],
             ignored: false,
@@ -460,8 +462,10 @@ fn test_merkle_node_multiple_operations() {
             ]);
 
             let mut directory_entry = DirectoryEntry {
-                path: warp_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
-                    .unwrap(),
+                path: uncaged_util::standardized_path::StandardizedPath::try_from_local(
+                    dirs.tests(),
+                )
+                .unwrap(),
                 children: vec![],
                 ignored: false,
                 loaded: true,
@@ -569,8 +573,10 @@ fn test_merkle_node_multiple_operations() {
             );
 
             let mut directory_entry = DirectoryEntry {
-                path: warp_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
-                    .unwrap(),
+                path: uncaged_util::standardized_path::StandardizedPath::try_from_local(
+                    dirs.tests(),
+                )
+                .unwrap(),
                 children: vec![],
                 ignored: false,
                 loaded: true,
@@ -771,8 +777,10 @@ fn test_merkle_node_multiple_operations() {
 
             // Create a new MerkleTree with the expected final structure manually
             let mut expected_directory_entry = DirectoryEntry {
-                path: warp_util::standardized_path::StandardizedPath::try_from_local(dirs.tests())
-                    .unwrap(),
+                path: uncaged_util::standardized_path::StandardizedPath::try_from_local(
+                    dirs.tests(),
+                )
+                .unwrap(),
                 children: vec![],
                 ignored: false,
                 loaded: true,
@@ -787,7 +795,7 @@ fn test_merkle_node_multiple_operations() {
 
             // Create nested subdirectory structure
             let mut subdir1_entry = DirectoryEntry {
-                path: warp_util::standardized_path::StandardizedPath::try_from_local(
+                path: uncaged_util::standardized_path::StandardizedPath::try_from_local(
                     &dirs.tests().join("subdir1"),
                 )
                 .unwrap(),
@@ -797,7 +805,7 @@ fn test_merkle_node_multiple_operations() {
             };
 
             let mut subdir2_entry = DirectoryEntry {
-                path: warp_util::standardized_path::StandardizedPath::try_from_local(
+                path: uncaged_util::standardized_path::StandardizedPath::try_from_local(
                     &dirs.tests().join("subdir1/subdir2"),
                 )
                 .unwrap(),

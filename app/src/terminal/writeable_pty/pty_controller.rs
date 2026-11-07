@@ -5,9 +5,9 @@ use std::sync::Arc;
 use async_channel::{Receiver, Sender};
 use parking_lot::FairMutex;
 use thiserror::Error;
-use warp_util::path::ShellFamily;
-use warpui::r#async::block_on;
-use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_ui::r#async::block_on;
+use uncaged_ui::{Entity, ModelContext, ModelHandle, SingletonEntity};
+use uncaged_util::path::ShellFamily;
 
 use super::Message;
 use crate::ai::agent::AIAgentPtyWriteMode;
@@ -438,7 +438,9 @@ impl<T: EventLoopSender> PtyController<T> {
             let chunks: Vec<Vec<u8>> = bytes.chunks(CHUNK_SIZE).map(|c| c.to_vec()).collect();
             for (i, chunk) in chunks.into_iter().enumerate() {
                 ctx.spawn(
-                    warpui::r#async::Timer::after(std::time::Duration::from_millis(i as u64 * 50)),
+                    uncaged_ui::r#async::Timer::after(std::time::Duration::from_millis(
+                        i as u64 * 50,
+                    )),
                     move |me, _, ctx| me.write_bytes(chunk, ctx),
                 );
             }

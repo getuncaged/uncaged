@@ -1,9 +1,9 @@
 #[cfg(test)]
-use warpui::App;
+use uncaged_ui::App;
 
 #[cfg(test)]
 pub fn initialize_settings_for_tests(app: &mut App) {
-    use warp_core::execution_mode::ExecutionMode;
+    use uncaged_core::execution_mode::ExecutionMode;
     initialize_settings_for_tests_with_mode(app, ExecutionMode::App, false);
 }
 
@@ -20,11 +20,11 @@ pub fn initialize_history_persistence_for_tests(app: &mut App) {
 #[cfg(test)]
 pub fn initialize_settings_for_tests_with_mode(
     app: &mut App,
-    mode: warp_core::execution_mode::ExecutionMode,
+    mode: uncaged_core::execution_mode::ExecutionMode,
     is_sandboxed: bool,
 ) {
-    use warp_core::execution_mode::AppExecutionMode;
-    use warp_core::semantic_selection::SemanticSelection;
+    use uncaged_core::execution_mode::AppExecutionMode;
+    use uncaged_core::semantic_selection::SemanticSelection;
 
     use crate::ai::cloud_agent_settings::CloudAgentSettings;
     use crate::drive::settings::WarpDriveSettings;
@@ -58,7 +58,7 @@ pub fn initialize_settings_for_tests_with_mode(
     app.add_singleton_model(WarpConfig::mock);
     app.update(|ctx| {
         // Register a no-op secure storage provider for testing.
-        warpui_extras::secure_storage::register_noop("test", ctx);
+        uncaged_ui_extras::secure_storage::register_noop("test", ctx);
     });
 
     AccessibilitySettings::register(app);
