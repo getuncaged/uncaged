@@ -14,7 +14,7 @@ use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::CancellationReason;
 use crate::network::NetworkStatus;
 use crate::report_error;
-use crate::server::server_api::{AIApiError, ServerApiProvider};
+use crate::server::server_api::AIApiError;
 
 /// Maximum number of times a single MAA request is re-sent before the failure is
 /// surfaced.
@@ -153,21 +153,17 @@ impl ResponseStream {
         can_attempt_resume_on_error: bool,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        let server_api = ServerApiProvider::as_ref(ctx).get();
         let (cancellation_tx, cancellation_rx) = oneshot::channel();
         let start_time = Local::now();
 
         let request_id = Uuid::new_v4();
         let params_clone = params.clone();
-        let _ =
-            ctx.spawn(
-                async move {
-                    generate_multi_agent_output(server_api, params_clone, cancellation_rx).await
-                },
-                move |me, stream, ctx| {
-                    me.handle_response_stream_result(request_id, stream, ctx);
-                },
-            );
+        let _ = ctx.spawn(
+            async move { generate_multi_agent_output(params_clone, cancellation_rx).await },
+            move |me, stream, ctx| {
+                me.handle_response_stream_result(request_id, stream, ctx);
+            },
+        );
         Self {
             id: ResponseStreamId(Uuid::new_v4().to_string()),
             params: params.clone(),
@@ -211,9 +207,8 @@ impl ResponseStream {
         let request_id = Uuid::new_v4();
         self.current_request_id = Some(request_id);
         let params = self.params.clone();
-        let server_api = ServerApiProvider::as_ref(ctx).get();
         let _ = ctx.spawn(
-            async move { generate_multi_agent_output(server_api, params, cancellation_rx).await },
+            async move { generate_multi_agent_output(params, cancellation_rx).await },
             move |me, stream, ctx| {
                 me.handle_response_stream_result(request_id, stream, ctx);
             },

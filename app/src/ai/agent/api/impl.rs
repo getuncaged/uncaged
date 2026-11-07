@@ -8,11 +8,12 @@ use warp_multi_agent_api as api;
 use super::convert_to::convert_input;
 use super::{ConvertToAPITypeError, RequestParams, ResponseStream};
 use crate::ai::agent::redaction;
-use crate::server::server_api::{AIApiError, ServerApi};
+use crate::server::server_api::AIApiError;
 use crate::terminal::model::session::SessionType;
 
+// The local engine is not built for wasm, which leaves the request unused there.
+#[cfg_attr(target_family = "wasm", allow(unused_variables))]
 pub async fn generate_multi_agent_output(
-    server_api: Arc<ServerApi>,
     mut params: RequestParams,
     cancellation_rx: futures::channel::oneshot::Receiver<()>,
 ) -> Result<ResponseStream, ConvertToAPITypeError> {
@@ -136,49 +137,32 @@ pub async fn generate_multi_agent_output(
         mcp_context: params.mcp_context.map(Into::into),
     };
 
-    let response_stream =
-        warp_multi_agent_client::generate_multi_agent_output(server_api.as_ref(), &request).await;
-    match response_stream {
-        Ok(stream) => {
-            let output_stream = stream
-                .then(|result| async {
-                    match result {
-                        Ok(event) => Ok(event),
-                        Err(error) => Err(convert_multi_agent_client_error(error).await),
-                    }
-                })
-                .take_until(cancellation_rx);
-            Ok(Box::pin(output_stream))
-        }
-        Err(e) => {
-            let (tx, rx) = async_channel::unbounded();
-            let _ = tx
-                .send(Err(convert_multi_agent_client_error(e).await))
-                .await;
-            Ok(Box::pin(rx))
-        }
+    // Uncaged: every Agent Mode turn runs on the local bring-your-own-model engine. Request
+    // building above, and response dispatch and native tool execution downstream, are
+    // unchanged from Warp's client; only the inference source is the user's machine. With no
+    // model connected (or on wasm, where the engine is not built) the turn fails with
+    // `NO_MODEL_CONNECTED`; Uncaged never sends the prompt to a remote server.
+    #[cfg(not(target_family = "wasm"))]
+    if let Some(stream) = uncaged_engine::run_if_active(&request) {
+        log::info!("Uncaged: routing Agent Mode turn to local engine");
+        return Ok(Box::pin(
+            stream
+                .map(|event| event.map_err(|error| Arc::new(AIApiError::Other(error))))
+                .take_until(cancellation_rx),
+        ));
     }
+    Ok(no_model_connected_stream())
 }
 
-async fn convert_multi_agent_client_error(
-    error: warp_multi_agent_client::Error,
-) -> Arc<AIApiError> {
-    let error = match error {
-        warp_multi_agent_client::Error::Authentication(error)
-        | warp_multi_agent_client::Error::AmbientHeaders(error) => AIApiError::Other(error),
-        warp_multi_agent_client::Error::Base64Decode(error) => {
-            AIApiError::Other(anyhow::Error::from(error))
-        }
-        warp_multi_agent_client::Error::ProtobufDecode(error) => {
-            AIApiError::Other(anyhow::Error::from(error))
-        }
-        warp_multi_agent_client::Error::EventSource(error) => {
-            AIApiError::from_stream_error("GenerateMultiAgentOutput", *error).await
-        }
-        #[cfg(not(target_family = "wasm"))]
-        warp_multi_agent_client::Error::LocalEngine(error) => AIApiError::Other(error),
-    };
-    Arc::new(error)
+/// Shown when an Agent Mode turn starts with no model connected.
+const NO_MODEL_CONNECTED: &str =
+    "No model is connected. Open Settings \u{2192} AI Models and connect a model \
+     (an API key, a local runtime like LM Studio or Ollama, or a CLI agent) \
+     to use the agent \u{2014} Uncaged never sends your prompts to a remote server.";
+
+fn no_model_connected_stream() -> ResponseStream {
+    let error = Arc::new(AIApiError::Other(anyhow::anyhow!(NO_MODEL_CONNECTED)));
+    Box::pin(futures::stream::iter([Err(error)]))
 }
 
 fn api_keys_with_warp_credit_fallback_setting(

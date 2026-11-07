@@ -242,7 +242,6 @@ rmcp.workspace = true
 warp_isolation_platform.workspace = true
 warp_ripgrep.workspace = true
 warp_managed_secrets.workspace = true
-warp_multi_agent_client.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block.workspace = true
@@ -680,7 +679,6 @@ agent_mode_evals = [
     "cloud_object_models/agent_mode_evals",
     "rust-embed/debug-embed",
     "warp_logging/agent_mode_evals",
-    "warp_multi_agent_client/agent_mode_evals",
     "warp_server_client/agent_mode_evals",
 ]
 ambient_agents_command_line = []

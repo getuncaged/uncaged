@@ -24,10 +24,10 @@ should stay untouched so we can still merge upstream fixes.
 Every Agent Mode turn in Warp funnels through a single function:
 
 ```
-crates/warp_multi_agent_client/src/lib.rs → generate_multi_agent_output()
+app/src/ai/agent/api/impl.rs → generate_multi_agent_output()
 ```
 
-Uncaged adds a few lines at the top of it:
+Once the request is built, it goes to the local engine:
 
 ```
 user types ──▶ generate_multi_agent_output()
@@ -35,9 +35,9 @@ user types ──▶ generate_multi_agent_output()
         uncaged_engine::active()?  (is a local model configured?)
              │ yes                         │ no
              ▼                             ▼
-     uncaged_engine::run_turn()     on Channel::Oss: HARD-FAIL with a
-             │                      "connect a model" error — NEVER POST
-     your backend (API / local /    to app.warp.dev
+     uncaged_engine::run_turn()     HARD-FAIL with a "connect a model"
+             │                      error — there is no server path
+     your backend (API / local /
      CLI), streamed back as the
      same ResponseEvents the UI
      already renders
@@ -53,7 +53,7 @@ all stock Warp. Only the model call moved onto your machine.
 
 | You want to touch… | File / dir |
 |---|---|
-| **The inference seam** (Warp → local engine) | `crates/warp_multi_agent_client/src/lib.rs` |
+| **The inference seam** (Warp → local engine) | `app/src/ai/agent/api/impl.rs` |
 | **The engine** (the whole BYO-model backend) | `crates/uncaged_engine/src/` |
 | ↳ config + provider enum + `~/.uncaged/engine.json` | `uncaged_engine/src/config.rs` |
 | ↳ the "Connect a model" gallery presets | `uncaged_engine/src/catalog.rs` |
@@ -188,7 +188,7 @@ configure."** That's enforced in code, not by trust. Each gate and where it live
 
 | Egress | Where it's cut |
 |---|---|
-| Agent Mode → Warp servers | `warp_multi_agent_client/src/lib.rs` — hard-fails on Oss instead of POSTing |
+| Agent Mode → Warp servers | `app/src/ai/agent/api/impl.rs` — the local engine is the only inference path; no model connected is a hard failure |
 | **All Warp URLs (defense-in-depth)** | `warp_core/src/channel/config.rs` — `uncaged_sentinel()` points every endpoint at the unroutable `192.0.2.0:9`; wired in `state.rs::init()` |
 | Autoupdate poll / version check | `app/src/autoupdate/mod.rs` + `channel_versions.rs` — gated off for Oss |
 | Login / accounts | `app/src/auth/auth_manager.rs` — refuses auth on Oss (so every account-gated call is unreachable) |

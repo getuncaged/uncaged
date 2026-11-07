@@ -7,18 +7,19 @@ overview; this file is the developer map.
 
 ## Where it plugs in
 
-One call site: [`warp_multi_agent_client::generate_multi_agent_output`](../warp_multi_agent_client/src/lib.rs).
-At the top of that function:
+One call site: the app's `generate_multi_agent_output`
+(`app/src/ai/agent/api/impl.rs`). Once the request is built:
 
 ```rust
 #[cfg(not(target_family = "wasm"))]
-if let Some(local_stream) = uncaged_engine::run_if_active(request) {
-    return Ok(local_stream.map(|e| e.map_err(Error::LocalEngine)).boxed());
+if let Some(stream) = uncaged_engine::run_if_active(&request) {
+    return Ok(Box::pin(stream.map(/* error into AIApiError */).take_until(cancellation_rx)));
 }
+Ok(no_model_connected_stream())
 ```
 
-`run_if_active` returns `None` when no engine is configured, so Warp's normal
-server path runs untouched.
+`run_if_active` returns `None` when no engine is configured; the turn then fails
+with a "connect a model" message. There is no server path.
 
 ## Module map
 

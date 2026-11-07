@@ -40,9 +40,9 @@ is free to use, forever, with nothing sent anywhere you didn't ask for.
 ## How it works
 
 Warp's entire foreground Agent Mode funnels through one function,
-[`generate_multi_agent_output`](crates/warp_multi_agent_client/src/lib.rs). Uncaged
-adds a few lines at the top: if a local engine is configured, the request goes to
-the **Uncaged engine** instead of Warp's servers. Everything else — request building,
+[`generate_multi_agent_output`](app/src/ai/agent/api/impl.rs). Uncaged
+hands the request to the **Uncaged engine** instead of Warp's servers; with no model
+connected, the turn fails with a "connect a model" message. Everything else — request building,
 response rendering, **native tool execution**, the permission UI — is unchanged.
 
 The engine is deliberately small ("inference + tool-call protocol" only). Warp's

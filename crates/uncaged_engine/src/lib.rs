@@ -9,9 +9,10 @@
 //! ## How it plugs in
 //!
 //! Warp's client funnels every Agent Mode turn through one function,
-//! [`warp_multi_agent_client::generate_multi_agent_output`]. That function calls
-//! [`active`]; if it returns a config, the request is handed to [`run_turn`]
-//! instead of being POSTed to Warp's servers. The client's request/response
+//! the app's `generate_multi_agent_output` (`app/src/ai/agent/api/impl.rs`). That
+//! function calls [`run_if_active`]; if a model is connected, the request is handed to
+//! [`run_turn`], otherwise the turn fails with a "connect a model" message. There is
+//! no path to Warp's servers. The client's request/response
 //! pipeline, native tool execution, and permission UI are all unchanged — only
 //! the inference source moves onto the user's machine.
 //!
