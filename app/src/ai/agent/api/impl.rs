@@ -237,18 +237,8 @@ fn get_supported_tools(params: &RequestParams) -> Vec<api::ToolType> {
                 supported_tools.push(api::ToolType::UploadFileArtifact);
             }
         }
-        Some(SessionType::WarpifiedRemote { host_id: Some(_) }) => {
-            // Remote session with a known host — enable tools that route
-            // through RemoteServerClient. The host_id is only populated
-            // after a successful connection handshake, so its presence is a
-            // sufficient proxy for client availability.
-            supported_tools.extend(&[api::ToolType::ReadFiles, api::ToolType::ApplyFileDiffs]);
-            if FeatureFlag::RemoteCodebaseIndexing.is_enabled() {
-                supported_tools.push(api::ToolType::SearchCodebase);
-            }
-        }
-        Some(SessionType::WarpifiedRemote { host_id: None }) => {
-            // Feature flag off or not yet connected — no remote tools.
+        Some(SessionType::WarpifiedRemote) => {
+            // No file tools reach a remote host.
         }
     }
 
@@ -297,13 +287,7 @@ fn get_supported_cli_agent_tools(params: &RequestParams) -> Vec<api::ToolType> {
             supported_cli_agent_tools
                 .extend(&[api::ToolType::ReadFiles, api::ToolType::SearchCodebase]);
         }
-        Some(SessionType::WarpifiedRemote { host_id: Some(_) }) => {
-            supported_cli_agent_tools.push(api::ToolType::ReadFiles);
-            if FeatureFlag::RemoteCodebaseIndexing.is_enabled() {
-                supported_cli_agent_tools.push(api::ToolType::SearchCodebase);
-            }
-        }
-        Some(SessionType::WarpifiedRemote { host_id: None }) => {}
+        Some(SessionType::WarpifiedRemote) => {}
     }
 
     supported_cli_agent_tools

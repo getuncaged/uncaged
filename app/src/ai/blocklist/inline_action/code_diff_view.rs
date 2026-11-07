@@ -22,12 +22,10 @@ use warp_core::ui::appearance::Appearance;
 use warp_core::ui::color::CLAUDE_ORANGE;
 use warp_core::ui::theme::color::internal_colors::{fg_overlay_6, neutral_1, neutral_4};
 use warp_core::ui::theme::Fill;
-use warp_core::HostId;
 use warp_editor::content::buffer::InitialBufferState;
 use warp_editor::render::element::VerticalExpansionBehavior;
 use warp_util::file::FileSaveError;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::remote_path::RemotePath;
 use warp_util::standardized_path::StandardizedPath;
 use warpui::elements::new_scrollable::{ScrollableAppearance, SingleAxisConfig};
 use warpui::elements::{
@@ -441,13 +439,6 @@ enum AcceptSelection {
     AndContinueWithAgent,
 }
 
-/// Whether a code diff targets the local filesystem or a remote host.
-#[derive(Clone, Debug)]
-pub enum DiffSessionType {
-    Local,
-    Remote(HostId),
-}
-
 #[derive(Clone)]
 struct PendingDiff {
     diff_view: ViewHandle<InlineDiffView>,
@@ -492,8 +483,6 @@ pub struct CodeDiffView {
     is_passive: bool,
     should_show_speedbump: bool,
     session_platform: Option<SessionPlatform>,
-    /// Whether diffs target local disk or a remote host.
-    diff_session_type: DiffSessionType,
 }
 
 impl CodeDiffView {
@@ -929,16 +918,7 @@ impl CodeDiffView {
             is_passive,
             should_show_speedbump,
             session_platform,
-            diff_session_type: DiffSessionType::Local,
         }
-    }
-
-    /// Set the session type for this diff view.
-    ///
-    /// When `Remote`, `set_candidate_diffs` registers files with the
-    /// remote backend instead of the local filesystem.
-    pub fn set_diff_session_type(&mut self, session_type: DiffSessionType) {
-        self.diff_session_type = session_type;
     }
 
     pub fn is_pending_diffs_empty(&self) -> bool {
@@ -999,10 +979,7 @@ impl CodeDiffView {
 
                 // On non-WASM, register the file with FileModel for save support.
                 #[cfg(not(target_family = "wasm"))]
-                {
-                    let session_type = &self.diff_session_type;
-                    diff_viewer.update(ctx, |view, ctx| view.register_file(session_type, ctx));
-                }
+                diff_viewer.update(ctx, |view, ctx| view.register_file(ctx));
 
                 self.setup_diff_view_subscriptions(&diff_viewer, idx, file_path, ctx);
 
@@ -2612,8 +2589,7 @@ impl CodeDiffView {
             .map(|p| p.to_string())
     }
 
-    /// Returns the primary file location as a `LocalOrRemotePath`,
-    /// using `diff_session_type` to correctly identify remote files.
+    /// Returns the primary file location as a `LocalOrRemotePath`.
     pub fn primary_file_location(&self, app: &AppContext) -> Option<LocalOrRemotePath> {
         self.pending_diffs
             .first()?
@@ -2624,13 +2600,7 @@ impl CodeDiffView {
     }
 
     fn location_for_standardized_path(&self, path: &StandardizedPath) -> Option<LocalOrRemotePath> {
-        match &self.diff_session_type {
-            DiffSessionType::Local => path.to_local_path().map(LocalOrRemotePath::Local),
-            DiffSessionType::Remote(host_id) => Some(LocalOrRemotePath::Remote(RemotePath {
-                host_id: host_id.clone(),
-                path: path.clone(),
-            })),
-        }
+        path.to_local_path().map(LocalOrRemotePath::Local)
     }
 }
 

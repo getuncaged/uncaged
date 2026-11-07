@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
 
@@ -7,17 +6,11 @@ use futures::StreamExt as _;
 use instant::Instant;
 use num_traits::SaturatingSub;
 use regex::escape;
-use remote_server::manager::{HostRequestError, RemoteServerManager, RipgrepSearchParams};
-use remote_server::proto::RipgrepSearchSuccess;
-use remote_server::protocol::RequestId;
-use remote_server::HostId;
 use string_offset::ByteOffset;
 use warp_ripgrep::search::{Match as RipgrepMatch, Submatch};
 use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warp_util::remote_path::RemotePath;
-use warp_util::standardized_path::StandardizedPath;
 use warpui::r#async::SpawnedFutureHandle;
-use warpui::{Entity, ModelContext, ModelSpawner, SingletonEntity};
+use warpui::{Entity, ModelContext, ModelSpawner};
 
 use crate::workspace::view::global_search::view::GlobalSearchEvent;
 use crate::workspace::view::global_search::{GlobalSearchMatch, SearchConfig};
@@ -25,10 +18,6 @@ use crate::workspace::view::global_search::{GlobalSearchMatch, SearchConfig};
 const START_BATCH_AFTER_COUNT: usize = 50;
 const MAX_BATCH_SIZE: usize = 512;
 const MAX_BATCH_AGE_MS: u64 = 4000;
-
-/// Client-requested cap on remote matches per host. The daemon clamps this
-/// to its own server-side cap; both bound the single-frame response size.
-const REMOTE_MAX_MATCH_COUNT: u32 = 5_000;
 
 /// Aggregate state for one logical search across all of its sources
 /// (one local ripgrep run plus one remote request per searched host).
@@ -59,10 +48,6 @@ struct SourceResult {
 pub struct GlobalSearch {
     /// Spawned local/remote search tasks for the current search.
     search_handles: Vec<SpawnedFutureHandle>,
-    /// Request ids of remote searches started for the current search, so
-    /// they can be aborted daemon-side when the query changes. May contain
-    /// ids of already-resolved requests; aborting those is a no-op.
-    in_flight_remote_requests: Vec<RequestId>,
     /// Aggregate completion state for the current search.
     active_search: Option<ActiveSearch>,
     // track the search ID so that we only show results for the current search
@@ -95,29 +80,16 @@ impl GlobalSearch {
     pub fn new() -> Self {
         GlobalSearch {
             search_handles: Vec::new(),
-            in_flight_remote_requests: Vec::new(),
             active_search: None,
             next_search_id: 1,
         }
     }
 
-    pub fn abort_search(&mut self, ctx: &mut ModelContext<Self>) {
+    pub fn abort_search(&mut self) {
         for handle in self.search_handles.drain(..) {
             handle.abort();
         }
         self.active_search = None;
-
-        // Cancel in-flight remote searches daemon-side as well: queries
-        // change on every debounced edit, so without this the daemon piles
-        // up wasted ripgrep runs.
-        let request_ids = std::mem::take(&mut self.in_flight_remote_requests);
-        if !request_ids.is_empty() {
-            RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
-                for request_id in &request_ids {
-                    manager.abort_host_request(request_id);
-                }
-            });
-        }
     }
 
     pub fn run_search(
@@ -130,7 +102,7 @@ impl GlobalSearch {
         if !self.search_handles.is_empty() {
             log::info!("GlobalSearch: aborting previous search");
         }
-        self.abort_search(ctx);
+        self.abort_search();
 
         let search_id = self.next_search_id;
         self.next_search_id += 1;
@@ -143,28 +115,22 @@ impl GlobalSearch {
         let ignore_case = !search_config.use_case_sensitivity;
         let multiline = effective_pattern.contains('\n');
 
-        // Split roots into the local filesystem source and one remote
-        // source per host.
+        // Only local roots can be searched; remote roots have no backend.
         let mut local_roots: Vec<PathBuf> = Vec::new();
-        let mut remote_roots: HashMap<HostId, Vec<StandardizedPath>> = HashMap::new();
         for root in roots {
             match root {
                 LocalOrRemotePath::Local(path) => local_roots.push(path),
                 LocalOrRemotePath::Remote(remote) => {
-                    remote_roots
-                        .entry(remote.host_id)
-                        .or_default()
-                        .push(remote.path);
+                    log::debug!("GlobalSearch: skipping remote root {remote:?}");
                 }
             }
         }
 
-        let remote_host_count = remote_roots.len();
         ctx.emit(GlobalSearchEvent::Started {
             search_id,
-            remote_host_count,
+            remote_host_count: 0,
         });
-        let source_count = usize::from(!local_roots.is_empty()) + remote_roots.len();
+        let source_count = usize::from(!local_roots.is_empty());
         if source_count == 0 {
             ctx.emit(GlobalSearchEvent::Completed {
                 search_id,
@@ -195,17 +161,6 @@ impl GlobalSearch {
                 multiline,
                 ctx,
             );
-        }
-
-        for (host_id, paths) in remote_roots {
-            let params = RipgrepSearchParams {
-                pattern: effective_pattern.clone(),
-                roots: paths,
-                ignore_case,
-                multiline,
-                max_matches: REMOTE_MAX_MATCH_COUNT,
-            };
-            self.spawn_remote_search(search_id, host_id, params, ctx);
         }
     }
 
@@ -249,48 +204,6 @@ impl GlobalSearch {
         );
     }
 
-    fn spawn_remote_search(
-        &mut self,
-        search_id: u32,
-        host_id: HostId,
-        params: RipgrepSearchParams,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let pending = RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
-            manager.start_ripgrep_search(&host_id, params)
-        });
-        self.in_flight_remote_requests
-            .push(pending.request_id().clone());
-        let spawner = ctx.spawner();
-        self.spawn_source(
-            search_id,
-            SearchSource::Remote,
-            async move {
-                match pending.result().await {
-                    Ok(success) => {
-                        let capped = success.capped;
-                        let mut items = Self::remote_matches_to_global(&host_id, success);
-                        let match_count = items.len();
-                        flush_batch(&spawner, search_id, &mut items).await;
-                        Some(SourceResult {
-                            match_count,
-                            capped,
-                        })
-                    }
-                    // An abort is initiated by a newer search (or a reset),
-                    // which already replaced the aggregate state; the stale
-                    // search-id guard drops this outcome regardless.
-                    Err(HostRequestError::Aborted) => None,
-                    Err(err) => {
-                        log::warn!("GlobalSearch: remote search failed for host {host_id}: {err}");
-                        None
-                    }
-                }
-            },
-            ctx,
-        );
-    }
-
     /// Spawns one search source (the local ripgrep run, or one remote
     /// host's request) and routes its outcome into the shared completion
     /// accounting. Sources emit their matches via `Progress`/`ProgressBatch`
@@ -306,43 +219,6 @@ impl GlobalSearch {
             me.handle_source_completed(search_id, source_kind, outcome, ctx);
         });
         self.search_handles.push(task);
-    }
-
-    /// Converts a remote search response into per-submatch result rows,
-    /// attaching the originating host to each match location.
-    fn remote_matches_to_global(
-        host_id: &HostId,
-        success: RipgrepSearchSuccess,
-    ) -> Vec<GlobalSearchMatch> {
-        success
-            .matches
-            .into_iter()
-            .filter_map(|m| {
-                let path = match StandardizedPath::try_new(&m.file_path) {
-                    Ok(path) => path,
-                    Err(err) => {
-                        log::warn!("GlobalSearch: dropping remote match with invalid path: {err}");
-                        return None;
-                    }
-                };
-                let submatches = m
-                    .submatches
-                    .into_iter()
-                    .map(|s| Submatch {
-                        byte_start: ByteOffset::from(s.byte_start as usize),
-                        byte_end: ByteOffset::from(s.byte_end as usize),
-                    })
-                    .collect();
-                Some(GlobalSearchMatch {
-                    location: LocalOrRemotePath::Remote(RemotePath::new(host_id.clone(), path)),
-                    line_number: m.line_number,
-                    column_num: None,
-                    line_text: m.line_text,
-                    submatches,
-                })
-            })
-            .flat_map(Self::expand_submatches)
-            .collect()
     }
 
     /// Records the completion of one search source (`None` when the source

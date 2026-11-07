@@ -62,7 +62,6 @@ use crate::workspaces::workspace::{Workspace as WorkspaceMetadata, WorkspaceUid}
 
 pub enum PersistenceScope {
     App,
-    RemoteServerDaemon { identity_key: String },
 }
 
 /// Initializes the persistence "subsystem".

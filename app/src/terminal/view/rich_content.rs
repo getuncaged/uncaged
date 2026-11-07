@@ -14,8 +14,6 @@ use crate::terminal::model::rich_content::RichContentType;
 use crate::terminal::model::terminal_model::BlockIndex;
 use crate::terminal::view::ambient_agent::AmbientAgentEntryBlock;
 use crate::terminal::view::init_environment::InitEnvironmentBlock;
-use crate::terminal::view::ssh_remote_server_choice_view::SshRemoteServerChoiceView;
-use crate::terminal::view::ssh_remote_server_failed_banner::SshRemoteServerFailedBanner;
 use crate::terminal::view::ssh_tmux_deprecation_banner::SshTmuxDeprecationBanner;
 use crate::terminal::warpify::success_block::WarpifySuccessBlock;
 use crate::terminal::TerminalView;
@@ -219,12 +217,6 @@ pub enum RichContentMetadata {
     },
     EnvVarCollectionBlock {
         env_var_collection_block_handle: ViewHandle<EnvVarCollectionBlock>,
-    },
-    SshRemoteServerChoiceBlock {
-        handle: ViewHandle<SshRemoteServerChoiceView>,
-    },
-    SshRemoteServerFailedBanner {
-        handle: ViewHandle<SshRemoteServerFailedBanner>,
     },
     SshTmuxDeprecationBanner {
         handle: ViewHandle<SshTmuxDeprecationBanner>,

@@ -66,15 +66,6 @@ pub struct ParentOpts {
     pub handle: Option<process_handle::ProcessHandle>,
 }
 
-/// Hidden worker args used to scope remote-server proxy/daemon sockets by
-/// Warp identity without exposing credentials.
-#[derive(Debug, Clone, Default, clap::Args)]
-pub struct RemoteServerIdentityArgs {
-    /// Non-secret identity partition key for the remote-server daemon.
-    #[arg(long = "identity-key", hide = true)]
-    pub identity_key: String,
-}
-
 /// Global options that apply to all CLI commands.
 #[derive(Debug, Default, Clone, clap::Args)]
 pub struct GlobalOptions {
@@ -454,20 +445,6 @@ pub enum WorkerCommand {
         #[clap(flatten)]
         parent: ParentOpts,
     },
-
-    /// Run the remote development server proxy over SSH stdio.
-    /// Ensures the daemon is running, then bridges its stdin/stdout
-    /// to the daemon via a Unix domain socket.
-    #[cfg(not(target_family = "wasm"))]
-    #[clap(hide = true)]
-    RemoteServerProxy(RemoteServerIdentityArgs),
-
-    /// Run the long-lived remote development server daemon.
-    /// Listens on a Unix domain socket and accepts multiple concurrent
-    /// connections from proxy processes.
-    #[cfg(not(target_family = "wasm"))]
-    #[clap(hide = true)]
-    RemoteServerDaemon(RemoteServerIdentityArgs),
 
     /// Run a headless ripgrep search worker.
     #[cfg(not(target_family = "wasm"))]

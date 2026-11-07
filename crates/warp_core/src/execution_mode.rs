@@ -12,8 +12,6 @@ pub enum ExecutionMode {
     App,
     /// Warp is running as a CLI.
     Sdk,
-    /// Warp is running as the remote server daemon.
-    RemoteServerDaemon,
 }
 
 impl ExecutionMode {
@@ -23,7 +21,6 @@ impl ExecutionMode {
         match self {
             ExecutionMode::App => "warp-app",
             ExecutionMode::Sdk => "warp-cli",
-            ExecutionMode::RemoteServerDaemon => "warp-remote-server-daemon",
         }
     }
 }
@@ -92,23 +89,17 @@ impl AppExecutionMode {
     }
 
     /// Whether telemetry should be sent synchronously at shutdown.
-    /// In CLI and daemon modes, we synchronously send events at shutdown because there's a
+    /// In CLI mode, we synchronously send events at shutdown because there's a
     /// higher likelihood that they will be lost otherwise.
     pub fn send_telemetry_at_shutdown(&self) -> bool {
-        matches!(
-            self.mode,
-            ExecutionMode::Sdk | ExecutionMode::RemoteServerDaemon
-        )
+        matches!(self.mode, ExecutionMode::Sdk)
     }
 
     /// If true, the app is running autonomously, without a user present.
     /// Wherever possible, prefer more targeted capability checks like
     /// [`Self::can_autostart_mcp_servers`].
     pub fn is_autonomous(&self) -> bool {
-        matches!(
-            self.mode,
-            ExecutionMode::Sdk | ExecutionMode::RemoteServerDaemon
-        )
+        matches!(self.mode, ExecutionMode::Sdk)
     }
 
     /// Returns the client ID to report to the server.
@@ -129,7 +120,7 @@ impl Entity for AppExecutionMode {
 
 impl SingletonEntity for AppExecutionMode {}
 
-/// Returns the current global client ID string ("warp-app", "warp-cli", or "warp-remote-server-daemon").
+/// Returns the current global client ID string ("warp-app" or "warp-cli").
 /// This is set when AppExecutionMode is constructed during application start.
 /// Returns None if the execution mode has not been set yet.
 pub fn current_client_id() -> Option<&'static str> {

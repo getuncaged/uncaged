@@ -33,12 +33,11 @@ use crate::ai::agent::{
     FileLocations, RequestFileEditsResult, UpdatedFileContext,
 };
 use crate::ai::blocklist::inline_action::code_diff_view::{
-    CodeDiffView, CodeDiffViewEvent, DiffSessionType, FileDiff,
+    CodeDiffView, CodeDiffViewEvent, FileDiff,
 };
 use crate::ai::blocklist::{BlocklistAIPermissions, RequestedEditResolution};
 use crate::ai::paths::host_native_absolute_path;
 use crate::terminal::model::session::active_session::ActiveSession;
-use crate::terminal::model::session::SessionType;
 use crate::{safe_warn, BlocklistAIHistoryModel};
 const APPLY_DIFF_RESULT_CONTEXT_LINES: usize = 10;
 
@@ -362,17 +361,7 @@ impl RequestFileEditsExecutor {
             diffs.push(file_diff);
         }
 
-        // Set the session type on the diff view so save/delete/create routes
-        // through the correct FileModel backend.
-        let diff_session_type = match self.active_session.as_ref(ctx).session_type(ctx) {
-            Some(SessionType::WarpifiedRemote {
-                host_id: Some(host_id),
-            }) => DiffSessionType::Remote(host_id.clone()),
-            _ => DiffSessionType::Local,
-        };
-
         diff_view.update(ctx, |diff_view, ctx| {
-            diff_view.set_diff_session_type(diff_session_type);
             diff_view.set_candidate_diffs(diffs, ctx);
         });
     }

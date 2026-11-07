@@ -1,8 +1,6 @@
 //! Unified diff state module.
 //!
-//! [`DiffStateModel`] is an enum that provides a unified API over local and remote models.
-//! It holds one of [`LocalDiffStateModel`] or [`RemoteDiffStateModel`] and dispatches
-//! operations to whichever is active.
+//! [`DiffStateModel`] provides a unified API over the [`LocalDiffStateModel`] backend.
 //! All consumers should use `DiffStateModel` rather than accessing sub-models directly.
 
 use std::path::PathBuf;
@@ -11,8 +9,6 @@ use std::time::Duration;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use warp_core::SessionId;
-use warp_util::remote_path::RemotePath;
 use warp_util::standardized_path::StandardizedPath;
 use warpui::{AppContext, ModelContext, ModelHandle};
 
@@ -23,9 +19,6 @@ mod local;
 #[cfg(feature = "local_fs")]
 pub(crate) use local::diff_metadata_against_head;
 pub use local::LocalDiffStateModel;
-
-mod remote;
-pub use remote::RemoteDiffStateModel;
 
 #[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
 mod error;
@@ -47,21 +40,12 @@ pub enum CommitChainMode {
 }
 
 /// Identifies the host of a [`DiffStateModel`] so failure telemetry can be
-/// attributed to where the model actually ran. This is more specific than the
-/// local/remote split already encoded by `is_local`: a [`LocalDiffStateModel`]
-/// can be instantiated on the user's client (`ClientLocal`) or on a remote
-/// daemon (`RemoteDaemon`) serving subscribers, and only the host knows which.
+/// attributed to where the model actually ran.
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 pub enum BackendOrigin {
     /// `LocalDiffStateModel` running on the user's client against local files.
     #[serde(rename = "client_local")]
     ClientLocal,
-    /// `RemoteDiffStateModel` running on the user's client; talks to a daemon.
-    #[serde(rename = "client_remote")]
-    ClientRemote,
-    /// `LocalDiffStateModel` running on a remote daemon, serving subscribers.
-    #[serde(rename = "remote_daemon")]
-    RemoteDaemon,
 }
 
 /// Identifies the diff-state operation that produced a [`DiffStateError`]
@@ -81,9 +65,6 @@ pub enum DiffOperation {
     /// Full repo-wide diff snapshot load.
     #[serde(rename = "diff_load")]
     DiffLoad,
-    /// Client-side reaction to a remote daemon's diff-state response.
-    #[serde(rename = "remote_diff")]
-    RemoteDiff,
 }
 
 // -- Shared types ──────────────────────────────────────────────────────
@@ -438,7 +419,6 @@ pub enum GitOpResult {
 /// interact with this enum rather than accessing sub-models directly.
 pub enum DiffStateModel {
     Local(ModelHandle<LocalDiffStateModel>),
-    Remote(ModelHandle<RemoteDiffStateModel>),
 }
 
 impl warpui::Entity for DiffStateModel {
@@ -456,25 +436,6 @@ impl DiffStateModel {
             .add_model(|ctx| LocalDiffStateModel::new(repo_path, BackendOrigin::ClientLocal, ctx));
         ctx.subscribe_to_model(&local, |me, _, event, ctx| me.forward_event(event, ctx));
         Self::Local(local)
-    }
-
-    /// Creates a new remote-backed `DiffStateModel`. The model is keyed by
-    /// `(host_id, repo, mode)` and shared across sessions viewing the same
-    /// repo. `preferred_session` is the session that opened this review (when
-    /// known): `GetDiffState` is session-scoped, so the manager dispatches it
-    /// over that session when it's connected and falls back to any connected
-    /// session for the host otherwise. Callers must ensure a session for the
-    /// host is connected before constructing.
-    pub fn new_remote(
-        remote_path: RemotePath,
-        preferred_session: Option<SessionId>,
-        ctx: &mut ModelContext<Self>,
-    ) -> Self {
-        let remote = ctx.add_model(|ctx| {
-            RemoteDiffStateModel::new(remote_path, DiffMode::default(), preferred_session, ctx)
-        });
-        ctx.subscribe_to_model(&remote, |me, _, event, ctx| me.forward_event(event, ctx));
-        Self::Remote(remote)
     }
 
     // ── Event forwarding ─────────────────────────────────────────────
@@ -527,21 +488,18 @@ impl DiffStateModel {
     pub(crate) fn get(&self, ctx: &AppContext) -> DiffState {
         match self {
             Self::Local(m) => m.as_ref(ctx).get(),
-            Self::Remote(m) => m.as_ref(ctx).get(),
         }
     }
 
     pub(crate) fn diff_mode(&self, ctx: &AppContext) -> DiffMode {
         match self {
             Self::Local(m) => m.as_ref(ctx).diff_mode(),
-            Self::Remote(m) => m.as_ref(ctx).diff_mode(),
         }
     }
 
     pub(crate) fn get_uncommitted_stats(&self, ctx: &AppContext) -> Option<DiffStats> {
         match self {
             Self::Local(m) => m.as_ref(ctx).get_uncommitted_stats(),
-            Self::Remote(m) => m.as_ref(ctx).get_uncommitted_stats(),
         }
     }
 
@@ -556,80 +514,64 @@ impl DiffStateModel {
     ) -> &'a [FileChangeEntry] {
         match self {
             Self::Local(m) => m.as_ref(ctx).uncommitted_file_entries(),
-            Self::Remote(m) => m.as_ref(ctx).uncommitted_file_entries(),
         }
     }
 
     pub(crate) fn get_main_branch_name(&self, ctx: &AppContext) -> Option<String> {
         match self {
             Self::Local(m) => m.as_ref(ctx).get_main_branch_name(),
-            Self::Remote(m) => m.as_ref(ctx).get_main_branch_name(),
         }
     }
 
     pub fn get_current_branch_name(&self, ctx: &AppContext) -> Option<String> {
         match self {
             Self::Local(m) => m.as_ref(ctx).get_current_branch_name(),
-            Self::Remote(m) => m.as_ref(ctx).get_current_branch_name(),
         }
     }
 
     pub(crate) fn is_on_main_branch(&self, ctx: &AppContext) -> bool {
         match self {
             Self::Local(m) => m.as_ref(ctx).is_on_main_branch(),
-            Self::Remote(m) => m.as_ref(ctx).is_on_main_branch(),
         }
     }
 
     pub(crate) fn unpushed_commits<'a>(&self, ctx: &'a AppContext) -> &'a [Commit] {
         match self {
             Self::Local(m) => m.as_ref(ctx).unpushed_commits(),
-            Self::Remote(m) => m.as_ref(ctx).unpushed_commits(),
         }
     }
 
     pub(crate) fn upstream_ref<'a>(&self, ctx: &'a AppContext) -> Option<&'a str> {
         match self {
             Self::Local(m) => m.as_ref(ctx).upstream_ref(),
-            Self::Remote(m) => m.as_ref(ctx).upstream_ref(),
         }
     }
 
     pub(crate) fn upstream_differs_from_main(&self, ctx: &AppContext) -> bool {
         match self {
             Self::Local(m) => m.as_ref(ctx).upstream_differs_from_main(),
-            Self::Remote(m) => m.as_ref(ctx).upstream_differs_from_main(),
         }
     }
 
     pub(crate) fn is_git_operation_blocked(&self, ctx: &AppContext) -> bool {
         match self {
             Self::Local(m) => m.as_ref(ctx).is_git_operation_blocked(ctx),
-            // Remote git ops rely on the daemon-side `.git` sentinel as the
-            // authoritative guard, so the client doesn't pre-emptively block.
-            Self::Remote(_) => false,
         }
     }
 
     pub(crate) fn has_head(&self, ctx: &AppContext) -> bool {
         match self {
             Self::Local(m) => m.as_ref(ctx).has_head(),
-            Self::Remote(m) => m.as_ref(ctx).has_head(),
         }
     }
 
     // ── Unified write API ─────────────────────────────────────────────
 
-    /// `preferred_session` is the session that triggered this call (the
-    /// session showing the review). It's forwarded per-call to the remote
-    /// model so the `GetDiffState` RPC rides that session; the local backend
-    /// ignores it. The remote model never caches it.
     pub(crate) fn set_diff_mode(
         &self,
         mode: DiffMode,
         should_fetch_base: bool,
         track_load_duration: bool,
-        preferred_session: Option<SessionId>,
         ctx: &mut ModelContext<Self>,
     ) {
         match self {
@@ -638,29 +580,18 @@ impl DiffStateModel {
                     local.set_diff_mode(mode, should_fetch_base, track_load_duration, ctx);
                 });
             }
-            Self::Remote(model) => {
-                model.update(ctx, |model, ctx| {
-                    model.set_diff_mode(mode, track_load_duration, preferred_session, ctx);
-                });
-            }
         }
     }
 
     pub(crate) fn set_diff_mode_and_fetch_base(
         &self,
         mode: DiffMode,
-        preferred_session: Option<SessionId>,
         ctx: &mut ModelContext<Self>,
     ) {
         match self {
             Self::Local(local) => {
                 local.update(ctx, |local, ctx| {
                     local.set_diff_mode_and_fetch_base(mode, ctx);
-                });
-            }
-            Self::Remote(model) => {
-                model.update(ctx, |model, ctx| {
-                    model.set_diff_mode(mode, true, preferred_session, ctx);
                 });
             }
         }
@@ -670,18 +601,12 @@ impl DiffStateModel {
         &self,
         should_fetch_base: bool,
         track_load_duration: bool,
-        preferred_session: Option<SessionId>,
         ctx: &mut ModelContext<Self>,
     ) {
         match self {
             Self::Local(local) => {
                 local.update(ctx, |local, ctx| {
                     local.load_diffs_for_current_repo(should_fetch_base, track_load_duration, ctx);
-                });
-            }
-            Self::Remote(remote) => {
-                remote.update(ctx, |remote, ctx| {
-                    remote.fetch_fresh_snapshot(track_load_duration, preferred_session, ctx);
                 });
             }
         }
@@ -698,7 +623,6 @@ impl DiffStateModel {
                     local.set_code_review_metadata_refresh_enabled(enabled, ctx);
                 });
             }
-            Self::Remote(_) => {}
         }
     }
 
@@ -707,11 +631,6 @@ impl DiffStateModel {
             Self::Local(local) => {
                 local.update(ctx, |local, ctx| {
                     local.fetch_branches(ctx);
-                });
-            }
-            Self::Remote(model) => {
-                model.update(ctx, |model, ctx| {
-                    model.fetch_branches(ctx);
                 });
             }
         }
@@ -724,7 +643,6 @@ impl DiffStateModel {
                     local.refresh_metadata_after_git_operation(ctx);
                 });
             }
-            Self::Remote(_) => {}
         }
     }
 
@@ -739,11 +657,6 @@ impl DiffStateModel {
             Self::Local(local) => {
                 local.update(ctx, |local, ctx| {
                     local.discard_files(file_infos, should_stash, branch_name, ctx);
-                });
-            }
-            Self::Remote(model) => {
-                model.update(ctx, |model, ctx| {
-                    model.discard_files(file_infos, should_stash, branch_name, ctx);
                 });
             }
         }
@@ -770,16 +683,6 @@ impl DiffStateModel {
                     ctx,
                 );
             }),
-            Self::Remote(remote) => remote.update(ctx, |remote, ctx| {
-                remote.git_commit_chain(
-                    mode,
-                    message,
-                    include_unstaged,
-                    branch,
-                    autogenerate_pr_content,
-                    ctx,
-                );
-            }),
         }
     }
 
@@ -794,9 +697,6 @@ impl DiffStateModel {
             Self::Local(local) => local.update(ctx, |local, ctx| {
                 local.generate_commit_message(include_unstaged, branch_name, ctx);
             }),
-            Self::Remote(remote) => remote.update(ctx, |remote, ctx| {
-                remote.generate_commit_message(include_unstaged, branch_name, ctx);
-            }),
         }
     }
 
@@ -805,9 +705,6 @@ impl DiffStateModel {
         match self {
             Self::Local(local) => local.update(ctx, |local, ctx| {
                 local.git_push(branch, ctx);
-            }),
-            Self::Remote(remote) => remote.update(ctx, |remote, ctx| {
-                remote.git_push(branch, ctx);
             }),
         }
     }
@@ -826,9 +723,6 @@ impl DiffStateModel {
             Self::Local(local) => local.update(ctx, |local, ctx| {
                 local.create_pr(branch, autogenerate_content, ctx);
             }),
-            Self::Remote(remote) => remote.update(ctx, |remote, ctx| {
-                remote.create_pr(branch, autogenerate_content, ctx);
-            }),
         }
     }
 
@@ -843,9 +737,6 @@ impl DiffStateModel {
             Self::Local(local) => local.update(ctx, |local, ctx| {
                 local.fetch_committed_branch_files(ctx);
             }),
-            Self::Remote(model) => model.update(ctx, |model, ctx| {
-                model.fetch_committed_branch_files(ctx);
-            }),
         }
     }
 
@@ -855,11 +746,6 @@ impl DiffStateModel {
             Self::Local(local) => {
                 local.update(ctx, |local, ctx| {
                     local.stop_active_watcher(ctx);
-                });
-            }
-            Self::Remote(remote) => {
-                remote.update(ctx, |remote, ctx| {
-                    remote.unsubscribe(ctx);
                 });
             }
         }

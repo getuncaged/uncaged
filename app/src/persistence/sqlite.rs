@@ -294,19 +294,11 @@ pub(super) fn init_db(scope: &PersistenceScope) -> Result<SqliteConnection> {
             "Encountered an error while creating parent directories for sqlite database: {err:#}"
         );
     }
-    if matches!(scope, PersistenceScope::RemoteServerDaemon { .. }) {
-        ensure_owner_only_dir(db_parent)?;
-    }
-
     if matches!(scope, PersistenceScope::App) {
         migrate_old_sqlite_into_secure_container_if_needed(&db_path);
     }
 
-    let conn = setup_database(&db_path)?;
-    if matches!(scope, PersistenceScope::RemoteServerDaemon { .. }) {
-        ensure_owner_only_file(&db_path)?;
-    }
-    Ok(conn)
+    setup_database(&db_path)
 }
 
 fn migrate_old_sqlite_into_secure_container_if_needed(db_path: &Path) {
@@ -377,9 +369,6 @@ fn setup_database(database_path: &Path) -> Result<SqliteConnection> {
 pub fn database_file_path_for_scope(scope: &PersistenceScope) -> PathBuf {
     match scope {
         PersistenceScope::App => app_database_file_path(),
-        PersistenceScope::RemoteServerDaemon { identity_key } => {
-            remote_server_daemon_database_file_path(identity_key)
-        }
     }
 }
 
@@ -387,43 +376,6 @@ fn app_database_file_path() -> PathBuf {
     warp_core::paths::secure_state_dir()
         .unwrap_or_else(warp_core::paths::state_dir)
         .join(WARP_SQLITE_FILE_NAME)
-}
-
-fn remote_server_daemon_database_file_path(identity_key: &str) -> PathBuf {
-    let data_dir = remote_server::setup::remote_server_daemon_data_dir(identity_key);
-    let expanded_data_dir = shellexpand::tilde(&data_dir).into_owned();
-    PathBuf::from(expanded_data_dir).join(WARP_SQLITE_FILE_NAME)
-}
-
-#[cfg(unix)]
-fn ensure_owner_only_dir(path: &Path) -> Result<()> {
-    use std::fs::Permissions;
-    use std::os::unix::fs::PermissionsExt;
-
-    std::fs::set_permissions(path, Permissions::from_mode(0o700))
-        .with_context(|| format!("setting permissions on directory {}", path.display()))
-}
-
-#[cfg(not(unix))]
-fn ensure_owner_only_dir(_path: &Path) -> Result<()> {
-    Ok(())
-}
-
-#[cfg(unix)]
-fn ensure_owner_only_file(path: &Path) -> Result<()> {
-    use std::fs::Permissions;
-    use std::os::unix::fs::PermissionsExt;
-
-    if path.exists() {
-        std::fs::set_permissions(path, Permissions::from_mode(0o600))
-            .with_context(|| format!("setting permissions on file {}", path.display()))?;
-    }
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn ensure_owner_only_file(_path: &Path) -> Result<()> {
-    Ok(())
 }
 
 pub(super) fn remove(sender: SyncSender<ModelEvent>) {

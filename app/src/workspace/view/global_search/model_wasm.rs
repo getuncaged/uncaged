@@ -15,7 +15,7 @@ impl GlobalSearch {
         GlobalSearch {}
     }
 
-    pub fn abort_search(&mut self, _ctx: &mut ModelContext<Self>) {}
+    pub fn abort_search(&mut self) {}
 
     pub fn run_search(
         &mut self,

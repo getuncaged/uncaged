@@ -65,7 +65,6 @@ use crate::terminal::shared_session::{
     SharedSessionStatus,
 };
 use crate::terminal::view::{ConversationRestorationInNewPaneType, Event as TerminalViewEvent};
-use crate::terminal::writeable_pty::terminal_manager_util::wire_up_remote_server_controller_with_view;
 use crate::terminal::{TerminalManager as TerminalManagerTrait, TerminalModel, TerminalView};
 use crate::view_components::ToastFlavor;
 use crate::NetworkStatus;
@@ -213,12 +212,6 @@ pub(crate) fn create_terminal_view_surface(
                     )
                 });
             }
-
-            wire_up_remote_server_controller_with_view(
-                &terminal_manager.remote_server_controller(),
-                view,
-                ctx,
-            );
 
             // Wire up TerminalView-specific session sharing (sharer setup, prompt/presence/LLM/
             // input-mode/conversation broadcasts, agent-view registration, network status).

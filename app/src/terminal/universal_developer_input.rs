@@ -73,26 +73,10 @@ impl AtContextMenuDisabledReason {
             .and_then(|metadata| metadata.session_id())
             .and_then(|session_id| sessions.get(session_id))
             .map(|session| {
-                let session_type = session.session_type();
-                let has_connected_remote_server = matches!(
-                    session_type,
-                    SessionType::WarpifiedRemote { host_id: Some(_) }
-                );
-                // The @ menu requires repo metadata which is only available for:
-                // - Local sessions
-                // - WarpifiedRemote sessions with a connected remote server (host_id is Some)
-                //
-                // Block when:
-                // - SSH wrapper session without a remote server upgrade
-                // - WarpifiedRemote still connecting (host_id is None)
-                //
-                // Note: is_ssh_wrapper_session() is set at bootstrap time and stays true
-                // even after the session transitions to WarpifiedRemote with a host_id.
-                // So we must check has_connected_remote_server first to avoid
-                // incorrectly blocking upgraded sessions.
-                let is_ssh_without_remote_server = !has_connected_remote_server
-                    && (session.is_ssh_wrapper_session()
-                        || matches!(session_type, SessionType::WarpifiedRemote { host_id: None }));
+                // The @ menu requires repo metadata, which is only available for
+                // local sessions. Block SSH wrapper and WarpifiedRemote sessions.
+                let is_ssh_without_remote_server = session.is_ssh_wrapper_session()
+                    || matches!(session.session_type(), SessionType::WarpifiedRemote);
                 let is_subshell = session.subshell_info().is_some();
                 (is_ssh_without_remote_server, is_subshell)
             })

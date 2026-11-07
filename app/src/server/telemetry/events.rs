@@ -1249,20 +1249,6 @@ pub enum CLISubagentControlState {
     AgentTaggedIn,
     AgentTaggedOut,
 }
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RemoteCodebaseIndexStatusTelemetrySource {
-    Snapshot,
-    PushUpdate,
-    MutationResponse,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RemoteCodebaseAutoIndexTrigger {
-    NavigatedToGitRepo,
-    CodebaseContextEnablementChanged,
-}
 
 #[derive(Clone, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
@@ -1394,9 +1380,7 @@ pub enum TelemetryEvent {
     /// We attempted to bootstrap an SSH session via the SSH wrapper.  The
     /// argument is the name of the remote shell.
     SSHBootstrapAttempt(String),
-    SSHControlMasterError {
-        has_remote_server: bool,
-    },
+    SSHControlMasterError,
     KeybindingChanged {
         action: String,
         keystroke: Keystroke,
@@ -1714,15 +1698,6 @@ pub enum TelemetryEvent {
     ReceivedSubshellRcFileDcs,
     ToggleSshWarpification {
         enabled: bool,
-    },
-    /// User changed the SSH extension install mode.
-    SetSshExtensionInstallMode {
-        mode: &'static str,
-    },
-    /// User toggled the "Don't ask me this again" checkbox on the SSH
-    /// remote-server choice block.
-    SshRemoteServerChoiceDoNotAskAgainToggled {
-        checked: bool,
     },
     WarpifyFooterShown {
         is_ssh: bool,
@@ -2830,121 +2805,6 @@ pub enum TelemetryEvent {
     FreeTierLimitHitInterstitialUpgradeButtonClicked,
     /// Emitted when the user clicks close on the free tier limit hit interstitial.
     FreeTierLimitHitInterstitialClosed,
-    /// Emitted when the remote server binary check completes.
-    RemoteServerBinaryCheck {
-        found: bool,
-        error: Option<String>,
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-    },
-    /// Emitted when the remote server binary installation completes.
-    /// `error` is `None` on success, `Some(reason)` on failure.
-    RemoteServerInstallation {
-        error: Option<String>,
-        install_source: Option<remote_server::transport::InstallSource>,
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-    },
-    /// Emitted when the remote server connection + initialization completes.
-    /// `error` is `None` on success, `Some(reason)` on failure.
-    RemoteServerInitialization {
-        phase: remote_server::manager::RemoteServerInitPhase,
-        error: Option<String>,
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-        /// Exit code of the SSH subprocess, if available.
-        /// Helps distinguish proxy crashes from transport failures.
-        exit_code: Option<i32>,
-        /// Whether the SSH subprocess was killed by a signal.
-        signal_killed: Option<bool>,
-        /// Last lines from the proxy's stderr, if available.
-        /// Provides server-side context for why the proxy exited.
-        proxy_stderr: Option<String>,
-    },
-    /// Emitted when an established remote server connection drops.
-    RemoteServerDisconnection {
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-    },
-    /// Emitted when a client request to the remote server fails.
-    RemoteServerClientRequestError {
-        operation: remote_server::manager::RemoteServerOperation,
-        error_type: remote_server::manager::RemoteServerErrorKind,
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-    },
-    /// Emitted when a server message cannot be decoded (no parseable request_id).
-    RemoteServerMessageDecodingError {
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-    },
-    /// Emitted when the full remote server setup flow completes successfully.
-    RemoteServerSetupDuration {
-        duration_ms: u64,
-        installed_binary: bool,
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-        /// Short description of the remote libc (e.g. "glibc 2.35",
-        /// "musl", "unknown"). `None` when the preinstall check did
-        /// not run (e.g. macOS hosts).
-        remote_libc: Option<String>,
-    },
-    /// Emitted when the preinstall check classifies the remote host as
-    /// unsupported by the prebuilt remote-server binary, so the controller
-    /// silently falls back to the wrapper-only SSH/`RemoteCommandExecutor`
-    /// flow without surfacing an install prompt.
-    RemoteServerHostUnsupported {
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-        /// Typed unsupported reason. Converted into stable telemetry
-        /// fields in `payload()`.
-        unsupported_reason: remote_server::setup::UnsupportedReason,
-        /// Detected libc on the remote host, e.g. `"glibc 2.28"`,
-        /// `"musl"`, `"unknown"`.
-        detected_libc: String,
-    },
-    /// Emitted when a reconnection attempt succeeds after a spontaneous disconnect.
-    RemoteServerReconnection {
-        attempt: u32,
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-    },
-    /// Emitted when the remote server daemon process finishes startup and
-    /// binds its Unix domain socket.  Reports the same `IntervalTimer`
-    /// data that `AppStartup` reports for the GUI, but from the headless
-    /// daemon process on the remote host.  Only emitted on success — if
-    /// the daemon crashes before binding, no event is sent.
-    RemoteServerDaemonStartup {
-        timing_data: Vec<warp_core::interval_timer::TimingDataPoint>,
-    },
-    /// Emitted when all reconnection attempts are exhausted.
-    RemoteServerReconnectExhausted {
-        attempts: u32,
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-        exit_code: Option<i32>,
-        signal_killed: Option<bool>,
-    },
-    /// Emitted when the remote codebase index status changes.
-    RemoteCodebaseIndexStatusChanged {
-        state: remote_server::codebase_index_proto::RemoteCodebaseIndexState,
-        previous_state: Option<remote_server::codebase_index_proto::RemoteCodebaseIndexState>,
-        has_root_hash: bool,
-        has_failure_message: bool,
-        progress_completed: Option<u64>,
-        progress_total: Option<u64>,
-        mutation_kind: Option<remote_server::manager::RemoteCodebaseIndexUpdateOperation>,
-        source: RemoteCodebaseIndexStatusTelemetrySource,
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-    },
-    /// Emitted when auto-indexing requests one or more remote codebases.
-    RemoteCodebaseAutoIndexRequested {
-        trigger: RemoteCodebaseAutoIndexTrigger,
-        requested_count: usize,
-        remote_os: Option<String>,
-        remote_arch: Option<String>,
-    },
     /// Emitted when the user commits a non-empty edit to a queued prompt row.
     QueuedPromptEdited {
         origin: TelemetryQueuedQueryOrigin,
@@ -3496,10 +3356,6 @@ impl TelemetryEvent {
                 Some(json!({"enabled": enabled}))
             }
             TelemetryEvent::ToggleSshWarpification { enabled } => Some(json!({"enabled": enabled})),
-            TelemetryEvent::SetSshExtensionInstallMode { mode } => Some(json!({"mode": mode})),
-            TelemetryEvent::SshRemoteServerChoiceDoNotAskAgainToggled { checked } => {
-                Some(json!({"checked": checked}))
-            }
             TelemetryEvent::JoinedSharedSession {
                 session_id,
                 source_type,
@@ -4234,176 +4090,6 @@ impl TelemetryEvent {
                 "local_source_failed": local_source_failed,
                 "remote_source_failures": remote_source_failures,
             })),
-            TelemetryEvent::SSHControlMasterError { has_remote_server } => Some(json!({
-                "has_remote_server": has_remote_server,
-            })),
-            TelemetryEvent::RemoteServerBinaryCheck {
-                found,
-                error,
-                remote_os,
-                remote_arch,
-            } => Some(json!({
-                "found": found,
-                "error": error,
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-            })),
-            TelemetryEvent::RemoteServerInstallation {
-                error,
-                install_source,
-                remote_os,
-                remote_arch,
-            } => Some(json!({
-                "error": error,
-                "install_source": install_source,
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-            })),
-            TelemetryEvent::RemoteServerInitialization {
-                phase,
-                error,
-                remote_os,
-                remote_arch,
-                exit_code,
-                signal_killed,
-                proxy_stderr,
-            } => Some(json!({
-                "phase": phase,
-                "error": error,
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-                "exit_code": exit_code,
-                "signal_killed": signal_killed,
-                "proxy_stderr": proxy_stderr,
-            })),
-            TelemetryEvent::RemoteServerDisconnection {
-                remote_os,
-                remote_arch,
-            } => Some(json!({
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-            })),
-            TelemetryEvent::RemoteServerReconnection {
-                attempt,
-                remote_os,
-                remote_arch,
-            } => Some(json!({
-                "attempt": attempt,
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-            })),
-            TelemetryEvent::RemoteServerReconnectExhausted {
-                attempts,
-                remote_os,
-                remote_arch,
-                exit_code,
-                signal_killed,
-            } => Some(json!({
-                "attempts": attempts,
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-                "exit_code": exit_code,
-                "signal_killed": signal_killed,
-            })),
-            TelemetryEvent::RemoteServerClientRequestError {
-                operation,
-                error_type,
-                remote_os,
-                remote_arch,
-            } => Some(json!({
-                "operation": operation,
-                "error_type": error_type,
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-            })),
-            TelemetryEvent::RemoteServerMessageDecodingError {
-                remote_os,
-                remote_arch,
-            } => Some(json!({
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-            })),
-            TelemetryEvent::RemoteCodebaseIndexStatusChanged {
-                state,
-                previous_state,
-                has_root_hash,
-                has_failure_message,
-                progress_completed,
-                progress_total,
-                mutation_kind,
-                source,
-                remote_os,
-                remote_arch,
-            } => Some(json!({
-                "state": state,
-                "previous_state": previous_state,
-                "has_root_hash": has_root_hash,
-                "has_failure_message": has_failure_message,
-                "progress_completed": progress_completed,
-                "progress_total": progress_total,
-                "mutation_kind": mutation_kind,
-                "source": source,
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-            })),
-            TelemetryEvent::RemoteCodebaseAutoIndexRequested {
-                trigger,
-                requested_count,
-                remote_os,
-                remote_arch,
-            } => Some(json!({
-                "trigger": trigger,
-                "requested_count": requested_count,
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-            })),
-            TelemetryEvent::RemoteServerDaemonStartup { timing_data } => {
-                Some(json!({ "timing_data": timing_data }))
-            }
-            TelemetryEvent::RemoteServerSetupDuration {
-                duration_ms,
-                installed_binary,
-                remote_os,
-                remote_arch,
-                remote_libc,
-            } => Some(json!({
-                "duration_ms": duration_ms,
-                "installed_binary": installed_binary,
-                "remote_os": remote_os,
-                "remote_arch": remote_arch,
-                "remote_libc": remote_libc,
-            })),
-            TelemetryEvent::RemoteServerHostUnsupported {
-                remote_os,
-                remote_arch,
-                unsupported_reason,
-                detected_libc,
-            } => {
-                let unsupported_os = match unsupported_reason {
-                    remote_server::setup::UnsupportedReason::UnsupportedOs { os } => {
-                        Some(os.clone())
-                    }
-                    remote_server::setup::UnsupportedReason::GlibcTooOld { .. }
-                    | remote_server::setup::UnsupportedReason::NonGlibc { .. }
-                    | remote_server::setup::UnsupportedReason::UnsupportedArch { .. } => None,
-                };
-                let unsupported_arch = match unsupported_reason {
-                    remote_server::setup::UnsupportedReason::UnsupportedArch { arch } => {
-                        Some(arch.clone())
-                    }
-                    remote_server::setup::UnsupportedReason::GlibcTooOld { .. }
-                    | remote_server::setup::UnsupportedReason::NonGlibc { .. }
-                    | remote_server::setup::UnsupportedReason::UnsupportedOs { .. } => None,
-                };
-                Some(json!({
-                    "remote_os": remote_os,
-                    "remote_arch": remote_arch,
-                    "reason": unsupported_reason.as_telemetry_reason(),
-                    "detected_libc": detected_libc,
-                    "unsupported_os": unsupported_os,
-                    "unsupported_arch": unsupported_arch,
-                }))
-            }
             TelemetryEvent::ConversationListItemOpened { is_ambient_agent } => Some(json!({
                 "is_ambient_agent": is_ambient_agent,
             })),
@@ -4760,6 +4446,7 @@ impl TelemetryEvent {
             TelemetryEvent::FreeTierLimitHitInterstitialDisplayed => None,
             TelemetryEvent::FreeTierLimitHitInterstitialUpgradeButtonClicked => None,
             TelemetryEvent::FreeTierLimitHitInterstitialClosed => None,
+            TelemetryEvent::SSHControlMasterError => None,
             TelemetryEvent::LoginButtonClicked { source }
             | TelemetryEvent::LoginLaterButtonClicked { source }
             | TelemetryEvent::LoginLaterConfirmationButtonClicked { source }
@@ -4876,7 +4563,7 @@ impl TelemetryEvent {
             | TelemetryEvent::LoggedOutStartup
             | TelemetryEvent::DownloadSource(_)
             | TelemetryEvent::SSHBootstrapAttempt(_)
-            | TelemetryEvent::SSHControlMasterError { .. }
+            | TelemetryEvent::SSHControlMasterError
             | TelemetryEvent::KeybindingChanged { .. }
             | TelemetryEvent::KeybindingResetToDefault { .. }
             | TelemetryEvent::KeybindingRemoved { .. }
@@ -5131,8 +4818,6 @@ impl TelemetryEvent {
             | TelemetryEvent::MCPToolCallAccepted { .. }
             | TelemetryEvent::ExecutedWarpDrivePrompt { .. }
             | TelemetryEvent::ToggleSshWarpification { .. }
-            | TelemetryEvent::SetSshExtensionInstallMode { .. }
-            | TelemetryEvent::SshRemoteServerChoiceDoNotAskAgainToggled { .. }
             | TelemetryEvent::SettingsImportInitiated
             | TelemetryEvent::AgentModeCreatedAIBlock { .. }
             | TelemetryEvent::AgentModeRatedResponse { .. }
@@ -5241,20 +4926,7 @@ impl TelemetryEvent {
             | TelemetryEvent::ComputerUseCancelled { .. }
             | TelemetryEvent::FreeTierLimitHitInterstitialDisplayed
             | TelemetryEvent::FreeTierLimitHitInterstitialUpgradeButtonClicked
-            | TelemetryEvent::FreeTierLimitHitInterstitialClosed
-            | TelemetryEvent::RemoteServerBinaryCheck { .. }
-            | TelemetryEvent::RemoteServerInstallation { .. }
-            | TelemetryEvent::RemoteServerInitialization { .. }
-            | TelemetryEvent::RemoteServerDaemonStartup { .. }
-            | TelemetryEvent::RemoteServerDisconnection { .. }
-            | TelemetryEvent::RemoteServerClientRequestError { .. }
-            | TelemetryEvent::RemoteServerMessageDecodingError { .. }
-            | TelemetryEvent::RemoteServerSetupDuration { .. }
-            | TelemetryEvent::RemoteServerHostUnsupported { .. }
-            | TelemetryEvent::RemoteServerReconnection { .. }
-            | TelemetryEvent::RemoteServerReconnectExhausted { .. }
-            | TelemetryEvent::RemoteCodebaseIndexStatusChanged { .. }
-            | TelemetryEvent::RemoteCodebaseAutoIndexRequested { .. } => false,
+            | TelemetryEvent::FreeTierLimitHitInterstitialClosed => false,
             #[cfg(feature = "local_fs")]
             TelemetryEvent::CodePaneOpened { .. }
             | TelemetryEvent::CodePanelsFileOpened { .. }
@@ -5558,8 +5230,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::AddDenylistedSubshellCommand => EnablementState::Always,
             Self::RemoveDenylistedSubshellCommand => EnablementState::Always,
             Self::ToggleSshWarpification => EnablementState::Always,
-            Self::SetSshExtensionInstallMode => EnablementState::Always,
-            Self::SshRemoteServerChoiceDoNotAskAgainToggled => EnablementState::Always,
             Self::WarpifyFooterShown
             | Self::AgentToolbarDismissed
             | Self::WarpifyFooterAcceptedWarpify => EnablementState::Always,
@@ -5806,21 +5476,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 EnablementState::Always
             }
             Self::FreeTierLimitHitInterstitialClosed { .. } => EnablementState::Always,
-            Self::RemoteServerBinaryCheck
-            | Self::RemoteServerInstallation
-            | Self::RemoteServerInitialization
-            | Self::RemoteServerDaemonStartup
-            | Self::RemoteServerDisconnection
-            | Self::RemoteServerClientRequestError
-            | Self::RemoteServerMessageDecodingError
-            | Self::RemoteServerSetupDuration
-            | Self::RemoteServerHostUnsupported
-            | Self::RemoteServerReconnection
-            | Self::RemoteServerReconnectExhausted
-            | Self::RemoteCodebaseIndexStatusChanged
-            | Self::RemoteCodebaseAutoIndexRequested => {
-                EnablementState::Flag(FeatureFlag::SshRemoteServer)
-            }
             Self::QueuedPromptEdited
             | Self::QueuedPromptDeleted
             | Self::QueuedPromptReordered
@@ -6061,10 +5716,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::RemoveAddedSubshellCommand => "Remove Added Subshell Command",
             Self::ReceivedSubshellRcFileDcs => "Received Subshell RC File DCS",
             Self::ToggleSshWarpification => "Toggle SSH Warpification",
-            Self::SetSshExtensionInstallMode => "Set SSH Extension Install Mode",
-            Self::SshRemoteServerChoiceDoNotAskAgainToggled => {
-                "SSH Remote Server Choice Do Not Ask Again Toggled"
-            }
             Self::WarpifyFooterShown => "Warpify Footer Shown",
             Self::AgentToolbarDismissed => "Agent Toolbar Dismissed",
             Self::WarpifyFooterAcceptedWarpify => "Warpify Footer Accepted Warpify",
@@ -6213,19 +5864,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::AutoexecutedAgentModeRequestedCommand => {
                 "AIAutonomy.AutoexecutedRequestedCommand"
             }
-            Self::RemoteServerBinaryCheck => "RemoteServer.BinaryCheck",
-            Self::RemoteServerInstallation => "RemoteServer.Installation",
-            Self::RemoteServerInitialization => "RemoteServer.Initialization",
-            Self::RemoteServerDaemonStartup => "RemoteServer.DaemonStartup",
-            Self::RemoteServerDisconnection => "RemoteServer.Disconnection",
-            Self::RemoteServerClientRequestError => "RemoteServer.ClientRequestError",
-            Self::RemoteServerMessageDecodingError => "RemoteServer.MessageDecodingError",
-            Self::RemoteServerSetupDuration => "RemoteServer.SetupDuration",
-            Self::RemoteServerHostUnsupported => "RemoteServer.HostUnsupported",
-            Self::RemoteServerReconnection => "RemoteServer.Reconnection",
-            Self::RemoteServerReconnectExhausted => "RemoteServer.ReconnectExhausted",
-            Self::RemoteCodebaseIndexStatusChanged => "RemoteCodebaseIndex.StatusChanged",
-            Self::RemoteCodebaseAutoIndexRequested => "RemoteCodebaseIndex.AutoIndexRequested",
             Self::QueuedPromptEdited => "QueuedPrompt.Edited",
             Self::QueuedPromptDeleted => "QueuedPrompt.Deleted",
             Self::QueuedPromptReordered => "QueuedPrompt.Reordered",
@@ -6759,12 +6397,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::ReceivedSubshellRcFileDcs => "Spawned a subshell to be automatically Warpified",
             Self::ToggleSshWarpification => "Changed the setting for SSH sessions to be warified",
-            Self::SetSshExtensionInstallMode => {
-                "Changed the SSH extension install mode (always ask / always allow / always skip)"
-            }
-            Self::SshRemoteServerChoiceDoNotAskAgainToggled => {
-                "Toggled the 'Don't ask me this again' checkbox on the SSH remote-server choice block"
-            }
             Self::AgentModeRatedResponse => "User rated an Agent Mode response",
             Self::WarpifyFooterShown => {
                 "Displayed the warpify footer for a detected subshell or SSH session"
@@ -7235,44 +6867,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             }
             Self::FreeTierLimitHitInterstitialClosed { .. } => {
                 "User closed the free tier limit hit interstitial"
-            }
-            Self::RemoteServerBinaryCheck => {
-                "Remote server binary check completed (found, not found, or error)"
-            }
-            Self::RemoteServerInstallation => {
-                "Remote server binary installation completed (success or failure)"
-            }
-            Self::RemoteServerInitialization => {
-                "Remote server connection and initialization completed (success or failure)"
-            }
-            Self::RemoteServerDaemonStartup => {
-                "Remote server daemon startup completed and socket bound"
-            }
-            Self::RemoteServerDisconnection => {
-                "An established remote server connection was dropped"
-            }
-            Self::RemoteServerClientRequestError => {
-                "A client request to the remote server failed"
-            }
-            Self::RemoteServerMessageDecodingError => {
-                "A server message could not be decoded (no parseable request_id)"
-            }
-            Self::RemoteServerSetupDuration => {
-                "End-to-end duration of the remote server setup flow"
-            }
-            Self::RemoteServerHostUnsupported => {
-                "Preinstall check classified the remote host as unsupported, \
-                 falling back to the wrapper-only SSH flow"
-            }
-            Self::RemoteServerReconnection => {
-                "A reconnection attempt succeeded after a spontaneous disconnect"
-            }
-            Self::RemoteServerReconnectExhausted => {
-                "All reconnection attempts were exhausted after a spontaneous disconnect"
-            }
-            Self::RemoteCodebaseIndexStatusChanged => "The remote codebase index status changed",
-            Self::RemoteCodebaseAutoIndexRequested => {
-                "Remote codebase auto-indexing requested one or more repositories"
             }
             Self::QueuedPromptEdited => {
                 "User committed a non-empty edit to a queued prompt row"

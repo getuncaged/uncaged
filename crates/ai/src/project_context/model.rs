@@ -5,7 +5,7 @@ use anyhow::Result;
 use futures::future::BoxFuture;
 use warp_util::host_id::HostId;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
-use warpui_core::{AppContext, Entity, ModelContext, SingletonEntity};
+use warpui_core::{Entity, ModelContext, SingletonEntity};
 
 use super::GlobalRules;
 
@@ -23,10 +23,8 @@ pub type ProjectRuleContents = Vec<(LocalOrRemotePath, String)>;
 /// App-provided transport for reading the exact rule paths discovered by repository metadata.
 ///
 /// This remains injected because remote file reads are implemented in the app crate.
-pub type ProjectRuleContentReader = fn(
-    Vec<LocalOrRemotePath>,
-    &AppContext,
-) -> BoxFuture<'static, anyhow::Result<ProjectRuleContents>>;
+pub type ProjectRuleContentReader =
+    fn(Vec<LocalOrRemotePath>) -> BoxFuture<'static, anyhow::Result<ProjectRuleContents>>;
 
 #[cfg(feature = "local_fs")]
 fn standing_project_rule_paths<'a>(
@@ -377,7 +375,7 @@ impl ProjectContextModel {
                 .into_iter()
                 .flat_map(|results| results.project_rules()),
         );
-        let read_rule_contents = project_rule_content_reader(rule_paths.clone(), ctx);
+        let read_rule_contents = project_rule_content_reader(rule_paths.clone());
 
         self.next_rule_refresh_generation += 1;
         let refresh_generation = self.next_rule_refresh_generation;

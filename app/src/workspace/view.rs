@@ -298,7 +298,6 @@ use crate::prompt::editor_modal::{
 };
 use crate::quit_warning::UnsavedStateSummary;
 use crate::referral_theme_status::ReferralThemeEvent;
-use crate::remote_server::manager::RemoteServerManager;
 use crate::resource_center::{
     mark_feature_used_and_write_to_user_defaults, skip_tips_and_write_to_user_defaults,
     ResourceCenterEvent, ResourceCenterPage, ResourceCenterView, Tip, TipAction, TipsCompleted,
@@ -9055,19 +9054,17 @@ impl Workspace {
                 Some((context.repo_path.clone(), context.diff_state_model.clone()))
             } else {
                 let active_pane_group = self.active_tab_pane_group().clone();
-                // Read repo_path and preferred session from the pane group (immutable context).
+                // Read repo_path from the pane group (immutable context).
                 let read_result = active_pane_group.read(ctx, |pane_group, ctx| {
-                    pane_group.active_session_view(ctx).map(|terminal_view| {
-                        let repo_path = terminal_view.as_ref(ctx).current_repo_path().cloned();
-                        let preferred_session = terminal_view.as_ref(ctx).active_block_session_id();
-                        (repo_path, preferred_session)
-                    })
+                    pane_group
+                        .active_session_view(ctx)
+                        .map(|terminal_view| terminal_view.as_ref(ctx).current_repo_path().cloned())
                 });
                 // Resolve DiffStateModel outside the read closure (needs mutable context).
-                read_result.and_then(|(repo_path, preferred_session)| {
+                read_result.and_then(|repo_path| {
                     let diff_state_model = repo_path.as_ref().and_then(|rp| {
                         self.working_directories_model.update(ctx, |model, ctx| {
-                            model.get_or_create_diff_state_model(rp.clone(), preferred_session, ctx)
+                            model.get_or_create_diff_state_model(rp.clone(), ctx)
                         })
                     })?;
                     Some((repo_path, diff_state_model))
@@ -9104,13 +9101,9 @@ impl Workspace {
         }
 
         let repo_location = panel_context.repo_path.clone();
-        let preferred_session = panel_context
-            .terminal_view
-            .upgrade(ctx)
-            .and_then(|tv| tv.as_ref(ctx).active_block_session_id());
         let diff_state_model = repo_location.as_ref().and_then(|rp| {
             self.working_directories_model.update(ctx, |model, ctx| {
-                model.get_or_create_diff_state_model(rp.clone(), preferred_session, ctx)
+                model.get_or_create_diff_state_model(rp.clone(), ctx)
             })
         });
         let Some(diff_state_model) = diff_state_model else {
@@ -9218,28 +9211,24 @@ impl Workspace {
         let target_open_state =
             pane_group_handle.read(ctx, |pane_group, _| !pane_group.right_panel_open);
 
-        // Read repo_path and preferred session from pane group (immutable context).
+        // Read repo_path from pane group (immutable context).
         let read_result = pane_group_handle.read(ctx, |pane_group, ctx| {
-            pane_group.active_session_view(ctx).map(|terminal_view| {
-                let repo_path = terminal_view.as_ref(ctx).current_repo_path().cloned();
-                let preferred_session = terminal_view.as_ref(ctx).active_block_session_id();
-                (repo_path, preferred_session)
-            })
+            pane_group
+                .active_session_view(ctx)
+                .map(|terminal_view| terminal_view.as_ref(ctx).current_repo_path().cloned())
         });
         // Resolve DiffStateModel outside the read closure (needs mutable context).
-        let context = read_result.and_then(
-            |(repo_path, preferred_session): (Option<LocalOrRemotePath>, Option<SessionId>)| {
-                let diff_state_model = repo_path.as_ref().and_then(|rp| {
-                    self.working_directories_model.update(ctx, |model, ctx| {
-                        model.get_or_create_diff_state_model(rp.clone(), preferred_session, ctx)
-                    })
-                })?;
-                Some(CodeReviewPaneContext {
-                    repo_path,
-                    diff_state_model,
+        let context = read_result.and_then(|repo_path: Option<LocalOrRemotePath>| {
+            let diff_state_model = repo_path.as_ref().and_then(|rp| {
+                self.working_directories_model.update(ctx, |model, ctx| {
+                    model.get_or_create_diff_state_model(rp.clone(), ctx)
                 })
-            },
-        );
+            })?;
+            Some(CodeReviewPaneContext {
+                repo_path,
+                diff_state_model,
+            })
+        });
 
         self.update_right_panel_open_state(
             RightPanelUpdateParams {
@@ -15311,17 +15300,13 @@ impl Workspace {
         });
 
         let source_pwd = source_view.as_ref(ctx).pwd();
-        let session_id = source_view
-            .as_ref(ctx)
-            .active_block_session_id()
-            .unwrap_or_default();
         let mut paths: Vec<StandardizedPath> = Vec::new();
         if let Some(ref pwd) = source_pwd {
             if let Ok(sp) = StandardizedPath::try_new(pwd) {
                 paths.push(sp);
             }
         }
-        let upload_target = handoff::snapshot::resolve_upload_target(session_id, ctx);
+        let upload_target = handoff::snapshot::resolve_upload_target(ctx);
         handoff::snapshot::spawn_handoff_snapshot_upload(paths, upload_target, model_handle, ctx);
     }
 
@@ -15771,17 +15756,13 @@ impl Workspace {
         });
 
         let source_pwd = source_view.as_ref(ctx).pwd();
-        let session_id = source_view
-            .as_ref(ctx)
-            .active_block_session_id()
-            .unwrap_or_default();
         let mut paths = extract_paths_from_conversation(&source_conversation);
         if let Some(ref pwd) = source_pwd {
             if let Ok(sp) = StandardizedPath::try_new(pwd) {
                 paths.push(sp);
             }
         }
-        let upload_target = handoff::snapshot::resolve_upload_target(session_id, ctx);
+        let upload_target = handoff::snapshot::resolve_upload_target(ctx);
         handoff::snapshot::spawn_handoff_snapshot_upload(paths, upload_target, model_handle, ctx);
     }
 
@@ -17203,33 +17184,25 @@ impl Workspace {
 
         if let Some(terminal_handle) = pane_group_handle.as_ref(ctx).active_session_view(ctx) {
             #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
-            let (
-                session,
-                pwd_location,
-                path_if_local,
-                is_local,
-                is_wsl_session,
-                session_id,
-                has_pending_ssh,
-            ) = terminal_handle.read(ctx, |terminal, ctx| {
-                let active_session_id = terminal.active_block_session_id();
-                let session =
-                    active_session_id.and_then(|id| terminal.sessions_model().as_ref(ctx).get(id));
-                let pwd_location = terminal.pwd_as_local_or_remote(ctx);
-                let path_if_local = terminal.active_session_path_if_local(ctx);
-                let is_local = terminal.active_session_is_local(ctx);
-                let is_wsl_session = session.as_ref().map(|s| s.is_wsl()).unwrap_or(false);
-                let has_pending_ssh = terminal.has_pending_ssh_command();
-                (
-                    session,
-                    pwd_location,
-                    path_if_local,
-                    is_local,
-                    is_wsl_session,
-                    active_session_id,
-                    has_pending_ssh,
-                )
-            });
+            let (session, pwd_location, path_if_local, is_local, is_wsl_session, has_pending_ssh) =
+                terminal_handle.read(ctx, |terminal, ctx| {
+                    let active_session_id = terminal.active_block_session_id();
+                    let session = active_session_id
+                        .and_then(|id| terminal.sessions_model().as_ref(ctx).get(id));
+                    let pwd_location = terminal.pwd_as_local_or_remote(ctx);
+                    let path_if_local = terminal.active_session_path_if_local(ctx);
+                    let is_local = terminal.active_session_is_local(ctx);
+                    let is_wsl_session = session.as_ref().map(|s| s.is_wsl()).unwrap_or(false);
+                    let has_pending_ssh = terminal.has_pending_ssh_command();
+                    (
+                        session,
+                        pwd_location,
+                        path_if_local,
+                        is_local,
+                        is_wsl_session,
+                        has_pending_ssh,
+                    )
+                });
 
             let window_id = ctx.window_id();
             let working_directory_clone = path_if_local.clone();
@@ -17252,21 +17225,10 @@ impl Workspace {
             let is_remote = matches!(is_local, Some(false));
             let is_unsupported_session = is_wsl_session;
 
-            // Check whether this remote session has an active remote server
-            // connection (or is in the process of connecting). This is only
-            // true for Auto SSH Warpification (mode 1) sessions where
-            // `connect_session` was called at `InitShell` time.
-            let has_remote_server = is_remote
-                && FeatureFlag::SshRemoteServer.is_enabled()
-                && session_id.is_some_and(|sid| {
-                    RemoteServerManager::as_ref(ctx).is_session_potentially_active(sid)
-                });
-
             let enablement = CodingPanelEnablementState::from_session_env(
                 file_tree_and_global_search_are_enabled,
                 is_remote,
                 is_unsupported_session,
-                has_remote_server,
             );
 
             // When an SSH command is running (pending host set + block
@@ -17299,7 +17261,6 @@ impl Workspace {
         } else {
             let enablement = CodingPanelEnablementState::from_session_env(
                 file_tree_and_global_search_are_enabled,
-                false,
                 false,
                 false,
             );
@@ -24152,21 +24113,13 @@ impl TypedActionView for Workspace {
                         pane_group
                             .terminal_view_from_pane_id(locator.pane_id, ctx)
                             .map(|terminal_view| {
-                                let repo_path =
-                                    terminal_view.as_ref(ctx).current_repo_path().cloned();
-                                let preferred_session =
-                                    terminal_view.as_ref(ctx).active_block_session_id();
-                                (repo_path, preferred_session)
+                                terminal_view.as_ref(ctx).current_repo_path().cloned()
                             })
                     });
-                    if let Some((repo_path, preferred_session)) = read_result {
+                    if let Some(repo_path) = read_result {
                         let diff_state_model = repo_path.as_ref().and_then(|rp| {
                             self.working_directories_model.update(ctx, |model, ctx| {
-                                model.get_or_create_diff_state_model(
-                                    rp.clone(),
-                                    preferred_session,
-                                    ctx,
-                                )
+                                model.get_or_create_diff_state_model(rp.clone(), ctx)
                             })
                         });
                         if let Some(diff_state_model) = diff_state_model {

@@ -187,10 +187,6 @@ impl BundledSkill {
 
     /// Detect all skill definitions under the given resources root on the
     /// local filesystem, rendering skill content against this host.
-    ///
-    /// Called directly by the remote-server daemon, whose resources live at
-    /// the global install location rather than inside an app bundle (which
-    /// is what [`warp_core::paths::bundled_resources_dir`] resolves).
     pub(crate) async fn detect_in_resources_dir(resources_dir: PathBuf) -> Self {
         let (mut definitions, figma_definitions) = futures::join!(
             load_bundled_skill_definitions(&resources_dir),

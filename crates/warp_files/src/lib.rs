@@ -15,14 +15,11 @@ use async_channel::Sender;
 use futures::io::{AsyncBufReadExt, BufReader};
 use futures::StreamExt;
 use notify_debouncer_full::notify::{RecursiveMode, WatchFilter};
-use remote_server::manager::RemoteServerManager;
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::repository::{RepositorySubscriber, SubscriberId};
 use repo_metadata::{CanonicalizedPath, Repository, RepositoryUpdate};
-use warp_core::HostId;
 use warp_util::content_version::ContentVersion;
 use warp_util::file::{FileId, FileLoadError, FileSaveError};
-use warp_util::standardized_path::StandardizedPath;
 use warpui_core::r#async::SpawnedFutureHandle;
 use warpui_core::{Entity, ModelContext, ModelHandle, SingletonEntity};
 use watcher::{BulkFilesystemWatcher, BulkFilesystemWatcherEvent};
@@ -81,45 +78,6 @@ enum WatcherType {
     Repository,
 }
 
-/// Per-file backing store.
-/// Remote files dispatch host-scoped requests through a
-/// [`RemoteServerManager`] `HostRequestHandle`.
-enum FileBackend {
-    Local(LocalFile),
-    Remote {
-        /// Identifies the remote host. A `HostRequestHandle` is resolved from
-        /// [`RemoteServerManager`] at call time, which naturally handles
-        /// disconnect (the request fails) without holding an `Arc` alive
-        /// per file.
-        host_id: HostId,
-        /// Platform-aware path on the remote host.
-        path: StandardizedPath,
-    },
-}
-
-impl FileBackend {
-    fn as_local(&self) -> Option<&LocalFile> {
-        match self {
-            FileBackend::Local(f) => Some(f),
-            FileBackend::Remote { .. } => None,
-        }
-    }
-
-    fn version(&self) -> Option<ContentVersion> {
-        match self {
-            FileBackend::Local(f) => f.version,
-            FileBackend::Remote { .. } => None,
-        }
-    }
-
-    fn set_version(&mut self, version: ContentVersion) {
-        match self {
-            FileBackend::Local(f) => f.version = Some(version),
-            FileBackend::Remote { .. } => {}
-        }
-    }
-}
-
 #[derive(Default)]
 struct LocalFile {
     path: Option<PathBuf>,
@@ -167,7 +125,7 @@ impl LocalFile {
 /// cannot forget to maintain the refcount invariant.
 #[derive(Default)]
 struct FileState {
-    files: HashMap<FileId, FileBackend>,
+    files: HashMap<FileId, LocalFile>,
     /// Tracks how many FileIds reference each path, for O(1) "path still used" checks.
     path_refcount: HashMap<PathBuf, usize>,
 }
@@ -177,65 +135,44 @@ impl FileState {
         if let Some(ref path) = local_file.path {
             *self.path_refcount.entry(path.clone()).or_insert(0) += 1;
         }
-        self.files.insert(file_id, FileBackend::Local(local_file));
+        self.files.insert(file_id, local_file);
     }
 
-    fn insert_remote(&mut self, file_id: FileId, host_id: HostId, path: StandardizedPath) {
-        self.files
-            .insert(file_id, FileBackend::Remote { host_id, path });
-    }
-
-    /// Removes a file and returns the backend along with whether the local path
-    /// is still referenced (always `false` for remote files).
-    fn remove(&mut self, file_id: FileId) -> Option<(FileBackend, bool)> {
-        let backend = self.files.remove(&file_id)?;
-        let path_still_used = match &backend {
-            FileBackend::Local(file) => {
-                if let Some(ref path) = file.path {
-                    match self.path_refcount.get_mut(path) {
-                        Some(count) => {
-                            *count -= 1;
-                            if *count == 0 {
-                                self.path_refcount.remove(path);
-                                false
-                            } else {
-                                true
-                            }
-                        }
-                        None => false,
+    /// Removes a file and returns it along with whether its path is still referenced.
+    fn remove(&mut self, file_id: FileId) -> Option<(LocalFile, bool)> {
+        let file = self.files.remove(&file_id)?;
+        let path_still_used = match &file.path {
+            Some(path) => match self.path_refcount.get_mut(path) {
+                Some(count) => {
+                    *count -= 1;
+                    if *count == 0 {
+                        self.path_refcount.remove(path);
+                        false
+                    } else {
+                        true
                     }
-                } else {
-                    false
                 }
-            }
-            FileBackend::Remote { .. } => false,
+                None => false,
+            },
+            None => false,
         };
-        Some((backend, path_still_used))
+        Some((file, path_still_used))
     }
 
-    fn get(&self, file_id: FileId) -> Option<&FileBackend> {
+    fn get(&self, file_id: FileId) -> Option<&LocalFile> {
         self.files.get(&file_id)
     }
 
-    fn get_mut(&mut self, file_id: FileId) -> Option<&mut FileBackend> {
+    fn get_mut(&mut self, file_id: FileId) -> Option<&mut LocalFile> {
         self.files.get_mut(&file_id)
     }
 
-    fn get_local(&self, file_id: FileId) -> Option<&LocalFile> {
-        self.get(file_id).and_then(FileBackend::as_local)
+    fn values(&self) -> impl Iterator<Item = &LocalFile> {
+        self.files.values()
     }
 
-    fn local_values(&self) -> impl Iterator<Item = &LocalFile> {
-        self.files.values().filter_map(FileBackend::as_local)
-    }
-
-    fn local_iter_mut(&mut self) -> impl Iterator<Item = (&FileId, &mut LocalFile)> {
-        self.files
-            .iter_mut()
-            .filter_map(|(id, backend)| match backend {
-                FileBackend::Local(f) => Some((id, f)),
-                FileBackend::Remote { .. } => None,
-            })
+    fn iter_mut(&mut self) -> impl Iterator<Item = (&FileId, &mut LocalFile)> {
+        self.files.iter_mut()
     }
 }
 
@@ -332,19 +269,7 @@ impl FileModel {
     }
 
     pub fn file_path(&self, file_id: FileId) -> Option<PathBuf> {
-        self.file_state
-            .get_local(file_id)
-            .and_then(|x| x.path.clone())
-    }
-
-    /// Register a remote file path and return a `FileId`.
-    ///
-    /// The returned `FileId` can be used with `save()` and `delete()` which
-    /// will dispatch to the remote backend via `RemoteServerClient`.
-    pub fn register_remote_file(&mut self, host_id: HostId, path: StandardizedPath) -> FileId {
-        let file_id = FileId::new();
-        self.file_state.insert_remote(file_id, host_id, path);
-        file_id
+        self.file_state.get(file_id).and_then(|x| x.path.clone())
     }
 
     /// Register a file path and immediately return a FileId without loading the file.
@@ -634,7 +559,7 @@ impl FileModel {
 
     pub fn unsubscribe(&mut self, file_id: FileId, ctx: &mut ModelContext<Self>) {
         self.abort_handles.remove(&file_id);
-        if let Some((FileBackend::Local(file), path_still_used)) = self.file_state.remove(file_id) {
+        if let Some((file, path_still_used)) = self.file_state.remove(file_id) {
             let path = file.path;
             let watcher_type = file.watcher_type;
 
@@ -650,15 +575,14 @@ impl FileModel {
                                 .parent()
                                 .map(|p| p.to_path_buf())
                                 .unwrap_or_else(|| path.clone());
-                            let other_files_share_parent =
-                                self.file_state.local_values().any(|f| {
-                                    f.watcher_type == WatcherType::Individual
-                                        && f.path
-                                            .as_deref()
-                                            .and_then(|p| p.parent())
-                                            .map(|p| p == watch_path)
-                                            .unwrap_or(false)
-                                });
+                            let other_files_share_parent = self.file_state.values().any(|f| {
+                                f.watcher_type == WatcherType::Individual
+                                    && f.path
+                                        .as_deref()
+                                        .and_then(|p| p.parent())
+                                        .map(|p| p == watch_path)
+                                        .unwrap_or(false)
+                            });
                             if !other_files_share_parent {
                                 self.watcher.update(ctx, |watcher, _ctx| {
                                     std::mem::drop(watcher.unregister_path(&watch_path));
@@ -679,7 +603,6 @@ impl FileModel {
                 }
             }
         }
-        // Remote files have no watcher to clean up.
     }
 
     pub fn save(
@@ -689,72 +612,41 @@ impl FileModel {
         version: ContentVersion,
         ctx: &mut ModelContext<Self>,
     ) -> Result<(), FileSaveError> {
-        let backend = self
-            .file_state
-            .get(file_id)
+        let file_path = self
+            .file_path(file_id)
             .ok_or(FileSaveError::NoFilePath(file_id))?;
 
-        match backend {
-            FileBackend::Local(_) => {
-                let file_path = self
-                    .file_path(file_id)
-                    .ok_or(FileSaveError::NoFilePath(file_id))?;
-
-                ctx.spawn(
-                    async move {
-                        if let Err(err) = Self::ensure_parent_directories(&file_path).await {
-                            return Err(FileSaveError::IOError {
-                                error: err,
-                                path: file_path,
-                            });
-                        }
-                        async_fs::write(&file_path, content).await.map_err(|err| {
-                            FileSaveError::IOError {
-                                error: err,
-                                path: file_path,
-                            }
+        ctx.spawn(
+            async move {
+                if let Err(err) = Self::ensure_parent_directories(&file_path).await {
+                    return Err(FileSaveError::IOError {
+                        error: err,
+                        path: file_path,
+                    });
+                }
+                async_fs::write(&file_path, content)
+                    .await
+                    .map_err(|err| FileSaveError::IOError {
+                        error: err,
+                        path: file_path,
+                    })
+            },
+            move |me, write_result: Result<(), FileSaveError>, ctx| {
+                match write_result {
+                    Ok(_) => {
+                        me.set_version(file_id, version);
+                        ctx.emit(FileModelEvent::FileSaved {
+                            id: file_id,
+                            version,
                         })
-                    },
-                    move |me, write_result: Result<(), FileSaveError>, ctx| {
-                        match write_result {
-                            Ok(_) => {
-                                me.set_version(file_id, version);
-                                ctx.emit(FileModelEvent::FileSaved {
-                                    id: file_id,
-                                    version,
-                                })
-                            }
-                            Err(err) => ctx.emit(FileModelEvent::FailedToSave {
-                                id: file_id,
-                                error: Rc::new(err),
-                            }),
-                        };
-                    },
-                );
-            }
-            FileBackend::Remote { host_id, path } => {
-                let handle = RemoteServerManager::as_ref(ctx).host_request_handle(host_id);
-                let path = path.as_str().to_string();
-                ctx.spawn(
-                    async move { handle.write_file(path, content).await },
-                    move |me, result, ctx| match result {
-                        Ok(()) => {
-                            me.set_version(file_id, version);
-                            ctx.emit(FileModelEvent::FileSaved {
-                                id: file_id,
-                                version,
-                            });
-                        }
-                        Err(e) => {
-                            ctx.emit(FileModelEvent::FailedToSave {
-                                id: file_id,
-                                error: Rc::new(FileSaveError::RemoteError(e.to_string())),
-                            });
-                        }
-                    },
-                );
-            }
-        }
+                    }
+                    Err(err) => ctx.emit(FileModelEvent::FailedToSave {
+                        id: file_id,
+                        error: Rc::new(err),
+                    }),
+                };
+            },
+        );
 
         Ok(())
     }
@@ -834,84 +726,53 @@ impl FileModel {
         version: ContentVersion,
         ctx: &mut ModelContext<Self>,
     ) -> Result<(), FileSaveError> {
-        let backend = self
-            .file_state
-            .get(file_id)
+        let file_path = self
+            .file_path(file_id)
             .ok_or(FileSaveError::NoFilePath(file_id))?;
 
-        match backend {
-            FileBackend::Local(_) => {
-                let file_path = self
-                    .file_path(file_id)
-                    .ok_or(FileSaveError::NoFilePath(file_id))?;
-
-                ctx.spawn(
-                    async move {
-                        if let Err(err) = Self::ensure_parent_directories(&file_path).await {
-                            return Err(FileSaveError::IOError {
-                                error: err,
-                                path: file_path,
-                            });
-                        }
-                        async_fs::remove_file(&file_path).await.map_err(|err| {
-                            FileSaveError::IOError {
-                                error: err,
-                                path: file_path,
-                            }
+        ctx.spawn(
+            async move {
+                if let Err(err) = Self::ensure_parent_directories(&file_path).await {
+                    return Err(FileSaveError::IOError {
+                        error: err,
+                        path: file_path,
+                    });
+                }
+                async_fs::remove_file(&file_path)
+                    .await
+                    .map_err(|err| FileSaveError::IOError {
+                        error: err,
+                        path: file_path,
+                    })
+            },
+            move |me, delete_result: Result<(), FileSaveError>, ctx| {
+                match delete_result {
+                    Ok(_) => {
+                        me.set_version(file_id, version);
+                        ctx.emit(FileModelEvent::FileSaved {
+                            id: file_id,
+                            version,
                         })
-                    },
-                    move |me, delete_result: Result<(), FileSaveError>, ctx| {
-                        match delete_result {
-                            Ok(_) => {
-                                me.set_version(file_id, version);
-                                ctx.emit(FileModelEvent::FileSaved {
-                                    id: file_id,
-                                    version,
-                                })
-                            }
-                            Err(err) => ctx.emit(FileModelEvent::FailedToSave {
-                                id: file_id,
-                                error: Rc::new(err),
-                            }),
-                        };
-                    },
-                );
-            }
-            FileBackend::Remote { host_id, path } => {
-                let handle = RemoteServerManager::as_ref(ctx).host_request_handle(host_id);
-                let path = path.as_str().to_string();
-                ctx.spawn(
-                    async move { handle.delete_file(path).await },
-                    move |me, result, ctx| match result {
-                        Ok(()) => {
-                            me.set_version(file_id, version);
-                            ctx.emit(FileModelEvent::FileSaved {
-                                id: file_id,
-                                version,
-                            });
-                        }
-                        Err(e) => {
-                            ctx.emit(FileModelEvent::FailedToSave {
-                                id: file_id,
-                                error: Rc::new(FileSaveError::RemoteError(e.to_string())),
-                            });
-                        }
-                    },
-                );
-            }
-        }
+                    }
+                    Err(err) => ctx.emit(FileModelEvent::FailedToSave {
+                        id: file_id,
+                        error: Rc::new(err),
+                    }),
+                };
+            },
+        );
 
         Ok(())
     }
 
     pub fn set_version(&mut self, file_id: FileId, version: ContentVersion) {
-        if let Some(backend) = self.file_state.get_mut(file_id) {
-            backend.set_version(version);
+        if let Some(file) = self.file_state.get_mut(file_id) {
+            file.version = Some(version);
         }
     }
 
     pub fn version(&self, file_id: FileId) -> Option<ContentVersion> {
-        self.file_state.get(file_id).and_then(|b| b.version())
+        self.file_state.get(file_id).and_then(|file| file.version)
     }
 
     /// Checks if a repository subscription exists for the given path, and creates one if needed.
@@ -1032,7 +893,7 @@ impl FileModel {
             }
             let has_file = self
                 .file_state
-                .local_values()
+                .values()
                 .any(|file| file.path.as_ref() == Some(&target.path));
             if has_file {
                 log::info!(
@@ -1049,7 +910,7 @@ impl FileModel {
             }
             let has_file = self
                 .file_state
-                .local_values()
+                .values()
                 .any(|file| file.path.as_ref() == Some(&from_target.path));
             if has_file {
                 log::info!(
@@ -1068,7 +929,7 @@ impl FileModel {
             .into_iter()
             .filter_map(|path| {
                 self.file_state
-                    .local_values()
+                    .values()
                     .any(|file| file.should_receive_update_for_path(&path))
                     .then_some(path)
             })
@@ -1092,7 +953,7 @@ impl FileModel {
             move |me, res, ctx| {
                 for (file_path, content) in res {
                     let mut emitted_event = false;
-                    for (file_id, file_state) in me.file_state.local_iter_mut() {
+                    for (file_id, file_state) in me.file_state.iter_mut() {
                         // Only set the new version of a file if it has opt-in to receiving updates.
                         if file_state.should_receive_update_for_path(&file_path) {
                             let new_version = ContentVersion::new();
@@ -1127,7 +988,7 @@ impl FileModel {
             self.repo_path_mapping.remove(&path);
 
             // Find the file(s) at this path and update their watcher type
-            for (_, file) in self.file_state.local_iter_mut() {
+            for (_, file) in self.file_state.iter_mut() {
                 if file.path.as_ref() == Some(&path) && file.watcher_type == WatcherType::Repository
                 {
                     file.watcher_type = WatcherType::Individual;

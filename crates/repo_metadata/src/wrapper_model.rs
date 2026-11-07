@@ -392,8 +392,7 @@ impl RepoMetadataModel {
     }
 
     // ── Remote-specific operations ─────────────────────────────────
-    // These delegate to the remote sub-model and are called by the
-    // RemoteServerManager event subscription in the app layer.
+    // These delegate to the remote sub-model.
 
     /// Inserts or replaces a remote repository from a snapshot push event.
     pub fn insert_remote_snapshot(

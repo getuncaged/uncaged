@@ -33,9 +33,7 @@ use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 #[cfg(feature = "local_fs")]
-use crate::ai::codebase_auto_indexing::{
-    auto_index_candidate_roots, should_auto_index_codebase, CodebaseAutoIndexingSurface,
-};
+use crate::ai::codebase_auto_indexing::{auto_index_candidate_roots, should_auto_index_codebase};
 use crate::ai::metadata_project_rules::read_project_rule_contents;
 use crate::ai::AIRequestUsageModel;
 #[cfg(feature = "local_fs")]
@@ -661,7 +659,7 @@ impl PersistedWorkspace {
         );
 
         #[cfg(feature = "local_fs")]
-        if should_auto_index_codebase(CodebaseAutoIndexingSurface::Local, ctx) {
+        if should_auto_index_codebase(ctx) {
             let roots = all_working_directories(ctx).into_iter().filter_map(|dir| {
                 DetectedRepositories::as_ref(ctx)
                     .get_root_for_path(&LocalOrRemotePath::Local(dir))

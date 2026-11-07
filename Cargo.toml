@@ -61,7 +61,6 @@ node_runtime = { path = "crates/node_runtime" }
 onboarding = { path = "crates/onboarding" }
 persistence = { path = "crates/persistence" }
 prevent_sleep = { path = "crates/prevent_sleep" }
-remote_server = { path = "crates/remote_server" }
 repo_metadata = { path = "crates/repo_metadata" }
 settings = { path = "crates/settings" }
 settings_value = { path = "crates/settings_value", default-features = false }
@@ -489,12 +488,6 @@ codegen-units = 1
 [profile.release-wasm-debug_assertions]
 inherits = "release-wasm"
 debug-assertions = true
-
-# A dev profile optimized for remote server deployment. Strips symbols to
-# reduce binary size and improve rsync delta transfer efficiency.
-[profile.dev-remote]
-inherits = "dev"
-strip = "symbols"
 
 [profile.dev-wasm]
 inherits = "dev"

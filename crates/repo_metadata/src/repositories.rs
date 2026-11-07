@@ -51,13 +51,8 @@ impl DetectedRepositories {
     /// to the local filesystem detection path.
     ///
     /// For **remote sessions**, pass `Some(future)` where the future resolves
-    /// with `(RemotePath, is_git)` from the remote server. The future is
-    /// typically obtained from `RemoteServerManager::navigate_to_directory`.
-    /// When `is_git` is true, the result is `Some(LocalOrRemotePath::Remote(...))`.
-    ///
-    /// This design avoids a circular dependency between `repo_metadata` and
-    /// `remote_server` — the caller in `app/` constructs the remote future
-    /// and injects it here.
+    /// with `(RemotePath, is_git)` for the remote host. When `is_git` is true,
+    /// the result is `Some(LocalOrRemotePath::Remote(...))`.
     pub fn detect_possible_git_repo<
         F: Future<Output = Option<RemoteNavigationResult>> + 'static,
     >(
