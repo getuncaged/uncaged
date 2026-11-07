@@ -64,7 +64,7 @@ use crate::ai::llms::{
 };
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::ai::paths::host_native_absolute_path;
-use crate::auth::auth_manager::{AuthManager, LoginGatedFeature};
+use crate::auth::auth_manager::AuthManager;
 use crate::auth::auth_view_modal::AuthViewVariant;
 use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
@@ -3857,16 +3857,6 @@ pub enum AISettingsPageAction {
         pattern: String,
         agent: Option<CLIAgent>,
     },
-}
-
-impl From<&AISettingsPageAction> for LoginGatedFeature {
-    fn from(val: &AISettingsPageAction) -> LoginGatedFeature {
-        use AISettingsPageAction::*;
-        match val {
-            AttemptLoginGatedUpgrade => "Upgrade AI Usage",
-            _ => "Unknown reason",
-        }
-    }
 }
 
 impl TypedActionView for AISettingsPageView {

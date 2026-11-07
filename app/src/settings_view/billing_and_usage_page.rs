@@ -39,7 +39,6 @@ use super::settings_page::{
 };
 use super::SettingsSection;
 use crate::ai::AIRequestUsageModel;
-use crate::auth::auth_manager::LoginGatedFeature;
 use crate::auth::auth_state::AuthState;
 use crate::auth::auth_view_modal::AuthViewVariant;
 use crate::auth::{AuthManager, AuthStateProvider, UserUid};
@@ -1049,17 +1048,6 @@ impl BillingAndUsagePageAction {
             self,
             Upgrade { .. } | GenerateStripeBillingPortalLink { .. },
         )
-    }
-}
-
-impl From<&BillingAndUsagePageAction> for LoginGatedFeature {
-    fn from(val: &BillingAndUsagePageAction) -> LoginGatedFeature {
-        use BillingAndUsagePageAction::*;
-        match val {
-            Upgrade { .. } => "Upgrade Plan",
-            GenerateStripeBillingPortalLink { .. } => "Generate Stripe Billing Portal Link",
-            _ => "Unknown reason",
-        }
     }
 }
 

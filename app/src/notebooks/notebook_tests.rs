@@ -2,19 +2,17 @@ use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 use futures_util::future::BoxFuture;
-use itertools::Itertools;
 use warp_core::ui::appearance::Appearance;
 use warp_editor::editor::EditorView;
 use warpui::platform::WindowStyle;
 use warpui::presenter::ChildView;
 use warpui::r#async::Timer;
-use warpui::telemetry::EventPayload;
 use warpui::{
     AddSingletonModel, App, AppContext, Element, Entity, SingletonEntity, TypedActionView, View,
     ViewHandle, WindowId,
 };
 
-use super::{NotebookEvent, NotebookView, EDIT_WINDOW_DURATION, SAVE_PERIOD};
+use super::{NotebookEvent, NotebookView, SAVE_PERIOD};
 use crate::auth::auth_manager::AuthManager;
 use crate::auth::user::{TEST_USER_EMAIL, TEST_USER_UID};
 use crate::auth::{AuthStateProvider, UserUid};
@@ -376,96 +374,6 @@ fn test_focus_tracking() {
         root.update(&mut app, |_, ctx| ctx.focus_self());
         notebook.update(&mut app, |notebook, ctx| notebook.focus(ctx));
         assert_eq!(app.focused_view_id(window), Some(input_view.id()));
-    });
-}
-
-#[test]
-#[ignore]
-fn test_edit_telemetry() {
-    fn edit_events() -> Vec<serde_json::Value> {
-        warpui::telemetry::flush_events()
-            .into_iter()
-            .filter_map(|event| match event.payload {
-                EventPayload::NamedEvent { name, value, .. } if name == "Notebook Edited" => value,
-                _ => None,
-            })
-            .collect_vec()
-    }
-
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-        initial_load(&mut app, []).await;
-
-        let (_, notebook, _) = create_notebook(&mut app);
-        open_notebook(
-            &mut app,
-            &notebook,
-            cloud_notebook("Test Notebook", "This is a notebook"),
-        )
-        .await;
-        let input_view = notebook.read(&app, |notebook, _| notebook.input.clone());
-
-        // The notebook should show in edit mode, with telemetry recording.
-        notebook.update(&mut app, |notebook, ctx| {
-            notebook.grab_edit_access(true, ctx);
-            assert_eq!(
-                notebook.active_notebook_data.as_ref(ctx).mode,
-                Mode::Editing
-            );
-            assert!(notebook.edit_telemetry_handle.is_some());
-            notebook.focus_input(ctx);
-        });
-
-        // With no edits, there are no events.
-        ensure_saved(&mut app, &notebook).await;
-        Timer::after(2 * EDIT_WINDOW_DURATION).await;
-        assert!(edit_events().is_empty());
-
-        // Make a small edit, which should get reported as non-meaningful.
-        input_view.update(&mut app, |input, ctx| {
-            input.user_typed("Hi", ctx);
-        });
-
-        ensure_saved(&mut app, &notebook).await;
-        Timer::after(2 * EDIT_WINDOW_DURATION).await;
-        assert_eq!(
-            edit_events(),
-            vec![serde_json::json!({
-                "notebook_id": None::<()>,
-                "meaningful_change": false,
-            })]
-        );
-
-        // If we switch to view mode, we stop recording elemetry.
-        notebook.update(&mut app, |notebook, ctx| {
-            notebook.switch_to_view(ctx);
-            assert!(notebook.edit_telemetry_handle.is_none());
-        });
-
-        // Telemetry resumes when we switch to editing.
-        notebook.update(&mut app, |notebook, ctx| {
-            notebook.switch_to_edit(ctx);
-            notebook.focus_input(ctx);
-            assert!(notebook.edit_telemetry_handle.is_some());
-        });
-
-        // Finally, a meaningful edit is recorded as such.
-        input_view.update(&mut app, |input, ctx| {
-            input.user_typed(
-                "This is a very very very very long edit. This is a heavy notebook user.",
-                ctx,
-            );
-        });
-
-        ensure_saved(&mut app, &notebook).await;
-        Timer::after(2 * EDIT_WINDOW_DURATION).await;
-        assert_eq!(
-            edit_events(),
-            vec![serde_json::json!({
-                "notebook_id": None::<()>,
-                "meaningful_change": true,
-            })]
-        );
     });
 }
 

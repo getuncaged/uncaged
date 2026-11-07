@@ -2,8 +2,8 @@ use warpui::{SingletonEntity, UpdateView};
 
 use super::{
     fork_label_for_query, mark_feature_used_and_write_to_user_defaults, AIAgentExchangeId,
-    AIConversationId, AgentModeRewindEntrypoint, AppContext, BlocklistAIHistoryModel, ChannelState,
-    ClipboardContent, ContextMenuAction, ContextMenuState, ContextMenuType, EntityId, FeatureFlag,
+    AIConversationId, AppContext, BlocklistAIHistoryModel, ChannelState, ClipboardContent,
+    ContextMenuAction, ContextMenuState, ContextMenuType, EntityId, FeatureFlag,
     ForkAIConversationParams, ForkFromExchange, ForkedConversationDestination, MenuItem,
     MenuItemFields, RichContentLink, ServerConversationToken, ServerOutputId, TerminalAction,
     TerminalModel, TerminalView, Tip, TipHint, ViewContext, CONTEXT_MENU_WIDTH,
@@ -393,7 +393,6 @@ impl TerminalView {
                         ai_block_view_id,
                         exchange_id: ai_exchange_id,
                         conversation_id: ai_conversation_id,
-                        entrypoint: AgentModeRewindEntrypoint::ContextMenu,
                     })
                     .into_item(),
             );

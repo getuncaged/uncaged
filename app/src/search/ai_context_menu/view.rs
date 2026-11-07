@@ -763,17 +763,6 @@ impl AIContextMenu {
         }
     }
 
-    fn query(&self, ctx: &ViewContext<Self>) -> String {
-        self.search_bar.as_ref(ctx).query(ctx)
-    }
-
-    fn item_count(&self, ctx: &ViewContext<Self>) -> Option<usize> {
-        self.search_bar_state
-            .as_ref(ctx)
-            .query_result_renderers()
-            .map(|results| results.len())
-    }
-
     /// Scrolls the query result at `index` into view.
     fn scroll_selected_index_into_view(&self, index: usize, ctx: &mut ViewContext<Self>) {
         self.state.uniform_list_state.scroll_to(index);

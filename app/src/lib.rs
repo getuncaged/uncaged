@@ -2,7 +2,6 @@
 
 mod ai;
 mod alloc;
-mod antivirus;
 #[cfg(target_os = "macos")]
 mod app_menus;
 mod app_services;
@@ -83,6 +82,7 @@ mod throttle;
 mod tips;
 mod tracing;
 mod ui_components;
+mod ui_sources;
 mod uncaged;
 mod undo_close;
 mod uri;
@@ -238,7 +238,6 @@ use crate::ai::outline::RepoOutlines;
 use crate::ai::restored_conversations::RestoredAgentConversations;
 use crate::ai::skills::SkillManager;
 use crate::ai::AIRequestUsageModel;
-use crate::antivirus::AntivirusInfo;
 use crate::app_state::AppState;
 use crate::autoupdate::{AutoupdateState, RelaunchModel};
 use crate::changelog_model::ChangelogModel;
@@ -272,10 +271,7 @@ use crate::server::cloud_objects::listener::Listener;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::experiments::ServerExperiments;
 use crate::server::sync_queue::{QueueItem, SyncQueue};
-pub use crate::server::telemetry::{
-    AgentModeEntrypoint, AgentModeEntrypointSelectionType, TelemetryEvent,
-};
-use crate::server::telemetry::{PaletteSource, TelemetryCollector};
+use crate::server::telemetry::TelemetryCollector;
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
 use crate::settings::cloud_preferences_syncer::initialize_cloud_preferences_syncer;
 use crate::settings::manager::SettingsManager;
@@ -288,6 +284,7 @@ use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::keys::TerminalKeybindings;
 use crate::terminal::resizable_data::ResizableData;
 use crate::terminal::{AudibleBell, CustomSecretRegexUpdater, History};
+use crate::ui_sources::PaletteSource;
 use crate::undo_close::UndoCloseStack;
 use crate::user_config::WarpConfig;
 use crate::util::bindings::is_binding_cross_platform;
@@ -503,10 +500,6 @@ pub fn run() -> Result<()> {
             }
             warp_cli::Command::DumpDebugInfo => {
                 return debug_dump::run();
-            }
-            #[cfg(not(target_family = "wasm"))]
-            warp_cli::Command::PrintTelemetryEvents => {
-                return TelemetryEvent::print_telemetry_events_json();
             }
         }
     }
@@ -1072,8 +1065,6 @@ pub(crate) fn initialize_app(
         }
         manager
     });
-
-    ctx.add_singleton_model(AntivirusInfo::new);
 
     ctx.set_fallback_font_source_provider(|url| ::asset_cache::url_source(url));
 

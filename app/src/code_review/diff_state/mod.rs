@@ -38,34 +38,6 @@ pub enum CommitChainMode {
     CommitAndCreatePr,
 }
 
-/// Identifies the host of a [`DiffStateModel`] so failure telemetry can be
-/// attributed to where the model actually ran.
-#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
-pub enum BackendOrigin {
-    /// `LocalDiffStateModel` running on the user's client against local files.
-    #[serde(rename = "client_local")]
-    ClientLocal,
-}
-
-/// Identifies the diff-state operation that produced a [`DiffStateError`]
-/// on the `LoadDiffFailed` telemetry path. Carried alongside the error so
-/// failures can be sliced by originating operation — every operation shares
-/// the same failure pool, so the error variant alone doesn't reveal where
-/// it came from.
-///
-/// Metadata-load failures are reported through a dedicated
-/// `LoadMetadataFailed` event and therefore don't need a variant here.
-#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
-#[cfg_attr(not(feature = "local_fs"), allow(dead_code))]
-pub enum DiffOperation {
-    /// Per-file diff refresh triggered by the file-invalidation queue.
-    #[serde(rename = "file_invalidation")]
-    FileInvalidation,
-    /// Full repo-wide diff snapshot load.
-    #[serde(rename = "diff_load")]
-    DiffLoad,
-}
-
 // -- Shared types ──────────────────────────────────────────────────────
 
 /// Represents the status of a file in the git working directory
@@ -430,8 +402,7 @@ impl DiffStateModel {
     /// to the inner model so it can forward events.
     pub fn new_local(path: PathBuf, ctx: &mut ModelContext<Self>) -> Self {
         let repo_path = Some(path.display().to_string());
-        let local = ctx
-            .add_model(|ctx| LocalDiffStateModel::new(repo_path, BackendOrigin::ClientLocal, ctx));
+        let local = ctx.add_model(|ctx| LocalDiffStateModel::new(repo_path, ctx));
         ctx.subscribe_to_model(&local, |me, _, event, ctx| me.forward_event(event, ctx));
         Self::Local(local)
     }

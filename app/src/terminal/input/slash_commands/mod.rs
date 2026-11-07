@@ -25,7 +25,6 @@ use crate::ai::blocklist::{
 };
 use crate::ai::conversation_rename::rename_conversation;
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 use crate::search::slash_command_menu::static_commands::commands::{self, COMMAND_REGISTRY};
 use crate::search::slash_command_menu::static_commands::Availability;
 use crate::search::slash_command_menu::{SlashCommandId, StaticCommand};
@@ -587,7 +586,7 @@ impl Input {
                         }
                     }
                     _ => {
-                        use crate::server::telemetry::PaletteSource;
+                        use crate::ui_sources::PaletteSource;
 
                         ctx.emit(Event::OpenFilesPalette {
                             source: PaletteSource::Keybinding,
@@ -661,9 +660,7 @@ impl Input {
                 ctx.dispatch_typed_action(&WorkspaceAction::SendFeedback);
             }
             open_code_review if command.name == commands::OPEN_CODE_REVIEW.name => {
-                ctx.dispatch_typed_action(&TerminalAction::ToggleCodeReviewPane {
-                    entrypoint: CodeReviewPaneEntrypoint::SlashCommand,
-                });
+                ctx.dispatch_typed_action(&TerminalAction::ToggleCodeReviewPane);
             }
             open_mcp_servers if command.name == commands::OPEN_MCP_SERVERS.name => {
                 ctx.dispatch_typed_action(&TerminalAction::OpenViewMCPPane);

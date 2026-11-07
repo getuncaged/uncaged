@@ -13,14 +13,13 @@ use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element, SingletonEntity, ViewContext, ViewHandle};
 
 use super::embedded_item::EmbeddedWorkflow;
-use super::view::{EditorViewAction, EditorViewEvent, RichTextEditorView};
+use super::view::{EditorViewAction, RichTextEditorView};
 use super::BlockType;
 use crate::appearance::Appearance;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{ObjectIdType, Space};
 use crate::drive::CloudObjectTypeAndId;
 use crate::menu::{self, Menu, MenuItemFields};
-use crate::notebooks::telemetry::EmbeddedObjectInfo;
 use crate::search::notebook_embedding::searcher::EmbeddingSearchItemAction;
 use crate::search::notebook_embedding::view::{EmbeddingSearchEvent, EmbeddingSearchMenu};
 use crate::server::ids::SyncId;
@@ -153,7 +152,6 @@ impl RichTextEditorView {
         // By default we should show the block insertion menu.
         self.insertion_menu_state.embedded_object_search_open = false;
         ctx.focus(&self.insertion_menu_state.menu);
-        ctx.emit(EditorViewEvent::OpenedBlockInsertionMenu(source));
     }
 
     pub(super) fn open_embedded_object_search(&mut self, ctx: &mut ViewContext<Self>) {
@@ -166,7 +164,6 @@ impl RichTextEditorView {
             menu.reset_state(ctx);
         });
         ctx.focus(embedded_object_search);
-        ctx.emit(EditorViewEvent::OpenedEmbeddedObjectSearch);
     }
 
     /// Set the space containing this notebook.
@@ -220,15 +217,6 @@ impl RichTextEditorView {
             }),
             ctx,
         );
-        let team_uid = CloudModel::as_ref(ctx)
-            .get_workflow(id)
-            .and_then(|workflow| workflow.permissions.owner.into());
-        ctx.emit(EditorViewEvent::InsertedEmbeddedObject(
-            EmbeddedObjectInfo::Workflow {
-                workflow_id: id.into_server().map(Into::into),
-                team_uid,
-            },
-        ))
     }
 
     /// Insert an embedded notebook inline view at the current insertion menu source.

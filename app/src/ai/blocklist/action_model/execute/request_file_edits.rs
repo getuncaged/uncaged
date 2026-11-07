@@ -1,6 +1,5 @@
 mod apply_diff_model;
 mod diff_application;
-mod telemetry;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -13,7 +12,6 @@ use futures::channel::oneshot;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use itertools::Itertools;
-pub use telemetry::RequestFileEditsFormatKind;
 use vec1::{vec1, Vec1};
 use warp_util::file::FileSaveError;
 use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _, ViewHandle};

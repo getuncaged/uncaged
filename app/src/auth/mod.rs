@@ -37,13 +37,13 @@ use crate::notebooks::manager::NotebookManager;
 use crate::palette::PaletteMode;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::sync_queue::SyncQueue;
-use crate::server::telemetry::PaletteSource;
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
 use crate::settings::{
     CloudPreferencesSettings, PrivacySettings, CRASH_REPORTING_ENABLED_DEFAULTS_KEY,
     TELEMETRY_ENABLED_DEFAULTS_KEY,
 };
 use crate::terminal::general_settings::GeneralSettings;
+use crate::ui_sources::PaletteSource;
 use crate::workflows::manager::WorkflowManager;
 use crate::workspace::{Workspace, WorkspaceAction};
 use crate::workspaces::update_manager::TeamUpdateManager;

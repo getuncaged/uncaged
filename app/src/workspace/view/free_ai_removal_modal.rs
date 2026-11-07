@@ -1,8 +1,5 @@
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use serde_json::{json, Value};
-use strum_macros::{EnumDiscriminants, EnumIter};
-use warp_core::telemetry::{EnablementState, TelemetryEvent, TelemetryEventDesc};
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
 use warpui::elements::{
@@ -39,8 +36,8 @@ const PROMPT_SUGGESTIONS_BODY_TEXT: &str = "To use AI features in Warp, subscrib
      add an API key (OpenAI, Anthropic, or Google), add a custom inference endpoint (OpenRouter, \
      LiteLLM), or log in using your SuperGrok subscription.";
 
-/// Which surface opened the modal. Selects the copy and disambiguates telemetry;
-/// the layout and CTAs are identical across variants.
+/// Which surface opened the modal. Selects the copy; the layout and CTAs are identical across
+/// variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FreeAiRemovalModalVariant {
     /// One-time notice shown to Free users when Warp-provided AI is removed from their plan.
@@ -71,13 +68,6 @@ impl FreeAiRemovalModalVariant {
         match self {
             Self::Notice => Some(NOTICE_BONUS_CREDITS_TEXT),
             Self::PromptSuggestions => None,
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Notice => "notice",
-            Self::PromptSuggestions => "prompt_suggestions",
         }
     }
 }
@@ -318,95 +308,3 @@ impl TypedActionView for FreeAiRemovalModal {
         }
     }
 }
-
-#[derive(Debug, Clone, Copy)]
-pub enum FreeAiRemovalModalCta {
-    SetUpByok,
-    Upgrade,
-}
-
-impl FreeAiRemovalModalCta {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Self::SetUpByok => "set_up_byok",
-            Self::Upgrade => "upgrade",
-        }
-    }
-}
-
-#[derive(Debug, EnumDiscriminants)]
-#[strum_discriminants(derive(EnumIter))]
-pub enum FreeAiRemovalModalTelemetryEvent {
-    Shown {
-        variant: FreeAiRemovalModalVariant,
-    },
-    Dismissed {
-        variant: FreeAiRemovalModalVariant,
-    },
-    CtaClicked {
-        variant: FreeAiRemovalModalVariant,
-        cta: FreeAiRemovalModalCta,
-    },
-}
-
-impl TelemetryEvent for FreeAiRemovalModalTelemetryEvent {
-    fn name(&self) -> &'static str {
-        FreeAiRemovalModalTelemetryEventDiscriminants::from(self).name()
-    }
-
-    fn payload(&self) -> Option<Value> {
-        match self {
-            Self::Shown { variant } | Self::Dismissed { variant } => Some(json!({
-                "variant": variant.as_str(),
-            })),
-            Self::CtaClicked { variant, cta } => Some(json!({
-                "variant": variant.as_str(),
-                "cta": cta.as_str(),
-            })),
-        }
-    }
-
-    fn description(&self) -> &'static str {
-        FreeAiRemovalModalTelemetryEventDiscriminants::from(self).description()
-    }
-
-    fn enablement_state(&self) -> EnablementState {
-        FreeAiRemovalModalTelemetryEventDiscriminants::from(self).enablement_state()
-    }
-
-    fn contains_ugc(&self) -> bool {
-        match self {
-            Self::Shown { .. } | Self::Dismissed { .. } | Self::CtaClicked { .. } => false,
-        }
-    }
-
-    fn event_descs() -> impl Iterator<Item = Box<dyn TelemetryEventDesc>> {
-        warp_core::telemetry::enum_events::<Self>()
-    }
-}
-
-impl TelemetryEventDesc for FreeAiRemovalModalTelemetryEventDiscriminants {
-    fn name(&self) -> &'static str {
-        match self {
-            Self::Shown => "FreeAiRemovalModal.Shown",
-            Self::Dismissed => "FreeAiRemovalModal.Dismissed",
-            Self::CtaClicked => "FreeAiRemovalModal.CtaClicked",
-        }
-    }
-
-    fn description(&self) -> &'static str {
-        match self {
-            Self::Shown => "The free AI removal notice modal was shown to the user",
-            Self::Dismissed => "The user dismissed the free AI removal notice modal",
-            Self::CtaClicked => "The user clicked a CTA in the free AI removal notice modal",
-        }
-    }
-
-    fn enablement_state(&self) -> EnablementState {
-        match self {
-            Self::Shown | Self::Dismissed | Self::CtaClicked => EnablementState::Always,
-        }
-    }
-}
-
-warp_core::register_telemetry_event!(FreeAiRemovalModalTelemetryEvent);

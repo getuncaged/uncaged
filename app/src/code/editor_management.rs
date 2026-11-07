@@ -10,7 +10,6 @@ use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity, ViewHa
 use super::buffer_location::LocalOrRemotePath;
 use super::view::CodeView;
 use crate::ai::agent::AIAgentActionId;
-use crate::ai::skills::SkillOpenOrigin;
 use crate::code_review::code_review_view::CodeReviewView;
 use crate::pane_group::{PaneGroup, PaneId};
 use crate::workspace::PaneViewLocator;
@@ -125,7 +124,6 @@ pub enum CodeSource {
     Skill {
         reference: SkillReference,
         location: LocalOrRemotePath,
-        origin: SkillOpenOrigin,
     },
 }
 

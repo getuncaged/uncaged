@@ -34,7 +34,7 @@ use super::settings_page::{
 };
 use super::{flags, SettingsAction, SettingsSection, ToggleSettingActionPair};
 use crate::appearance::Appearance;
-use crate::auth::auth_manager::{AuthManager, LoginGatedFeature};
+use crate::auth::auth_manager::AuthManager;
 use crate::auth::auth_state::AuthState;
 use crate::auth::auth_view_modal::AuthViewVariant;
 use crate::auth::{AuthStateProvider, UserUid};
@@ -135,18 +135,6 @@ impl MainPageAction {
             self,
             Upgrade { .. } | GenerateStripeBillingPortalLink { .. } | ToggleSettingsSync,
         )
-    }
-}
-
-impl From<&MainPageAction> for LoginGatedFeature {
-    fn from(val: &MainPageAction) -> LoginGatedFeature {
-        use MainPageAction::*;
-        match val {
-            Upgrade { .. } => "Upgrade Plan",
-            GenerateStripeBillingPortalLink { .. } => "Generate Stripe Billing Portal Link",
-            ToggleSettingsSync => "Toggle Settings Sync",
-            _ => "Unknown reason",
-        }
     }
 }
 

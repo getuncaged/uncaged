@@ -445,11 +445,6 @@ impl CommandSearchView {
         });
     }
 
-    /// Returns the active query filters
-    fn active_query_filter(&self, app: &AppContext) -> Option<QueryFilter> {
-        self.search_bar_state.as_ref(app).active_query_filter()
-    }
-
     /// Emits the `ItemSelected` event containing the passed `CommandSearchEventPayload` and closes
     /// the search panel.
     fn handle_result_selected(

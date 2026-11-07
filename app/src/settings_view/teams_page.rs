@@ -43,7 +43,7 @@ use super::transfer_ownership_confirmation_modal::{
 use super::SettingsSection;
 use crate::ai::AIRequestUsageModel;
 use crate::appearance::Appearance;
-use crate::auth::auth_manager::{AuthManager, LoginGatedFeature};
+use crate::auth::auth_manager::AuthManager;
 use crate::auth::auth_state::AuthState;
 use crate::auth::auth_view_modal::AuthViewVariant;
 use crate::auth::{AuthStateProvider, UserUid};
@@ -63,7 +63,6 @@ use crate::network::NetworkStatus;
 use crate::pricing::PricingInfoModel;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::ServerId;
-use crate::server::telemetry::TelemetryEvent;
 use crate::themes::theme::Blend;
 use crate::themes::{self};
 use crate::ui_components::icons::Icon;
@@ -233,51 +232,6 @@ impl TeamsPageAction {
                 | ToggleTeamDiscoverability { .. }
                 | JoinTeamWithTeamDiscovery { .. }
         )
-    }
-}
-
-impl From<&TeamsPageAction> for LoginGatedFeature {
-    fn from(val: &TeamsPageAction) -> LoginGatedFeature {
-        use TeamsPageAction::*;
-        match val {
-            LeaveTeam => "Leave Team",
-            ShowDeleteTeamConfirmationDialog => "Delete Team",
-            CreateTeam => "Create Team",
-            DeletePendingEmailInvitation { .. } => "Delete Pending Email Invitation",
-            RemoveUserFromTeam { .. } => "Remove User From Team",
-            AddDomainRestrictions { .. } => "Add Domain Restrictions",
-            DeleteDomainRestriction { .. } => "Delete Domain Restriction",
-            SendEmailInvites { .. } => "Send Email Invites",
-            GenerateUpgradeLink { .. } => "Generate Upgrade Link",
-            GenerateStripeBillingPortalLink { .. } => "Generate Stripe Billing Portal Link",
-            OpenAdminPanel { .. } => "Open Admin Panel",
-            ContactSupport => "Contact Support",
-            ContactSales => "Contact Sales",
-            ToggleTeamDiscoverability { .. } | ToggleTeamDiscoverabilityBeforeCreation => {
-                "Toggle Team Discoverability"
-            }
-            JoinTeamWithTeamDiscovery { .. } => "Join Team With Team Discovery",
-            _ => "Unknown reason",
-        }
-    }
-}
-
-impl TryFrom<&TeamsPageAction> for TelemetryEvent {
-    type Error = anyhow::Error;
-    fn try_from(action: &TeamsPageAction) -> Result<Self, Self::Error> {
-        match action {
-            TeamsPageAction::CopyLink(_) => Ok(TelemetryEvent::TeamLinkCopied),
-            TeamsPageAction::ChangeInviteViewOption(option) => {
-                Ok(TelemetryEvent::ChangedInviteViewOption(*option))
-            }
-            TeamsPageAction::SendEmailInvites { .. } => Ok(TelemetryEvent::SendEmailInvites),
-            // Some Team events are logged from the server so we do not want to log
-            // them from the client as well. For more details see:
-            // https://docs.google.com/document/d/1va3_qfkHtDFKZqYaMgNUn5nwU4f8NByzyhg1uolHlck/edit
-            _ => Err(anyhow::anyhow!(
-                "We do not log this telemetry event from the client."
-            )),
-        }
     }
 }
 

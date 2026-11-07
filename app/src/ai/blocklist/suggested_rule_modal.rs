@@ -55,8 +55,8 @@ enum EditorType {
 
 #[derive(Debug, Clone)]
 pub enum SuggestedRuleModalEvent {
-    AddNewRule { rule: SuggestedRule },
-    OpenRuleForEditing { rule: SuggestedRule },
+    AddNewRule,
+    OpenRuleForEditing,
     Close,
 }
 
@@ -155,11 +155,11 @@ impl SuggestedRuleModal {
 
     fn handle_view_event(&mut self, event: &SuggestedRuleDialogEvent, ctx: &mut ViewContext<Self>) {
         match event {
-            SuggestedRuleDialogEvent::AddNewRule { rule } => {
-                ctx.emit(SuggestedRuleModalEvent::AddNewRule { rule: rule.clone() })
+            SuggestedRuleDialogEvent::AddNewRule { .. } => {
+                ctx.emit(SuggestedRuleModalEvent::AddNewRule)
             }
-            SuggestedRuleDialogEvent::OpenRuleForEditing { rule } => {
-                ctx.emit(SuggestedRuleModalEvent::OpenRuleForEditing { rule: rule.clone() })
+            SuggestedRuleDialogEvent::OpenRuleForEditing { .. } => {
+                ctx.emit(SuggestedRuleModalEvent::OpenRuleForEditing)
             }
             SuggestedRuleDialogEvent::Close => ctx.emit(SuggestedRuleModalEvent::Close),
         }

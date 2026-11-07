@@ -365,7 +365,6 @@ windows = { version = "0.62.2", features = [
   "Wdk_System",
   "Wdk_System_SystemServices",
   "Win32_System_Com",
-  "Win32_System_SecurityCenter",
   "Win32_System_SystemInformation",
   "Win32_System_Console",
 ] }

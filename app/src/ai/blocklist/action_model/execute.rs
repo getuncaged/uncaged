@@ -45,8 +45,8 @@ use read_documents::ReadDocumentsExecutor;
 pub(super) use read_files::ReadFilesExecutor;
 use read_mcp_resource::ReadMCPResourceExecutor;
 use read_skill::ReadSkillExecutor;
+pub use request_file_edits::RequestFileEditsExecutor;
 pub(crate) use request_file_edits::{apply_edits, FileReadResult};
-pub use request_file_edits::{RequestFileEditsExecutor, RequestFileEditsFormatKind};
 #[cfg(test)]
 pub use run_agents::{compose_run_agents_child_prompt, run_agents_to_start_agent_mode};
 pub use run_agents::{RunAgentsExecutor, RunAgentsExecutorEvent, RunAgentsSpawningSnapshot};

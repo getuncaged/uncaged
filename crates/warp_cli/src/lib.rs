@@ -226,11 +226,6 @@ pub enum Command {
     /// Print debugging information and exit.
     #[clap(long_flag = "dump-debug-info")]
     DumpDebugInfo,
-
-    /// Print telemetry events in production and exit.
-    #[clap(long_flag = "print-telemetry-events", hide = true)]
-    #[cfg(not(target_family = "wasm"))]
-    PrintTelemetryEvents,
 }
 
 impl Command {
@@ -240,8 +235,6 @@ impl Command {
             Command::Worker(_) => false,
             Command::DumpDebugInfo => true,
             Command::Completions { .. } => true,
-            #[cfg(not(target_family = "wasm"))]
-            Command::PrintTelemetryEvents => true,
         }
     }
 }

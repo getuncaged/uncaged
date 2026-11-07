@@ -1,7 +1,6 @@
 mod collector;
 mod context;
 pub mod context_provider;
-mod events;
 mod macros;
 pub mod rudder_message;
 pub mod secret_redaction;
@@ -16,7 +15,6 @@ use anyhow::Result;
 use chrono::Utc;
 pub use collector::*;
 pub use context::telemetry_context;
-pub use events::*;
 use futures::FutureExt;
 use rudder_message::{
     Batch as RudderBatch, BatchMessage as RudderBatchMessageWithMetadata,

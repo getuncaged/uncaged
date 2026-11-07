@@ -46,9 +46,9 @@ use warpui::{
 };
 
 use crate::ai::agent::icons::{self, yellow_stop_icon};
-use crate::ai::agent::{AIAgentActionId, AIIdentifiers, FileEdit, FileLocations, ServerOutputId};
+use crate::ai::agent::{AIAgentActionId, AIIdentifiers, FileEdit, FileLocations};
 use crate::ai::blocklist::action_model::{
-    AIActionStatus, BlocklistAIActionEvent, BlocklistAIActionModel, RequestFileEditsFormatKind,
+    AIActionStatus, BlocklistAIActionEvent, BlocklistAIActionModel,
 };
 use crate::ai::blocklist::history_model::BlocklistAIHistoryModel;
 use crate::ai::blocklist::inline_action::inline_action_header::INLINE_ACTION_HORIZONTAL_PADDING;
@@ -70,7 +70,6 @@ use crate::code::editor::view::{CodeEditorEvent, CodeEditorRenderOptions, CodeEd
 use crate::code::editor::{add_color, remove_color};
 use crate::code::inline_diff::{InlineDiffView, InlineDiffViewEvent};
 use crate::code::DiffResult;
-use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 use crate::menu::{Event as MenuEvent, Menu, MenuItemFields, MenuVariant};
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::{view, PaneId};
@@ -231,9 +230,7 @@ pub enum CodeDiffViewEvent {
     ContinuePassiveCodeDiffWithAgent {
         accepted: bool,
     },
-    ToggleCodeReviewPane {
-        entrypoint: CodeReviewPaneEntrypoint,
-    },
+    ToggleCodeReviewPane,
     /// Emitted when candidate diffs are loaded and ready to display.
     /// Used to trigger AIBlock height recalculation for passive code diffs.
     LoadedDiffs,
@@ -456,7 +453,6 @@ pub struct CodeDiffView {
     focus_handle: Option<PaneFocusHandle>,
     /// Client and server identifiers for the AI output associated with the code diffs.
     identifiers: AIIdentifiers,
-    edit_format_kind: RequestFileEditsFormatKind,
     /// `False` until a user makes the first edit to one of the diffs in the view.
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     user_edited_file_contents: bool,
@@ -635,7 +631,6 @@ impl CodeDiffView {
         model: &dyn AIBlockModel<View = crate::ai::blocklist::AIBlock>,
         title: Option<String>,
         identifiers: AIIdentifiers,
-        edit_format_kind: RequestFileEditsFormatKind,
         should_show_speedbump: bool,
         action_model: ModelHandle<BlocklistAIActionModel>,
         session_platform: Option<SessionPlatform>,
@@ -656,7 +651,6 @@ impl CodeDiffView {
             initial_state,
             title,
             identifiers,
-            edit_format_kind,
             should_show_speedbump,
             session_platform,
             ctx,
@@ -707,7 +701,6 @@ impl CodeDiffView {
         action_id: &AIAgentActionId,
         title: Option<String>,
         identifiers: AIIdentifiers,
-        edit_format_kind: RequestFileEditsFormatKind,
         should_show_speedbump: bool,
         session_platform: Option<SessionPlatform>,
         ctx: &mut ViewContext<Self>,
@@ -718,7 +711,6 @@ impl CodeDiffView {
             CodeDiffState::WaitingForUser,
             title,
             identifiers,
-            edit_format_kind,
             should_show_speedbump,
             session_platform,
             ctx,
@@ -732,7 +724,6 @@ impl CodeDiffView {
         initial_state: CodeDiffState,
         title: Option<String>,
         identifiers: AIIdentifiers,
-        edit_format_kind: RequestFileEditsFormatKind,
         should_show_speedbump: bool,
         session_platform: Option<SessionPlatform>,
         ctx: &mut ViewContext<Self>,
@@ -887,7 +878,6 @@ impl CodeDiffView {
             title,
             focus_handle: None,
             identifiers,
-            edit_format_kind,
             user_edited_file_contents: false,
             original_pane_id: None,
             scrollable_state: Default::default(),
@@ -2155,10 +2145,6 @@ impl CodeDiffView {
         }
     }
 
-    fn server_output_id(&self) -> Option<ServerOutputId> {
-        self.identifiers.server_output_id.clone()
-    }
-
     /// We are processing unified diff and saving files concurrently. That's why
     /// we need to have separate handlers for diff calculation and save completed.
     ///
@@ -2664,9 +2650,7 @@ impl TypedActionView for CodeDiffView {
                 self.code_review_button.update(ctx, |_, ctx| {
                     ctx.notify();
                 });
-                ctx.emit(CodeDiffViewEvent::ToggleCodeReviewPane {
-                    entrypoint: CodeReviewPaneEntrypoint::CodeDiffHeader,
-                });
+                ctx.emit(CodeDiffViewEvent::ToggleCodeReviewPane);
                 ctx.notify();
             }
             CodeDiffViewAction::RevertChanges => {

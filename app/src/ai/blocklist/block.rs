@@ -70,7 +70,7 @@ use warpui::{
 #[cfg(feature = "agent_mode_debug")]
 use self::code_diff_view::FileDiff;
 use self::model::{AIBlockModel, AIBlockModelHelper};
-use super::action_model::{AIActionStatus, BlocklistAIActionEvent, RequestFileEditsFormatKind};
+use super::action_model::{AIActionStatus, BlocklistAIActionEvent};
 use super::code_block::CodeSnippetButtonHandles;
 use super::controller::ClientIdentifiers;
 use super::inline_action::code_diff_view::{
@@ -138,8 +138,6 @@ use crate::ai::facts::{AIFact, AIMemory, CloudAIFactModel};
 use crate::ai::get_relevant_files::controller::{
     GetRelevantFilesController, GetRelevantFilesControllerEvent,
 };
-#[cfg(feature = "local_fs")]
-use crate::ai::skills::SkillOpenOrigin;
 use crate::ai::{AIRequestUsageModel, AIRequestUsageModelEvent};
 use crate::auth::{AuthStateProvider, UserUid};
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
@@ -152,12 +150,10 @@ use crate::code_review::comments::{
     attach_pending_imported_comments, convert_insert_review_comments, AttachedReviewComment,
     CommentId, CommentOrigin,
 };
-use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 use crate::editor::InteractionState;
 use crate::notebooks::editor::model::FileLinkResolutionContext;
 use crate::notebooks::editor::view::{EditorViewEvent, RichTextEditorView};
 use crate::server::ids::SyncId;
-use crate::server::telemetry::AgentModeRewindEntrypoint;
 use crate::settings::{
     AISettings, AISettingsChangedEvent, AgentModeCodingPermissionsType, FontSettings,
     InputModeSettings, InputModeSettingsChangedEvent, OrchestrationMessageDisplayMode,
@@ -344,15 +340,6 @@ pub enum TextLocation {
 pub enum AIBlockResponseRating {
     Positive,
     Negative,
-}
-
-impl AIBlockResponseRating {
-    pub fn name(&self) -> &'static str {
-        match self {
-            AIBlockResponseRating::Positive => "positive",
-            AIBlockResponseRating::Negative => "negative",
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -1373,7 +1360,6 @@ impl AIBlock {
                         ai_block_view_id,
                         exchange_id,
                         conversation_id,
-                        entrypoint: AgentModeRewindEntrypoint::Button,
                     });
                 })
         });
@@ -2954,24 +2940,6 @@ impl AIBlock {
             server_conversation_id: None,
             model_id: self.model.model_id(ctx),
         };
-        let contains_str_replace = file_edits.iter().any(|file_edit| {
-            matches!(
-                file_edit,
-                FileEdit::Edit(ai::diff_validation::ParsedDiff::StrReplaceEdit { .. })
-            )
-        });
-        let contains_v4a = file_edits.iter().any(|file_edit| {
-            matches!(
-                file_edit,
-                FileEdit::Edit(ai::diff_validation::ParsedDiff::V4AEdit { .. })
-            )
-        });
-        let edit_format_kind = match (contains_str_replace, contains_v4a) {
-            (true, false) => RequestFileEditsFormatKind::StrReplace,
-            (false, true) => RequestFileEditsFormatKind::V4A,
-            (true, true) => RequestFileEditsFormatKind::Mixed,
-            (false, false) => RequestFileEditsFormatKind::Unknown,
-        };
 
         // Only show the speedbump once, update the setting afterwards.
         let should_show_code_suggestion_speedbump =
@@ -2995,7 +2963,6 @@ impl AIBlock {
                 self.model.as_ref(),
                 title.clone(),
                 identifiers,
-                edit_format_kind,
                 should_show_code_suggestion_speedbump,
                 self.action_model.clone(),
                 self.shell_launch_data.clone().map(|data| data.into()),
@@ -3115,10 +3082,8 @@ impl AIBlock {
                     ctx.emit(AIBlockEvent::FocusTerminal);
                     ctx.notify();
                 }
-                CodeDiffViewEvent::ToggleCodeReviewPane { entrypoint } => {
-                    ctx.emit(AIBlockEvent::ToggleCodeReviewPane {
-                        entrypoint: *entrypoint,
-                    });
+                CodeDiffViewEvent::ToggleCodeReviewPane => {
+                    ctx.emit(AIBlockEvent::ToggleCodeReviewPane);
                 }
                 CodeDiffViewEvent::LoadedDiffs => {
                     if me.model.request_type(ctx).is_passive_code_diff() {
@@ -3133,7 +3098,6 @@ impl AIBlock {
                             source: CodeSource::Skill {
                                 reference: reference.clone(),
                                 location: path.clone(),
-                                origin: SkillOpenOrigin::EditFiles,
                             },
                             layout: *crate::util::file::external_editor::EditorSettings::as_ref(
                                 ctx,
@@ -5768,9 +5732,7 @@ pub enum AIBlockEvent {
         conversation_id: AIConversationId,
     },
     InsertForkSlashCommand,
-    ToggleCodeReviewPane {
-        entrypoint: CodeReviewPaneEntrypoint,
-    },
+    ToggleCodeReviewPane,
     DismissedPassiveBlock,
     OpenAIDocumentPane {
         document_id: AIDocumentId,
@@ -5797,13 +5759,6 @@ pub enum AIBlockEvent {
 
 impl Entity for AIBlock {
     type Event = AIBlockEvent;
-}
-
-/// User's final response to an AI-suggested code edit.
-#[derive(Clone, Copy, Debug, Serialize)]
-pub enum RequestedEditResolution {
-    Accept,
-    Reject,
 }
 
 #[derive(Debug, Clone)]
@@ -6382,9 +6337,7 @@ impl TypedActionView for AIBlock {
                 }
             }
             AIBlockAction::ToggleCodeReviewPane => {
-                ctx.emit(AIBlockEvent::ToggleCodeReviewPane {
-                    entrypoint: CodeReviewPaneEntrypoint::AgentModeRunning,
-                });
+                ctx.emit(AIBlockEvent::ToggleCodeReviewPane);
             }
             AIBlockAction::StoreRightClickedCommand { command } => {
                 self.last_right_clicked_command = Some(command.clone());

@@ -10,13 +10,13 @@ use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::palette::PaletteMode;
-use crate::server::telemetry::PaletteSource;
 use crate::settings::AISettings;
 use crate::terminal::input::SET_INPUT_MODE_AGENT_ACTION_NAME;
 use crate::terminal::view::init::{
     CANCEL_COMMAND_KEYBINDING, SELECT_PREVIOUS_BLOCK_ACTION_NAME,
     TOGGLE_AUTOEXECUTE_MODE_KEYBINDING,
 };
+use crate::ui_sources::PaletteSource;
 use crate::util::bindings::trigger_to_keystroke;
 use crate::workspace::view::{
     TOGGLE_COMMAND_PALETTE_KEYBINDING_NAME, TOGGLE_RIGHT_PANEL_BINDING_NAME,

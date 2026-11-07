@@ -138,7 +138,6 @@ use warpui::image_cache::ImageType;
 use warpui::keymap::Keystroke;
 use warpui::notification::{NotificationSendError, RequestPermissionsOutcome, UserNotification};
 use warpui::platform::{Cursor, OperatingSystem};
-use warpui::r#async::executor::Background;
 use warpui::r#async::{SpawnedFutureHandle, Timer};
 use warpui::text::SelectionType;
 use warpui::ui_components::components::UiComponent;
@@ -225,10 +224,9 @@ use crate::ai::blocklist::{
     ConversationStatusUpdate, InputConfig, InputType, InputTypeAutoDetectionSource,
     LegacyPassiveSuggestionsEvent, LegacyPassiveSuggestionsModel, MaaPassiveSuggestionsEvent,
     MaaPassiveSuggestionsModel, PassiveSuggestionsModels, PendingAttachment, PendingQueryState,
-    QueuedQuery, QueuedQueryId, QueuedQueryModel, QueuedQueryOrigin, RequestFileEditsFormatKind,
-    ShellCommandExecutor, ShellCommandExecutorEvent, SlashCommandRequest, StartAgentExecutor,
-    StartAgentExecutorEvent, StartAgentRequest, ATTACH_AS_AGENT_MODE_CONTEXT_TEXT,
-    PRE_REWIND_PREFIX,
+    QueuedQuery, QueuedQueryId, QueuedQueryModel, QueuedQueryOrigin, ShellCommandExecutor,
+    ShellCommandExecutorEvent, SlashCommandRequest, StartAgentExecutor, StartAgentExecutorEvent,
+    StartAgentRequest, ATTACH_AS_AGENT_MODE_CONTEXT_TEXT, PRE_REWIND_PREFIX,
 };
 use crate::ai::conversation_details_panel::{
     ConversationDetailsData, ConversationDetailsPanelEvent,
@@ -273,7 +271,6 @@ use crate::code_review::diff_state::LocalDiffStateModel;
 use crate::code_review::diff_state::{DiffMode, GitDeltaPreference};
 use crate::code_review::git_repo_model::{GitRepoModels, GitRepoStatusModel, GitStatusMetadata};
 use crate::code_review::github_repo_model::GitHubRepoModel;
-use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 #[cfg(feature = "local_fs")]
 use crate::code_review::DiffSetScope;
 use crate::context_chips::prompt::{Prompt, PromptSelection};
@@ -301,11 +298,6 @@ use crate::resource_center::{
 use crate::search::slash_command_menu::static_commands::commands;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ObjectUid, SyncId};
-use crate::server::server_api::ServerApi;
-use crate::server::telemetry::{
-    AgentModeRewindEntrypoint, AnonymousUserSignupEntrypoint, PaletteSource,
-    PromptSuggestionViewType, TelemetryEvent, ToggleBlockFilterSource,
-};
 use crate::session_management::{CommandContext, SessionNavigationPromptElements};
 use crate::settings::ai::FocusedTerminalInfo;
 #[cfg(feature = "local_fs")]
@@ -316,8 +308,7 @@ use crate::settings::{
     BlockVisibilitySettings, BlockVisibilitySettingsChangedEvent, CodeSettings, DebugSettings,
     DebugSettingsChangedEvent, EmacsBindingsSettings, FontSettings, FontSettingsChangedEvent,
     InputModeSettings, InputModeSettingsChangedEvent, InputSettings, PaneSettings,
-    PaneSettingsChangedEvent, PrivacySettings, PrivacySettingsChangedEvent,
-    PrivacySettingsSnapshot, SelectionSettings, VimBannerSettings,
+    PaneSettingsChangedEvent, SelectionSettings, VimBannerSettings,
 };
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
 use crate::settings_view::mcp_servers_page::MCPServersSettingsPage;
@@ -442,6 +433,7 @@ use crate::terminal::{
 use crate::themes::theme::WarpTheme;
 use crate::throttle::throttle;
 use crate::ui_components::icons::{self};
+use crate::ui_sources::PaletteSource;
 use crate::util::bindings::{
     custom_tag_to_keystroke, keybinding_name_to_display_string, keybinding_name_to_keystroke,
     set_custom_keybinding, CustomAction,
@@ -1583,9 +1575,7 @@ pub enum Event {
         buffer_text: String,
         results_tx: async_channel::Sender<Vec<ShellCompletion>>,
     },
-    SignupAnonymousUser {
-        entrypoint: AnonymousUserSignupEntrypoint,
-    },
+    SignupAnonymousUser,
 
     OpenThemeGallery,
     OpenConversationHistory,
@@ -2178,7 +2168,6 @@ pub struct TerminalView {
 
     mouse_states: TerminalViewMouseStates,
 
-    server_api: Arc<ServerApi>,
     auth_state: Arc<AuthState>,
 
     /// A sender used to handle messages for whenever the entire terminal view
@@ -2202,7 +2191,6 @@ pub struct TerminalView {
 
     last_hover_fragment_boundary: Option<WithinModel<FragmentBoundary>>,
 
-    bootstrap_start: Option<Instant>,
     is_login_shell_bootstrapped: bool,
     /// Set when a pending command is submitted to the shell. Cleared on the
     /// next `AfterBlockCompleted`, at which point `Event::PendingCommandCompleted`
@@ -2256,10 +2244,6 @@ pub struct TerminalView {
 
     block_text_selection_start_position: Option<Vector2F>,
 
-    /// Background executor for sending telemetry when a TerminalView is
-    /// dropped.
-    background_executor: Arc<Background>,
-
     inline_banners_state: InlineBannersState,
 
     /// Most recent command correction encountered, if any, used for the keyboard shortcut action.
@@ -2273,14 +2257,6 @@ pub struct TerminalView {
 
     last_focus_ts: Option<NaiveDateTime>,
     tips_completed: ModelHandle<TipsCompleted>,
-
-    /// A manually managed [`PrivacySettingsSnapshot`]. We must maintain a separate snapshot of
-    /// [`PrivacySettings`] (rather than using it directly), so we can decide whether to send a
-    /// telemetry event in the view's `drop()` method, which does not have access to a ViewContext
-    /// (which is required for reading the `PrivacySettings` model). This is a less-than-ideal
-    /// workaround; other usages of PrivacyModel should directly read from the singleton model
-    /// managed by the UI framework (e.g. via `PrivacySettings::handle(ctx)`).
-    privacy_settings_snapshot: PrivacySettingsSnapshot,
 
     /// Whether or not this terminal session was ever active.
     was_ever_visible: bool,
@@ -3462,17 +3438,6 @@ impl TerminalView {
         let ligature_handle = LigatureSettings::handle(ctx);
         ctx.subscribe_to_model(&ligature_handle, |_, _, _, ctx| ctx.notify());
 
-        let privacy_settings_handle = PrivacySettings::handle(ctx);
-        ctx.subscribe_to_model(
-            &privacy_settings_handle,
-            |me, privacy_settings_handle, event, ctx| {
-                if let PrivacySettingsChangedEvent::UpdateIsTelemetryEnabled { .. } = event {
-                    me.privacy_settings_snapshot =
-                        privacy_settings_handle.as_ref(ctx).get_snapshot(ctx)
-                }
-            },
-        );
-
         let block_visibility_settings_handle = BlockVisibilitySettings::handle(ctx);
         ctx.subscribe_to_model(
             &block_visibility_settings_handle,
@@ -3710,7 +3675,6 @@ impl TerminalView {
             mouse_states: Default::default(),
             open_grid_link_tool_tip: None,
             open_rich_content_link_tool_tip: None,
-            server_api: resources.server_api.clone(),
             auth_state: AuthStateProvider::as_ref(ctx).get().clone(),
             find_bar,
             resize_tx,
@@ -3718,7 +3682,6 @@ impl TerminalView {
             find_link_tx,
             highlighted_link: HighlightedLinkOption::default(),
             last_hover_fragment_boundary: None,
-            bootstrap_start: None,
             is_login_shell_bootstrapped: false,
             awaiting_pending_command_completion: false,
             pending_command_queue: Default::default(),
@@ -3740,13 +3703,11 @@ impl TerminalView {
             active_block_metadata: None,
             canonical_session_pwd_cache: RefCell::new(None),
             block_text_selection_start_position: None,
-            background_executor: ctx.background_executor().clone(),
             inline_banners_state: Default::default(),
             bookmarked_blocks: Default::default(),
             file_link_scanning_join_handle: None,
             last_focus_ts: None,
             tips_completed: resources.tips_completed.clone(),
-            privacy_settings_snapshot: privacy_settings_handle.as_ref(ctx).get_snapshot(ctx),
             was_ever_visible: false,
             view_id: ctx.view_id(),
             current_state: TerminalViewStateChange::default(),
@@ -4005,7 +3966,6 @@ impl TerminalView {
         if let Some(deferred) = self.deferred_code_review_open.take() {
             self.toggle_code_review_pane(
                 deferred.git_delta_preference,
-                CodeReviewPaneEntrypoint::Other,
                 None,
                 deferred.focus_new_pane,
                 ctx,
@@ -4651,8 +4611,7 @@ impl TerminalView {
                     ctx,
                 );
             }
-            LegacyPassiveSuggestionsEvent::PassiveCodeDiffRequestStarted { .. } => {}
-            LegacyPassiveSuggestionsEvent::PassiveCodeDiffFailed { .. } => {
+            LegacyPassiveSuggestionsEvent::PassiveCodeDiffFailed => {
                 self.try_clear_prompt_suggestions_banner_code_state(ctx);
             }
         }
@@ -5752,7 +5711,6 @@ impl TerminalView {
     fn toggle_or_open_code_review_pane(
         &mut self,
         delta_pref: GitDeltaPreference,
-        entrypoint: CodeReviewPaneEntrypoint,
         cli_agent: Option<super::CLIAgent>,
         focus_new_pane: bool,
         event_constructor: impl Fn(CodeReviewPanelArg) -> Event,
@@ -5761,7 +5719,6 @@ impl TerminalView {
         let arg = CodeReviewPanelArg {
             repo_path: self.current_repo_path.clone(),
             terminal_view: self.view_handle.clone(),
-            entrypoint,
             focus_new_pane,
             cli_agent,
         };
@@ -5809,14 +5766,12 @@ impl TerminalView {
     pub fn toggle_code_review_pane(
         &mut self,
         delta_pref: GitDeltaPreference,
-        entrypoint: CodeReviewPaneEntrypoint,
         cli_agent: Option<super::CLIAgent>,
         focus_new_pane: bool,
         ctx: &mut ViewContext<Self>,
     ) {
         self.toggle_or_open_code_review_pane(
             delta_pref,
-            entrypoint,
             cli_agent,
             focus_new_pane,
             Event::ToggleCodeReviewPane,
@@ -5827,14 +5782,12 @@ impl TerminalView {
     pub fn open_code_review_pane(
         &mut self,
         delta_pref: GitDeltaPreference,
-        entrypoint: CodeReviewPaneEntrypoint,
         cli_agent: Option<super::CLIAgent>,
         focus_new_pane: bool,
         ctx: &mut ViewContext<Self>,
     ) {
         self.toggle_or_open_code_review_pane(
             delta_pref,
-            entrypoint,
             cli_agent,
             focus_new_pane,
             Event::OpenCodeReviewPane,
@@ -6045,7 +5998,6 @@ impl TerminalView {
                             {
                                 self.open_code_review_pane(
                                     GitDeltaPreference::Always,
-                                    CodeReviewPaneEntrypoint::ForceOpened,
                                     None,  // cli_agent
                                     false, /* focus_new_pane */
                                     ctx,
@@ -6073,7 +6025,6 @@ impl TerminalView {
             BlocklistAIActionEvent::ToggleCodeReview(_) => {
                 self.toggle_code_review_pane(
                     GitDeltaPreference::Always,
-                    CodeReviewPaneEntrypoint::InvokedByAgent,
                     None,  // cli_agent
                     false, /* focus_new_pane */
                     ctx,
@@ -6129,7 +6080,6 @@ impl TerminalView {
             Some(CodeReviewPanelArg {
                 repo_path: Some(LocalOrRemotePath::Local(repo_path.to_path_buf())),
                 terminal_view: self.view_handle.clone(),
-                entrypoint: CodeReviewPaneEntrypoint::InvokedByAgent,
                 focus_new_pane: false,
                 cli_agent: None,
             })
@@ -8151,16 +8101,6 @@ impl TerminalView {
         });
     }
 
-    /// Returns the view type for prompt suggestion telemetry based on whether agent view is active.
-    fn prompt_suggestion_view_type(&self, ctx: &ViewContext<Self>) -> PromptSuggestionViewType {
-        if FeatureFlag::AgentView.is_enabled() && self.agent_view_controller.as_ref(ctx).is_active()
-        {
-            PromptSuggestionViewType::AgentView
-        } else {
-            PromptSuggestionViewType::TerminalView
-        }
-    }
-
     fn resolve_prompt_suggestion(
         &mut self,
         resolution: PromptSuggestionResolution,
@@ -8626,9 +8566,7 @@ impl TerminalView {
     ) {
         match action {
             AnonymousUserLoginBannerAction::SignUp => {
-                ctx.emit(Event::SignupAnonymousUser {
-                    entrypoint: AnonymousUserSignupEntrypoint::LoginGatedFeature,
-                });
+                ctx.emit(Event::SignupAnonymousUser);
                 self.remove_anonymous_user_ai_sign_up_banner(ctx);
             }
             AnonymousUserLoginBannerAction::Close => {
@@ -9408,15 +9346,12 @@ impl TerminalView {
                 // indicator in terminal tabs.
                 ctx.request_user_attention();
             }
-            ModelEvent::Exit { reason } => {
+            ModelEvent::Exit { .. } => {
                 // If the pty spawn has failed, we've already inserted a banner.
                 if !self.pty_spawn_failed {
                     let shell_detail = self.shell_detail.take().unwrap_or("shell".to_owned());
                     self.insert_shell_process_terminated_banner(
-                        shell_terminated_banner::TerminationType::Premature {
-                            shell_detail,
-                            reason: *reason,
-                        },
+                        shell_terminated_banner::TerminationType::Premature { shell_detail },
                         ctx,
                     );
                 }
@@ -11322,7 +11257,6 @@ impl TerminalView {
                         if open_code_review_pane_after_rule_generation {
                             me.toggle_code_review_pane(
                                 GitDeltaPreference::Always,
-                                CodeReviewPaneEntrypoint::AgentModeCompleted,
                                 None,
                                 false, /* focus_new_pane */
                                 ctx,
@@ -12256,7 +12190,6 @@ impl TerminalView {
             }
             MaaPassiveSuggestionsEvent::NewCodeDiffSuggestion {
                 diffs,
-                edit_format_kind,
                 title,
                 original_edits,
                 conversation_id,
@@ -12264,7 +12197,6 @@ impl TerminalView {
             } => {
                 self.on_maa_code_diff_generated(
                     diffs.clone(),
-                    *edit_format_kind,
                     title.clone(),
                     original_edits.clone(),
                     *conversation_id,
@@ -12323,7 +12255,6 @@ impl TerminalView {
     fn on_maa_code_diff_generated(
         &mut self,
         diffs: Vec<FileDiff>,
-        edit_format_kind: RequestFileEditsFormatKind,
         title: Option<String>,
         original_edits: Vec<PassiveCodeDiffEntry>,
         conversation_id: Option<AIConversationId>,
@@ -12344,15 +12275,7 @@ impl TerminalView {
             .map(Into::into);
 
         let diff_view = ctx.add_typed_action_view(|ctx| {
-            CodeDiffView::new_passive(
-                &action_id,
-                title,
-                identifiers,
-                edit_format_kind,
-                false,
-                session_platform,
-                ctx,
-            )
+            CodeDiffView::new_passive(&action_id, title, identifiers, false, session_platform, ctx)
         });
 
         diff_view.update(ctx, |view, ctx| {
@@ -12476,14 +12399,8 @@ impl TerminalView {
                     }
                     ctx.notify();
                 }
-                CodeDiffViewEvent::ToggleCodeReviewPane { entrypoint } => {
-                    me.toggle_code_review_pane(
-                        GitDeltaPreference::Always,
-                        *entrypoint,
-                        None,
-                        true,
-                        ctx,
-                    );
+                CodeDiffViewEvent::ToggleCodeReviewPane => {
+                    me.toggle_code_review_pane(GitDeltaPreference::Always, None, true, ctx);
                 }
                 CodeDiffViewEvent::DisplayModeChanged => {
                     // Re-render wrapper when the diff view expands/collapses.
@@ -13622,9 +13539,7 @@ impl TerminalView {
                         .into_item(),
                 ]);
                 items.append(&mut vec![MenuItemFields::new("Toggle block filter")
-                    .with_on_select_action(TerminalAction::ToggleBlockFilterOnSelectedOrLastBlock(
-                        ToggleBlockFilterSource::ContextMenu,
-                    ))
+                    .with_on_select_action(TerminalAction::ToggleBlockFilterOnSelectedOrLastBlock)
                     .with_key_shortcut_label(keybinding_name_to_display_string(
                         TOGGLE_BLOCK_FILTER_KEYBINDING,
                         ctx,
@@ -13785,7 +13700,6 @@ impl TerminalView {
                                         ai_block_view_id: *rich_content_view_id,
                                         exchange_id: ai_metadata.exchange_id,
                                         conversation_id: ai_metadata.conversation_id,
-                                        entrypoint: AgentModeRewindEntrypoint::ContextMenu,
                                     })
                                     .into_item(),
                             );
@@ -16865,10 +16779,9 @@ impl TerminalView {
                     layout: *layout,
                 });
             }
-            AIBlockEvent::ToggleCodeReviewPane { entrypoint } => {
+            AIBlockEvent::ToggleCodeReviewPane => {
                 self.toggle_code_review_pane(
                     GitDeltaPreference::Always,
-                    *entrypoint,
                     None, // cli_agent
                     true, /* focus_new_pane */
                     ctx,
@@ -16882,7 +16795,6 @@ impl TerminalView {
                 let arg = CodeReviewPanelArg {
                     repo_path: Some(repo_path.clone()),
                     terminal_view: self.view_handle.clone(),
-                    entrypoint: CodeReviewPaneEntrypoint::AgentModeRunning,
                     focus_new_pane: true,
                     cli_agent: None,
                 };
@@ -16963,7 +16875,6 @@ impl TerminalView {
         CodeReviewPanelArg {
             repo_path: self.current_repo_path.clone(),
             terminal_view: self.view_handle.clone(),
-            entrypoint: CodeReviewPaneEntrypoint::AgentModeRunning,
             focus_new_pane: true,
             cli_agent: None,
         }
@@ -17861,10 +17772,8 @@ impl TerminalView {
                 ctx.dispatch_typed_action(&PaneGroupAction::HandleFocusChange);
                 ctx.notify();
             }
-            InputEvent::SignupAnonymousUser { entrypoint } => {
-                ctx.emit(Event::SignupAnonymousUser {
-                    entrypoint: *entrypoint,
-                });
+            InputEvent::SignupAnonymousUser => {
+                ctx.emit(Event::SignupAnonymousUser);
             }
             InputEvent::OpenSettings(section) => {
                 ctx.emit(Event::OpenSettings(*section));
@@ -17880,7 +17789,6 @@ impl TerminalView {
                 ctx.emit(Event::OpenCodeReviewPane(CodeReviewPanelArg {
                     repo_path: self.current_repo_path.clone(),
                     terminal_view: self.view_handle.clone(),
-                    entrypoint: CodeReviewPaneEntrypoint::GitDiffChip,
                     focus_new_pane: true,
                     cli_agent: None,
                 }));
@@ -22027,7 +21935,7 @@ impl TypedActionView for TerminalView {
             | OnboardingFlow(_)
             | ImportSettings
             | DragAndDropFiles(_)
-            | ToggleBlockFilterOnSelectedOrLastBlock(_)
+            | ToggleBlockFilterOnSelectedOrLastBlock
             | SetMarkedText { .. }
             | ResumeConversation
             | ForkConversationFromLastKnownGoodState
@@ -22105,7 +22013,7 @@ impl TypedActionView for TerminalView {
             | ToggleQueueNextPrompt
             | ToggleTodoPopup
             | CloseTodoPopup
-            | ToggleCodeReviewPane { .. }
+            | ToggleCodeReviewPane
             | OpenProjectRulesPane
             | InitProject
             | IndexProjectSpeedbump
@@ -22227,7 +22135,6 @@ impl TypedActionView for TerminalView {
                 ai_block_view_id,
                 exchange_id,
                 conversation_id,
-                ..
             } => {
                 self.show_rewind_confirmation_dialog(
                     *ai_block_view_id,
@@ -22521,7 +22428,7 @@ impl TypedActionView for TerminalView {
                     self.add_settings_import_block(ctx);
                 }
             }
-            ToggleBlockFilterOnSelectedOrLastBlock(_) => {
+            ToggleBlockFilterOnSelectedOrLastBlock => {
                 self.toggle_block_filter_on_selected_or_last_block(ctx);
             }
             ToggleSnackbarInActivePane => self.toggle_snackbar_in_active_pane(ctx),
@@ -22925,11 +22832,10 @@ impl TypedActionView for TerminalView {
                 self.is_todo_popup_visible = false;
                 ctx.notify();
             }
-            ToggleCodeReviewPane { entrypoint } => {
+            ToggleCodeReviewPane => {
                 ctx.emit(Event::ToggleCodeReviewPane(CodeReviewPanelArg {
                     repo_path: self.current_repo_path.clone(),
                     terminal_view: self.view_handle.clone(),
-                    entrypoint: *entrypoint,
                     focus_new_pane: true,
                     cli_agent: None,
                 }));
@@ -23016,7 +22922,6 @@ impl TypedActionView for TerminalView {
                                 source: CodeSource::Skill {
                                     reference: skill_reference.clone(),
                                     location: path.clone(),
-                                    origin: crate::ai::skills::SkillOpenOrigin::OpenSkillCommand,
                                 },
                                 layout:
                                     *crate::util::file::external_editor::EditorSettings::as_ref(ctx)
@@ -24025,29 +23930,6 @@ impl Drop for TerminalView {
                     log_level,
                     "Session abandoned before bootstrap for shell {pending_shell:?} on ssh {has_pending_ssh_session}"
                 );
-
-                let was_ever_visible = self.was_ever_visible;
-                let duration_since_start =
-                    self.bootstrap_start.unwrap_or_else(Instant::now).elapsed();
-                let server_api = self.server_api.clone();
-                let privacy_settings_snapshot = self.privacy_settings_snapshot;
-                let task = self.background_executor.spawn(async move {
-                    if let Err(error) = server_api
-                        .send_telemetry_event(
-                            TelemetryEvent::SessionAbandonedBeforeBootstrap {
-                                pending_shell,
-                                has_pending_ssh_session,
-                                was_ever_visible,
-                                duration_since_start,
-                            },
-                            privacy_settings_snapshot,
-                        )
-                        .await
-                    {
-                        log::warn!("Error occurred with sending telemetry event: {error}");
-                    }
-                });
-                task.detach();
             }
         };
     }

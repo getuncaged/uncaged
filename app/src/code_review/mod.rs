@@ -12,7 +12,6 @@ pub mod git_repo_model;
 mod git_repo_models;
 pub mod github_repo_model;
 mod hidden_lines;
-pub mod telemetry_event;
 
 pub(crate) mod code_review_header;
 pub(crate) mod comment_rendering;
@@ -29,7 +28,6 @@ use warpui::{
 };
 
 use crate::code::buffer_location::LocalOrRemotePath;
-use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 use crate::terminal::view::TerminalView;
 use crate::terminal::CLIAgent;
 use crate::util::bindings::CustomAction;
@@ -41,7 +39,6 @@ use crate::util::bindings::CustomAction;
 pub struct CodeReviewPanelArg {
     pub repo_path: Option<LocalOrRemotePath>,
     pub terminal_view: WeakViewHandle<TerminalView>,
-    pub entrypoint: CodeReviewPaneEntrypoint,
     pub focus_new_pane: bool,
     pub cli_agent: Option<CLIAgent>,
 }

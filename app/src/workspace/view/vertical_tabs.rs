@@ -1,5 +1,3 @@
-pub mod telemetry;
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -71,7 +69,6 @@ use crate::workspace::tab_settings::{
     TabSettings, VerticalTabsCompactSubtitle, VerticalTabsDisplayGranularity,
     VerticalTabsPrimaryInfo, VerticalTabsTabItemMode, VerticalTabsViewMode,
 };
-use crate::workspace::view::vertical_tabs::telemetry::VerticalTabsChipEntrypoint;
 use crate::workspace::{
     PaneViewLocator, TabBarLocation, TabContextMenuAnchor, VerticalTabsPaneContextMenuTarget,
     VerticalTabsPaneDropTargetData, Workspace,
@@ -4281,15 +4278,6 @@ fn render_terminal_row_content(
         .finish(),
     );
     content.finish()
-}
-
-fn chip_entrypoint_for_granularity(
-    granularity: VerticalTabsDisplayGranularity,
-) -> VerticalTabsChipEntrypoint {
-    match granularity {
-        VerticalTabsDisplayGranularity::Panes => VerticalTabsChipEntrypoint::Pane,
-        VerticalTabsDisplayGranularity::Tabs => VerticalTabsChipEntrypoint::Tab,
-    }
 }
 
 fn branch_label_display(git_branch: Option<&str>, fallback: &str) -> (String, bool) {

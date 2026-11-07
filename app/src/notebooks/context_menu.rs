@@ -9,7 +9,6 @@ use warpui::{Action, Element, EventContext, TypedActionView, View, ViewContext, 
 
 use super::editor::keys::custom_action_to_display;
 use super::editor::view::RichTextEditorView;
-use super::telemetry::ActionEntrypoint;
 use crate::editor::EditorView;
 use crate::menu::{self, Menu, MenuItem, MenuItemFields};
 use crate::pane_group::focus_state::PaneFocusHandle;
@@ -268,7 +267,7 @@ where
             }
             ContextMenuAction::CopySelectedText => match &self.source {
                 Some(MenuSource::RichTextEditor { editor, .. }) => {
-                    editor.update(ctx, |editor, ctx| editor.copy(ActionEntrypoint::Menu, ctx))
+                    editor.update(ctx, |editor, ctx| editor.copy(ctx))
                 }
                 Some(MenuSource::TextEditor { editor, .. }) => {
                     editor.update(ctx, |editor, ctx| editor.copy(ctx))
@@ -278,7 +277,7 @@ where
             ContextMenuAction::CutSelectedText => match &self.source {
                 Some(MenuSource::RichTextEditor { editor, .. }) => {
                     ctx.focus(editor);
-                    editor.update(ctx, |editor, ctx| editor.cut(ActionEntrypoint::Menu, ctx));
+                    editor.update(ctx, |editor, ctx| editor.cut(ctx));
                 }
                 Some(MenuSource::TextEditor { editor, .. }) => {
                     ctx.focus(editor);

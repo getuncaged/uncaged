@@ -98,7 +98,6 @@ use crate::ai::blocklist::{AIBlockResponseRating, BlocklistAIActionModel, Sugges
 use crate::ai::paths::shell_native_absolute_path;
 use crate::ai::skills::{
     icon_override_for_skill_name, render_skill_button, skill_path_from_location, SkillManager,
-    SkillOpenOrigin,
 };
 use crate::appearance::Appearance;
 use crate::code::diff_viewer::DisplayMode;
@@ -1739,7 +1738,6 @@ fn render_read_skill(
                 let source = CodeSource::Skill {
                     reference: skill_reference.clone(),
                     location: skill.path.clone(),
-                    origin: SkillOpenOrigin::ReadSkill,
                 };
 
                 let skill_icon_override = icon_override_for_skill_name(&skill.name);
@@ -1846,7 +1844,6 @@ fn render_read_files(
             let source = CodeSource::Skill {
                 reference,
                 location: skill.path.clone(),
-                origin: SkillOpenOrigin::ReadFiles,
             };
             let skill_icon_override = icon_override_for_skill_name(&skill.name);
             let open_button = render_skill_button(

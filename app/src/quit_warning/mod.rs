@@ -8,7 +8,6 @@ use warpui::{AppContext, EntityId, SingletonEntity, ViewContext, WeakViewHandle,
 use crate::code::editor_management::{CodeEditorStatus, CodeEditorSummary};
 use crate::pane_group::{CodePane, PaneGroup, PaneId, TerminalPane};
 use crate::report_if_error;
-use crate::server::telemetry::CloseTarget;
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
 use crate::terminal::general_settings::GeneralSettings;
 use crate::workspace::Workspace;
@@ -151,16 +150,6 @@ impl QuitScope<'_> {
                 .flat_map(|window_id| CodeEditorStatus::code_review_views_in_window(window_id, ctx))
                 .collect_vec(),
             Self::EditorTab { .. } => vec![],
-        }
-    }
-
-    fn close_target(&self) -> CloseTarget {
-        match self {
-            Self::Pane { .. } => CloseTarget::Pane,
-            Self::Tabs(_) => CloseTarget::Tab,
-            Self::Window(_) => CloseTarget::Window,
-            Self::App => CloseTarget::App,
-            Self::EditorTab { .. } => CloseTarget::EditorTab,
         }
     }
 }

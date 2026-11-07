@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use anyhow::Context;
 use async_channel::Sender;
-use futures_util::stream::AbortHandle;
 use lazy_static::lazy_static;
 use regex::Regex;
 use settings::Setting as _;
@@ -20,7 +19,7 @@ use warpui::elements::{
 };
 use warpui::keymap::{EditableBinding, FixedBinding};
 use warpui::presenter::ChildView;
-use warpui::r#async::{SpawnedFutureHandle, Timer};
+use warpui::r#async::SpawnedFutureHandle;
 use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{
@@ -67,9 +66,6 @@ use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::server::cloud_objects::update_manager::{FetchSingleObjectOption, UpdateManager};
 use crate::server::ids::{ClientId, ServerId, SyncId};
-use crate::server::telemetry::{
-    CloudObjectTelemetryMetadata, NotebookTelemetryMetadata, TelemetryCloudObjectType,
-};
 use crate::settings::app_installation_detection::{
     UserAppInstallDetectionSettings, UserAppInstallStatus,
 };
@@ -109,18 +105,6 @@ const FEATURE_NOT_AVAILABLE_MESSAGE: &str = "This notebook could not be saved to
 /// lets us trade off how quickly edits appear on other clients with the load on the server for RTC
 /// object updates.
 const SAVE_PERIOD: Duration = Duration::from_secs(2);
-
-/// The minimum size of an edit delta (in terms of the change in byte length of the serialized
-/// Markdown) for it to be considered "meaningful". We're likely going to tune this over time:
-/// * By refining the threshold
-/// * By using a more advanced diff algorithm
-const MEANINGFUL_EDIT_THRESHOLD: usize = 30;
-
-#[cfg(not(test))]
-const EDIT_WINDOW_DURATION: Duration = Duration::from_secs(60);
-// Use a shorter window to make testing reasonable.
-#[cfg(test)]
-const EDIT_WINDOW_DURATION: Duration = Duration::from_millis(5);
 
 lazy_static! {
     // This is used to replace any backslash followed by a punctuation character with just the punctuation character.
@@ -220,12 +204,6 @@ pub struct NotebookView {
     focus_handle: Option<PaneFocusHandle>,
     links: ModelHandle<NotebookLinks>,
     context_menu: ContextMenuState<Self>,
-
-    /// Buffer length as of the last meaningful-edit check.
-    last_content_length: usize,
-    /// Whether or not the buffer has been edited since the last check.
-    send_edit_telemetry: bool,
-    edit_telemetry_handle: Option<AbortHandle>,
 
     /// Whether or not there are un-saved content edits.
     content_is_dirty: bool,
@@ -411,9 +389,6 @@ impl NotebookView {
             button_mouse_states: Default::default(),
             pane_configuration,
             focus_handle: None,
-            send_edit_telemetry: false,
-            last_content_length: 0,
-            edit_telemetry_handle: None,
             content_is_dirty: false,
             title_is_dirty: false,
             save_tx,
@@ -764,7 +739,6 @@ impl NotebookView {
 
     /// Saves the notebook's current Markdown content, via the [`UpdateManager`].
     fn save_content(&mut self, ctx: &mut ViewContext<Self>) {
-        self.send_edit_telemetry = true;
         let content = Arc::new(self.content(ctx));
 
         // Block saving if secrets are detected in the notebook when secret redaction is enabled.
@@ -827,40 +801,6 @@ impl NotebookView {
             }
             ActiveNotebook::None => log::error!("Tried to save notebook, but none were active"),
         }
-    }
-
-    /// Check for edit activity and send telemetry accordingly.
-    ///
-    /// This runs as a recursive async task that reports if an edit was made over the past
-    /// [`EDIT_WINDOW_DURATION`]. The telemetry loop starts when entering edit mode, and stops
-    /// when switching to view.
-    fn check_edited(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(handle) = self.edit_telemetry_handle.take() {
-            handle.abort();
-        }
-
-        // The notebook could have switched to view mode while the timer was pending, since Future
-        // cancellation isn't guaranteed.
-        if self.mode(ctx) != Mode::Editing {
-            return;
-        }
-
-        if self.send_edit_telemetry {
-            let content = self.content(ctx);
-            self.last_content_length = content.len();
-            self.send_edit_telemetry = false;
-        }
-
-        // Schedule another check. If we stop editing in the meantime, either the mode check above
-        // or the cancellation logic in `switch_to_view` will stop the timer loop.
-        let next_check = ctx.spawn_abortable(
-            Timer::after(EDIT_WINDOW_DURATION),
-            |me, _, ctx| {
-                me.check_edited(ctx);
-            },
-            |_, _| {},
-        );
-        self.edit_telemetry_handle = Some(next_check.abort_handle());
     }
 
     /// Checks if the user is the current known editor of the notebook, if they
@@ -942,21 +882,11 @@ impl NotebookView {
             }
             EditorViewEvent::CmdEnter
             | EditorViewEvent::EscapePressed
-            | EditorViewEvent::TextSelectionChanged
-            | EditorViewEvent::OpenedBlockInsertionMenu(_)
-            | EditorViewEvent::OpenedEmbeddedObjectSearch
-            | EditorViewEvent::OpenedFindBar
-            | EditorViewEvent::InsertedEmbeddedObject(_)
-            | EditorViewEvent::CopiedBlock { .. }
-            | EditorViewEvent::NavigatedCommands
-            | EditorViewEvent::ChangedSelectionMode(_) => (),
+            | EditorViewEvent::TextSelectionChanged => (),
         }
     }
 
     fn switch_to_view(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(handle) = self.edit_telemetry_handle.take() {
-            handle.abort();
-        }
         self.active_notebook_data.update(ctx, |data, ctx| {
             data.mode = Mode::View;
             ctx.notify();
@@ -990,40 +920,6 @@ impl NotebookView {
         self.notebook_id(ctx)?.into_server().map(Into::into)
     }
 
-    /// The current notebook metadata for telemetry.
-    fn telemetry_metadata(&self, ctx: &ViewContext<Self>) -> NotebookTelemetryMetadata {
-        let active_notebook_data = self.active_notebook_data.as_ref(ctx);
-        let owner = active_notebook_data.owner(ctx);
-        let space = active_notebook_data.space(ctx);
-        NotebookTelemetryMetadata::new(
-            self.server_id(ctx),
-            owner.and_then(Into::into),
-            owner.map_or(NotebookLocation::PersonalCloud, Into::into),
-            space.map(Into::into),
-        )
-    }
-
-    fn open_telemetry_metadata(&self, ctx: &ViewContext<Self>) -> NotebookTelemetryMetadata {
-        self.telemetry_metadata(ctx).with_markdown_table_count(
-            self.input
-                .as_ref(ctx)
-                .model()
-                .as_ref(ctx)
-                .markdown_table_count(ctx),
-        )
-    }
-
-    #[cfg_attr(not(target_family = "wasm"), allow(dead_code))]
-    fn generic_telemetry_metadata(&self, ctx: &ViewContext<Self>) -> CloudObjectTelemetryMetadata {
-        let notebook_data = self.active_notebook_data.as_ref(ctx);
-        CloudObjectTelemetryMetadata {
-            object_type: TelemetryCloudObjectType::Notebook,
-            object_uid: notebook_data.id().and_then(SyncId::into_server),
-            space: notebook_data.space(ctx).map(Into::into),
-            team_uid: notebook_data.owner(ctx).and_then(Into::into),
-        }
-    }
-
     /// Puts the nodebook into edit mode and focuses the editor. The caller is responsible for
     /// checking that the notebook is editable.
     fn switch_to_edit(&mut self, ctx: &mut ViewContext<Self>) {
@@ -1033,11 +929,6 @@ impl NotebookView {
         });
 
         self.set_editor_interaction_state(InteractionState::Editable, ctx);
-
-        // Reset edit-tracking state to prevent a false initial event.
-        self.send_edit_telemetry = false;
-        self.last_content_length = self.content(ctx).len();
-        self.check_edited(ctx);
     }
 
     /// Sends a request to the server to grab notebook edit access, if the user is taking
@@ -1105,8 +996,6 @@ impl NotebookView {
     }
 
     fn set_content(&mut self, notebook: &CloudNotebook, ctx: &mut ViewContext<Self>) {
-        // Initialize the content length so we can get a delta when editing.
-        self.last_content_length = notebook.model().data.len();
         self.input.update(ctx, |input, ctx| {
             input.reset_with_markdown(notebook.model().data.as_str(), ctx);
         });

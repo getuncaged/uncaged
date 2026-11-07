@@ -14,7 +14,6 @@ use warp_graphql::ai::{
 use warp_graphql::mutations::generate_commands::{GenerateCommandsFailureType, GeneratedCommand};
 
 use crate::ai::{RequestLimitInfo, RequestLimitRefreshDuration};
-use crate::server::telemetry::OpenedWarpAISource;
 use crate::terminal::model::terminal_model::BlockIndex;
 use crate::workflows::workflow::{Argument, Workflow};
 
@@ -63,18 +62,6 @@ pub enum AskAIType {
     FromAICommandSearch {
         query: Arc<String>,
     },
-}
-
-impl From<&AskAIType> for OpenedWarpAISource {
-    fn from(value: &AskAIType) -> Self {
-        match value {
-            AskAIType::FromAICommandSearch { .. } => OpenedWarpAISource::FromAICommandSearch,
-            AskAIType::FromBlock { .. } | AskAIType::FromBlocks { .. } => {
-                OpenedWarpAISource::HelpWithBlock
-            }
-            AskAIType::FromTextSelection { .. } => OpenedWarpAISource::HelpWithTextSelection,
-        }
-    }
 }
 
 pub struct AIGeneratedCommand {

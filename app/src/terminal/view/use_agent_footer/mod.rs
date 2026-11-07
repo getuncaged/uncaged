@@ -48,7 +48,6 @@ use crate::ai::blocklist::agent_view::agent_view_bg_fill;
 use crate::ai::blocklist::block::cli_controller::CLISubagentEvent;
 use crate::cmd_or_ctrl_shift;
 use crate::code_review::diff_state::GitDeltaPreference;
-use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 use crate::settings::{
     AISettings, AISettingsChangedEvent, CompiledCommandsForCodingAgentToolbar, InputModeSettings,
 };
@@ -224,7 +223,6 @@ impl TerminalView {
             UseAgentToolbarEvent::ToggleCodeReviewPane(cli_agent) => {
                 self.toggle_code_review_pane(
                     GitDeltaPreference::Always,
-                    CodeReviewPaneEntrypoint::CLIAgentView,
                     Some(*cli_agent),
                     true, // focus_new_pane
                     ctx,

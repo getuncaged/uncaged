@@ -207,7 +207,6 @@ use crate::search::QueryFilter;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::SyncId;
 use crate::server::server_api::ServerApi;
-use crate::server::telemetry::{AnonymousUserSignupEntrypoint, CommandXRayTrigger, PaletteSource};
 use crate::session_management::SessionNavigationPromptElements;
 use crate::settings::{
     AISettings, AISettingsChangedEvent, AliasExpansionSettings, AppEditorSettings,
@@ -258,6 +257,7 @@ use crate::terminal::view::CodeDiffAction;
 use crate::terminal::CLIAgent;
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
+use crate::ui_sources::{CommandXRayTrigger, PaletteSource};
 use crate::user_config::WarpConfig;
 use crate::util::bindings::{self, keybinding_name_to_normalized_string, CustomAction};
 #[cfg(feature = "local_fs")]
@@ -289,10 +289,7 @@ use crate::workspaces::user_workspaces::UserWorkspaces;
 #[allow(unused_imports)]
 use crate::ASSETS;
 #[allow(unused_imports)]
-use crate::{
-    cmd_or_ctrl_shift, report_if_error, send_telemetry_from_ctx, AgentModeEntrypoint,
-    ServerApiProvider,
-};
+use crate::{cmd_or_ctrl_shift, report_if_error, ServerApiProvider};
 
 /// Drop target data for dropping content on the [`Input`].
 #[derive(Debug, Clone)]
@@ -710,50 +707,6 @@ impl InputSuggestionsMode {
             _ => None,
         }
     }
-
-    fn to_telemetry_mode(&self) -> TelemetryInputSuggestionsMode {
-        match *self {
-            InputSuggestionsMode::HistoryUp {
-                search_mode: HistorySearchMode::Prefix,
-                ..
-            } => TelemetryInputSuggestionsMode::HistoryUp,
-            InputSuggestionsMode::HistoryUp {
-                search_mode: HistorySearchMode::Fuzzy,
-                ..
-            } => TelemetryInputSuggestionsMode::HistoryFuzzySearch,
-            InputSuggestionsMode::CompletionSuggestions { .. } => {
-                TelemetryInputSuggestionsMode::CompletionSuggestions
-            }
-            InputSuggestionsMode::StaticWorkflowEnumSuggestions { .. } => {
-                TelemetryInputSuggestionsMode::StaticWorkflowEnumSuggestions
-            }
-            InputSuggestionsMode::DynamicWorkflowEnumSuggestions { .. } => {
-                TelemetryInputSuggestionsMode::DynamicWorkflowEnumSuggestions
-            }
-            InputSuggestionsMode::AIContextMenu { .. } => {
-                TelemetryInputSuggestionsMode::AIContextMenu
-            }
-            InputSuggestionsMode::SlashCommands => TelemetryInputSuggestionsMode::SlashCommands,
-            InputSuggestionsMode::ConversationMenu => {
-                TelemetryInputSuggestionsMode::ConversationMenu
-            }
-            InputSuggestionsMode::ModelSelector => TelemetryInputSuggestionsMode::ModelSelector,
-            InputSuggestionsMode::ProfileSelector => TelemetryInputSuggestionsMode::ProfileSelector,
-            InputSuggestionsMode::PromptsMenu => TelemetryInputSuggestionsMode::PromptsMenu,
-            InputSuggestionsMode::SkillMenu => TelemetryInputSuggestionsMode::SkillMenu,
-            InputSuggestionsMode::UserQueryMenu { .. } => {
-                TelemetryInputSuggestionsMode::ConversationMenu
-            }
-            InputSuggestionsMode::InlineHistoryMenu { .. } => {
-                TelemetryInputSuggestionsMode::InlineHistoryMenu
-            }
-            InputSuggestionsMode::IndexedReposMenu => {
-                TelemetryInputSuggestionsMode::IndexedReposMenu
-            }
-            InputSuggestionsMode::PlanMenu { .. } => TelemetryInputSuggestionsMode::PlanMenu,
-            InputSuggestionsMode::Closed => unreachable!(),
-        }
-    }
 }
 
 /// Where a command execution request originates from.
@@ -882,9 +835,7 @@ pub enum Event {
     EditorFocused,
     UnhandledCmdEnter,
     CtrlEnter,
-    SignupAnonymousUser {
-        entrypoint: AnonymousUserSignupEntrypoint,
-    },
+    SignupAnonymousUser,
     OpenSettings(SettingsSection),
     #[cfg(feature = "local_fs")]
     OpenCodeInWarp {
@@ -5217,9 +5168,7 @@ impl Input {
     ) {
         match prompt_alert {
             PromptAlertEvent::SignupAnonymousUser => {
-                ctx.emit(Event::SignupAnonymousUser {
-                    entrypoint: AnonymousUserSignupEntrypoint::SignUpAIPrompt,
-                });
+                ctx.emit(Event::SignupAnonymousUser);
             }
             PromptAlertEvent::OpenBillingAndUsagePage => {
                 ctx.emit(Event::OpenSettings(SettingsSection::BillingAndUsage));
@@ -10679,7 +10628,7 @@ impl Input {
                     async move {
                         completer::describe(buffer_text.as_str(), pos, &completion_context).await
                     },
-                    |input, description, ctx| {
+                    move |input, description, ctx| {
                         input.show_xray(description, trigger, ctx);
                     },
                 );
@@ -12939,9 +12888,7 @@ impl Input {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            PromptSuggestionsEvent::SignupAnonymousUser => ctx.emit(Event::SignupAnonymousUser {
-                entrypoint: AnonymousUserSignupEntrypoint::SignUpAIPrompt,
-            }),
+            PromptSuggestionsEvent::SignupAnonymousUser => ctx.emit(Event::SignupAnonymousUser),
             PromptSuggestionsEvent::OpenBillingAndUsagePage => {
                 ctx.emit(Event::OpenSettings(SettingsSection::BillingAndUsage))
             }

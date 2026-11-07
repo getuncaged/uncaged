@@ -5,11 +5,11 @@ pub(crate) mod todos;
 pub(crate) mod api;
 pub(crate) mod comment;
 pub(crate) mod icons;
+pub(super) mod identifiers;
 pub(crate) mod linearization;
 pub(crate) mod redaction;
 pub(crate) mod task;
 mod task_store;
-pub(super) mod telemetry;
 pub(super) mod util;
 
 use std::collections::{HashMap, HashSet};
@@ -27,11 +27,11 @@ use ai::skills::ParsedSkill;
 use chrono::{DateTime, Local, TimeDelta};
 use comment::ReviewComment;
 use derivative::Derivative;
+pub use identifiers::AIIdentifiers;
 use markdown_parser::{parse_markdown, FormattedTable, FormattedText, FormattedTextInline};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use task::TaskId;
-pub use telemetry::AIIdentifiers;
 use uuid::Uuid;
 use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
@@ -52,7 +52,6 @@ use crate::search::slash_command_menu::static_commands::commands;
 use crate::server::server_api::{AIApiError, DeserializationError};
 use crate::terminal::model::block::BlockId;
 use crate::terminal::shell::ShellType;
-use crate::TelemetryEvent;
 
 /// A server supplied ID for a specific AI generated output.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -408,11 +407,6 @@ pub struct AIAgentOutput {
 
     /// Information about the model that generated this output.
     pub model_info: Option<OutputModelInfo>,
-
-    /// Telemetry events related to the AI Agent Output that we want to send after completion.
-    #[derivative(Debug = "ignore")]
-    #[derivative(PartialEq = "ignore")]
-    pub telemetry_events: Vec<TelemetryEvent>,
 
     /// The number of requests that the request cost.
     pub request_cost: Option<RequestCost>,

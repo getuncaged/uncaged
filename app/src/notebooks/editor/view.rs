@@ -62,7 +62,6 @@ use crate::notebooks::editor::find_bar::FindBarAction;
 use crate::notebooks::editor::model::word_unit;
 use crate::notebooks::file::MarkdownDisplayMode;
 use crate::notebooks::link::{LinkTarget, NotebookLinks, ResolveError};
-use crate::notebooks::telemetry::{ActionEntrypoint, BlockInfo, EmbeddedObjectInfo, SelectionMode};
 use crate::server::ids::SyncId;
 use crate::settings::{AppEditorSettings, FontSettings, SelectionSettings};
 use crate::terminal::grid_renderer::URL_COLOR;
@@ -857,8 +856,6 @@ pub enum EditorViewAction {
     },
     CopyTextToClipboard {
         text: UserInput<String>,
-        block: BlockInfo,
-        entrypoint: ActionEntrypoint,
     },
     OpenEmbeddedObjectSearch,
     RemoveEmbeddingAt(CharOffset),
@@ -948,24 +945,6 @@ pub enum EditorViewEvent {
     /// for sending it to the active terminal.
     RunWorkflow(NotebookWorkflow),
     EditWorkflow(SyncId),
-    /// The block insertion menu was opened.
-    OpenedBlockInsertionMenu(BlockInsertionSource),
-    /// The embedded object search menu was opened.
-    OpenedEmbeddedObjectSearch,
-    /// The find bar was opened.
-    OpenedFindBar,
-    /// An embedded object was inserted (via the menu - this doesn't account for copy/pasting
-    /// embeds).
-    InsertedEmbeddedObject(EmbeddedObjectInfo),
-    CopiedBlock {
-        block: BlockInfo,
-        entrypoint: ActionEntrypoint,
-    },
-    /// One of the command-navigation keyboard shortcuts was used.
-    NavigatedCommands,
-    /// The editor switched between text selection and command selection. The event contains the
-    /// _new_ selection mode.
-    ChangedSelectionMode(SelectionMode),
     /// The text selection changed (cursor moved, selection extended, etc.).
     TextSelectionChanged,
     /// Escape was pressed (emitted when shell command execution is disabled,
@@ -1260,9 +1239,6 @@ impl RichTextEditorView {
             RichTextEditorModelEvent::ActiveStylesChanged { .. } => {
                 self.reset_for_editing_change(ctx);
                 ctx.emit(EditorViewEvent::TextSelectionChanged);
-            }
-            RichTextEditorModelEvent::SwitchedSelectionMode { new_mode } => {
-                ctx.emit(EditorViewEvent::ChangedSelectionMode(*new_mode))
             }
         }
     }
@@ -1758,14 +1734,12 @@ impl RichTextEditorView {
     fn command_up(&mut self, ctx: &mut ViewContext<Self>) {
         self.model
             .update(ctx, |model, ctx| model.select_command_up(ctx));
-        ctx.emit(EditorViewEvent::NavigatedCommands);
     }
 
     /// Select the command below the current selection.
     fn command_down(&mut self, ctx: &mut ViewContext<Self>) {
         self.model
             .update(ctx, |model, ctx| model.select_command_down(ctx));
-        ctx.emit(EditorViewEvent::NavigatedCommands);
     }
 
     pub fn move_up(&mut self, ctx: &mut ViewContext<Self>) {
@@ -1841,12 +1815,8 @@ impl RichTextEditorView {
         self.focus(ctx);
 
         self.ongoing_mouse_state = OngoingMouseEvent::Selecting;
-        let had_command_selection = self
-            .model
+        self.model
             .update(ctx, |model, ctx| model.select_at(offset, multiselect, ctx));
-        if had_command_selection {
-            ctx.emit(EditorViewEvent::ChangedSelectionMode(SelectionMode::Text));
-        }
     }
 
     /// Updates the current selection that is being dragged.  This should be called after
@@ -2028,18 +1998,14 @@ impl RichTextEditorView {
     }
 
     /// Copy the current selection.
-    pub fn copy(&self, entrypoint: ActionEntrypoint, ctx: &mut ViewContext<Self>) {
-        if let Some(block) = self.model.update(ctx, |model, ctx| model.copy(ctx)) {
-            ctx.emit(EditorViewEvent::CopiedBlock { block, entrypoint });
-        }
+    pub fn copy(&self, ctx: &mut ViewContext<Self>) {
+        self.model.update(ctx, |model, ctx| model.copy(ctx));
     }
 
     /// Cuts the current selection.
-    pub fn cut(&mut self, entrypoint: ActionEntrypoint, ctx: &mut ViewContext<Self>) {
+    pub fn cut(&mut self, ctx: &mut ViewContext<Self>) {
         if self.is_editable(ctx) {
-            if let Some(block) = self.model.update(ctx, |model, ctx| model.cut(ctx)) {
-                ctx.emit(EditorViewEvent::CopiedBlock { block, entrypoint });
-            }
+            self.model.update(ctx, |model, ctx| model.cut(ctx));
         }
     }
 
@@ -3025,8 +2991,8 @@ impl TypedActionView for RichTextEditorView {
                 });
                 ctx.notify();
             }
-            Copy => self.copy(ActionEntrypoint::Keyboard, ctx),
-            Cut => self.cut(ActionEntrypoint::Keyboard, ctx),
+            Copy => self.copy(ctx),
+            Cut => self.cut(ctx),
             Undo => self.undo(ctx),
             Redo => self.redo(ctx),
             OpenBlockInsertionMenu => {
@@ -3073,17 +3039,9 @@ impl TypedActionView for RichTextEditorView {
                     });
                 }
             }
-            CopyTextToClipboard {
-                text,
-                block,
-                entrypoint,
-            } => {
+            CopyTextToClipboard { text } => {
                 ctx.clipboard()
                     .write(ClipboardContent::plain_text(text.clone().into_inner()));
-                ctx.emit(EditorViewEvent::CopiedBlock {
-                    block: *block,
-                    entrypoint: *entrypoint,
-                });
             }
             OpenEmbeddedObjectSearch => {
                 self.open_embedded_object_search(ctx);

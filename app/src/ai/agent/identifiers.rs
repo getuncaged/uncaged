@@ -1,41 +1,8 @@
 use serde::Serialize;
-use warpui::{AppContext, SingletonEntity};
 
 use super::conversation::AIConversationId;
-use super::{
-    AIAgentCitation, AIAgentExchangeId, EntrypointType, PassiveSuggestionTriggerType,
-    ServerOutputId,
-};
+use super::{AIAgentExchangeId, EntrypointType, PassiveSuggestionTriggerType, ServerOutputId};
 use crate::ai::llms::LLMId;
-use crate::server::telemetry::AgentModeCitation as CitationForTelemetry;
-use crate::CloudModel;
-
-pub trait ForTelemetry {
-    type Output;
-
-    fn for_telemetry(&self, ctx: &AppContext) -> Option<Self::Output>;
-}
-
-impl ForTelemetry for AIAgentCitation {
-    type Output = CitationForTelemetry;
-
-    fn for_telemetry(&self, ctx: &AppContext) -> Option<Self::Output> {
-        match self {
-            Self::WarpDriveObject { uid } => {
-                CloudModel::as_ref(ctx).get_by_uid(uid).map(|object| {
-                    CitationForTelemetry::WarpDriveObject {
-                        object_type: object.object_type(),
-                        uid: object.uid(),
-                    }
-                })
-            }
-            Self::WarpDocumentation { path } => {
-                Some(CitationForTelemetry::WarpDocs { page: path.clone() })
-            }
-            Self::WebPage { url } => Some(CitationForTelemetry::WebPage { url: url.clone() }),
-        }
-    }
-}
 
 impl EntrypointType {
     pub fn entrypoint(&self) -> String {
@@ -78,7 +45,6 @@ impl EntrypointType {
 
 #[derive(Clone, Default, Debug, Serialize)]
 pub struct AIIdentifiers {
-    /// Useful for joining to client-side telemetry.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_conversation_id: Option<AIConversationId>,
     /// A stable ID to relate failures for the same underlying request.

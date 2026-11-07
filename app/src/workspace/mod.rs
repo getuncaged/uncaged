@@ -45,9 +45,9 @@ use crate::channel::{Channel, ChannelState};
 use crate::features::FeatureFlag;
 use crate::palette::PaletteMode;
 use crate::pane_group::TabBarHoverIndex;
-use crate::server::telemetry::PaletteSource;
 use crate::settings_view::{self, flags, SettingsSection};
 use crate::tab::{uses_vertical_tabs, NewSessionMenuItem};
+use crate::ui_sources::PaletteSource;
 use crate::util::bindings::{self, cmd_or_ctrl_shift, is_binding_pty_compliant, CustomAction};
 use crate::{code, modal, notebooks, tab_configs};
 

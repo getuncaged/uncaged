@@ -1121,10 +1121,8 @@ fn handle_terminal_view_event(
                     upload_id: *upload_id,
                 })
             }
-            Event::SignupAnonymousUser { entrypoint } => {
-                ctx.emit(pane_group::Event::SignupAnonymousUser {
-                    entrypoint: *entrypoint,
-                });
+            Event::SignupAnonymousUser => {
+                ctx.emit(pane_group::Event::SignupAnonymousUser);
             }
             Event::OpenThemeGallery => {
                 ctx.emit(pane_group::Event::OpenThemeGallery);

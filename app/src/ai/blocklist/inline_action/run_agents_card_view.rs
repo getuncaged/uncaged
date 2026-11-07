@@ -39,7 +39,6 @@ use crate::ai::blocklist::inline_action::orchestration_controls::{
 use crate::ai::blocklist::inline_action::requested_action::{
     render_requested_action_row_for_text, CTRL_C_KEYSTROKE, ENTER_KEYSTROKE,
 };
-use crate::ai::blocklist::telemetry::orchestration_modified_field;
 use crate::ai::harness_availability::{HarnessAvailabilityEvent, HarnessAvailabilityModel};
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
 use crate::appearance::Appearance;
@@ -846,94 +845,6 @@ impl TypedActionView for RunAgentsCardView {
             }
         }
     }
-}
-
-/// Field names from [`orchestration_modified_field`] that differ
-/// between the user-edited `state` and the LLM's original
-/// `RunAgentsRequest`.
-fn diverged_orch_fields(
-    state: &oc::OrchestrationEditState,
-    original: &RunAgentsRequest,
-) -> Vec<&'static str> {
-    let mut fields = Vec::new();
-    if state.model_id != original.model_id {
-        fields.push(orchestration_modified_field::MODEL_ID);
-    }
-    if state.harness_type != original.harness_type {
-        fields.push(orchestration_modified_field::HARNESS);
-    }
-    let state_remote = state.execution_mode.is_remote();
-    let original_remote = original.execution_mode.is_remote();
-    if state_remote != original_remote {
-        fields.push(orchestration_modified_field::EXECUTION_MODE);
-    } else if let (
-        RunAgentsExecutionMode::Remote {
-            environment_id: state_env,
-            worker_host: state_host,
-            ..
-        },
-        RunAgentsExecutionMode::Remote {
-            environment_id: orig_env,
-            worker_host: orig_host,
-            ..
-        },
-    ) = (&state.execution_mode, &original.execution_mode)
-    {
-        if state_env != orig_env {
-            fields.push(orchestration_modified_field::ENVIRONMENT_ID);
-        }
-        if state_host != orig_host {
-            fields.push(orchestration_modified_field::WORKER_HOST);
-        }
-    }
-    if state.auth_secret_name() != original.harness_auth_secret_name.as_deref() {
-        fields.push(orchestration_modified_field::AUTH_SECRET);
-    }
-    fields
-}
-
-/// Same shape as [`diverged_orch_fields`] but compares against an
-/// approved `OrchestrationConfig`. auth_secret is omitted: managed
-/// secrets are per-user, not stored on the config.
-fn diverged_orch_fields_against_config(
-    state: &oc::OrchestrationEditState,
-    config: &OrchestrationConfig,
-) -> Vec<&'static str> {
-    use ai::agent::orchestration_config::OrchestrationExecutionMode;
-    let mut fields = Vec::new();
-    if state.model_id != config.model_id {
-        fields.push(orchestration_modified_field::MODEL_ID);
-    }
-    if state.harness_type != config.harness_type {
-        fields.push(orchestration_modified_field::HARNESS);
-    }
-    let state_remote = state.execution_mode.is_remote();
-    let config_remote = matches!(
-        config.execution_mode,
-        OrchestrationExecutionMode::Remote { .. }
-    );
-    if state_remote != config_remote {
-        fields.push(orchestration_modified_field::EXECUTION_MODE);
-    } else if let (
-        RunAgentsExecutionMode::Remote {
-            environment_id: state_env,
-            worker_host: state_host,
-            ..
-        },
-        OrchestrationExecutionMode::Remote {
-            environment_id: cfg_env,
-            worker_host: cfg_host,
-        },
-    ) = (&state.execution_mode, &config.execution_mode)
-    {
-        if state_env != cfg_env {
-            fields.push(orchestration_modified_field::ENVIRONMENT_ID);
-        }
-        if state_host != cfg_host {
-            fields.push(orchestration_modified_field::WORKER_HOST);
-        }
-    }
-    fields
 }
 
 fn render_confirmation_card(

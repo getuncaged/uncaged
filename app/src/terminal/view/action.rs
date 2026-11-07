@@ -24,9 +24,7 @@ use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::codebase_index_speedbump_banner::CodebaseIndexSpeedbumpBannerAction;
-use crate::code_review::telemetry_event::CodeReviewPaneEntrypoint;
 use crate::server::ids::SyncId;
-use crate::server::telemetry::{AgentModeRewindEntrypoint, PaletteSource, ToggleBlockFilterSource};
 use crate::terminal::available_shells::AvailableShell;
 use crate::terminal::block_list_element::{
     BlockHoverAction, BlockListMenuSource, BlockSelectAction, BlockTextSelectAction,
@@ -41,6 +39,7 @@ use crate::terminal::model::SecretHandle;
 use crate::terminal::view::inline_banner::AgentModeSetupSpeedbumpBannerAction;
 use crate::terminal::view::passive_suggestions::PromptSuggestionResolution;
 use crate::terminal::view::RichContentSecretTooltipInfo;
+use crate::ui_sources::PaletteSource;
 use crate::workflows::workflow::Workflow;
 
 /// Version of the agent onboarding flow (non-legacy).
@@ -221,8 +220,6 @@ pub enum TerminalAction {
         ai_block_view_id: EntityId,
         exchange_id: AIAgentExchangeId,
         conversation_id: AIConversationId,
-        /// The entrypoint from which this action was triggered (for telemetry).
-        entrypoint: AgentModeRewindEntrypoint,
     },
     /// Actually execute the rewind (called after user confirms in the dialog)
     ExecuteRewindAIConversation {
@@ -287,7 +284,7 @@ pub enum TerminalAction {
     OpenBlockFilterEditor(BlockIndex),
     OnboardingFlow(OnboardingVersion),
     ImportSettings,
-    ToggleBlockFilterOnSelectedOrLastBlock(ToggleBlockFilterSource),
+    ToggleBlockFilterOnSelectedOrLastBlock,
     VimModeBanner(VimModeBannerAction),
     ToggleSnackbarInActivePane,
     /// User selected a block inside an AI block's attached block menu so we jump to it and select
@@ -338,9 +335,7 @@ pub enum TerminalAction {
     ToggleAIDocumentPane,
     ToggleTodoPopup,
     CloseTodoPopup,
-    ToggleCodeReviewPane {
-        entrypoint: CodeReviewPaneEntrypoint,
-    },
+    ToggleCodeReviewPane,
     InitProject,
     SummarizeConversation,
     IndexProjectSpeedbump,
@@ -585,7 +580,7 @@ impl fmt::Debug for TerminalAction {
             }
             OnboardingFlow(version) => write!(f, "OnboardingFlow({version:?})"),
             ImportSettings => write!(f, "ImportSettings"),
-            ToggleBlockFilterOnSelectedOrLastBlock(_) => {
+            ToggleBlockFilterOnSelectedOrLastBlock => {
                 f.write_str("ToggleBlockFilterOnSelectedOrLastBlock")
             }
             VimModeBanner(action) => write!(f, "VimModeBanner({action:?})"),
@@ -646,7 +641,7 @@ impl fmt::Debug for TerminalAction {
             ToggleAIDocumentPane => write!(f, "ToggleAIDocumentPane"),
             ToggleTodoPopup => write!(f, "ToggleTodoPopup"),
             CloseTodoPopup => write!(f, "CloseTodoPopup"),
-            ToggleCodeReviewPane { .. } => write!(f, "ToggleCodeReviewPane"),
+            ToggleCodeReviewPane => write!(f, "ToggleCodeReviewPane"),
             InitProject => write!(f, "InitProject"),
             IndexProjectSpeedbump => write!(f, "IndexProject"),
             AddProjectAtCurrentDirectory => write!(f, "AddProjectAtCurrentDirectory"),

@@ -18,14 +18,11 @@ use warpui::{
     ViewHandle,
 };
 
-use crate::cloud_object::model::persistence::CloudModel;
-use crate::cloud_object::CloudObject;
 use crate::editor::{
     EditOrigin, EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys,
     SingleLineEditorOptions, TextOptions, ValidInputType,
 };
 use crate::server::ids::SyncId;
-use crate::server::telemetry::TelemetrySpace;
 use crate::ui_components::buttons::icon_button;
 use crate::ui_components::icons::Icon;
 use crate::workflows::aliases::{WorkflowAlias, WorkflowAliases};
@@ -122,12 +119,6 @@ impl AliasBar {
             workflow_id,
             deleted_aliases: Default::default(),
         }
-    }
-
-    /// The current workflow's space for telemetry events.
-    fn workflow_space(&self, app: &AppContext) -> Option<TelemetrySpace> {
-        let workflow = CloudModel::as_ref(app).get_workflow(&self.workflow_id)?;
-        Some(workflow.space(app).into())
     }
 
     fn mark_dirty(&mut self, is_dirty: bool, ctx: &mut ViewContext<Self>) {

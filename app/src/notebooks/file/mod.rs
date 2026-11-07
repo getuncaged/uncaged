@@ -46,7 +46,6 @@ use crate::pane_group::pane::view::header::components::{
     CenteredHeaderEdgeWidth,
 };
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
-use crate::server::telemetry::NotebookTelemetryMetadata;
 use crate::settings::FontSettings;
 use crate::terminal::model::session::Session;
 use crate::ui_components::icons::Icon;
@@ -333,18 +332,6 @@ impl FileNotebookView {
         });
     }
 
-    #[cfg(feature = "local_fs")]
-    fn open_telemetry_metadata(&self, ctx: &ViewContext<Self>) -> NotebookTelemetryMetadata {
-        NotebookTelemetryMetadata::new(None, None, NotebookLocation::LocalFile, None)
-            .with_markdown_table_count(
-                self.editor
-                    .as_ref(ctx)
-                    .model()
-                    .as_ref(ctx)
-                    .markdown_table_count(ctx),
-            )
-    }
-
     /// Set the notebook's location context.
     fn set_context(&mut self, path: &Path, session: Arc<Session>, ctx: &mut ViewContext<Self>) {
         self.location = Some(FileLocation::new(path, session.home_dir()));
@@ -621,14 +608,7 @@ impl FileNotebookView {
             | EditorViewEvent::EditWorkflow(_)
             | EditorViewEvent::CmdEnter
             | EditorViewEvent::EscapePressed
-            | EditorViewEvent::TextSelectionChanged
-            | EditorViewEvent::OpenedBlockInsertionMenu(_)
-            | EditorViewEvent::OpenedEmbeddedObjectSearch
-            | EditorViewEvent::OpenedFindBar
-            | EditorViewEvent::InsertedEmbeddedObject(_)
-            | EditorViewEvent::CopiedBlock { .. }
-            | EditorViewEvent::NavigatedCommands
-            | EditorViewEvent::ChangedSelectionMode(_) => (),
+            | EditorViewEvent::TextSelectionChanged => (),
             EditorViewEvent::OpenFile { .. } => {
                 // We don't support opening files from the notebook view.
                 // File paths rely on a Session to be present, and this is only set from the AI document view today.
