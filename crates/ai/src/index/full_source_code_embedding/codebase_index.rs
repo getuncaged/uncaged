@@ -9,7 +9,6 @@ use async_channel;
 use chrono::{DateTime, Utc};
 use futures::stream::AbortHandle;
 use ignore::gitignore::Gitignore;
-use instant::Instant;
 #[cfg(feature = "local_fs")]
 use repo_metadata::entry::{BudgetExceededBehavior, IgnoredPathStrategy};
 use repo_metadata::Repository;
@@ -33,7 +32,6 @@ use super::{
     CodebaseContextConfig, ContentHash, EmbeddingConfig, Error, Fragment, NodeHash, RepoMetadata,
 };
 use crate::index::locations::CodeContextLocation;
-use crate::telemetry::{AITelemetryEvent, CodebaseContextSyncType};
 use crate::workspace::{WorkspaceMetadata, WorkspaceMetadataEvent};
 
 cfg_if::cfg_if! {
@@ -49,8 +47,6 @@ cfg_if::cfg_if! {
             matches_gitignores,
             full_source_code_embedding::sync_client::CodebaseIndexSyncOperation,
         };
-        use warp_core::send_telemetry_from_ctx;
-        use warp_core::interval_timer::IntervalTimer;
         use warpui_core::r#async::Timer;
         use warpui_core::SingletonEntity;
         use warp_core::sync_queue::SyncQueue;
@@ -64,10 +60,6 @@ const MAX_DEPTH: usize = 200;
 /// The interval for periodic reindexing (20 minutes).
 const REINDEX_INTERVAL: Duration = Duration::from_secs(20 * 60);
 const DEFAULT_INCREMENAL_SYNC_FLUSH_INTERVAL: Duration = Duration::from_secs(60 * 60);
-
-const FILE_TRAVERSAL_TIME: &str = "file_traversal_time";
-const MERKLE_TREE_BUILD_TIME: &str = "merkle_tree_build_time";
-const SYNC_TIME: &str = "sync_time";
 
 const SUPPORTED_IGNORES: [&str; 5] = [
     ".uncagedignore",
@@ -97,7 +89,6 @@ pub enum SyncProgress {
 struct BuildFileTreeResult {
     file_tree: Entry,
     gitignores: Vec<Gitignore>,
-    time_tracker: IntervalTimer,
 }
 
 #[cfg(feature = "local_fs")]
@@ -105,7 +96,6 @@ struct IndexBuildResult {
     tree: MerkleTree,
     leaf_to_fragment_metadata: LeafToFragmentMetadata,
     server_sync_result: SyncOperationResult,
-    time_tracker: IntervalTimer,
 }
 
 /// Successful output of the background snapshot parse + filesystem diff task.
@@ -116,7 +106,6 @@ struct SnapshotLoaded {
     fragment_metadata: LeafToFragmentMetadata,
     changed_files: ChangedFiles,
     gitignores: Vec<Gitignore>,
-    diff_duration: Duration,
 }
 
 /// Error loading a codebase snapshot.
@@ -247,32 +236,6 @@ enum SyncOperationResult {
 }
 
 impl SyncOperationResult {
-    fn telemetry_event(
-        &self,
-        sync_duration: Duration,
-        sync_type: CodebaseContextSyncType,
-    ) -> AITelemetryEvent {
-        match self {
-            SyncOperationResult::Success {
-                flushed_node_count,
-                flushed_fragment_result,
-                cache_population_error,
-                ..
-            } => AITelemetryEvent::SyncCodebaseContextSuccess {
-                total_sync_duration: sync_duration,
-                sync_type,
-                flushed_node_count: *flushed_node_count,
-                flushed_fragment_count: flushed_fragment_result.fragment_count,
-                total_fragment_size_bytes: flushed_fragment_result.total_fragment_size_bytes,
-                cache_population_error: cache_population_error.as_ref().map(|e| e.to_string()),
-            },
-            SyncOperationResult::Error(err) => AITelemetryEvent::SyncCodebaseContextFailed {
-                error: err.to_string(),
-                sync_type,
-            },
-        }
-    }
-
     fn server_sync_result(
         self,
         last_server_synced_root_node: Option<NodeHash>,
@@ -346,24 +309,6 @@ pub enum CodebaseIndexEvent {
 struct IncrementalUpdateResult {
     tree: MerkleTree,
     build_result: IncrementalUpdateBuildResult,
-}
-
-impl IncrementalUpdateResult {
-    fn telemetry_event(&self, sync_start_time: Instant) -> AITelemetryEvent {
-        match &self.build_result {
-            IncrementalUpdateBuildResult::Success {
-                operation_result, ..
-            } => operation_result.telemetry_event(
-                sync_start_time.elapsed(),
-                CodebaseContextSyncType::Incremental,
-            ),
-            IncrementalUpdateBuildResult::Error { error, .. } => {
-                AITelemetryEvent::BuildTreeFailed {
-                    error: error.to_string(),
-                }
-            }
-        }
-    }
 }
 
 enum IncrementalUpdateBuildResult {
@@ -538,7 +483,6 @@ impl CodebaseIndex {
 
         let embedding_config = self.embedding_config();
         let repo_metadata = self.repo_metadata();
-        let sync_start_time = Instant::now();
         let sync_queue = SyncQueue::as_ref(ctx).clone();
         let sync_progress_tx = self.sync_progress_tx.clone();
         let embedding_generation_batch_size = self.embedding_generation_batch_size;
@@ -560,10 +504,6 @@ impl CodebaseIndex {
                     .await
                 },
                 move |me, incremental_update_sync_result, ctx| {
-                    send_telemetry_from_ctx!(
-                        incremental_update_sync_result.telemetry_event(sync_start_time),
-                        ctx
-                    );
                     me.process_sync_update_result(incremental_update_sync_result, ctx);
                 },
             )
@@ -829,12 +769,6 @@ impl CodebaseIndex {
                         ),
                         Err(e) => {
                             log::error!("Failed to build tree {e}");
-                            send_telemetry_from_ctx!(
-                                AITelemetryEvent::BuildTreeFailed {
-                                    error: e.to_string(),
-                                },
-                                ctx
-                            );
                             me.update_tree_sync_state(
                                 TreeSourceSyncState::InitializeTreeFailure(e),
                                 ctx,
@@ -929,8 +863,6 @@ impl CodebaseIndex {
         max_num_files_limit: Option<usize>,
     ) -> Result<BuildFileTreeResult, Error> {
         log::info!("Started creating codebase index for repository root: {repo_path:?}");
-        let time_tracker = IntervalTimer::new();
-
         // We need to canonicalize the path to make sure build tree can apply gitignores correctly.
         let mut gitignores = Self::construct_initial_ignores(&repo_path);
 
@@ -954,7 +886,6 @@ impl CodebaseIndex {
         Ok(BuildFileTreeResult {
             file_tree: entry,
             gitignores,
-            time_tracker,
         })
     }
 
@@ -972,10 +903,7 @@ impl CodebaseIndex {
         let BuildFileTreeResult {
             file_tree,
             gitignores,
-            mut time_tracker,
         } = build_file_tree_result;
-
-        time_tracker.mark_interval_end(FILE_TRAVERSAL_TIME);
 
         self.gitignores = Arc::new(gitignores);
         ctx.emit(CodebaseIndexEvent::GitignoresUpdated {
@@ -996,7 +924,6 @@ impl CodebaseIndex {
                         repo_path,
                         store_client,
                         sync_queue,
-                        time_tracker,
                         sync_progress_tx,
                         embedding_generation_batch_size,
                     )
@@ -1018,13 +945,10 @@ impl CodebaseIndex {
         repo_path: PathBuf,
         store_client: Arc<dyn StoreClient>,
         sync_queue: SyncQueue<SyncTask>,
-        mut time_tracker: IntervalTimer,
         sync_progress_tx: async_channel::Sender<SyncProgress>,
         embedding_generation_batch_size: usize,
     ) -> Result<IndexBuildResult, Error> {
         let (tree, leaf_to_fragment_metadata) = MerkleTree::try_new(file_tree).await?;
-
-        time_tracker.mark_interval_end(MERKLE_TREE_BUILD_TIME);
 
         log::info!("Created index for repository: {repo_path:?}");
 
@@ -1040,15 +964,12 @@ impl CodebaseIndex {
         )
         .await;
 
-        time_tracker.mark_interval_end(SYNC_TIME);
-
         log::info!("Finished syncing index for repository: {repo_path:?}");
 
         Ok(IndexBuildResult {
             tree,
             leaf_to_fragment_metadata,
             server_sync_result,
-            time_tracker,
         })
     }
 
@@ -1165,8 +1086,6 @@ impl CodebaseIndex {
             }
         };
 
-        let sync_start_time = Instant::now();
-
         let store_client = self.store_client.clone();
         let repo_metadata = self.repo_metadata();
 
@@ -1195,14 +1114,6 @@ impl CodebaseIndex {
                     (tree, sync_result)
                 },
                 move |me, (tree, server_sync_result), ctx| {
-                    send_telemetry_from_ctx!(
-                        server_sync_result.telemetry_event(
-                            sync_start_time.elapsed(),
-                            CodebaseContextSyncType::Full
-                        ),
-                        ctx
-                    );
-
                     // We should only flush pending changes when we know the sync failed because of a read fragment error.
                     let should_flush_pending_changes = if let SyncOperationResult::Error(
                         SyncOperationError::ReadFragmentError(changed_files),
@@ -1255,30 +1166,7 @@ impl CodebaseIndex {
                 tree,
                 leaf_to_fragment_metadata,
                 server_sync_result,
-                time_tracker,
             }) => {
-                // Emit telemetries for the initial sync result.
-                if let Some(sync_time) = time_tracker.compute_duration_for_interval(SYNC_TIME) {
-                    send_telemetry_from_ctx!(
-                        server_sync_result
-                            .telemetry_event(sync_time, CodebaseContextSyncType::Initial),
-                        ctx
-                    );
-                }
-
-                if let Some((file_traversal_duration, merkle_tree_parse_duration)) = time_tracker
-                    .compute_duration_for_interval(FILE_TRAVERSAL_TIME)
-                    .zip(time_tracker.compute_duration_for_interval(MERKLE_TREE_BUILD_TIME))
-                {
-                    send_telemetry_from_ctx!(
-                        AITelemetryEvent::BuildTreeSuccess {
-                            file_traversal_duration,
-                            merkle_tree_parse_duration
-                        },
-                        ctx
-                    );
-                }
-
                 if let SyncOperationResult::Error(SyncOperationError::ReadFragmentError(
                     changed_files,
                 )) = &server_sync_result
@@ -1304,12 +1192,6 @@ impl CodebaseIndex {
                 safe_error!(
                     safe: ("Failed to build index: {err:?}"),
                     full: ("Failed to build index at root {}: {err:?}", self.repo_path.display())
-                );
-                send_telemetry_from_ctx!(
-                    AITelemetryEvent::BuildTreeFailed {
-                        error: err.to_string()
-                    },
-                    ctx
                 );
                 self.update_tree_sync_state(TreeSourceSyncState::InitializeTreeFailure(err), ctx);
             }
@@ -1750,7 +1632,6 @@ impl CodebaseIndex {
                     log::info!(
                         "Diffing filesystem with tree from snapshot for repo {repo_path:?}"
                     );
-                    let diff_start_time = Instant::now();
                     let (changed_files, gitignores) = Self::diff_filesystem_with_tree(
                         repo_path.clone(),
                         &tree,
@@ -1764,7 +1645,6 @@ impl CodebaseIndex {
                         fragment_metadata,
                         changed_files,
                         gitignores,
-                        diff_duration: diff_start_time.elapsed(),
                     })
                 },
                 move |me, load_result, ctx| match load_result {
@@ -1774,15 +1654,8 @@ impl CodebaseIndex {
                         fragment_metadata,
                         changed_files,
                         gitignores,
-                        diff_duration,
                     }) => {
                         let tree = *boxed_tree;
-                        send_telemetry_from_ctx!(
-                            AITelemetryEvent::MerkleTreeSnapshotDiffSuccess {
-                                duration: diff_duration
-                            },
-                            ctx
-                        );
 
                         log::info!(
                             "Diffed filesystem with tree from snapshot for repo {repo_path:?}"
@@ -1886,12 +1759,6 @@ impl CodebaseIndex {
                         let _ = me.tree_sync_state.set_sync_abort_handle(abort_handle);
                     }
                     Err(SnapshotLoadError::DiffFailed(err)) => {
-                        send_telemetry_from_ctx!(
-                            AITelemetryEvent::MerkleTreeSnapshotDiffFailed {
-                                error: err.to_string()
-                            },
-                            ctx
-                        );
                         log::error!(
                             "Failed to diff filesystem with tree from snapshot: {err:?}"
                         );

@@ -1,7 +1,5 @@
-use warp_core::send_telemetry_from_ctx;
 use warpui_core::{Entity, ModelContext};
 
-use crate::telemetry::OnboardingEvent;
 use crate::OnboardingIntention;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -18,17 +16,6 @@ pub enum FinalState {
     BackToTerminal,
 }
 
-impl std::fmt::Display for FinalState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FinalState::Submit => write!(f, "submitted"),
-            FinalState::Skip => write!(f, "skipped"),
-            FinalState::Finish => write!(f, "finished"),
-            FinalState::Initialize => write!(f, "initialize"),
-            FinalState::BackToTerminal => write!(f, "back_to_terminal"),
-        }
-    }
-}
 
 /// Prompt information for the onboarding callout
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -148,7 +135,6 @@ impl OnboardingCalloutModel {
     }
 
     pub fn next(&mut self, ctx: &mut ModelContext<Self>) {
-        send_telemetry_from_ctx!(OnboardingEvent::CalloutNext, ctx);
         match &self.state {
             OnboardingCalloutState::UniversalInput(universal_input_state) => {
                 self.next_universal_input(*universal_input_state, ctx);
@@ -320,39 +306,9 @@ impl OnboardingCalloutModel {
         self.state
     }
 
-    fn send_callout_displayed_telemetry(
-        new_state: OnboardingCalloutState,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let callout_name = match new_state {
-            OnboardingCalloutState::UniversalInput(UniversalInputCalloutState::MeetInput) => {
-                Some("meet_input")
-            }
-            OnboardingCalloutState::UniversalInput(UniversalInputCalloutState::TalkToAgent) => {
-                Some("talk_to_agent")
-            }
-            OnboardingCalloutState::AgentModality(AgentModalityCalloutState::TerminalMode) => {
-                Some("natural_language_support")
-            }
-            OnboardingCalloutState::AgentModality(AgentModalityCalloutState::AgentMode) => {
-                Some("introducing_agent_experience")
-            }
-            _ => None,
-        };
-        if let Some(callout) = callout_name {
-            send_telemetry_from_ctx!(
-                OnboardingEvent::CalloutDisplayed {
-                    callout: callout.to_string(),
-                },
-                ctx
-            );
-        }
-    }
-
     fn set_state(&mut self, new_state: OnboardingCalloutState, ctx: &mut ModelContext<Self>) {
         if self.state != new_state {
             self.state = new_state;
-            Self::send_callout_displayed_telemetry(new_state, ctx);
             ctx.emit(OnboardingCalloutModelEvent::StateUpdated);
 
             // Check for completion
@@ -367,12 +323,6 @@ impl OnboardingCalloutModel {
             };
 
             if let Some(final_state) = final_state {
-                send_telemetry_from_ctx!(
-                    OnboardingEvent::CalloutCompleted {
-                        completion_type: final_state.to_string(),
-                    },
-                    ctx
-                );
                 ctx.emit(OnboardingCalloutModelEvent::Completed(final_state));
             }
         }

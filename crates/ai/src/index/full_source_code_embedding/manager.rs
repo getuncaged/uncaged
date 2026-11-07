@@ -17,9 +17,7 @@ cfg_if::cfg_if! {
         use warp_core::features::FeatureFlag;
         use watcher::{BulkFilesystemWatcher, BulkFilesystemWatcherEvent};
         use warpui_core::r#async::Timer;
-        use warp_core::{send_telemetry_from_ctx, report_if_error};
-        use crate::telemetry::AITelemetryEvent;
-        use instant::Instant;
+        use warp_core::report_if_error;
         use warp_core::channel::ChannelState;
         use warp_core::safe_warn;
     }
@@ -986,8 +984,7 @@ impl CodebaseIndexManager {
                     })
             {
                 if let Some(snapshot_storage) = snapshot_storage.as_ref() {
-                    let read_snapshot_start_time = Instant::now();
-                    match read_snapshot(
+                    if let Ok(snapshot_index) = read_snapshot(
                         store_client.clone(),
                         snapshot_storage.path(),
                         repository.clone(),
@@ -995,23 +992,7 @@ impl CodebaseIndexManager {
                         embedding_generation_batch_size,
                         ctx,
                     ) {
-                        Ok(snapshot_index) => {
-                            send_telemetry_from_ctx!(
-                                AITelemetryEvent::MerkleTreeSnapshotRebuildSuccess {
-                                    duration: read_snapshot_start_time.elapsed()
-                                },
-                                ctx
-                            );
-                            return snapshot_index;
-                        }
-                        Err(err) => {
-                            send_telemetry_from_ctx!(
-                                AITelemetryEvent::MerkleTreeSnapshotRebuildFailed {
-                                    error: err.to_string()
-                                },
-                                ctx
-                            );
-                        }
+                        return snapshot_index;
                     }
                 }
             }

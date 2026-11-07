@@ -4,7 +4,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use serde_json::json;
 use warp_core::ui::builder;
 use warpui::elements::{ConstrainedBox, Container, Text};
 use warpui::{AppContext, Element, SingletonEntity};
@@ -241,10 +240,6 @@ impl DataSourceRunError for GenerateCommandsFromNaturalLanguageError {
             Self::Other => "Something went wrong. Please try again.",
         }
         .to_string()
-    }
-
-    fn telemetry_payload(&self) -> serde_json::Value {
-        json!(self)
     }
 
     fn as_any(&self) -> &dyn Any {

@@ -6,7 +6,6 @@ use enum_iterator::{Sequence, all};
 use lazy_static::lazy_static;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::icons::Icon;
@@ -538,10 +537,6 @@ impl DataSourceSearchError {
 impl DataSourceRunError for DataSourceSearchError {
     fn user_facing_error(&self) -> String {
         self.message.clone()
-    }
-
-    fn telemetry_payload(&self) -> serde_json::Value {
-        json!(self)
     }
 
     fn as_any(&self) -> &dyn Any {
