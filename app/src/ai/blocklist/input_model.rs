@@ -73,8 +73,6 @@ pub enum InputTypeAutoDetectionSource {
     RestoreSavedConfig,
     /// `set_input_config_for_classic_mode` reset (CtrlC, delete-all-left, etc.).
     ClassicModeReset,
-    /// Toggling voice input forced AI mode.
-    VoiceInputToggle,
     /// Inserting from the AI `@` context menu forced AI mode.
     AtContextMenuInsert,
 }
@@ -88,7 +86,6 @@ impl From<InputClassifierDecisionSource> for InputTypeAutoDetectionSource {
 use super::agent_view::{AgentViewController, AgentViewControllerEvent, AgentViewEntryOrigin};
 use super::context_model::BlocklistAIContextModel;
 use crate::input_classifier::InputClassifierModel;
-use crate::report_if_error;
 use crate::settings::{AISettings, AISettingsChangedEvent, InputBoxType, InputSettings};
 use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
@@ -527,15 +524,6 @@ impl BlocklistAIInputModel {
             self.last_ai_autodetection_ts = Some(Instant::now());
         } else {
             self.last_ai_autodetection_ts = None;
-        }
-
-        if new_config.input_type.is_ai() {
-            AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                let new_num_times = *settings.entered_agent_mode_num_times + 1;
-                report_if_error!(settings
-                    .entered_agent_mode_num_times
-                    .set_value(new_num_times, ctx));
-            });
         }
 
         self.input_config = new_config;

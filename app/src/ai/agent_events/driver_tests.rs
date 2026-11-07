@@ -11,7 +11,7 @@ use warp_core::errors::AnyhowErrorExt as _;
 use super::*;
 use crate::ai::agent_events::driver::agent_event_failure_should_log_error;
 use crate::server::server_api::ai::AgentRunEvent;
-use crate::server::server_api::presigned_upload::HttpStatusError;
+use crate::server::server_api::HttpStatusError;
 
 const ZERO_BACKOFF_STEPS: &[u64] = &[0];
 

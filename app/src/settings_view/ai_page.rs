@@ -83,7 +83,7 @@ use crate::settings::{
     PreferShellForKnownCommands, PromptSubmissionMode, RuleSuggestionsEnabled,
     SharedBlockTitleGenerationEnabled, ShouldRenderCLIAgentToolbar,
     ShouldRenderUseAgentToolbarForUserCommands, ShowAgentTips, ShowHintText, ThinkingDisplayMode,
-    VoiceInputEnabled, WarpDriveContextEnabled,
+    WarpDriveContextEnabled,
 };
 use crate::terminal::session_settings::{SessionSettings, SessionSettingsChangedEvent};
 use crate::terminal::CLIAgent;
@@ -132,7 +132,7 @@ use crate::ai::{AIRequestUsageModel, AIRequestUsageModelEvent};
 use crate::appearance::{Appearance, AppearanceEvent};
 use crate::editor::{EditorView, Event as EditorEvent, TextOptions};
 use crate::menu::{MenuItem, MenuItemFields};
-use crate::settings::{AISettings, VoiceInputToggleKey};
+use crate::settings::AISettings;
 use crate::ui_components::icons::Icon;
 use crate::util::bindings;
 use crate::view_components::dropdown::DropdownAction;
@@ -427,17 +427,6 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
         app,
     );
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
-        vec![ToggleSettingActionPair::new(
-            "voice input",
-            builder(SettingsAction::AI(AISettingsPageAction::ToggleVoiceInput)),
-            &(context.clone() & id!(flags::IS_ANY_AI_ENABLED)),
-            flags::IS_VOICE_INPUT_ENABLED,
-        )
-        .with_group(bindings::BindingGroup::WarpAi)
-        .with_enabled(|| cfg!(feature = "voice_input"))],
-        app,
-    );
-    ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![ToggleSettingActionPair::custom(
             SettingActionPairDescriptions::new(
                 "Show \"Use Agent\" footer",
@@ -588,7 +577,6 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
 pub struct AISettingsPageView {
     page: PageType<Self>,
     active_subpage: Option<AISubpage>,
-    voice_input_toggle_key_dropdown: ViewHandle<Dropdown<AISettingsPageAction>>,
     local_only_icon_tooltip_states: RefCell<HashMap<String, MouseStateHandle>>,
     autodetection_denylist_editor: ViewHandle<EditorView>,
     agent_trigger_editor: ViewHandle<EditorView>,
@@ -729,42 +717,6 @@ impl AISettingsPageView {
                 me.sync_custom_endpoint_buttons(ctx);
                 ctx.notify();
             }
-        });
-
-        let voice_input_toggle_key_dropdown = ctx.add_typed_action_view(|ctx| {
-            let mut dropdown = Dropdown::new(ctx);
-            dropdown.set_top_bar_max_width(AI_SETTINGS_DROPDOWN_WIDTH);
-            if !AISettings::as_ref(ctx).is_voice_input_enabled(ctx) {
-                dropdown.set_disabled(ctx);
-            }
-
-            let values = VoiceInputToggleKey::all_possible_values();
-            let current_value = AISettings::as_ref(ctx).voice_input_toggle_key.value();
-            let selected_index = values
-                .iter()
-                .position(|val| val == current_value)
-                .unwrap_or_else(|| {
-                    log::warn!(
-                        "Could not find current VoiceInputToggleKey value in dropdown option list"
-                    );
-                    0
-                });
-
-            dropdown.add_items(
-                values
-                    .into_iter()
-                    .map(|val| {
-                        DropdownItem::new(
-                            val.display_name(),
-                            AISettingsPageAction::SetVoiceInputToggleKey(val),
-                        )
-                    })
-                    .collect(),
-                ctx,
-            );
-            dropdown.set_selected_by_index(selected_index, ctx);
-
-            dropdown
         });
 
         let coding_model_dropdown = ctx.add_typed_action_view(|ctx| {
@@ -1061,7 +1013,7 @@ impl AISettingsPageView {
         });
 
         ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |me, _handle, _event, ctx| {
-            // Re-render if teams-related data changed that may affect whether features such as voice input are enabled.
+            // Re-render if teams-related data changed that may affect which features are enabled.
             Self::refresh_base_model_menu(&me.base_model_dropdown, ctx);
             Self::refresh_coding_model_menu(&me.coding_model_dropdown, ctx);
             me.sync_custom_endpoint_buttons(ctx);
@@ -1204,7 +1156,6 @@ impl AISettingsPageView {
                         ctx,
                     );
 
-                    me.update_voice_input_dropdown_enablement(ctx);
                     Self::refresh_autonomy_dropdown_menu(&me.autonomy_dropdown_menu, ctx);
 
                     me.refresh_all_execution_profile_ui(ctx);
@@ -1220,9 +1171,6 @@ impl AISettingsPageView {
                     me.sync_context_window_editor(ctx, true);
                     me.sync_custom_endpoint_buttons(ctx);
                 }
-                AISettingsChangedEvent::VoiceInputEnabled { .. } => {
-                    me.update_voice_input_dropdown_enablement(ctx);
-                }
                 AISettingsChangedEvent::AgentModeExecuteReadonlyCommands { .. } => {
                     Self::refresh_autonomy_dropdown_menu(&me.autonomy_dropdown_menu, ctx);
                     Self::refresh_code_read_autonomy_dropdown_menu(
@@ -1235,16 +1183,6 @@ impl AISettingsPageView {
                         &me.code_read_autonomy_dropdown_menu,
                         ctx,
                     );
-                }
-                AISettingsChangedEvent::VoiceInputToggleKey { .. } => {
-                    let current_value = AISettings::as_ref(ctx)
-                        .voice_input_toggle_key
-                        .value()
-                        .display_name();
-                    me.voice_input_toggle_key_dropdown
-                        .update(ctx, |dropdown, ctx| {
-                            dropdown.set_selected_by_name(current_value, ctx)
-                        });
                 }
                 AISettingsChangedEvent::AgentModeCommandExecutionAllowlist { .. } => {
                     me.command_execution_allowlist_mouse_state_handles = AISettings::as_ref(ctx)
@@ -1900,7 +1838,6 @@ impl AISettingsPageView {
         Self {
             page: Self::build_page(None, ctx),
             active_subpage: None,
-            voice_input_toggle_key_dropdown,
             autodetection_denylist_editor,
             agent_trigger_editor,
             local_only_icon_tooltip_states: Default::default(),
@@ -1967,19 +1904,6 @@ impl AISettingsPageView {
             #[cfg(not(target_family = "wasm"))]
             grok_code_editor,
         }
-    }
-
-    fn update_voice_input_dropdown_enablement(&mut self, ctx: &mut ViewContext<Self>) {
-        let is_voice_enabled = AISettings::as_ref(ctx).is_voice_input_enabled(ctx);
-        self.voice_input_toggle_key_dropdown
-            .update(ctx, |dropdown, ctx| {
-                if is_voice_enabled {
-                    dropdown.set_enabled(ctx);
-                } else {
-                    dropdown.set_disabled(ctx);
-                }
-            });
-        ctx.notify();
     }
 
     pub fn get_modal_content(&self, app: &AppContext) -> Option<Box<dyn Element>> {
@@ -2961,13 +2885,6 @@ impl AISettingsPageView {
                 if FeatureFlag::AIRules.is_enabled() {
                     widgets.push(Box::new(AIFactWidget::default()));
                 }
-                if cfg!(feature = "voice_input")
-                    && ai_settings
-                        .voice_input_enabled_internal
-                        .is_supported_on_current_platform()
-                {
-                    widgets.push(Box::new(VoiceWidget::default()));
-                }
                 widgets.push(Box::new(CloudHandoffWidget::default()));
                 widgets.push(Box::new(CLIAgentWidget::default()));
                 // Uncaged: keys are entered under "Connect a model"; these account-gated
@@ -3011,13 +2928,6 @@ impl AISettingsPageView {
                     widgets.push(Box::new(ActiveAIWidget::default()));
                 }
                 widgets.push(Box::new(AIInputWidget::default()));
-                let voice_supported = cfg!(feature = "voice_input")
-                    && ai_settings
-                        .voice_input_enabled_internal
-                        .is_supported_on_current_platform();
-                if voice_supported {
-                    widgets.push(Box::new(VoiceWidget::default()));
-                }
                 widgets.push(Box::new(CloudHandoffWidget::default()));
                 // Uncaged: keys are entered under "Connect a model"; these account-gated
                 // fields could only render greyed out.
@@ -3761,7 +3671,6 @@ impl Entity for AISettingsPageView {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AISettingsPageAction {
     OpenUrl(String),
-    SetVoiceInputToggleKey(VoiceInputToggleKey),
     ToggleGlobalAI,
     ToggleActiveAI,
     ToggleIntelligentAutosuggestions,
@@ -3777,7 +3686,6 @@ pub enum AISettingsPageAction {
     /// Show/hide a specific CLI agent's launcher button in the coding-agent toolbar.
     ToggleCliAgentLauncherVisibility(crate::terminal::cli_agent::CLIAgent),
     ToggleUseAgentToolbar,
-    ToggleVoiceInput,
     ToggleCanUseWarpCreditsForFallback,
     HyperlinkClick(HyperlinkUrl),
     ToggleCodebaseContext,
@@ -3866,15 +3774,6 @@ impl TypedActionView for AISettingsPageView {
         match action {
             AISettingsPageAction::OpenUrl(url) => {
                 ctx.open_url(url.as_str());
-            }
-            AISettingsPageAction::SetVoiceInputToggleKey(key) => {
-                AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    report_if_error!(settings.voice_input_toggle_key.set_value(*key, ctx));
-                    report_if_error!(settings
-                        .explicitly_interacted_with_voice
-                        .set_value(true, ctx));
-                });
-                ctx.notify();
             }
             AISettingsPageAction::ToggleGlobalAI => {
                 if let Err(e) = AISettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -4056,16 +3955,6 @@ impl TypedActionView for AISettingsPageView {
                     settings.codebase_context_enabled.toggle_and_save_value(ctx)
                 }) {
                     log::warn!("Failed to set value for Codebase Context: {e:?}");
-                }
-                ctx.notify();
-            }
-            AISettingsPageAction::ToggleVoiceInput => {
-                if let Err(e) = AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    settings
-                        .voice_input_enabled_internal
-                        .toggle_and_save_value(ctx)
-                }) {
-                    log::warn!("Failed to set value for Voice Input: {e:?}");
                 }
                 ctx.notify();
             }
@@ -6718,117 +6607,6 @@ impl SettingsWidget for AIFactWidget {
     }
 }
 
-#[derive(Default)]
-struct VoiceWidget {
-    voice_input_toggle: SwitchStateHandle,
-    wispr_highlight_index: HighlightedHyperlink,
-}
-
-impl VoiceWidget {
-    fn render_voice_section(
-        &self,
-        view: &AISettingsPageView,
-        appearance: &Appearance,
-        app: &warpui::AppContext,
-    ) -> Box<dyn warpui::Element> {
-        let ai_settings = AISettings::as_ref(app);
-        let is_toggleable = ai_settings.is_any_ai_enabled(app);
-        let mut column = Flex::column().with_child(render_ai_setting_toggle::<VoiceInputEnabled>(
-            "Voice Input",
-            AISettingsPageAction::ToggleVoiceInput,
-            *ai_settings.voice_input_enabled_internal,
-            is_toggleable,
-            self.voice_input_toggle.clone(),
-            &view.local_only_icon_tooltip_states,
-            app,
-        ));
-
-        let voice_input_description_text_fragments = vec![
-            FormattedTextFragment::plain_text(
-                "Voice input allows you to control Uncaged by speaking directly to your terminal (powered by ",
-            ),
-            FormattedTextFragment::hyperlink("Wispr Flow", WISPR_FLOW_URL),
-            FormattedTextFragment::plain_text(")."),
-        ];
-
-        let voice_input_description = FormattedTextElement::new(
-            FormattedText::new([FormattedTextLine::Line(
-                voice_input_description_text_fragments,
-            )]),
-            appearance.ui_font_size(),
-            appearance.ui_font_family(),
-            appearance.ui_font_family(),
-            styles::description_font_color(is_toggleable, app).into(),
-            self.wispr_highlight_index.clone(),
-        )
-        .with_hyperlink_font_color(appearance.theme().accent().into_solid())
-        .register_default_click_handlers(|url, ctx, _| {
-            ctx.dispatch_typed_action(AISettingsPageAction::HyperlinkClick(url));
-        });
-
-        column.add_child(
-            Container::new(voice_input_description.finish())
-                .with_margin_top(styles::DESCRIPTION_NEGATIVE_MARGIN_OFFSET)
-                .with_margin_bottom(styles::DESCRIPTION_MARGIN_BOTTOM)
-                .with_margin_right(styles::TOGGLE_WIDTH_MARGIN)
-                .finish(),
-        );
-
-        if ai_settings.is_voice_input_enabled(app) {
-            column.add_child(render_dropdown_item(
-                appearance,
-                "Key for Activating Voice Input",
-                Some("Press and hold to activate."),
-                None,
-                LocalOnlyIconState::for_setting(
-                    VoiceInputToggleKey::storage_key(),
-                    VoiceInputToggleKey::sync_to_cloud(),
-                    &mut view.local_only_icon_tooltip_states.borrow_mut(),
-                    app,
-                ),
-                None,
-                &view.voice_input_toggle_key_dropdown,
-            ));
-        }
-
-        column.finish()
-    }
-}
-
-impl SettingsWidget for VoiceWidget {
-    type View = AISettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "voice agent oz ai a.i. speech input natural language talk english"
-    }
-
-    fn should_render(&self, app: &AppContext) -> bool {
-        cfg!(feature = "voice_input") && UserWorkspaces::as_ref(app).is_voice_enabled()
-    }
-
-    fn render(
-        &self,
-        view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let ai_settings = AISettings::as_ref(app);
-        let is_any_ai_enabled = ai_settings.is_any_ai_enabled(app);
-        Flex::column()
-            .with_child(render_separator(appearance))
-            .with_child(
-                build_sub_header(
-                    appearance,
-                    "Voice",
-                    Some(styles::header_font_color(is_any_ai_enabled, app)),
-                )
-                .with_padding_bottom(HEADER_PADDING)
-                .finish(),
-            )
-            .with_child(self.render_voice_section(view, appearance, app))
-            .finish()
-    }
-}
 #[derive(Default)]
 struct OtherAIWidget {
     use_agent_footer_toggle: SwitchStateHandle,

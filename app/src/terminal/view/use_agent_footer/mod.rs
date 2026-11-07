@@ -1141,12 +1141,6 @@ impl UseAgentToolbar {
     pub(in crate::terminal) fn is_warpify_active(&self, app: &AppContext) -> bool {
         self.warpify_footer_view.as_ref(app).is_active()
     }
-
-    /// Returns whether there's a current CLI agent (like Claude Code).
-    #[cfg(feature = "voice_input")]
-    pub fn has_cli_agent(&self, app: &AppContext) -> bool {
-        self.cli_agent(app).is_some()
-    }
 }
 
 /// Events emitted by UseAgentToolbar.

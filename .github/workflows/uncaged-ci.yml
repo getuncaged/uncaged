@@ -75,13 +75,6 @@ jobs:
       - name: Build warp-oss (GUI binary)
         run: cargo build --bin warp-oss
 
-      # voice_input is no longer in any shipped feature set (gui = []), so no
-      # build path would catch it bit-rotting. This check keeps the optional
-      # feature compiling without shipping it anywhere.
-      - name: cargo check (voice_input feature stays compilable)
-        timeout-minutes: 25
-        run: cargo check --bin warp-oss --features gui,voice_input
-
       # The tree is clippy-clean, so lints gate the job. Two runs, because each
       # feature set compiles code the other doesn't (local_tty without
       # remote_tty, cloud_environments tests, release_bundle). dead_code is
@@ -128,14 +121,14 @@ jobs:
           lfs: true
 
       # System build deps mirrored from script/linux/install_build_deps.
-      # (freetype, fontconfig, expat, libgit2, ssl, alsa, clang, cmake, etc.)
+      # (freetype, fontconfig, expat, libgit2, ssl, clang, cmake, etc.)
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential cmake pkg-config python-is-python3 \
             libssl-dev libfreetype-dev libexpat1-dev libgit2-dev \
-            libfontconfig1-dev jq brotli libasound2-dev libclang-dev \
+            libfontconfig1-dev jq brotli libclang-dev \
             libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
             libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev
 

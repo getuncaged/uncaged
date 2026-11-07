@@ -1,4 +1,5 @@
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
+use ai::index::full_source_code_embedding::LocalStoreClient;
 #[cfg(feature = "local_fs")]
 use ai::skills::SKILL_PROVIDER_DEFINITIONS;
 use repo_metadata::repositories::DetectedRepositories;
@@ -150,12 +151,10 @@ pub fn initialize_app_for_terminal_view(app: &mut App) {
     app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
     app.add_singleton_model(SkillManager::new);
     app.add_singleton_model(|ctx| {
-        CodebaseIndexManager::new_for_test(ServerApiProvider::as_ref(ctx).get(), ctx)
+        CodebaseIndexManager::new_for_test(std::sync::Arc::new(LocalStoreClient::new()), ctx)
     });
     app.add_singleton_model(|_| TemplatableMCPServerManager::default());
     app.add_singleton_model(AIExecutionProfilesModel::new);
-    #[cfg(feature = "voice_input")]
-    app.add_singleton_model(voice_input::VoiceInput::new);
 
     #[cfg(not(target_family = "wasm"))]
     app.add_singleton_model(SystemInfo::new);

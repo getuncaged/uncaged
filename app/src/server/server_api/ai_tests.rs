@@ -4,12 +4,10 @@ use warp_server_client::base_client::CLOUD_AGENT_ID_HEADER;
 
 use super::super::ServerApi;
 use super::{
-    build_fork_conversation_url, build_list_agent_runs_url, build_run_followup_url,
-    AgentMessageHeader, AgentRunEvent, AgentSource, AmbientAgentTaskState, Artifact,
-    ArtifactDownloadResponse, ArtifactType, ConnectedSelfHostedWorker, ExecutionLocation,
-    ForkConversationResponse, ListConnectedSelfHostedWorkersResponse, ListRunsResponse,
-    ReadAgentMessageResponse, RunFollowupRequest, RunSortBy, RunSortOrder, SpawnAgentRequest,
-    TaskListFilter, UserQueryMode, CONNECTED_SELF_HOSTED_WORKERS_PATH,
+    build_fork_conversation_url, build_list_agent_runs_url, AgentRunEvent, AgentSource,
+    AmbientAgentTaskState, Artifact, ArtifactDownloadResponse, ArtifactType, ExecutionLocation,
+    ForkConversationResponse, ListRunsResponse, ReadAgentMessageResponse, RunSortBy, RunSortOrder,
+    TaskListFilter,
 };
 use crate::notebooks::NotebookId;
 
@@ -35,110 +33,6 @@ fn ambient_agent_headers_for_task_overrides_existing_cloud_agent_header() {
             task_scoped_id.to_string()
         )]
     );
-}
-
-#[test]
-fn spawn_agent_request_serializes_agent_uid_as_agent_identity_uid() {
-    let request = SpawnAgentRequest {
-        prompt: Some("hello".to_string()),
-        mode: UserQueryMode::Normal,
-        config: None,
-        title: None,
-        team: None,
-        agent_identity_uid: Some("agent_123".to_string()),
-        skill: None,
-        attachments: vec![],
-        interactive: None,
-        parent_run_id: None,
-        runtime_skills: vec![],
-        referenced_attachments: vec![],
-        conversation_id: None,
-        initial_snapshot_token: None,
-        snapshot_disabled: None,
-        orchestration_handoff: None,
-    };
-
-    let value = serde_json::to_value(&request).unwrap();
-
-    assert_eq!(
-        value.get("agent_identity_uid").and_then(|v| v.as_str()),
-        Some("agent_123")
-    );
-    assert!(value.get("agent_uid").is_none());
-}
-
-#[test]
-fn connected_self_hosted_workers_path_uses_public_api_route() {
-    assert_eq!(
-        CONNECTED_SELF_HOSTED_WORKERS_PATH,
-        "agent/connected-self-hosted-workers"
-    );
-}
-
-#[test]
-fn deserialize_connected_self_hosted_workers_response() {
-    let json = r#"{
-        "workers": [
-            {
-                "worker_host": "worker-2",
-                "connection_count": 2,
-                "connected_at": "2026-05-18T19:00:00Z",
-                "last_seen_at": "2026-05-18T19:05:00Z"
-            },
-            {
-                "worker_host": "worker-1",
-                "connection_count": 1,
-                "connected_at": "2026-05-18T18:00:00Z",
-                "last_seen_at": "2026-05-18T18:05:00Z"
-            }
-        ]
-    }"#;
-
-    let response: ListConnectedSelfHostedWorkersResponse = serde_json::from_str(json).unwrap();
-
-    assert_eq!(
-        response.workers,
-        vec![
-            ConnectedSelfHostedWorker {
-                worker_host: "worker-2".to_string(),
-                connection_count: 2,
-                connected_at: "2026-05-18T19:00:00Z".to_string(),
-                last_seen_at: "2026-05-18T19:05:00Z".to_string(),
-            },
-            ConnectedSelfHostedWorker {
-                worker_host: "worker-1".to_string(),
-                connection_count: 1,
-                connected_at: "2026-05-18T18:00:00Z".to_string(),
-                last_seen_at: "2026-05-18T18:05:00Z".to_string(),
-            },
-        ]
-    );
-}
-
-#[test]
-fn spawn_agent_request_omits_prompt_when_none() {
-    let request = SpawnAgentRequest {
-        prompt: None,
-        mode: UserQueryMode::Normal,
-        config: None,
-        title: None,
-        team: None,
-        agent_identity_uid: None,
-        skill: None,
-        attachments: vec![],
-        interactive: None,
-        parent_run_id: None,
-        runtime_skills: vec![],
-        referenced_attachments: vec![],
-        conversation_id: None,
-        initial_snapshot_token: None,
-        snapshot_disabled: None,
-        orchestration_handoff: None,
-    };
-
-    let value = serde_json::to_value(&request).unwrap();
-
-    assert!(value.get("prompt").is_none());
 }
 
 #[test]
@@ -846,33 +740,6 @@ fn test_artifact_plan_serialize_deserialize_roundtrip() {
 }
 
 #[test]
-fn test_deserialize_agent_message_headers() {
-    let json = r#"[
-        {
-            "message_id": "message-1",
-            "sender_run_id": "run-1",
-            "subject": "Build finished",
-            "sent_at": "2026-04-09T20:00:00Z",
-            "delivered_at": "2026-04-09T20:01:00Z",
-            "read_at": null
-        }
-    ]"#;
-
-    let headers: Vec<AgentMessageHeader> = serde_json::from_str(json).unwrap();
-
-    assert_eq!(headers.len(), 1);
-    assert_eq!(headers[0].message_id, "message-1");
-    assert_eq!(headers[0].sender_run_id, "run-1");
-    assert_eq!(headers[0].subject, "Build finished");
-    assert_eq!(headers[0].sent_at, "2026-04-09T20:00:00Z");
-    assert_eq!(
-        headers[0].delivered_at.as_deref(),
-        Some("2026-04-09T20:01:00Z")
-    );
-    assert_eq!(headers[0].read_at, None);
-}
-
-#[test]
 fn test_deserialize_read_agent_message_response_with_timestamps() {
     let json = r#"{
         "message_id": "message-1",
@@ -1104,31 +971,6 @@ fn build_list_agent_runs_url_routes_to_runs_not_tasks() {
     let url = build_list_agent_runs_url(10, &TaskListFilter::default());
     assert!(url.starts_with("agent/runs?"));
     assert!(!url.starts_with("agent/tasks"));
-}
-
-#[test]
-fn build_run_followup_url_routes_to_run_followups() {
-    let run_id = "550e8400-e29b-41d4-a716-446655440000".parse().unwrap();
-    assert_eq!(
-        build_run_followup_url(&run_id),
-        "agent/runs/550e8400-e29b-41d4-a716-446655440000/followups"
-    );
-}
-
-#[test]
-fn serialize_run_followup_request() {
-    let request = RunFollowupRequest {
-        message: "continue from here".to_string(),
-    };
-
-    let json = serde_json::to_value(request).unwrap();
-
-    assert_eq!(
-        json,
-        serde_json::json!({
-            "message": "continue from here",
-        })
-    );
 }
 
 #[test]

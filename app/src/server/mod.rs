@@ -8,4 +8,3 @@ pub mod network_log_view;
 pub mod retry_strategies;
 pub mod server_api;
 pub mod sync_queue;
-pub mod voice_transcriber;

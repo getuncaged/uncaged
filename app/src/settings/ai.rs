@@ -18,12 +18,9 @@ use serde::{Deserialize, Serialize};
 use settings::{
     define_settings_group, RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud,
 };
-use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
-use warpui::platform::keyboard::KeyCode;
-use warpui::platform::OperatingSystem;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 
 use crate::ai::request_usage_model::RequestLimitInfo;
@@ -91,189 +88,6 @@ impl Entity for FocusedTerminalInfo {
 }
 
 impl SingletonEntity for FocusedTerminalInfo {}
-
-#[derive(
-    Default,
-    Debug,
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    Copy,
-    Clone,
-    EnumIter,
-    schemars::JsonSchema,
-    settings_value::SettingsValue,
-)]
-#[schemars(
-    description = "Physical key used to toggle voice input.",
-    rename_all = "snake_case"
-)]
-pub enum VoiceInputToggleKey {
-    #[default]
-    #[schemars(description = "No toggle key assigned.")]
-    None,
-    /// Fn key is default toggle key for Mac, when the feature is toggled on.
-    #[schemars(description = "Fn key.")]
-    Fn,
-    /// Alt or Option key (left side).
-    #[schemars(description = "Alt or Option key (left side).")]
-    AltLeft,
-    /// Alt or Option key (right side). Used as default toggle
-    /// key for Windows and Linux, , when the feature is toggled on.
-    #[schemars(description = "Alt or Option key (right side).")]
-    AltRight,
-    #[schemars(description = "Control key (left side).")]
-    ControlLeft,
-    #[schemars(description = "Control key (right side).")]
-    ControlRight,
-    /// The Windows, ⌘, Command, or other OS symbol key.
-    #[schemars(description = "Super, Windows, or Command key (left side).")]
-    SuperLeft,
-    /// The Windows, ⌘, Command, or other OS symbol key.
-    #[schemars(description = "Super, Windows, or Command key (right side).")]
-    SuperRight,
-    #[schemars(description = "Shift key (left side).")]
-    ShiftLeft,
-    #[schemars(description = "Shift key (right side).")]
-    ShiftRight,
-}
-
-settings::macros::implement_setting_for_enum!(
-    VoiceInputToggleKey,
-    AISettings,
-    SupportedPlatforms::DESKTOP,
-    // Never sync to cloud to allow users to use different toggle keys on different devices,
-    // especially given platform differences.
-    SyncToCloud::Never,
-    private: false,
-    toml_path: "agents.voice.voice_input_toggle_key",
-    description: "The key used to toggle voice input.",
-);
-
-impl VoiceInputToggleKey {
-    pub fn all_possible_values() -> Vec<VoiceInputToggleKey> {
-        let all_keys = VoiceInputToggleKey::iter().collect();
-        match OperatingSystem::get() {
-            OperatingSystem::Mac => all_keys,
-            // For non-Mac platforms, we exclude the `Fn` key since it may not be correctly identified by winit.
-            // In particular, we saw it is unidentified for a ThinkPad with a standard keyboard.
-            OperatingSystem::Windows | OperatingSystem::Linux | OperatingSystem::Other(_) => {
-                all_keys
-                    .into_iter()
-                    .filter(|key| *key != VoiceInputToggleKey::Fn)
-                    .collect()
-            }
-        }
-    }
-
-    /// Display name for choosing key from the AI settings page.
-    pub fn display_name(&self) -> &'static str {
-        // We use the underlying host OS to determine the correct key name to display.
-        let (super_key_name, alt_key_name): (&'static str, &'static str) =
-            match OperatingSystem::get() {
-                OperatingSystem::Mac => ("Command", "Option"),
-                OperatingSystem::Windows => ("Windows", "Alt"),
-                OperatingSystem::Linux | OperatingSystem::Other(_) => ("Super", "Alt"),
-            };
-
-        match self {
-            VoiceInputToggleKey::None => "None",
-            VoiceInputToggleKey::Fn => "Fn",
-            VoiceInputToggleKey::AltLeft => {
-                Box::leak(format!("{alt_key_name} (Left)").into_boxed_str())
-            }
-            VoiceInputToggleKey::AltRight => {
-                Box::leak(format!("{alt_key_name} (Right)").into_boxed_str())
-            }
-            VoiceInputToggleKey::ControlLeft => "Control (Left)",
-            VoiceInputToggleKey::ControlRight => "Control (Right)",
-            VoiceInputToggleKey::SuperLeft => {
-                Box::leak(format!("{super_key_name} (Left)").into_boxed_str())
-            }
-            VoiceInputToggleKey::SuperRight => {
-                Box::leak(format!("{super_key_name} (Right)").into_boxed_str())
-            }
-            VoiceInputToggleKey::ShiftLeft => "Shift (Left)",
-            VoiceInputToggleKey::ShiftRight => "Shift (Right)",
-        }
-    }
-
-    pub fn to_key_code(&self) -> Option<KeyCode> {
-        match self {
-            VoiceInputToggleKey::None => None,
-            VoiceInputToggleKey::Fn => Some(KeyCode::Fn),
-            VoiceInputToggleKey::AltLeft => Some(KeyCode::AltLeft),
-            VoiceInputToggleKey::AltRight => Some(KeyCode::AltRight),
-            VoiceInputToggleKey::ControlLeft => Some(KeyCode::ControlLeft),
-            VoiceInputToggleKey::ControlRight => Some(KeyCode::ControlRight),
-            VoiceInputToggleKey::SuperLeft => Some(KeyCode::SuperLeft),
-            VoiceInputToggleKey::SuperRight => Some(KeyCode::SuperRight),
-            VoiceInputToggleKey::ShiftLeft => Some(KeyCode::ShiftLeft),
-            VoiceInputToggleKey::ShiftRight => Some(KeyCode::ShiftRight),
-        }
-    }
-
-    /// Converts the voice input toggle key to a Keystroke representation.
-    /// Since these are standalone modifier keys, we construct the Keystroke directly
-    /// rather than using `parse()` (which always requires a non-modifier key to be included).
-    pub fn keystroke(&self) -> Option<warpui::keymap::Keystroke> {
-        use warpui::keymap::Keystroke;
-
-        let keystroke = match self {
-            VoiceInputToggleKey::None => return None,
-            VoiceInputToggleKey::Fn => Keystroke {
-                key: "fn".to_string(),
-                ..Default::default()
-            },
-            VoiceInputToggleKey::AltLeft | VoiceInputToggleKey::AltRight => Keystroke {
-                alt: true,
-                ..Default::default()
-            },
-            VoiceInputToggleKey::ControlLeft | VoiceInputToggleKey::ControlRight => Keystroke {
-                ctrl: true,
-                ..Default::default()
-            },
-            VoiceInputToggleKey::SuperLeft | VoiceInputToggleKey::SuperRight => Keystroke {
-                cmd: true,
-                ..Default::default()
-            },
-            VoiceInputToggleKey::ShiftLeft | VoiceInputToggleKey::ShiftRight => Keystroke {
-                shift: true,
-                ..Default::default()
-            },
-        };
-        Some(keystroke)
-    }
-
-    pub fn tooltip_message(&self) -> String {
-        match self.keystroke() {
-            Some(keystroke) => {
-                let symbol = keystroke.displayed();
-                let side = match self {
-                    VoiceInputToggleKey::AltLeft
-                    | VoiceInputToggleKey::ControlLeft
-                    | VoiceInputToggleKey::SuperLeft
-                    | VoiceInputToggleKey::ShiftLeft => Some("Left"),
-                    VoiceInputToggleKey::AltRight
-                    | VoiceInputToggleKey::ControlRight
-                    | VoiceInputToggleKey::SuperRight
-                    | VoiceInputToggleKey::ShiftRight => Some("Right"),
-                    VoiceInputToggleKey::None | VoiceInputToggleKey::Fn => None,
-                };
-                let key_name = match side {
-                    Some(side) => format!("{side} {symbol}"),
-                    None => symbol,
-                };
-                format!("Voice input (hold {key_name} key)")
-            }
-            None => "Voice input".to_string(),
-        }
-    }
-
-    pub fn is_none(&self) -> bool {
-        matches!(self, VoiceInputToggleKey::None)
-    }
-}
 
 /// The default mode for new terminal sessions.
 #[derive(
@@ -973,49 +787,6 @@ define_settings_group!(AISettings, settings: [
         description: "Controls whether the agent suggests rules to save after responses.",
         feature_flag: FeatureFlag::SuggestedRules,
     }
-    // This field should not be referenced directly to lookup Voice AI enablement -- use the
-    // `is_voice_input_enabled()` getter.
-    voice_input_enabled_internal: VoiceInputEnabled {
-        type: bool,
-        default: true,
-        supported_platforms: SupportedPlatforms::DESKTOP,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
-        private: false,
-        toml_path: "agents.voice.voice_input_enabled",
-        description: "Controls whether voice input is enabled for AI interactions.",
-    },
-    // The number of times the user has entered Agent Mode.
-    // Not a user-visible setting. We model it so we can show the voice input new feature popup
-    // the correct number of times.
-    entered_agent_mode_num_times: EnteredAgentModeNumTimes {
-        type: usize,
-        default: 0,
-        supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
-        private: true,
-    },
-    // Whether or not the user has manually dismissed the voice input new feature popup.
-    dismissed_voice_input_new_feature_popup: DismissedVoiceInputNewFeaturePopup {
-        type: bool,
-        default: false,
-        supported_platforms: SupportedPlatforms::DESKTOP,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
-        private: true,
-    },
-    // This field is used to store the key used for voice input toggling.
-    // Note this is not the named key, but rather corresponds to the physical key.
-    voice_input_toggle_key: VoiceInputToggleKey,
-    // This is not a user-visible setting - it's merely a one-time flag to track if the user has
-    // explicitly interacted with voice input. We use this to determine whether we should show a toast
-    // to inform the user about voice input and auto-set the keybinding.
-    explicitly_interacted_with_voice: ExplicitlyInteractedWithVoice {
-        type: bool,
-        default: false,
-        supported_platforms: SupportedPlatforms::DESKTOP,
-        // Never sync to cloud to keep state separate across devices, since microphone access is per-device.
-        sync_to_cloud: SyncToCloud::Never,
-        private: true,
-    },
     // Predicates that Agent Mode can use to decide if it can execute
     // a command without explicit user consent.
     //
@@ -1760,13 +1531,6 @@ impl AISettings {
         self.is_active_ai_enabled(app) && *self.intelligent_autosuggestions_enabled_internal
     }
 
-    pub fn is_voice_input_enabled(&self, app: &warpui::AppContext) -> bool {
-        // Voice input is conditionally-compiled because it requires additional dependencies on some platforms.
-        cfg!(feature = "voice_input")
-            && self.is_any_ai_enabled(app)
-            && *self.voice_input_enabled_internal
-    }
-
     /// Returns `true` if input autodetection is enabled.
     ///
     /// If `FeatureFlag::AgentView` is enabled, this specifically gates NLD enablement in the agent
@@ -2003,38 +1767,6 @@ impl AISettings {
 
     pub fn show_code_suggestion_speedbump(&self, app: &AppContext) -> bool {
         self.is_any_ai_enabled(app) && *self.show_code_suggestion_speedbump
-    }
-
-    /// Handles first-time voice input setup when user clicks the voice button.
-    ///
-    /// If the user hasn't explicitly interacted with voice yet:
-    /// - Sets the default voice input toggle key based on the OS
-    /// - Marks `explicitly_interacted_with_voice` as true
-    /// - Returns `Some(toggle_key)` so the caller can show a toast
-    ///
-    /// If the user has already interacted with voice, returns `None`.
-    pub fn maybe_setup_first_time_voice(
-        &mut self,
-        ctx: &mut ModelContext<Self>,
-    ) -> Option<VoiceInputToggleKey> {
-        if *self.explicitly_interacted_with_voice.value() {
-            return None;
-        }
-
-        let voice_input_toggle_key = match OperatingSystem::get() {
-            OperatingSystem::Mac => VoiceInputToggleKey::Fn,
-            OperatingSystem::Windows | OperatingSystem::Linux | OperatingSystem::Other(_) => {
-                VoiceInputToggleKey::AltRight
-            }
-        };
-
-        report_if_error!(self
-            .voice_input_toggle_key
-            .set_value(voice_input_toggle_key, ctx));
-
-        report_if_error!(self.explicitly_interacted_with_voice.set_value(true, ctx));
-
-        Some(voice_input_toggle_key)
     }
 
     pub fn add_cli_agent_footer_enabled_command(

@@ -55,7 +55,6 @@ pub enum AgentToolbarItemKind {
     RichInput,
 
     // Both
-    VoiceInput,
     // Renamed from ImageAttach; alias preserves existing user toolbar configs.
     #[serde(alias = "ImageAttach")]
     FileAttach,
@@ -70,7 +69,7 @@ pub enum AgentToolbarItemKind {
 impl AgentToolbarItemKind {
     pub fn available_in(&self) -> ToolbarAvailability {
         match self {
-            Self::ContextChip(_) | Self::VoiceInput | Self::FileAttach => ToolbarAvailability::Both,
+            Self::ContextChip(_) | Self::FileAttach => ToolbarAvailability::Both,
             Self::ModelSelector
             | Self::NLDToggle
             | Self::ContextWindowUsage
@@ -86,7 +85,6 @@ impl AgentToolbarItemKind {
             Self::ContextChip(_) => "Context Chip",
             Self::ModelSelector => "Model Selector",
             Self::NLDToggle => "Autodetection",
-            Self::VoiceInput => "Voice Input",
             Self::FileAttach => "Attach File",
             Self::ContextWindowUsage => "Context Usage",
             Self::FileExplorer => "File Explorer",
@@ -101,7 +99,6 @@ impl AgentToolbarItemKind {
             Self::ContextChip(kind) => kind.udi_icon(),
             Self::ModelSelector => Some(Icon::Oz),
             Self::NLDToggle => Some(Icon::NLD),
-            Self::VoiceInput => Some(Icon::Microphone),
             Self::FileAttach => Some(Icon::Plus),
             Self::ContextWindowUsage => Some(Icon::ConversationContext0),
             Self::FileExplorer => Some(Icon::FileCopy),
@@ -139,16 +136,12 @@ impl AgentToolbarItemKind {
 
     /// Default right-side items for the agent view footer.
     pub fn default_right() -> Vec<Self> {
-        let mut items = vec![
+        vec![
             Self::ContextChip(ContextChipKind::AgentPlanAndTodoList),
             Self::ContextWindowUsage,
             Self::ModelSelector,
-        ];
-        if cfg!(feature = "voice_input") {
-            items.push(Self::VoiceInput);
-        }
-        items.push(Self::FileAttach);
-        items
+            Self::FileAttach,
+        ]
     }
 
     /// All items available for the agent view footer configurator.
@@ -163,9 +156,6 @@ impl AgentToolbarItemKind {
             Self::FileAttach,
             Self::ContextWindowUsage,
         ]);
-        if cfg!(feature = "voice_input") {
-            items.push(Self::VoiceInput);
-        }
         if FeatureFlag::FastForwardAutoexecuteButton.is_enabled() {
             items.push(Self::FastForwardToggle);
         }
@@ -178,9 +168,6 @@ impl AgentToolbarItemKind {
             Self::FileAttach,
             Self::ContextChip(ContextChipKind::GitDiffStats),
         ];
-        if cfg!(feature = "voice_input") {
-            items.insert(1, Self::VoiceInput);
-        }
         items.push(Self::FileExplorer);
         if FeatureFlag::CLIAgentRichInput.is_enabled() {
             items.push(Self::RichInput);
@@ -209,9 +196,6 @@ impl AgentToolbarItemKind {
             Self::FileAttach,
             Self::Settings,
         ]);
-        if cfg!(feature = "voice_input") {
-            items.push(Self::VoiceInput);
-        }
         items
     }
 

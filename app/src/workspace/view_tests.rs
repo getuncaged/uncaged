@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
+use ai::index::full_source_code_embedding::LocalStoreClient;
 use ai::project_context::model::ProjectContextModel;
 use pane_group::{NotebookPane, PaneState, SplitPaneState, TerminalPaneId};
 use repo_metadata::repositories::DetectedRepositories;
@@ -183,8 +184,6 @@ pub(crate) fn initialize_app(app: &mut App) {
     app.add_singleton_model(FileModel::new);
     app.add_singleton_model(AIExecutionProfilesModel::new);
     app.add_singleton_model(RepoOutlines::new_for_test);
-    #[cfg(feature = "voice_input")]
-    app.add_singleton_model(voice_input::VoiceInput::new);
     app.add_singleton_model(BlocklistAIPermissions::new);
     app.add_singleton_model(|_| GPUState::new());
     // Register IapManager in a disabled state (no IapState). The settings
@@ -232,7 +231,7 @@ pub(crate) fn initialize_app(app: &mut App) {
         crate::workspace::bonus_grant_notification_model::BonusGrantNotificationModel::new,
     );
     app.add_singleton_model(|ctx| {
-        CodebaseIndexManager::new_for_test(ServerApiProvider::as_ref(ctx).get(), ctx)
+        CodebaseIndexManager::new_for_test(std::sync::Arc::new(LocalStoreClient::new()), ctx)
     });
     app.add_singleton_model(|ctx| PersistedWorkspace::new(vec![], HashMap::new(), None, ctx));
     app.add_singleton_model(|_| ProjectContextModel::default());

@@ -2,12 +2,13 @@ use super::{AgentToolbarChipSelection, CLIAgentToolbarChipSelection};
 use crate::ai::blocklist::agent_view::toolbar_item::AgentToolbarItemKind;
 
 #[test]
-fn custom_agent_toolbar_drops_removed_share_session_item() {
-    // `ShareSession` was a toolbar item for session sharing, which no longer exists. A stored
-    // custom layout that still lists it should load with the remaining items intact.
+fn custom_agent_toolbar_drops_removed_items() {
+    // `ShareSession` (session sharing) and `VoiceInput` (voice dictation through Warp's server)
+    // were toolbar items that no longer exist. A stored custom layout that still lists them
+    // should load with the remaining items intact.
     let value = serde_json::json!({
         "Custom": {
-            "left": ["NLDToggle", "ShareSession"],
+            "left": ["NLDToggle", "ShareSession", "VoiceInput"],
             "right": ["ShareSession", "ModelSelector"],
         }
     });
@@ -25,10 +26,10 @@ fn custom_agent_toolbar_drops_removed_share_session_item() {
 }
 
 #[test]
-fn custom_cli_agent_toolbar_drops_removed_share_session_item() {
+fn custom_cli_agent_toolbar_drops_removed_items() {
     let value = serde_json::json!({
         "Custom": {
-            "left": ["FileAttach", "ShareSession", "FileExplorer"],
+            "left": ["FileAttach", "VoiceInput", "ShareSession", "FileExplorer"],
             "right": ["Settings"],
         }
     });

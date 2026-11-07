@@ -29,7 +29,6 @@ use crate::ai::agent_conversations_model::AgentConversationsModel;
 use crate::ai::blocklist::agent_view::orchestration_pill_bar_model::OrchestrationPillBarModel;
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
-use crate::ai_assistant::requests::REQUEST_LIMIT_INFO_CACHE_KEY;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::code::editor_management::{CodeEditorStatus, CodeEditorSummary};
 use crate::env_vars::manager::EnvVarCollectionManager;
@@ -264,13 +263,6 @@ fn remove_cloud_persisted_settings(app: &mut AppContext) {
         log::error!(
             "Failed to remove Crash Reporting Enabled Defaults Key from user defaults: {e:?}"
         );
-    }
-
-    if let Err(e) = app
-        .private_user_preferences()
-        .remove_value(REQUEST_LIMIT_INFO_CACHE_KEY)
-    {
-        log::error!("Failed to remove Request Limit Defaults Key from user defaults: {e:?}");
     }
 
     // Reset the Privacy Settings in the login screen to default values.

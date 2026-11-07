@@ -23,8 +23,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| KeybindingChangedNotifier::mock());
     app.add_singleton_model(|_| AuthStateProvider::new_for_test());
     app.add_singleton_model(UserWorkspaces::default_mock);
-    #[cfg(feature = "voice_input")]
-    app.add_singleton_model(voice_input::VoiceInput::new);
     app.update(|ctx| {
         ThemeSettings::handle(ctx).update(ctx, |settings, ctx| {
             settings.use_system_theme.set_value(false, ctx).unwrap();

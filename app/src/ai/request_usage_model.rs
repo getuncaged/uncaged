@@ -540,46 +540,6 @@ impl AIRequestUsageModel {
     }
 }
 
-/// Voice request usage, only available if built with voice input support.
-#[cfg(feature = "voice_input")]
-impl AIRequestUsageModel {
-    fn voice_requests(&self) -> usize {
-        self.request_limit_info
-            .voice_requests_used_since_last_refresh
-    }
-
-    fn voice_requests_limit(&self) -> usize {
-        self.request_limit_info.voice_request_limit
-    }
-
-    fn is_unlimited_voice_requests(&self) -> bool {
-        self.request_limit_info.is_unlimited_voice
-    }
-
-    /// Returns the number of remaining requests the user has based on their latest rate limit info.
-    /// If the current time is past the next refresh time, then the number of remaining reqs is the limit.
-    fn voice_requests_remaining(&self) -> usize {
-        if self.next_refresh_time() <= Utc::now() || self.is_unlimited_voice_requests() {
-            self.voice_requests_limit()
-        } else {
-            self.voice_requests_limit()
-                .saturating_sub(self.voice_requests())
-        }
-    }
-
-    /// Returns `true` if the user has at least one voice request before hitting the
-    /// limit. Returns `false` otherwise.
-    fn has_voice_requests_remaining(&self) -> bool {
-        self.voice_requests_remaining() > 0
-    }
-
-    /// Checks request limits to see if the user can make a voice request.
-    /// Returns true if the user can make a voice request, false otherwise.
-    pub fn can_request_voice(&self) -> bool {
-        self.has_voice_requests_remaining()
-    }
-}
-
 impl SingletonEntity for AIRequestUsageModel {}
 
 #[cfg(test)]

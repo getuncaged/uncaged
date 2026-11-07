@@ -2,37 +2,20 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use itertools::Itertools;
 use lazy_static::lazy_static;
 use pathfinder_color::ColorU;
-use serde::{Deserialize, Serialize};
 use warp_core::command::ExitCode;
 use warp_graphql::ai::{
     RequestLimitInfo as RequestLimitInfoGraphql,
     RequestLimitRefreshDuration as RequestLimitRefreshDurationGraphql,
 };
-use warp_graphql::mutations::generate_commands::{GenerateCommandsFailureType, GeneratedCommand};
 
 use crate::ai::{RequestLimitInfo, RequestLimitRefreshDuration};
 use crate::terminal::model::terminal_model::BlockIndex;
-use crate::workflows::workflow::{Argument, Workflow};
 
 pub mod execution_context;
-pub mod requests;
-pub mod utils;
 
-#[cfg(test)]
-mod test_util;
-
-/// We want to make sure the user doesn't send a prompt too large.s
-/// Since a token is ~ 4 chars, the limit we impose here is 250 tokens.
-/// This is also roughly the limit at which the editor starts degrading.
-pub const PROMPT_CHARACTER_LIMIT: usize = 1000;
-
-pub const AI_ASSISTANT_FEATURE_NAME: &str = "Uncaged AI";
 pub const ASK_AI_ASSISTANT_TEXT: &str = "Ask Uncaged AI";
-
-pub const AI_ASSISTANT_SVG_PATH: &str = "bundled/svg/ai-assistant.svg";
 
 lazy_static! {
     pub static ref AI_ASSISTANT_LOGO_COLOR: ColorU = ColorU::new(243, 185, 17, 255);
@@ -62,71 +45,6 @@ pub enum AskAIType {
     FromAICommandSearch {
         query: Arc<String>,
     },
-}
-
-pub struct AIGeneratedCommand {
-    command: String,
-    description: String,
-    parameters: Vec<AIGeneratedCommandParameter>,
-}
-
-pub struct AIGeneratedCommandParameter {
-    id: String,
-    description: String,
-}
-
-impl From<AIGeneratedCommand> for Workflow {
-    fn from(ai_command: AIGeneratedCommand) -> Self {
-        // Note that we use the AI generated description as the _title_ of the workflow.
-        Workflow::new(ai_command.description, ai_command.command).with_arguments(
-            ai_command
-                .parameters
-                .into_iter()
-                .map(|p| Argument {
-                    name: p.id,
-                    description: Some(p.description),
-                    default_value: None,
-                    arg_type: Default::default(),
-                })
-                .collect_vec(),
-        )
-    }
-}
-
-impl From<GeneratedCommand> for AIGeneratedCommand {
-    fn from(value: GeneratedCommand) -> Self {
-        AIGeneratedCommand {
-            command: value.command,
-            description: value.description,
-            parameters: value
-                .parameters
-                .into_iter()
-                .map(|p| AIGeneratedCommandParameter {
-                    id: p.id,
-                    description: p.description,
-                })
-                .collect_vec(),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum GenerateCommandsFromNaturalLanguageError {
-    BadPrompt,
-    AiProviderError,
-    RateLimited,
-    Other,
-}
-
-impl From<GenerateCommandsFailureType> for GenerateCommandsFromNaturalLanguageError {
-    fn from(value: GenerateCommandsFailureType) -> Self {
-        match value {
-            GenerateCommandsFailureType::BadPrompt => Self::BadPrompt,
-            GenerateCommandsFailureType::AiProviderError => Self::AiProviderError,
-            GenerateCommandsFailureType::RateLimited => Self::RateLimited,
-            GenerateCommandsFailureType::Other => Self::Other,
-        }
-    }
 }
 
 impl From<RequestLimitRefreshDurationGraphql> for RequestLimitRefreshDuration {

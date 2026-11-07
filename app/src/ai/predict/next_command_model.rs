@@ -3,11 +3,10 @@ use std::sync::Arc;
 #[cfg(feature = "local_fs")]
 use std::time::Duration;
 
-use chrono::Utc;
 use futures::stream::AbortHandle;
 use itertools::Itertools;
 #[cfg_attr(not(feature = "local_fs"), allow(unused_imports))]
-use parking_lot::{FairMutex, Mutex};
+use parking_lot::Mutex;
 use warp_completer::completer::{
     self, expand_command_aliases, AliasExpansionResult, CompleterOptions,
     CompletionsFallbackStrategy, MatchStrategy,
@@ -21,21 +20,16 @@ use warpui::r#async::FutureExt;
 use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::generate_ai_input_suggestions::{
-    create_generate_ai_input_suggestions_request, get_context_messages,
-    GenerateAIInputSuggestionsRequest, GenerateAIInputSuggestionsResponseV2, NextCommandContext,
+    GenerateAIInputSuggestionsResponseV2, NextCommandContext,
 };
-use crate::ai::block_context::BlockContext;
-use crate::ai_assistant::execution_context::WarpAiExecutionContext;
 use crate::completer::SessionContext;
 #[cfg(feature = "local_fs")]
 use crate::persistence::{database_file_path_for_scope, establish_ro_connection, PersistenceScope};
-use crate::report_error;
-use crate::server::server_api::{AIApiError, ServerApi};
 use crate::settings::AISettings;
 use crate::terminal::event::UserBlockCompleted;
-use crate::terminal::input::{CompleterData, IntelligentAutosuggestionResult};
+use crate::terminal::input::CompleterData;
 use crate::terminal::model::session::Sessions;
-use crate::terminal::{History, HistoryEntry, TerminalModel};
+use crate::terminal::{History, HistoryEntry};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 cfg_if::cfg_if! {
@@ -62,31 +56,15 @@ pub fn is_next_command_enabled(app: &warpui::AppContext) -> bool {
         && UserWorkspaces::as_ref(app).is_next_command_enabled()
 }
 
-/// Information about an autosuggestion that would have been made if purely based off history.
-/// If there was no history, history_command_prediction would be an empty string.
-#[derive(Clone, Default, PartialEq, Debug)]
-pub struct HistoryBasedAutosuggestionState {
-    pub history_command_prediction: String,
-    pub history_command_prediction_likelihood: f64,
-    pub total_history_count: usize,
-}
-
 #[derive(Clone, Default, PartialEq)]
 pub enum NextCommandSuggestionState {
     #[default]
     None,
     Cycling,
     Ready {
-        request: Box<GenerateAIInputSuggestionsRequest>,
         response: GenerateAIInputSuggestionsResponseV2,
-        /// How long the request took to complete, in milliseconds.
-        request_duration_ms: i64,
-        /// If true, we made a call to an LLM to generate this.
-        /// Otherwise it came from history.
-        is_from_ai: bool,
         /// If true, this suggestion came from the user explicitly cycling (is not the initial suggestion).
         is_from_cycle: bool,
-        history_based_autosuggestion_state: HistoryBasedAutosuggestionState,
     },
 }
 
@@ -115,19 +93,8 @@ impl NextCommandSuggestionState {
     }
 }
 
-/// Struct storing the result of the zero-state next command suggestion.
-#[derive(Clone)]
-pub struct ZeroStateSuggestionInfo {
-    pub response: GenerateAIInputSuggestionsResponseV2,
-    /// If true, we made a call to an LLM to generate this.
-    /// Otherwise it came from history.
-    pub is_from_ai: bool,
-}
-
 pub struct NextCommandModel {
     sessions: ModelHandle<Sessions>,
-    model: Arc<FairMutex<TerminalModel>>,
-    server_api: Arc<ServerApi>,
     #[cfg(feature = "local_fs")]
     conn: Option<Arc<Mutex<SqliteConnection>>>,
 
@@ -135,7 +102,6 @@ pub struct NextCommandModel {
     /// Context used to generate the zero-state suggestion.
     /// We reuse this but apply filtering on history_contexts as the user edits the input.
     cached_zerostate_next_command_context: Option<NextCommandContext>,
-    zerostate_suggestion_info: Option<ZeroStateSuggestionInfo>,
     next_command_abort_handle: Option<AbortHandle>,
 }
 
@@ -148,11 +114,7 @@ pub enum NextCommandModelEvent {
 }
 
 impl NextCommandModel {
-    pub fn new(
-        sessions: ModelHandle<Sessions>,
-        model: Arc<FairMutex<TerminalModel>>,
-        server_api: Arc<ServerApi>,
-    ) -> Self {
+    pub fn new(sessions: ModelHandle<Sessions>) -> Self {
         #[cfg(feature = "local_fs")]
         let conn = database_file_path_for_scope(&PersistenceScope::App)
             .to_str()
@@ -163,13 +125,10 @@ impl NextCommandModel {
             });
         Self {
             sessions,
-            model,
-            server_api,
             #[cfg(feature = "local_fs")]
             conn,
             next_command_state: NextCommandSuggestionState::None,
             cached_zerostate_next_command_context: None,
-            zerostate_suggestion_info: None,
             next_command_abort_handle: None,
         }
     }
@@ -233,14 +192,9 @@ impl NextCommandModel {
         &self.next_command_state
     }
 
-    pub fn get_zero_state_suggestion_info(&self) -> Option<&ZeroStateSuggestionInfo> {
-        self.zerostate_suggestion_info.as_ref()
-    }
-
     pub fn clear_state(&mut self) {
         self.next_command_state = NextCommandSuggestionState::None;
         self.cached_zerostate_next_command_context = None;
-        self.zerostate_suggestion_info = None;
         self.abort_inflight_request();
     }
 
@@ -256,14 +210,11 @@ impl NextCommandModel {
 
     #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
     fn get_next_command_context(
-        terminal_model: Arc<FairMutex<TerminalModel>>,
         #[cfg(feature = "local_fs")] conn: Option<Arc<Mutex<SqliteConnection>>>,
-        ai_execution_context: WarpAiExecutionContext,
         block_completed: &UserBlockCompleted,
     ) -> NextCommandContext {
         #[cfg_attr(not(feature = "local_fs"), allow(unused_mut))]
         let mut history_contexts = vec![];
-        let context_messages = get_context_messages(terminal_model.clone(), 5, 100, 200);
         #[cfg(feature = "local_fs")]
         if let Some(conn) = conn {
             let mut conn = conn.lock();
@@ -273,33 +224,22 @@ impl NextCommandModel {
                 NUM_ADDITIONAL_PREV_COMMAND_CONTEXT_LLM,
             );
         }
-        NextCommandContext {
-            history_contexts,
-            ai_execution_context,
-            context_messages,
-        }
+        NextCommandContext { history_contexts }
     }
 
     /// Generates a zero-state next command suggestion immediately after a block completes.
     pub fn generate_next_command_suggestion(
         &mut self,
         block_completed: UserBlockCompleted,
-        context: WarpAiExecutionContext,
         completer_data: CompleterData,
-        block_context: Option<Box<BlockContext>>,
-        previous_result: Option<IntelligentAutosuggestionResult>,
         ctx: &mut ModelContext<Self>,
     ) {
         // Clear the cached next command context so we don't use stale data.
         self.cached_zerostate_next_command_context = None;
-        self.zerostate_suggestion_info = None;
         self.generate_next_command_suggestion_with_prefix(
             None,
             block_completed,
-            context,
             completer_data,
-            block_context,
-            previous_result,
             ctx,
         );
     }
@@ -324,21 +264,17 @@ impl NextCommandModel {
         ))
     }
 
-    /// Generates a next command suggestion with a prefix in the input.
+    /// Generates a next command suggestion with a prefix in the input. Suggestions come from
+    /// rich command history, then (with a prefix) recent history and the completer; Uncaged has
+    /// no server LLM fallback, so with none of those there is no suggestion.
     #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
-    #[expect(clippy::too_many_arguments)]
     pub fn generate_next_command_suggestion_with_prefix(
         &mut self,
         prefix: Option<String>,
         block_completed: UserBlockCompleted,
-        context: WarpAiExecutionContext,
         completer_data: CompleterData,
-        block_context: Option<Box<BlockContext>>,
-        previous_result: Option<IntelligentAutosuggestionResult>,
         ctx: &mut ModelContext<Self>,
     ) {
-        let server_api = self.server_api.clone();
-        let terminal_model = self.model.clone();
         let cached_next_command_context = self.cached_zerostate_next_command_context.clone();
 
         let completion_context = completer_data.completion_session_context(ctx);
@@ -363,22 +299,21 @@ impl NextCommandModel {
         self.next_command_abort_handle = Some(
             ctx.spawn(
                 async move {
-                    let mut history_based_autosuggestion_state =
-                        HistoryBasedAutosuggestionState::default();
-                    let start_ts_ms = Utc::now().timestamp_millis();
-
                     let mut next_command_context =
                         if let Some(cached_next_command_context) = cached_next_command_context {
                             cached_next_command_context
                         } else {
                             Self::get_next_command_context(
-                                terminal_model,
                                 #[cfg(feature = "local_fs")]
                                 conn,
-                                context,
                                 &block_completed,
                             )
                         };
+                    let suggestion = |command: String| GenerateAIInputSuggestionsResponseV2 {
+                        commands: vec![command.clone()],
+                        ai_queries: vec![],
+                        most_likely_action: command,
+                    };
                     // Filter history contexts for only cases where the next command matches our prefix.
                     if let Some(prefix) = &prefix {
                         next_command_context.history_contexts = next_command_context
@@ -406,13 +341,8 @@ impl NextCommandModel {
                             }
                             let history_command_prediction_likelihood =
                                 *count as f64 / total_history_count as f64;
-                            history_based_autosuggestion_state = HistoryBasedAutosuggestionState {
-                                history_command_prediction: most_likely_next_command.to_owned(),
-                                history_command_prediction_likelihood,
-                                total_history_count,
-                            };
 
-                            // If one command is very likely based on history, skip the LLM call and return it directly.
+                            // If one command is very likely based on history, return it.
                             // Use history-based autosuggestion if there are a min number of similar cases in history
                             // AND the same command was run at least skip_llm_confidence_threshold of the time.
                             // Partial autosuggestions with a prefix have more lenient requirements
@@ -427,48 +357,18 @@ impl NextCommandModel {
                                 && history_command_prediction_likelihood
                                     >= skip_llm_confidence_threshold
                             {
-                                // We construct the request even though we're not sending it to the server because
-                                // it might be used later for cycling next command suggestions.
-                                let request = create_generate_ai_input_suggestions_request(
-                                    next_command_context.clone(),
-                                    prefix,
-                                    block_context,
-                                    previous_result,
-                                );
                                 return (
-                                    Ok(GenerateAIInputSuggestionsResponseV2 {
-                                        commands: vec![most_likely_next_command.to_owned()],
-                                        ai_queries: vec![],
-                                        most_likely_action: most_likely_next_command.to_owned(),
-                                    }),
-                                    request,
-                                    false,
-                                    start_ts_ms,
-                                    history_based_autosuggestion_state,
-                                    false,
+                                    Some(suggestion(most_likely_next_command.to_owned())),
+                                    prefix,
                                     next_command_context,
                                 );
                             }
                         }
                     }
-                    let request = create_generate_ai_input_suggestions_request(
-                        next_command_context.clone(),
-                        prefix.clone(),
-                        block_context,
-                        previous_result,
-                    );
 
-                    // For zero-state next command suggestions, return the result immediately.
+                    // Zero-state suggestions only come from rich history.
                     let Some(prefix) = prefix else {
-                        return (
-                            server_api.generate_ai_input_suggestions(&request).await,
-                            request,
-                            true,
-                            start_ts_ms,
-                            history_based_autosuggestion_state,
-                            false,
-                            next_command_context,
-                        );
+                        return (None, None, next_command_context);
                     };
 
                     // At this point we know we're generating a partial suggestion with a prefix.
@@ -477,16 +377,8 @@ impl NextCommandModel {
                     for reverse_chronological_command in reverse_chronological_potential_autosuggestions.unwrap_or_default() {
                         if is_command_valid(&reverse_chronological_command, completion_context.as_ref(), session_env_vars.as_ref()).await {
                             return (
-                                Ok(GenerateAIInputSuggestionsResponseV2 {
-                                    commands: vec![reverse_chronological_command.clone()],
-                                ai_queries: vec![],
-                                most_likely_action: reverse_chronological_command,
-                            }),
-                            request,
-                            false,
-                            start_ts_ms,
-                                history_based_autosuggestion_state,
-                                false,
+                                Some(suggestion(reverse_chronological_command)),
+                                Some(prefix),
                                 next_command_context,
                             );
                         }
@@ -525,33 +417,15 @@ impl NextCommandModel {
                         if let Some(autosuggestion) = autosuggestion {
                             if is_command_valid(&autosuggestion, Some(&completion_context), session_env_vars.as_ref()).await {
                                 return (
-                                    Ok(GenerateAIInputSuggestionsResponseV2 {
-                                        commands: vec![autosuggestion.clone()],
-                                    ai_queries: vec![],
-                                    most_likely_action: autosuggestion,
-                                }),
-                                request,
-                                false,
-                                    start_ts_ms,
-                                    history_based_autosuggestion_state,
-                                    false,
+                                    Some(suggestion(autosuggestion)),
+                                    Some(prefix),
                                     next_command_context,
                                 );
                             }
                         }
                     };
 
-                    // Only if we have no commands from history and no completions, use the LLM to generate a partial suggestion.
-                    let response = server_api.generate_ai_input_suggestions(&request).await;
-                    (
-                        response,
-                        request,
-                        true,
-                        start_ts_ms,
-                        history_based_autosuggestion_state,
-                        false,
-                        next_command_context,
-                    )
+                    (None, Some(prefix), next_command_context)
                 },
                 Self::on_next_command_suggestion_result,
             )
@@ -561,68 +435,36 @@ impl NextCommandModel {
 
     fn on_next_command_suggestion_result(
         &mut self,
-        result: (
-            Result<GenerateAIInputSuggestionsResponseV2, AIApiError>,
-            GenerateAIInputSuggestionsRequest,
-            bool,
-            i64,
-            HistoryBasedAutosuggestionState,
-            bool,
+        (response, prefix, next_command_context): (
+            Option<GenerateAIInputSuggestionsResponseV2>,
+            Option<String>,
             NextCommandContext,
         ),
         ctx: &mut ModelContext<Self>,
     ) {
         self.next_command_abort_handle = None;
-        let (
-            result,
-            request,
-            is_from_ai,
-            start_ts_ms,
-            history_based_autosuggestion_state,
-            is_from_cycle,
-            next_command_context,
-        ) = result;
-        let end_ts_ms = Utc::now().timestamp_millis();
-        let request_duration_ms = end_ts_ms - start_ts_ms;
-        if request.prefix.is_none() {
+        if prefix.is_none() {
             self.cached_zerostate_next_command_context = Some(next_command_context);
         }
-        match result {
-            Ok(response) => {
-                if let Some(prefix) = &request.prefix {
-                    if !response.most_likely_action.starts_with(prefix) {
-                        // This is not expected to happen because the server applies its own filtering,
-                        // but check just in case.
-                        log::warn!(
-                            "Next command suggestion `{}` does not start with prefix `{}`.",
-                            response.most_likely_action,
-                            prefix
-                        );
-                        return;
-                    }
-                } else {
-                    self.zerostate_suggestion_info = Some(ZeroStateSuggestionInfo {
-                        response: response.clone(),
-                        is_from_ai,
-                    });
-                }
-
-                self.next_command_state = NextCommandSuggestionState::Ready {
-                    request: Box::new(request),
-                    response,
-                    request_duration_ms,
-                    is_from_ai,
-                    is_from_cycle,
-                    history_based_autosuggestion_state,
-                };
-                ctx.emit(NextCommandModelEvent::NextCommandSuggestionReady);
-            }
-            Err(err) => {
-                report_error!(
-                    anyhow::anyhow!(err).context("Failed to generate Next Command suggestion")
-                );
-            }
+        let Some(response) = response else {
+            return;
         };
+        if let Some(prefix) = &prefix {
+            if !response.most_likely_action.starts_with(prefix) {
+                log::warn!(
+                    "Next command suggestion `{}` does not start with prefix `{}`.",
+                    response.most_likely_action,
+                    prefix
+                );
+                return;
+            }
+        }
+
+        self.next_command_state = NextCommandSuggestionState::Ready {
+            response,
+            is_from_cycle: false,
+        };
+        ctx.emit(NextCommandModelEvent::NextCommandSuggestionReady);
     }
 }
 

@@ -4923,20 +4923,8 @@ impl AIBlock {
             |me, requested_command_id, ctx| {
                 me.auto_expand_requested_command_timer_handle = None;
 
-                // Avoid auto-expanding while voice input is active.
-                let voice_active = {
-                    #[cfg(feature = "voice_input")]
-                    {
-                        voice_input::VoiceInput::as_ref(ctx).is_active()
-                    }
-                    #[cfg(not(feature = "voice_input"))]
-                    {
-                        false
-                    }
-                };
-
                 // If user has typed since the last submit, do not auto-expand while they are editing.
-                if me.terminal_model.lock().is_input_dirty() || voice_active {
+                if me.terminal_model.lock().is_input_dirty() {
                     return;
                 }
 

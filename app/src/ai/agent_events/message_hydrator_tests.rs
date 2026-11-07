@@ -8,7 +8,7 @@ use super::*;
 use crate::server::server_api::ai::{
     AIClient, AgentRunEvent, MockAIClient, ReadAgentMessageResponse,
 };
-use crate::server::server_api::presigned_upload::HttpStatusError;
+use crate::server::server_api::HttpStatusError;
 
 fn make_run_event(
     sequence: i64,
