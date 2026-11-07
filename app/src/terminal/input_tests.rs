@@ -307,7 +307,7 @@ pub fn initialize_app(app: &mut App) {
 
     AltScreenReporting::register(app);
     app.add_singleton_model(|_| RestoredAgentConversations::new(vec![]));
-    app.add_singleton_model(OneTimeModalModel::new);
+    app.add_singleton_model(|_| OneTimeModalModel::new());
     app.add_singleton_model(|_| WorkspaceRegistry::new());
     app.add_singleton_model(|_| ToastStack);
     app.add_singleton_model(AgentConversationsModel::new);

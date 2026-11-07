@@ -175,7 +175,7 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(|_| ProjectContextModel::default());
     app.add_singleton_model(|ctx| crate::ai::agent_tips::AITipModel::new_for_agent_tips(ctx));
     app.add_singleton_model(|_| RestoredAgentConversations::new(vec![]));
-    app.add_singleton_model(OneTimeModalModel::new);
+    app.add_singleton_model(|_| OneTimeModalModel::new());
     app.add_singleton_model(|_| WorkspaceRegistry::new());
     app.add_singleton_model(UndoCloseStack::new);
     app.add_singleton_model(|_| IgnoredSuggestionsModel::new(vec![]));

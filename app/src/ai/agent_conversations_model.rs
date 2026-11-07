@@ -40,8 +40,6 @@ use crate::ai::blocklist::{
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, ConversationStatusUpdate,
 };
 use crate::ai::conversation_navigation::ConversationNavigationData;
-use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
-use crate::auth::AuthStateProvider;
 use crate::network::{NetworkStatus, NetworkStatusEvent, NetworkStatusKind};
 use crate::server::cloud_objects::update_manager::{UpdateManager, UpdateManagerEvent};
 use crate::server::retry_strategies::{
@@ -49,7 +47,6 @@ use crate::server::retry_strategies::{
 };
 use crate::server::server_api::ai::TaskListFilter;
 use crate::server::server_api::{HttpStatusError, ServerApiProvider};
-use crate::settings::AISettings;
 use crate::ui_components::icons::Icon;
 use crate::workspace::{RestoreConversationLayout, WorkspaceAction};
 
@@ -622,10 +619,6 @@ impl AgentConversationsModel {
         let window_manager = WindowManager::handle(ctx);
         ctx.subscribe_to_model(&window_manager, Self::handle_window_state_changed);
 
-        // Subscribe to auth events to retry initial sync when user becomes available
-        let auth_manager = AuthManager::handle(ctx);
-        ctx.subscribe_to_model(&auth_manager, Self::handle_auth_manager_event);
-
         let history_model = BlocklistAIHistoryModel::handle(ctx);
         ctx.subscribe_to_model(&history_model, move |me, _, event, ctx| {
             me.handle_history_event(event, ctx);
@@ -700,22 +693,6 @@ impl AgentConversationsModel {
                     self.update_polling_state(ctx);
                 }
             }
-        }
-    }
-
-    fn handle_auth_manager_event(
-        &mut self,
-        _: ModelHandle<AuthManager>,
-        event: &AuthManagerEvent,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        // When auth completes, retry the initial task sync if we haven't loaded tasks yet
-        // Only sync if we're not in CLI mode
-        if matches!(event, AuthManagerEvent::AuthComplete)
-            && !self.has_finished_initial_load
-            && AppExecutionMode::as_ref(ctx).can_fetch_agent_runs_for_management()
-        {
-            self.fetch_ambient_agent_tasks_and_cloud_convo_metadata(ctx);
         }
     }
 
@@ -867,146 +844,6 @@ impl AgentConversationsModel {
         }
 
         ctx.emit(AgentConversationsModelEvent::ConversationsLoaded);
-    }
-
-    /// Fetches tasks and cloud conversation metadata async. Cloud conversation metadata is merged with
-    /// metadata stored in local db in the BlocklistAIHistoryModel
-    fn fetch_ambient_agent_tasks_and_cloud_convo_metadata(&mut self, ctx: &mut ModelContext<Self>) {
-        let Some(creator_uid) = AuthStateProvider::as_ref(ctx)
-            .get()
-            .user_id()
-            .map(|uid| uid.as_string())
-        else {
-            // If we don't have a user ID, don't pull tasks
-            return;
-        };
-
-        let ai_settings = AISettings::as_ref(ctx);
-        if !ai_settings.is_any_ai_enabled(ctx) {
-            // If we don't have AI enabled, don't pull tasks
-            return;
-        }
-
-        let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client();
-
-        ctx.spawn_with_retry_on_error(
-            move || {
-                let ai_client = ai_client.clone();
-                let creator_uid = creator_uid.clone();
-                async move {
-                    // Fetch personal tasks only on initialization; team tasks fetched by the view model when filters applied
-                    let personal_future = ai_client.list_ambient_agent_tasks(
-                        INITIAL_TASK_AMOUNT,
-                        TaskListFilter {
-                            creator_uid: Some(creator_uid),
-                            ..Default::default()
-                        },
-                    );
-                    let conversation_metadata_future =
-                        ai_client.list_ai_conversation_metadata(None);
-
-                    let (personal_result, conversation_metadata_result) =
-                        futures::future::join(personal_future, conversation_metadata_future).await;
-
-                    // Handle tasks result
-                    let tasks = match personal_result {
-                        Ok(tasks) => tasks,
-                        Err(e) => {
-                            log::warn!("Failed to fetch ambient agent tasks: {e:?}");
-                            vec![]
-                        }
-                    };
-
-                    // Handle conversation metadata result
-                    let mut conversation_metadata = match conversation_metadata_result {
-                        Ok(metadata) => metadata,
-                        Err(e) => {
-                            log::warn!("Failed to fetch conversation metadata: {e:?}");
-                            vec![]
-                        }
-                    };
-
-                    // Collect all conversation IDs from tasks
-                    let task_conversation_ids: HashSet<String> = tasks
-                        .iter()
-                        .filter_map(|task| task.conversation_id().map(str::to_string))
-                        .collect();
-
-                    // Build a set of conversation IDs we already have
-                    let fetched_conversation_ids: HashSet<String> = conversation_metadata
-                        .iter()
-                        .map(|meta| meta.server_conversation_token.as_str().to_string())
-                        .collect();
-
-                    // Find conversation IDs that are in tasks but not in the initial metadata fetch
-                    let missing_conversation_ids: Vec<String> = task_conversation_ids
-                        .difference(&fetched_conversation_ids)
-                        .cloned()
-                        .collect();
-
-                    // If there are missing conversation IDs, fetch their metadata
-                    if !missing_conversation_ids.is_empty() {
-                        log::info!(
-                            "Fetching {} missing conversation metadata entries for ambient agent tasks",
-                            missing_conversation_ids.len()
-                        );
-                        match ai_client
-                            .list_ai_conversation_metadata(Some(missing_conversation_ids))
-                            .await
-                        {
-                            Ok(additional_metadata) => {
-                                log::info!(
-                                    "Fetched {} additional conversation metadata entries",
-                                    additional_metadata.len()
-                                );
-                                conversation_metadata.extend(additional_metadata);
-                            }
-                            Err(e) => {
-                                log::warn!("Failed to fetch additional conversation metadata: {e:?}");
-                            }
-                        }
-                    }
-
-                    // Always return success - we handle failures individually above
-                    Ok((tasks, conversation_metadata))
-                }
-            },
-            OUT_OF_BAND_REQUEST_RETRY_STRATEGY,
-            |model, result, ctx| {
-                if let RequestState::RequestSucceeded((tasks, conversation_metadata)) = result {
-                    model.has_finished_initial_load = true;
-
-                    // Update tasks if we got any
-                    if !tasks.is_empty() {
-                        log::info!("Updating model with {} tasks", tasks.len());
-                        for task in tasks {
-                            model.tasks.insert(task.task_id, task);
-                        }
-                    }
-
-                    // Update BlocklistAIHistoryModel with cloud conversation metadata if we got any
-                    if !conversation_metadata.is_empty() {
-                        log::info!(
-                            "Fetched {} cloud conversation metadata entries total",
-                            conversation_metadata.len()
-                        );
-                        BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, _| {
-                            history_model.merge_cloud_conversation_metadata(conversation_metadata);
-                        });
-                    }
-
-                    // Sync conversations to refresh local cache
-                    model.sync_conversations(ctx);
-
-                    model.update_polling_state(ctx);
-                    ctx.emit(AgentConversationsModelEvent::ConversationsLoaded);
-                } else if let RequestState::RequestFailed(e) = result {
-                    model.has_finished_initial_load = true;
-                    model.update_polling_state(ctx);
-                    report_error!(e);
-                }
-            },
-        );
     }
 
     /// Called when a view that consumes this model's data becomes visible.
@@ -1232,7 +1069,7 @@ impl AgentConversationsModel {
 
         entries
             .into_iter()
-            .filter(|entry| entry.matches_filters(filters, app))
+            .filter(|entry| entry.matches_filters(filters))
             .sorted_by(|a, b| b.display.last_updated.cmp(&a.display.last_updated))
             .collect()
     }
@@ -1704,138 +1541,10 @@ impl AgentConversationsModel {
             })
             .collect();
 
-        // Include the current user since they may have local conversations
-        let auth_state = AuthStateProvider::as_ref(app).get();
-        if let (Some(name), Some(uid)) = (auth_state.display_name(), auth_state.user_id()) {
-            creators.push((name, uid.to_string()));
-        }
-
         creators.sort_by(|a, b| a.0.cmp(&b.0));
         creators.dedup_by(|a, b| a.0 == b.0);
 
         creators
-    }
-
-    /// Converts AgentManagementFilters to TaskListFilter for server API calls.
-    pub fn build_task_list_filter(
-        &self,
-        filters: &AgentManagementFilters,
-        current_user_uid: &str,
-    ) -> TaskListFilter {
-        let states = match filters.status {
-            StatusFilter::All => None,
-            StatusFilter::Working => Some(vec![
-                AmbientAgentTaskState::Queued,
-                AmbientAgentTaskState::Pending,
-                AmbientAgentTaskState::Claimed,
-                AmbientAgentTaskState::InProgress,
-            ]),
-            StatusFilter::Done => Some(vec![
-                AmbientAgentTaskState::Succeeded,
-                AmbientAgentTaskState::InProgress,
-            ]),
-            StatusFilter::Failed => Some(vec![
-                AmbientAgentTaskState::InProgress,
-                AmbientAgentTaskState::Failed,
-                AmbientAgentTaskState::Error,
-                AmbientAgentTaskState::Blocked,
-                AmbientAgentTaskState::Cancelled,
-                AmbientAgentTaskState::Unknown,
-            ]),
-        };
-
-        let source = match &filters.source {
-            SourceFilter::All => None,
-            SourceFilter::Specific(s) => Some(s.clone()),
-        };
-
-        let now = Utc::now();
-        let created_after = match filters.created_on {
-            CreatedOnFilter::All => None,
-            CreatedOnFilter::Last24Hours => Some(now - chrono::Duration::hours(24)),
-            CreatedOnFilter::Past3Days => Some(now - chrono::Duration::days(3)),
-            CreatedOnFilter::LastWeek => Some(now - chrono::Duration::days(7)),
-        };
-
-        let creator_uid = match filters.owners {
-            OwnerFilter::PersonalOnly => Some(current_user_uid.to_string()),
-            OwnerFilter::All => match &filters.creator {
-                CreatorFilter::All => None,
-                CreatorFilter::Specific { uid, .. } => Some(uid.clone()),
-            },
-        };
-
-        let environment_id = match &filters.environment {
-            EnvironmentFilter::All | EnvironmentFilter::NoEnvironment => None,
-            EnvironmentFilter::Specific(id) => Some(id.clone()),
-        };
-
-        TaskListFilter {
-            creator_uid,
-            states,
-            source,
-            created_after,
-            environment_id,
-            ..TaskListFilter::default()
-        }
-    }
-
-    /// Fetches tasks matching the given filters from the server, merges them into the model,
-    /// and enforces the task cap. Called when user changes filters in AgentManagementView.
-    pub fn fetch_tasks_for_filters(
-        &mut self,
-        filters: &AgentManagementFilters,
-        current_user_uid: &str,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let ai_client = ServerApiProvider::handle(ctx).as_ref(ctx).get_ai_client();
-        let task_filter = self.build_task_list_filter(filters, current_user_uid);
-        let current_user_uid = current_user_uid.to_string();
-
-        ctx.spawn_with_retry_on_error(
-            move || {
-                let ai_client = ai_client.clone();
-                let task_filter = task_filter.clone();
-                async move {
-                    ai_client
-                        .list_ambient_agent_tasks(INITIAL_TASK_AMOUNT, task_filter)
-                        .await
-                }
-            },
-            OUT_OF_BAND_REQUEST_RETRY_STRATEGY,
-            move |model, result, ctx| {
-                if let RequestState::RequestSucceeded(tasks) = result {
-                    // Merge results into model
-                    let mut has_new_tasks = false;
-                    let mut has_updated_tasks = false;
-
-                    for task in tasks {
-                        let task_id = task.task_id;
-                        match model.tasks.get(&task_id) {
-                            Some(existing_task) => {
-                                if existing_task != &task {
-                                    has_updated_tasks = true;
-                                }
-                            }
-                            None => has_new_tasks = true,
-                        };
-                        model.tasks.insert(task_id, task);
-                    }
-
-                    // Enforce task cap
-                    model.enforce_task_cap(&current_user_uid);
-
-                    // Emit appropriate event
-                    if has_new_tasks {
-                        ctx.emit(AgentConversationsModelEvent::NewTasksReceived);
-                    } else if has_updated_tasks {
-                        ctx.emit(AgentConversationsModelEvent::TasksUpdated);
-                    }
-                } else if let RequestState::RequestFailed(e) = result {
-                    report_error!(e);
-                }
-            },
-        );
     }
 
     /// Enforces cap on tasks stored in the model so it doesn't grow without bound.

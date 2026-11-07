@@ -15,16 +15,14 @@ use warpui::keymap::Keystroke;
 use warpui::platform::Cursor;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{
-    AppContext, Element, Entity, EventContext, ModelHandle, SingletonEntity, TypedActionView, View,
-    ViewContext, ViewHandle,
+    AppContext, Element, Entity, EventContext, ModelHandle, SingletonEntity, View, ViewContext,
+    ViewHandle,
 };
 
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::{PassiveSuggestionTrigger, StaticQueryType};
-use crate::ai::blocklist::prompt::prompt_alert::{
-    PromptAlertEvent, PromptAlertState, PromptAlertView,
-};
+use crate::ai::blocklist::prompt::prompt_alert::{PromptAlertState, PromptAlertView};
 use crate::ai::blocklist::BlocklistAIInputModel;
 use crate::ai::predict::prompt_suggestions::ACCEPT_PROMPT_SUGGESTION_KEYBINDING;
 use crate::ai::AIRequestUsageModel;
@@ -135,9 +133,7 @@ fn render_button(
     let theme = appearance.theme();
     let is_button_disabled = matches!(
         prompt_alert_state,
-        PromptAlertState::NoConnection
-            | PromptAlertState::AnonymousUserRequestLimitHardGate
-            | PromptAlertState::RequestLimitReached
+        PromptAlertState::NoConnection | PromptAlertState::RequestLimitReached
     ) && !force_enabled;
     let opacity: f32 = if is_button_disabled { 0.5 } else { 1.0 };
     let opacity_u8 = (opacity * 255.0).round() as u8;
@@ -296,29 +292,20 @@ fn get_tooltip_text_for_alert_state(alert_state: &PromptAlertState) -> Option<St
     // This is not an exhaustive list; the actual prompt alert component will have more information,
     // so we can keep the tooltip's text relatively minimal and just capture broad groups.
     match alert_state {
-        PromptAlertState::RequestLimitReached
-        | PromptAlertState::AnonymousUserRequestLimitHardGate
-        | PromptAlertState::AnonymousUserRequestLimitSoftGate => {
-            Some(OUT_OF_REQUESTS_TOOLTIP_MESSAGE.to_string())
-        }
+        PromptAlertState::RequestLimitReached => Some(OUT_OF_REQUESTS_TOOLTIP_MESSAGE.to_string()),
         _ => None,
     }
 }
 
 /// Free-plan users who run out of Warp-provided AI credits should get a modal
 /// offering BYO/upgrade instead of a disabled button. Other disabled states
-/// (offline, anonymous hard gate) keep the disabled treatment.
+/// (offline) keep the disabled treatment.
 fn should_open_unavailable_modal(state: &PromptAlertState, app: &AppContext) -> bool {
     FeatureFlag::OpenWarpNewSettingsModes.is_enabled()
         && matches!(state, PromptAlertState::RequestLimitReached)
         // ICPs who still receive base credits on the Free plan keep the disabled
         // button; only offer the modal once the base allowance is gone.
         && AIRequestUsageModel::as_ref(app).request_limit() == 0
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PromptSuggestionsEvent {
-    SignupAnonymousUser,
 }
 
 pub struct PromptSuggestionsView {
@@ -332,10 +319,7 @@ impl PromptSuggestionsView {
         ai_input_model: ModelHandle<BlocklistAIInputModel>,
         ctx: &mut ViewContext<Self>,
     ) -> Self {
-        let prompt_alert = ctx.add_typed_action_view(PromptAlertView::new);
-        ctx.subscribe_to_view(&prompt_alert, |me, _, event, ctx| {
-            me.handle_prompt_alert_event(event, ctx);
-        });
+        let prompt_alert = ctx.add_view(PromptAlertView::new);
 
         ctx.subscribe_to_model(&ai_input_model, |_, _, _, ctx| {
             ctx.notify();
@@ -351,18 +335,10 @@ impl PromptSuggestionsView {
     pub fn set_banner_state(&mut self, banner_state: PromptSuggestionBannerState) {
         self.banner_state = Some(banner_state);
     }
-
-    fn handle_prompt_alert_event(&mut self, event: &PromptAlertEvent, ctx: &mut ViewContext<Self>) {
-        match event {
-            PromptAlertEvent::SignupAnonymousUser => {
-                ctx.emit(PromptSuggestionsEvent::SignupAnonymousUser);
-            }
-        }
-    }
 }
 
 impl Entity for PromptSuggestionsView {
-    type Event = PromptSuggestionsEvent;
+    type Event = ();
 }
 
 impl View for PromptSuggestionsView {
@@ -447,17 +423,5 @@ impl View for PromptSuggestionsView {
             .with_padding_top(1.)
             .with_overdraw_bottom(1.)
             .finish()
-    }
-}
-
-impl TypedActionView for PromptSuggestionsView {
-    type Action = PromptSuggestionsEvent;
-
-    fn handle_action(&mut self, action: &PromptSuggestionsEvent, ctx: &mut ViewContext<Self>) {
-        match action {
-            PromptSuggestionsEvent::SignupAnonymousUser => {
-                ctx.emit(PromptSuggestionsEvent::SignupAnonymousUser);
-            }
-        }
     }
 }

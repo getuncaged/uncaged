@@ -24,7 +24,6 @@ use crate::ai::ai_document_view::DEFAULT_PLANNING_DOCUMENT_TITLE;
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::appearance::Appearance;
-use crate::auth::auth_state::AuthStateProvider;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{CloudObject, CloudObjectEventEntrypoint, Owner};
 use crate::drive::folders::CloudFolder;
@@ -259,10 +258,8 @@ impl AIDocumentModel {
         let title = document.title.clone();
         let content = document.editor.as_ref(ctx).markdown(ctx);
 
-        let Some(owner) = Self::get_plan_owner(ctx) else {
-            log::warn!("Failed to get owner while saving AI Document to Warp Drive. Skipping");
-            return false;
-        };
+        // Plans go to the local user's personal drive.
+        let owner = Owner::local_user();
 
         let Some(plan_folder_id) = self.get_or_create_plan_folder(owner, ctx).into_server() else {
             // Plan folder is still being created (has ClientId only).
@@ -488,21 +485,20 @@ impl AIDocumentModel {
         // NOTE: this handler runs for *all* Warp Drive object creations, so we must only create the
         // Plans folder when we actually have a plan notebook waiting to be created.
         if !self.pending_document_queue.is_empty() {
-            if let Some(owner) = Self::get_plan_owner(ctx) {
-                if let Some(folder_id) = self.get_or_create_plan_folder(owner, ctx).into_server() {
-                    let queue = std::mem::take(&mut self.pending_document_queue);
+            let owner = Owner::local_user();
+            if let Some(folder_id) = self.get_or_create_plan_folder(owner, ctx).into_server() {
+                let queue = std::mem::take(&mut self.pending_document_queue);
 
-                    for pending in queue {
-                        self.create_notebook_in_plan_folder(
-                            pending.id,
-                            &pending.title,
-                            &pending.content,
-                            owner,
-                            folder_id,
-                            ctx,
-                        );
-                        ctx.emit(AIDocumentModelEvent::DocumentSaveStatusUpdated(pending.id));
-                    }
+                for pending in queue {
+                    self.create_notebook_in_plan_folder(
+                        pending.id,
+                        &pending.title,
+                        &pending.content,
+                        owner,
+                        folder_id,
+                        ctx,
+                    );
+                    ctx.emit(AIDocumentModelEvent::DocumentSaveStatusUpdated(pending.id));
                 }
             }
         }
@@ -1255,21 +1251,6 @@ impl AIDocumentModel {
         id: &AIDocumentId,
     ) -> Option<&Vec<AIDocumentEarlierVersion>> {
         self.earlier_versions.get(id)
-    }
-
-    /// Get the appropriate owner for plan documents.
-    /// For service accounts, returns the team drive owner.
-    /// For regular users, returns the personal drive owner.
-    fn get_plan_owner(ctx: &AppContext) -> Option<Owner> {
-        let is_service_account = AuthStateProvider::as_ref(ctx).get().is_service_account();
-
-        if is_service_account {
-            // Uncaged has no teams, so a service account has no team drive and the caller
-            // skips the plan sync.
-            None
-        } else {
-            Some(Owner::local_user())
-        }
     }
 
     /// Get or create the Plans folder in the appropriate drive.

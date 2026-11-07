@@ -14,7 +14,7 @@ use warp_graphql::mutations::create_anonymous_user::{
 };
 use warp_server_auth::user::persistence::PersistedUser;
 use warpui::clipboard::ClipboardContent;
-use warpui::{Entity, ModelContext, SingletonEntity, UpdateModel};
+use warpui::{Entity, ModelContext, SingletonEntity};
 
 use super::auth_state::{AuthState, PersistAction};
 use super::auth_view_modal::{AuthRedirectPayload, AuthViewVariant};
@@ -24,7 +24,6 @@ use super::user_properties::UserProperties;
 use super::{AuthStateProvider, UserUid};
 use crate::ai::llms::LLMPreferences;
 use crate::ai::persisted_workspace::PersistedWorkspace;
-use crate::ai::AIRequestUsageModel;
 use crate::autoupdate::AutoupdateState;
 use crate::persistence::ModelEvent;
 use crate::server::cloud_objects::update_manager::UpdateManager;
@@ -35,8 +34,6 @@ use crate::server::server_api::auth::{
 };
 use crate::server::server_api::ServerApi;
 use crate::settings::cloud_preferences_syncer::CloudPreferencesSyncer;
-use crate::settings::initializer::SettingsInitializer;
-use crate::settings::PrivacySettings;
 use crate::terminal::general_settings::GeneralSettings;
 #[cfg(target_family = "wasm")]
 use crate::uri::browser_url_handler::{parse_current_url, update_browser_url};
@@ -352,10 +349,6 @@ impl AuthManager {
 
                 self.set_needs_reauth(false, ctx);
 
-                SettingsInitializer::handle(ctx).update(ctx, |initializer, ctx| {
-                    initializer.handle_user_fetched(self.auth_state.clone(), ctx);
-                });
-
                 // Reset the initial-load condition so that any cloud preference
                 // sync waits for the *new* user's cloud objects rather than
                 // resolving immediately against stale data from a prior session.
@@ -376,10 +369,6 @@ impl AuthManager {
 
                 CloudPreferencesSyncer::handle(ctx).update(ctx, |model, ctx| {
                     model.handle_user_fetched(self.auth_state.clone(), ctx)
-                });
-
-                AIRequestUsageModel::handle(ctx).update(ctx, |usage_model, ctx| {
-                    usage_model.refresh_request_usage_async(ctx);
                 });
 
                 LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
@@ -416,12 +405,6 @@ impl AuthManager {
                         log::error!("Error persisting user information to database: {e:?}");
                     };
                 }
-
-                // Fetch the user's privacy settings from the server if any or update the server settings.
-                let privacy_settings_handle = PrivacySettings::handle(ctx);
-                ctx.update_model(&privacy_settings_handle, |privacy_settings, ctx| {
-                    privacy_settings.fetch_or_update_settings(ctx);
-                });
 
                 // Now that the user is logged in, do the daily version check.
                 if FeatureFlag::Autoupdate.is_enabled() {

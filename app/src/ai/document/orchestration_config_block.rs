@@ -24,7 +24,6 @@ use crate::ai::blocklist::inline_action::orchestration_controls::{
 };
 use crate::ai::blocklist::BlocklistAIHistoryEvent;
 use crate::ai::document::ai_document_model::AIDocumentModel;
-use crate::ai::harness_availability::{HarnessAvailabilityEvent, HarnessAvailabilityModel};
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
 use crate::appearance::Appearance;
 use crate::ui_components::blended_colors;
@@ -189,27 +188,6 @@ impl OrchestrationConfigBlockView {
                 }
             }
         });
-
-        // Repopulate pickers when the server-provided harness list,
-        // harness model catalogs, or per-harness auth secrets change.
-        // Without an `AuthSecretsLoaded` handler the picker stays on
-        // "Loading…" forever after the lazy fetch completes.
-        ctx.subscribe_to_model(
-            &HarnessAvailabilityModel::handle(ctx),
-            |me, _, event, ctx| match event {
-                HarnessAvailabilityEvent::AuthSecretCreated { .. }
-                | HarnessAvailabilityEvent::Changed
-                | HarnessAvailabilityEvent::AuthSecretsLoaded
-                | HarnessAvailabilityEvent::AuthSecretsFetchFailed => {
-                    // Repopulate even on fetch failure to replace "Loading…".
-                    if me.pickers_initialized {
-                        oc::repopulate_all_pickers(&mut me.edit_state, &me.pickers, ctx);
-                    }
-                    ctx.notify();
-                }
-                HarnessAvailabilityEvent::AuthSecretCreationFailed { .. } => {}
-            },
-        );
 
         let mut view = Self {
             conversation_id,

@@ -991,11 +991,6 @@ pub fn populate_auth_secret_picker_for_harness<A: OrchestrationControlAction, V:
     if harness == Harness::Oz {
         return;
     }
-    // Trigger lazy fetch so the next paint shows real entries.
-    HarnessAvailabilityModel::handle(ctx).update(ctx, |model, ctx| {
-        model.ensure_auth_secrets_fetched(harness, ctx);
-    });
-
     let initial = match selection {
         AuthSecretSelection::Named(name) => Some(name.clone()),
         _ => None,

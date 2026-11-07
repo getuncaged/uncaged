@@ -613,7 +613,6 @@ pub enum Event {
         flavor: ToastFlavor,
         pane_id: Option<PaneId>,
     },
-    SignupAnonymousUser,
     OpenThemeGallery,
     InvalidatedActiveConversation,
     OpenConversationHistory,

@@ -14,7 +14,6 @@ use warpui::{
 
 use super::{NotebookEvent, NotebookView, SAVE_PERIOD};
 use crate::auth::auth_manager::AuthManager;
-use crate::auth::user::{TEST_USER_EMAIL, TEST_USER_UID};
 use crate::auth::{AuthStateProvider, UserUid};
 use crate::cloud_object::model::actions::ObjectActions;
 use crate::cloud_object::model::persistence::CloudModel;
@@ -371,49 +370,6 @@ fn test_focus_tracking() {
     });
 }
 
-/// Test to make sure we eagerly enter edit mode when user is already the current editor
-#[test]
-fn test_eager_baton_grab_same_current_editor() {
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-
-        // Complete the initial load so that grab-the-baton behavior applies.
-        initial_load(&mut app, vec![]).await;
-
-        let (_, notebook_view, _) = create_notebook(&mut app);
-        let mut cloud_notebook = cloud_notebook("Test Notebook", r#"A notebook"#);
-
-        // Set the current editor of the notebook to be the test notebook
-        cloud_notebook.metadata.current_editor_uid = Some(TEST_USER_UID.to_string().clone());
-
-        // Add the notebook to cloud model
-        CloudModel::handle(&app).update(&mut app, |model, _| {
-            model.add_object(cloud_notebook.id, cloud_notebook.clone())
-        });
-
-        // Open the notebook
-        open_notebook(&mut app, &notebook_view, cloud_notebook).await;
-
-        // Assert that the editor is the current editor from the test user email
-        notebook_view.update(&mut app, |notebook, ctx| {
-            assert_eq!(
-                notebook
-                    .active_notebook_data
-                    .as_ref(ctx)
-                    .current_editor(ctx),
-                Some(Editor {
-                    state: EditorState::CurrentUser,
-                    email: Some(TEST_USER_EMAIL.to_string())
-                })
-            )
-        });
-
-        let mode = notebook_view.read(&app, |notebook, ctx| notebook.mode(ctx));
-        // Assert that we are in edit mode open since the editor is the current editor
-        assert_eq!(mode, Mode::Editing);
-    });
-}
-
 /// Test to make sure we do not eagerly enter edit mode when there is another editor
 #[test]
 fn test_not_eager_baton_grab_different_editor() {
@@ -522,53 +478,6 @@ fn test_baton_grab_editor_changed_offline() {
                 })
             );
             assert_eq!(notebook.mode_app_ctx(ctx), Mode::View);
-        })
-    });
-}
-
-/// Test to make sure we can eagerly grab the baton if the previous editor exits offline.
-#[test]
-fn test_baton_grab_editor_left_offline() {
-    App::test((), |mut app| async move {
-        initialize_app(&mut app);
-
-        let other_uid = "ben@warp.dev";
-
-        let (_, notebook_view, _) = create_notebook(&mut app);
-
-        // Create a notebook with an editor.
-        let mut server_notebook = mock_server_notebook("Test Notebook", "Some text");
-        server_notebook.metadata.current_editor_uid = Some(other_uid.to_string());
-        let cloud_notebook = CloudNotebook::new_from_server(server_notebook.clone());
-
-        // Add the notebook to the cloud model, with the saved editor.
-        CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
-            cloud_model.add_object(cloud_notebook.id, cloud_notebook.clone());
-        });
-
-        // Open the notebook, before initial load has finished.
-        let open_future = open_notebook(&mut app, &notebook_view, cloud_notebook);
-
-        // In the meantime, complete initial load with no editor.
-        server_notebook.metadata.metadata_last_updated_ts =
-            (Utc::now() + Duration::seconds(1)).into();
-        server_notebook.metadata.current_editor_uid = None;
-        initial_load(&mut app, vec![server_notebook]).await;
-
-        // The notebook should load and take the baton.
-        open_future.await;
-        notebook_view.read(&app, |notebook, ctx| {
-            assert_eq!(
-                notebook
-                    .active_notebook_data
-                    .as_ref(ctx)
-                    .current_editor(ctx),
-                Some(Editor {
-                    state: EditorState::CurrentUser,
-                    email: Some(TEST_USER_EMAIL.to_string())
-                })
-            );
-            assert_eq!(notebook.mode_app_ctx(ctx), Mode::Editing);
         })
     });
 }

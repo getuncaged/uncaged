@@ -138,7 +138,7 @@ use crate::ai::get_relevant_files::controller::{
     GetRelevantFilesController, GetRelevantFilesControllerEvent,
 };
 use crate::ai::{AIRequestUsageModel, AIRequestUsageModelEvent};
-use crate::auth::{AuthStateProvider, UserUid};
+use crate::auth::UserUid;
 use crate::cloud_object::model::generic_string_model::GenericStringObjectId;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::code::editor::comment_editor::create_readonly_comment_markdown_editor;
@@ -205,13 +205,11 @@ struct UserAvatarInfo {
     profile_image_path: Option<String>,
 }
 
-fn current_user_avatar_info(app: &AppContext) -> UserAvatarInfo {
-    let auth_state = AuthStateProvider::as_ref(app).get().clone();
+/// Uncaged's local user has no account name or photo.
+fn current_user_avatar_info() -> UserAvatarInfo {
     UserAvatarInfo {
-        display_name: auth_state
-            .username_for_display()
-            .unwrap_or_else(|| DEFAULT_USER_DISPLAY_NAME.to_owned()),
-        profile_image_path: auth_state.user_photo_url(),
+        display_name: DEFAULT_USER_DISPLAY_NAME.to_owned(),
+        profile_image_path: None,
     }
 }
 
@@ -259,7 +257,7 @@ fn user_avatar_info_for_ai_block(
     model: &dyn AIBlockModel<View = AIBlock>,
     app: &AppContext,
 ) -> UserAvatarInfo {
-    let fallback = current_user_avatar_info(app);
+    let fallback = current_user_avatar_info();
     let server_metadata = model
         .conversation(app)
         .and_then(|conversation| conversation.server_metadata());

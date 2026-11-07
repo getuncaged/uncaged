@@ -78,7 +78,15 @@ struct OnboardingMainView {
 
 impl OnboardingMainView {
     fn new(ctx: &mut ViewContext<Self>) -> Self {
-        let themes = [phenomenon(), dark_theme(), light_theme(), adeberry()];
+        // The picker shows five themes; the demo has no Uncaged or Midnight theme, so
+        // Phenomenon stands in for both.
+        let themes = [
+            phenomenon(),
+            phenomenon(),
+            dark_theme(),
+            light_theme(),
+            adeberry(),
+        ];
         let default_model_id = LLMId::from("auto");
         let models = vec![
             OnboardingModelInfo {
@@ -108,8 +116,6 @@ impl OnboardingMainView {
                 models.clone(),
                 default_model_id.clone(),
                 false,
-                false,
-                onboarding::OnboardingAuthState::LoggedOut,
                 ctx,
             )
         });
@@ -163,7 +169,9 @@ impl OnboardingMainView {
             | AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested
             | AgentOnboardingEvent::LoginFromWelcomeRequested
             | AgentOnboardingEvent::PrivacySettingsFromTerminalThemeSlideRequested
-            | AgentOnboardingEvent::AppBecameActive => {
+            | AgentOnboardingEvent::AppBecameActive
+            | AgentOnboardingEvent::ConnectPresetRequested(_)
+            | AgentOnboardingEvent::ActivateConnectionRequested(_) => {
                 // No-op in the standalone demo binary
             }
         }

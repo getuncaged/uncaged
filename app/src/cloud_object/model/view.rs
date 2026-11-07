@@ -6,7 +6,7 @@ use warp_graphql::scalars::time::ServerTimestamp;
 use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
 use super::persistence::{CloudModel, CloudModelEvent};
-use crate::auth::{AuthStateProvider, UserUid};
+use crate::auth::UserUid;
 use crate::cloud_object::{CloudObject, CloudObjectLocation, Space};
 use crate::drive::folders::CloudFolder;
 use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
@@ -82,8 +82,8 @@ impl CloudViewModel {
         Self::new(ctx)
     }
 
-    /// Returns the current editor of the object based on what current exists in CloudModel. If the current editor
-    /// matches the logged in user's email, we assume that that user is the current editor.
+    /// Returns the current editor of the object based on what current exists in CloudModel.
+    /// Uncaged has no account, so a recorded editor is always another user.
     /// If the current editor hasn't made an edit in the past 15 minutes, they are considered idle and
     /// we instead just return Editor::OtherUserIdle. This is to prevent introducing friction into the baton grabbing process
     /// when it's not needed. For more info see:
@@ -94,18 +94,6 @@ impl CloudViewModel {
 
         match &object.metadata().current_editor_uid {
             Some(uid) => {
-                let auth_state = AuthStateProvider::as_ref(ctx).get();
-                let user_uid = auth_state.user_id();
-
-                // If the logged in user matches the current UID, then the editor is the current
-                // user.
-                if user_uid.is_some_and(|user_uid| user_uid.as_string() == uid.clone()) {
-                    return Some(Editor {
-                        state: EditorState::CurrentUser,
-                        email: auth_state.user_email().clone(),
-                    });
-                }
-
                 let editor_uid = UserUid::new(uid);
                 let editor_email = UserProfiles::as_ref(ctx)
                     .profile_for_uid(editor_uid)
@@ -163,12 +151,12 @@ impl CloudViewModel {
     /// client expects is allowed.
     pub fn access_level(&self, object_uid: &ObjectUid, app: &AppContext) -> SharingAccessLevel {
         match CloudModel::as_ref(app).get_by_uid(object_uid) {
-            Some(object) => Self::object_access_level(object, app),
+            Some(object) => Self::object_access_level(object),
             None => SharingAccessLevel::View,
         }
     }
 
-    fn object_access_level(object: &dyn CloudObject, app: &AppContext) -> SharingAccessLevel {
+    fn object_access_level(object: &dyn CloudObject) -> SharingAccessLevel {
         match object.space() {
             // For now, users have full access to all objects in their own drives. We may introduce
             // drive-level ACLs in the future.
@@ -179,26 +167,6 @@ impl CloudViewModel {
                 // Check the default link-based access (if set, this is *at least* View).
                 if let Some(link_settings) = &object.permissions().anyone_with_link {
                     access_level = link_settings.access_level;
-                }
-
-                let user_uid = AuthStateProvider::as_ref(app).get().user_id();
-                if let Some(user_uid) = user_uid {
-                    for guest in object.permissions().guests.iter() {
-                        if guest.subject.is_user(user_uid) {
-                            access_level = access_level.max(guest.access_level);
-                        }
-                    }
-                }
-
-                // If the user created an object in a shared space, they will be treated as a guest and not the owner.
-                // The guest permissions aren't fetched until the object is re-fetched, and this fixes this behavior
-                // by forcing edit access if they created the object.
-                if let (Some(creator_uid), Some(user_uid)) =
-                    (object.metadata().creator_uid.clone(), user_uid)
-                {
-                    if creator_uid == user_uid.as_string() {
-                        access_level = access_level.max(SharingAccessLevel::Edit);
-                    }
                 }
 
                 access_level
@@ -214,21 +182,14 @@ impl CloudViewModel {
     ) -> ContentEditability {
         match CloudModel::as_ref(app).get_by_uid(object_uid) {
             Some(object) => {
-                let access_level = Self::object_access_level(object, app);
+                let access_level = Self::object_access_level(object);
                 if access_level < SharingAccessLevel::Edit {
                     ContentEditability::ReadOnly
-                } else if AuthStateProvider::as_ref(app)
-                    .get()
-                    .is_anonymous_or_logged_out()
-                {
-                    // The object is editable, but the user is not logged in.
-                    if object.space() == Space::Personal {
-                        ContentEditability::Editable
-                    } else {
-                        ContentEditability::RequiresLogin
-                    }
-                } else {
+                } else if object.space() == Space::Personal {
                     ContentEditability::Editable
+                } else {
+                    // The object is editable, but Uncaged has no account to edit it with.
+                    ContentEditability::RequiresLogin
                 }
             }
             // Assume objects not yet in CloudModel are new, and therefore editable.

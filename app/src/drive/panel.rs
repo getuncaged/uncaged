@@ -9,21 +9,13 @@ use warpui::{
     ViewHandle,
 };
 
-use super::drive_helpers::{
-    has_feature_gated_anonymous_user_reached_env_var_limit,
-    has_feature_gated_anonymous_user_reached_notebook_limit,
-    has_feature_gated_anonymous_user_reached_workflow_limit,
-};
 use super::index::{DriveIndex, DriveIndexAction, DriveIndexEvent};
 use super::items::WarpDriveItemId;
 use super::{CloudObjectTypeAndId, DriveObjectType};
 use crate::ai::document::ai_document_model::AIDocumentId;
 use crate::ai::facts::CloudAIFactModel;
 use crate::cloud_object::model::persistence::CloudModel;
-use crate::cloud_object::model::view::CloudViewModel;
-use crate::cloud_object::{
-    CloudObjectEventEntrypoint, GenericStringObjectFormat, JsonObjectType, Owner, Space,
-};
+use crate::cloud_object::{CloudObjectEventEntrypoint, Owner, Space};
 use crate::env_vars::manager::EnvVarCollectionSource;
 use crate::env_vars::CloudEnvVarCollection;
 use crate::notebooks::manager::NotebookSource;
@@ -345,43 +337,6 @@ impl DrivePanel {
         cloud_object_type_and_id: &CloudObjectTypeAndId,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Check if object being duplicated is in team space, if it is, then check
-        // corresponding object limits for that team.
-        if let Some(space) =
-            CloudViewModel::as_ref(ctx).object_space(&cloud_object_type_and_id.uid(), ctx)
-        {
-            match space {
-                // Uncaged has no teams, so there are no team object limits to check.
-                Space::Team { .. } => (),
-                Space::Personal => match cloud_object_type_and_id {
-                    CloudObjectTypeAndId::Notebook(_) => {
-                        if has_feature_gated_anonymous_user_reached_notebook_limit(ctx) {
-                            return;
-                        }
-                    }
-                    CloudObjectTypeAndId::Workflow(_) => {
-                        if has_feature_gated_anonymous_user_reached_workflow_limit(ctx) {
-                            return;
-                        }
-                    }
-                    CloudObjectTypeAndId::GenericStringObject {
-                        object_type:
-                            GenericStringObjectFormat::Json(JsonObjectType::EnvVarCollection),
-                        id: _,
-                    } => {
-                        if has_feature_gated_anonymous_user_reached_env_var_limit(ctx) {
-                            return;
-                        }
-                    }
-                    _ => {}
-                },
-                // We're reliant on server checks here, since the client doesn't know how many
-                // objects are in the owning drive.
-                Space::Shared => (),
-            }
-        }
-
-        // Otherwise allow object duplication to go through.
         UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
             update_manager.duplicate_object(cloud_object_type_and_id, ctx);
         });

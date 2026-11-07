@@ -56,9 +56,6 @@ use crate::ai::execution_profiles::{
 use crate::ai::llms::{LLMContextWindow, LLMId, LLMPreferences, LLMPreferencesEvent};
 use crate::ai::mcp::TemplatableMCPServerManager;
 use crate::ai::paths::host_native_absolute_path;
-use crate::auth::auth_manager::AuthManager;
-use crate::auth::auth_view_modal::AuthViewVariant;
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::GenericStringObjectFormat::Json;
 use crate::cloud_object::{JsonObjectType, ObjectType};
@@ -3045,7 +3042,6 @@ pub enum AISettingsPageEvent {
     #[cfg(feature = "local_fs")]
     OpenCustomRouterFile(PathBuf),
     OpenExecutionProfileEditor(ClientProfileId),
-    SignupAnonymousUser,
     ShowModal,
     HideModal,
 }
@@ -3081,7 +3077,6 @@ pub enum AISettingsPageAction {
     SetOrchestrationMessageDisplayMode(OrchestrationMessageDisplayMode),
     SetPromptSubmissionMode(PromptSubmissionMode),
     SetLongRunningCommandSubmissionMode(LongRunningCommandSubmissionMode),
-    AttemptLoginGatedUpgrade,
     RemoveCLIAgentToolbarEnabledCommand(String),
     RemoveFromCommandExecutionAllowlist(AgentModeCommandExecutionPredicate),
     RemoveFromCommandExecutionDenylist(AgentModeCommandExecutionPredicate),
@@ -3116,7 +3111,6 @@ pub enum AISettingsPageAction {
     AddToMCPDenylist(uuid::Uuid),
     RemoveFromMCPDenylist(uuid::Uuid),
     CreateProfile,
-    SignupAnonymousUser,
     ToggleCloudAgentComputerUse,
     ToggleFileBasedMcp,
     ToggleIncludeAgentCommandsInHistory,
@@ -3391,12 +3385,6 @@ impl TypedActionView for AISettingsPageView {
                 });
                 ctx.notify();
             }
-            AISettingsPageAction::AttemptLoginGatedUpgrade => {
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    auth_manager
-                        .attempt_login_gated_feature(AuthViewVariant::RequireLoginCloseable, ctx)
-                });
-            }
             AISettingsPageAction::RemoveCLIAgentToolbarEnabledCommand(command) => {
                 AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     settings.remove_cli_agent_footer_enabled_command(command, ctx);
@@ -3642,9 +3630,6 @@ impl TypedActionView for AISettingsPageView {
                 }
                 ctx.notify();
             }
-            AISettingsPageAction::SignupAnonymousUser => {
-                ctx.emit(AISettingsPageEvent::SignupAnonymousUser);
-            }
             AISettingsPageAction::ToggleCloudAgentComputerUse => {
                 AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     report_if_error!(settings
@@ -3771,12 +3756,6 @@ impl SettingsPageMeta for AISettingsPageView {
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
         FeatureFlag::AgentMode.is_enabled()
-    }
-
-    fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {
-        AIRequestUsageModel::handle(ctx).update(ctx, |ai_request_usage_model, ctx| {
-            ai_request_usage_model.refresh_request_usage_async(ctx)
-        });
     }
 
     fn update_filter(&mut self, query: &str, ctx: &mut ViewContext<Self>) -> MatchData {
@@ -3999,15 +3978,10 @@ impl SettingsWidget for GlobalAIWidget {
         let is_ai_disabled_due_to_remote_session_org_policy =
             AISettings::as_ref(app).is_ai_disabled_due_to_remote_session_org_policy(app);
 
-        let is_anonymous = AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out();
-
         // Uncaged: the settings view titles the page "Models", so the global switch is an
         // ordinary row in its own card rather than a second, larger "Models" heading.
         // Uncaged has no accounts -- AI is always available via the local engine, so this is
         // just the global AI on/off toggle, never a sign-up nag.
-        let _ = is_anonymous;
         let description = if is_ai_disabled_due_to_remote_session_org_policy {
             "Your organization disallows AI when the active pane contains content from a remote session"
         } else {

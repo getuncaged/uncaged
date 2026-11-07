@@ -13842,22 +13842,15 @@ dependencies = [
  "chrono",
  "getrandom 0.3.4",
  "hpke",
- "log",
  "rand 0.9.4",
  "serde",
  "serde_json",
- "tempfile",
  "thiserror 2.0.17",
  "tink-core",
  "tink-hybrid",
  "tink-proto",
- "tracing",
  "vec1",
- "warp_core",
  "warp_graphql",
- "warp_isolation_platform",
- "warpui_core",
- "zeroize",
 ]
 
 [[package]]
@@ -13937,7 +13930,6 @@ dependencies = [
  "uuid",
  "warp_core",
  "warp_graphql",
- "warp_managed_secrets",
  "warpui_core",
  "warpui_extras",
 ]

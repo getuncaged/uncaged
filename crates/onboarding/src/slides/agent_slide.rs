@@ -142,8 +142,7 @@ impl AgentSlide {
                     let model_count = state.models().len();
                     me.ensure_mouse_states_for_models(model_count, ctx);
                 }
-                OnboardingStateEvent::AuthStateChanged
-                | OnboardingStateEvent::SelectedSlideChanged
+                OnboardingStateEvent::SelectedSlideChanged
                 | OnboardingStateEvent::IntentionChanged
                 | OnboardingStateEvent::Completed
                 | OnboardingStateEvent::UpgradeRequested
@@ -181,17 +180,10 @@ impl AgentSlide {
         self.onboarding_state.as_ref(app).agent_settings()
     }
 
-    fn workspace_enforces_autonomy(&self, app: &AppContext) -> bool {
-        self.onboarding_state
-            .as_ref(app)
-            .workspace_enforces_autonomy()
-    }
-
     fn render_content(
         &self,
         appearance: &Appearance,
         settings: &AgentDevelopmentSettings,
-        workspace_enforces_autonomy: bool,
         app: &AppContext,
     ) -> Box<dyn Element> {
         // The collapsed slide content is rendered unconditionally — the expanded
@@ -202,7 +194,7 @@ impl AgentSlide {
         slide_content::onboarding_slide_content(
             vec![
                 self.render_header(appearance),
-                self.render_sections(appearance, settings, workspace_enforces_autonomy, app),
+                self.render_sections(appearance, settings, app),
             ],
             bottom_nav,
             self.scroll_state.clone(),
@@ -248,15 +240,10 @@ impl AgentSlide {
         &self,
         appearance: &Appearance,
         settings: &AgentDevelopmentSettings,
-        workspace_enforces_autonomy: bool,
         app: &AppContext,
     ) -> Box<dyn Element> {
         let model_section = self.render_model_section(appearance, settings, app);
-        let autonomy_section = if workspace_enforces_autonomy {
-            self.render_autonomy_workspace_enforced(appearance)
-        } else {
-            self.render_autonomy_section(appearance, settings)
-        };
+        let autonomy_section = self.render_autonomy_section(appearance, settings);
 
         let upper_col = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
@@ -656,57 +643,6 @@ impl AgentSlide {
             .finish()
     }
 
-    fn render_autonomy_workspace_enforced(&self, appearance: &Appearance) -> Box<dyn Element> {
-        let header = self.render_section_header("Autonomy", appearance);
-
-        let theme = appearance.theme();
-        let background_for_text = theme.background().into_solid();
-        let ui_font_family = appearance.ui_font_family();
-
-        let title_color = internal_colors::text_main(theme, background_for_text);
-        let subtitle_color = internal_colors::text_sub(theme, background_for_text);
-
-        let title_el = Text::new("Set by Team Workspace", ui_font_family, 14.0)
-            .with_color(title_color)
-            .with_style(Properties {
-                weight: Weight::Normal,
-                ..Default::default()
-            })
-            .with_line_height_ratio(1.0)
-            .finish();
-
-        let subtitle_el = Text::new(
-            "Autonomy settings are configured as part of your team workspace.",
-            ui_font_family,
-            12.0,
-        )
-        .with_color(subtitle_color)
-        .with_style(Properties {
-            weight: Weight::Normal,
-            ..Default::default()
-        })
-        .with_line_height_ratio(1.0)
-        .finish();
-
-        let content = Flex::column()
-            .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(title_el)
-            .with_child(Container::new(subtitle_el).with_margin_top(8.).finish())
-            .finish();
-
-        let message_box = Container::new(content)
-            .with_uniform_padding(12.)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))
-            .with_border(Border::all(1.).with_border_color(internal_colors::neutral_4(theme)))
-            .finish();
-
-        Flex::column()
-            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-            .with_child(header)
-            .with_child(Container::new(message_box).with_margin_top(12.).finish())
-            .finish()
-    }
-
     fn render_autonomy_section(
         &self,
         appearance: &Appearance,
@@ -869,13 +805,12 @@ impl View for AgentSlide {
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let settings = self.agent_settings(app);
-        let workspace_enforces_autonomy = self.workspace_enforces_autonomy(app);
 
         // The floating dropdown overlay is built inside `render_model_section`
         // so it inherits the column width naturally. Here we only need the
         // base two-column layout.
         layout::static_left(
-            || self.render_content(appearance, settings, workspace_enforces_autonomy, app),
+            || self.render_content(appearance, settings, app),
             || self.render_visual(appearance, app),
         )
     }
@@ -948,9 +883,6 @@ impl AgentSlide {
     }
 
     fn select_autonomy(&mut self, autonomy: AgentAutonomy, ctx: &mut ViewContext<Self>) {
-        if self.workspace_enforces_autonomy(ctx) {
-            return;
-        }
         self.onboarding_state.update(ctx, |state, ctx| {
             state.set_agent_autonomy(autonomy, ctx);
         });
@@ -975,9 +907,6 @@ impl OnboardingSlide for AgentSlide {
             self.advance_highlighted_model(/* forward */ false, ctx);
             return;
         }
-        if self.workspace_enforces_autonomy(ctx) {
-            return;
-        }
         let Some(autonomy) = self.agent_settings(ctx).autonomy else {
             return;
         };
@@ -996,9 +925,6 @@ impl OnboardingSlide for AgentSlide {
         }
         if self.is_model_list_expanded {
             self.advance_highlighted_model(/* forward */ true, ctx);
-            return;
-        }
-        if self.workspace_enforces_autonomy(ctx) {
             return;
         }
         let Some(autonomy) = self.agent_settings(ctx).autonomy else {

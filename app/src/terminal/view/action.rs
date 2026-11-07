@@ -12,9 +12,7 @@ use warpui::event::ModifiersState;
 use warpui::units::Lines;
 use warpui::EntityId;
 
-use super::inline_banner::{
-    AnonymousUserLoginBannerAction, OpenInWarpBannerAction, VimModeBannerAction,
-};
+use super::inline_banner::{OpenInWarpBannerAction, VimModeBannerAction};
 use super::{
     AliasExpansionBannerAction, ContextMenuAction, GridHighlightedLink, InputContextMenuAction,
     NotificationsDiscoveryBannerAction, NotificationsErrorBannerAction, RichContentLink,
@@ -297,7 +295,6 @@ pub enum TerminalAction {
     SetInputModeTerminal,
 
     HyperlinkClick(HyperlinkUrl),
-    AttemptLoginGatedFeature,
     StartFileDropTarget,
     StopFileDropTarget,
     SetMarkedText {
@@ -323,7 +320,6 @@ pub enum TerminalAction {
     ToggleQueueNextPrompt,
     CodebaseIndexSpeedbumpBanner(CodebaseIndexSpeedbumpBannerAction),
     AgentModeSetupSpeedbumpBanner(AgentModeSetupSpeedbumpBannerAction),
-    AnonymousUserAISignUpBanner(AnonymousUserLoginBannerAction),
     ResumeConversation,
     ForkConversationFromLastKnownGoodState,
     ToggleAIDocumentPane,
@@ -592,7 +588,6 @@ impl fmt::Debug for TerminalAction {
             SetInputModeAgent => write!(f, "SetInputModeAgent"),
             SetInputModeTerminal => write!(f, "SetInputModeTerminal"),
             HyperlinkClick(hyperlink_url) => write!(f, "HyperlinkClick({hyperlink_url:?})"),
-            AttemptLoginGatedFeature => write!(f, "AttemptLoginGatedFeature"),
             StartFileDropTarget => write!(f, "StartFileDropTarget"),
             StopFileDropTarget => write!(f, "StopFileDropTarget"),
             RunNativeShellCompletions { buffer_text, .. } => {
@@ -618,9 +613,6 @@ impl fmt::Debug for TerminalAction {
             }
             AgentModeSetupSpeedbumpBanner(action) => {
                 write!(f, "AgentModeSetupSpeedbumpBanner({action:?})")
-            }
-            AnonymousUserAISignUpBanner(action) => {
-                write!(f, "AnonymousUserLoginBanner({action:?})")
             }
             ResumeConversation => write!(f, "ResumeConversation"),
             ForkConversationFromLastKnownGoodState => {

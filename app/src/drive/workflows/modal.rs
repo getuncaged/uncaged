@@ -31,7 +31,6 @@ use super::workflow_arg_selector::{
 };
 use super::workflow_arg_type_helpers::{self, ArgumentEditorRowIndex};
 use crate::appearance::Appearance;
-use crate::auth::UserUid;
 use crate::cloud_object::breadcrumbs::{ContainingObject, ContainingObjectKind};
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{CloudObject, CloudObjectEventEntrypoint, ObjectType, Owner, Revision};
@@ -179,7 +178,6 @@ pub enum WorkflowModalEvent {
     Close,
     UpdatedWorkflow(SyncId),
     AiAssistError(String),
-    AiAssistUpgradeError(UserUid),
     ViewInWarpDrive(WarpDriveItemId),
 }
 

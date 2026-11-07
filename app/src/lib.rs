@@ -202,7 +202,6 @@ pub use warp_core::r#async::debounce;
 pub use warp_core::{safe_debug, safe_error, safe_info, safe_warn};
 #[cfg(feature = "local_fs")]
 use warp_files::FileModel;
-use warp_managed_secrets::ManagedSecretManager;
 use warp_server_client::iap::{IapManager, IapManagerEvent, IapState};
 use warp_server_client::network_logging::NetworkLogModel;
 use warpui::integration::TestDriver;
@@ -900,7 +899,7 @@ pub(crate) fn initialize_app(
     // side). Must precede persistence::initialize so the restore read path
     // sees it.
     FeatureFlag::OneHistory.set_enabled(true);
-    let (sqlite_data, writer_handles) = persistence::initialize(ctx, persistence_scope);
+    let (sqlite_data, writer_handles) = persistence::initialize(persistence_scope);
     timer.mark_interval_end("SQLITE_INITIALIZED");
 
     let persistence_writer = PersistenceWriter::new(writer_handles);
@@ -1024,13 +1023,6 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(|_| AIFactManager::new());
     ctx.add_singleton_model(|_| ExecutionProfileEditorManager::default());
     ctx.add_singleton_model(|_| NetworkLogPaneManager::default());
-    ctx.add_singleton_model(|ctx| {
-        // Not using the *Provider types isn't ideal, but it's worth it for the ability to move managed secrets to a separate crate.
-        ManagedSecretManager::new(
-            server_api_provider.as_ref(ctx).get_managed_secrets_client(),
-            auth_state.clone(),
-        )
-    });
 
     #[cfg(target_os = "macos")]
     AppearanceManager::as_ref(ctx).set_app_icon(ctx);
@@ -1245,7 +1237,7 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(UndoCloseStack::new);
     ctx.add_singleton_model(|_| ToastStack);
     ctx.add_singleton_model(|_| GlobalCodeReviewModel);
-    ctx.add_singleton_model(workspace::OneTimeModalModel::new);
+    ctx.add_singleton_model(|_| workspace::OneTimeModalModel::new());
     ctx.add_singleton_model(
         workspace::bonus_grant_notification_model::BonusGrantNotificationModel::new,
     );

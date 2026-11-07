@@ -65,7 +65,7 @@ fn sqlite_read_restores_app_state_and_codebase_metadata() {
     let metadata = test_codebase_metadata("/tmp/remote-repo");
     save_codebase_index_metadata(&mut conn, metadata.clone())
         .expect("codebase index metadata should save");
-    let restored = read_sqlite_data(&mut conn, None).expect("persisted data should load");
+    let restored = read_sqlite_data(&mut conn).expect("persisted data should load");
     assert_eq!(restored.app_state.windows.len(), 1);
     assert_eq!(restored.codebase_indices.len(), 1);
     assert_eq!(restored.codebase_indices[0].path, metadata.path);
@@ -268,7 +268,7 @@ fn test_sqlite_round_trips_vertical_tabs_panel_open() {
 
     save_app_state(&mut conn, &app_state).expect("app state should save");
 
-    let restored = read_sqlite_data(&mut conn, None)
+    let restored = read_sqlite_data(&mut conn)
         .expect("app state should load")
         .app_state;
 
@@ -341,7 +341,7 @@ fn test_sqlite_round_trips_custom_vertical_tabs_title() {
 
     save_app_state(&mut conn, &app_state).expect("app state should save");
 
-    let restored = read_sqlite_data(&mut conn, None)
+    let restored = read_sqlite_data(&mut conn)
         .expect("app state should load")
         .app_state;
 
@@ -418,7 +418,7 @@ fn test_sqlite_round_trips_code_pane_with_multiple_tabs() {
 
     save_app_state(&mut conn, &app_state).expect("app state should save");
 
-    let restored = read_sqlite_data(&mut conn, None)
+    let restored = read_sqlite_data(&mut conn)
         .expect("app state should load")
         .app_state;
 
@@ -541,7 +541,7 @@ fn test_sqlite_round_trips_tab_groups() {
 
     save_app_state(&mut conn, &app_state).expect("app state should save");
 
-    let restored = read_sqlite_data(&mut conn, None)
+    let restored = read_sqlite_data(&mut conn)
         .expect("app state should load")
         .app_state;
 
@@ -700,7 +700,7 @@ fn test_sqlite_round_trips_pinned_state() {
 
     save_app_state(&mut conn, &app_state).expect("app state should save");
 
-    let restored = read_sqlite_data(&mut conn, None)
+    let restored = read_sqlite_data(&mut conn)
         .expect("app state should load")
         .app_state;
 
@@ -789,7 +789,7 @@ fn test_deserialize_corrupted_guests() {
     };
 
     // The overall permissions should successfully convert, minus the object guests.
-    let cloud_permissions = to_cloud_object_permissions(&db_permissions, None);
+    let cloud_permissions = to_cloud_object_permissions(&db_permissions);
     assert_eq!(
         cloud_permissions,
         Some(CloudObjectPermissions {
@@ -877,7 +877,7 @@ fn test_sqlite_drops_too_small_bounds_on_read() {
     )
     .expect("corrupting update should succeed");
 
-    let restored = read_sqlite_data(&mut conn, None)
+    let restored = read_sqlite_data(&mut conn)
         .expect("app state should load")
         .app_state;
 

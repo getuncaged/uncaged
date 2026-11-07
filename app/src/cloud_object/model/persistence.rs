@@ -12,7 +12,6 @@ use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use super::generic_string_model::GenericStringObjectId;
 use crate::ai::execution_profiles::CloudAIExecutionProfile;
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::{
     CloudModelType, CloudObject, CloudObjectLocation, CloudObjectPermissions, GenericCloudObject,
     GenericServerObject, GenericStringObjectFormat, JsonObjectType, ObjectIdType, ObjectType,
@@ -1103,15 +1102,6 @@ impl CloudModel {
         self.objects_by_id
             .iter()
             .any(|(_, object)| !object.metadata().is_welcome_object)
-    }
-
-    /// Whether or not there are any objects directly shared with the user.
-    pub fn has_directly_shared_objects(&self, app: &AppContext) -> bool {
-        let user_uid = AuthStateProvider::as_ref(app).get().user_id();
-        self.objects_by_id.values().any(|object| {
-            Space::from_owner(object.permissions().owner) == Space::Shared
-                && user_uid.is_some_and(|uid| object.permissions().has_direct_user_access(uid))
-        })
     }
 
     pub fn get_folder_by_uid(&self, uid: &str) -> Option<&CloudFolder> {

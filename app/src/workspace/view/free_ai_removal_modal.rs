@@ -14,8 +14,6 @@ use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
-use crate::auth::AuthStateProvider;
-use crate::billing;
 use crate::settings_view::SettingsSection;
 use crate::ui_components::blended_colors;
 use crate::workspace::WorkspaceAction;
@@ -86,7 +84,6 @@ pub fn init(app: &mut AppContext) {
 pub enum FreeAiRemovalModalAction {
     Close,
     SetUpByok,
-    Upgrade,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -98,7 +95,6 @@ pub enum FreeAiRemovalModalEvent {
 struct StateHandles {
     close_button: MouseStateHandle,
     byok_button: MouseStateHandle,
-    upgrade_button: MouseStateHandle,
 }
 
 /// Notice shown to Free-plan users about the removal of Warp-provided AI. The
@@ -115,14 +111,6 @@ impl FreeAiRemovalModal {
             variant,
             state_handles: Default::default(),
         }
-    }
-
-    fn upgrade_url(ctx: &ViewContext<Self>) -> String {
-        let user_id = AuthStateProvider::as_ref(ctx)
-            .get()
-            .user_id()
-            .unwrap_or_default();
-        billing::upgrade_link(user_id)
     }
 
     fn render_buttons(&self, appearance: &Appearance) -> Box<dyn Element> {
@@ -145,32 +133,12 @@ impl FreeAiRemovalModal {
             })
             .finish();
 
-        let upgrade_button = appearance
-            .ui_builder()
-            .button(
-                ButtonVariant::Accent,
-                self.state_handles.upgrade_button.clone(),
-            )
-            .with_style(UiComponentStyles {
-                font_size: Some(14.),
-                height: Some(32.),
-                ..Default::default()
-            })
-            .with_centered_text_label("View pricing".to_string())
-            .build()
-            .with_cursor(Cursor::PointingHand)
-            .on_click(|ctx, _, _| {
-                ctx.dispatch_typed_action(FreeAiRemovalModalAction::Upgrade);
-            })
-            .finish();
-
         Flex::row()
             .with_main_axis_size(MainAxisSize::Max)
             .with_main_axis_alignment(MainAxisAlignment::End)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_spacing(8.)
             .with_child(byok_button)
-            .with_child(upgrade_button)
             .finish()
     }
 
@@ -294,11 +262,6 @@ impl TypedActionView for FreeAiRemovalModal {
                     search_query: "api".to_string(),
                     section: Some(SettingsSection::WarpAgent),
                 });
-                ctx.emit(FreeAiRemovalModalEvent::Close);
-            }
-            FreeAiRemovalModalAction::Upgrade => {
-                let upgrade_url = Self::upgrade_url(ctx);
-                ctx.open_url(&upgrade_url);
                 ctx.emit(FreeAiRemovalModalEvent::Close);
             }
         }

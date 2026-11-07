@@ -57,7 +57,6 @@ use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::ai::harness_display;
 use crate::app_state::PersistedAgentManagementFilters;
 use crate::appearance::Appearance;
-use crate::auth::AuthStateProvider;
 use crate::editor::{
     EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys,
     PropagateHorizontalNavigationKeys, SingleLineEditorOptions, TextOptions,
@@ -194,13 +193,6 @@ impl AgentManagementView {
             Self::handle_agent_management_model_event,
         );
 
-        ctx.subscribe_to_model(
-            &HarnessAvailabilityModel::handle(ctx),
-            |me, _, _event, ctx| {
-                me.update_harness_dropdown(ctx);
-            },
-        );
-
         let list_state = Self::construct_fresh_list_state(ctx.handle());
 
         let setup_guide_button = CompactibleActionButton::new(
@@ -326,12 +318,6 @@ impl AgentManagementView {
 
         view.sync_with_loaded_filters(ctx);
         view.update_creator_dropdown(ctx);
-
-        // Trigger server fetch if persisted filters differ from defaults
-        // (team tasks are not loaded at startup, so we need to fetch them)
-        if view.filters != AgentManagementFilters::default() {
-            view.trigger_filter_fetch(ctx);
-        }
 
         view.get_tasks_from_model(ctx);
         view
@@ -674,13 +660,6 @@ impl AgentManagementView {
         dropdown.set_button_variant(ButtonVariant::Secondary);
     }
 
-    fn update_harness_dropdown(&mut self, ctx: &mut ViewContext<Self>) {
-        let items = Self::build_harness_dropdown_items(ctx);
-        self.harness_dropdown.update(ctx, |dropdown, ctx| {
-            dropdown.set_rich_items(items, ctx);
-        });
-    }
-
     fn update_creator_dropdown(&mut self, ctx: &mut ViewContext<Self>) {
         let creators = AgentConversationsModel::as_ref(ctx).get_all_creators(ctx);
         let creator_filter_name = match &self.filters.creator {
@@ -722,26 +701,10 @@ impl AgentManagementView {
         }
     }
 
-    /// Common handler for filter changes: fetch, refresh tasks, and save.
+    /// Common handler for filter changes: refresh tasks and save.
     fn on_filter_changed(&mut self, ctx: &mut ViewContext<Self>) {
-        self.trigger_filter_fetch(ctx);
         self.get_tasks_from_model(ctx);
         ctx.dispatch_global_action("workspace:save_app", ());
-    }
-
-    /// Trigger a server fetch for tasks matching current filters.
-    fn trigger_filter_fetch(&self, ctx: &mut ViewContext<Self>) {
-        let current_user_uid = AuthStateProvider::handle(ctx)
-            .as_ref(ctx)
-            .get()
-            .user_id()
-            .map(|uid| uid.as_string());
-        if let Some(uid) = current_user_uid {
-            let filters = self.filters.clone();
-            AgentConversationsModel::handle(ctx).update(ctx, |model, ctx| {
-                model.fetch_tasks_for_filters(&filters, &uid, ctx);
-            });
-        }
     }
 
     /// Shows the setup guide from a deep-link/action without toggling it off on repeated calls.

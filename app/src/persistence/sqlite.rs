@@ -44,7 +44,6 @@ use persistence::model::AMBIENT_AGENT_PANE_KIND;
 use uuid::Uuid;
 use warpui::platform::FullscreenState;
 use warpui::windowing::{MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH};
-use warpui::{AppContext, SingletonEntity};
 
 use super::agent::{delete_agent_conversations, upsert_agent_conversation};
 use super::block_list::{
@@ -76,8 +75,6 @@ use crate::app_state::{
     TerminalPaneSnapshot, WindowSnapshot, WorkflowPaneSnapshot,
 };
 use crate::auth::auth_manager::PersistedCurrentUserInformation;
-use crate::auth::auth_state::AuthStateProvider;
-use crate::auth::UserUid;
 use crate::cloud_object::model::actions::{
     object_action_from_persisted, ObjectAction, ObjectActionSubtype,
 };
@@ -120,10 +117,7 @@ const WARP_SQLITE_FILE_NAME: &str = "warp.sqlite";
 /// Runs any migrations and creates the Sqlite database if it doesn't exist.
 /// Reads from the sqlite database to get the app state for session restoration.
 /// Starts a writer thread that listens for ModelEvents and processes them.
-pub fn initialize(
-    ctx: &mut AppContext,
-    scope: PersistenceScope,
-) -> (Option<Box<PersistedData>>, Option<WriterHandles>) {
+pub fn initialize(scope: PersistenceScope) -> (Option<Box<PersistedData>>, Option<WriterHandles>) {
     unsafe {
         // Set up logging before any SQLite calls.
         init_logging();
@@ -131,7 +125,7 @@ pub fn initialize(
     let database_path = database_file_path_for_scope(&scope);
     match init_db(&scope) {
         Ok(mut conn) => {
-            let persisted_data = read_persisted_data(&mut conn, ctx);
+            let persisted_data = read_persisted_data(&mut conn);
 
             let writer_handles = match start_writer(conn, database_path.clone()) {
                 Ok(writer_handles) => Some(writer_handles),
@@ -149,12 +143,8 @@ pub fn initialize(
     }
 }
 
-fn read_persisted_data(
-    conn: &mut SqliteConnection,
-    ctx: &mut AppContext,
-) -> Option<Box<PersistedData>> {
-    let user_uid = AuthStateProvider::as_ref(ctx).get().user_id();
-    match read_sqlite_data(conn, user_uid) {
+fn read_persisted_data(conn: &mut SqliteConnection) -> Option<Box<PersistedData>> {
+    match read_sqlite_data(conn) {
         Ok(app_state) => Some(Box::new(app_state)),
         Err(err) => {
             report_error!(anyhow::Error::new(err).context("Failed to read persisted data"));
@@ -2066,10 +2056,7 @@ fn box_persisted_generic_string_object(
 /// happen is the user won't have session restoration.
 ///
 /// In the future, the awkwardness of the transaction interface is resolved in diesel 2.0.0.
-fn read_sqlite_data(
-    conn: &mut SqliteConnection,
-    current_user_id: Option<UserUid>,
-) -> Result<PersistedData, Error> {
+fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error> {
     use schema::windows::dsl::*;
 
     let active_window_id = schema::app::dsl::app
@@ -2262,7 +2249,7 @@ fn read_sqlite_data(
         )
         .collect();
 
-    let read_context = load_cloud_object_read_context(conn, current_user_id)?;
+    let read_context = load_cloud_object_read_context(conn)?;
     let mut cloud_objects: Vec<Box<dyn CloudObject>> = Vec::new();
     cloud_objects.extend(
         workflow_persistence::read_workflows(conn, &read_context)?

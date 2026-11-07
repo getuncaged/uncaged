@@ -403,7 +403,7 @@ impl MCPServersEditPageView {
 
                 if let Some(template_uuid) = template_uuid {
                     let is_authorized_editor = TemplatableMCPServerManager::as_ref(app)
-                        .is_authorized_editor(template_uuid, app);
+                        .is_authorized_editor(template_uuid);
                     let is_shared = TemplatableMCPServerManager::as_ref(app)
                         .is_server_template_shared(template_uuid);
 
@@ -415,8 +415,8 @@ impl MCPServersEditPageView {
             Some(ServerCardItemId::TemplatableMCP(template_uuid)) => {
                 let is_shared = TemplatableMCPServerManager::as_ref(app)
                     .is_server_template_shared(template_uuid);
-                let is_authorized_editor = TemplatableMCPServerManager::as_ref(app)
-                    .is_authorized_editor(template_uuid, app);
+                let is_authorized_editor =
+                    TemplatableMCPServerManager::as_ref(app).is_authorized_editor(template_uuid);
 
                 is_authorized_editor || !is_shared
             }
@@ -457,9 +457,7 @@ impl MCPServersEditPageView {
             _ => None,
         };
         let is_author = template_uuid
-            .map(|template_uuid| {
-                TemplatableMCPServerManager::as_ref(app).is_author(template_uuid, app)
-            })
+            .map(|template_uuid| TemplatableMCPServerManager::as_ref(app).is_author(template_uuid))
             .unwrap_or(false);
 
         is_author && is_shared

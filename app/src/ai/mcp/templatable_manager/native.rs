@@ -34,7 +34,6 @@ use crate::ai::mcp::{
     MCPServerExt, MCPServerUpdate, ParsedTemplatableMCPServerResult, StaticEnvVar,
     TemplatableMCPServer, TemplatableMCPServerInstallation, TransportType,
 };
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::{
     CloudObject, CloudObjectLocation, CloudObjectLookup as _, CloudObjectMetadataExt,
@@ -1221,7 +1220,7 @@ impl TemplatableMCPServerManager {
             return None;
         }
 
-        let author = if self.is_author(templatable_mcp_server.uuid, app) {
+        let author = if self.is_author(templatable_mcp_server.uuid) {
             Author::CurrentUser
         } else {
             let creator = self.get_creator(templatable_mcp_server.uuid, app);
@@ -1393,24 +1392,28 @@ impl TemplatableMCPServerManager {
         }
     }
 
-    pub fn is_authorized_editor(&self, template_uuid: Uuid, ctx: &AppContext) -> bool {
+    pub fn is_authorized_editor(&self, template_uuid: Uuid) -> bool {
         let cloud_templatable_mcp_server = self.get_cloud_templatable_mcp_server(template_uuid);
 
         if let Some(cloud_templatable_mcp_server) = cloud_templatable_mcp_server {
-            let auth_state = AuthStateProvider::as_ref(ctx).get();
-            cloud_templatable_mcp_server.metadata().creator_uid
-                == auth_state.user_id().map(|user_id| user_id.as_string())
+            // Uncaged's local user has no uid, so only uid-less servers are its own.
+            cloud_templatable_mcp_server
+                .metadata()
+                .creator_uid
+                .is_none()
         } else {
             false
         }
     }
 
-    pub fn is_author(&self, template_uuid: Uuid, ctx: &AppContext) -> bool {
+    pub fn is_author(&self, template_uuid: Uuid) -> bool {
         let cloud_templatable_mcp_server = self.get_cloud_templatable_mcp_server(template_uuid);
         if let Some(cloud_templatable_mcp_server) = cloud_templatable_mcp_server {
-            let auth_state = AuthStateProvider::as_ref(ctx).get();
-            cloud_templatable_mcp_server.metadata().creator_uid
-                == auth_state.user_id().map(|user_id| user_id.as_string())
+            // Uncaged's local user has no uid, so only uid-less servers are its own.
+            cloud_templatable_mcp_server
+                .metadata()
+                .creator_uid
+                .is_none()
         } else {
             false
         }

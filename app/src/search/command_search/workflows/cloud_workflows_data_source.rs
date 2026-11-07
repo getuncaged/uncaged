@@ -40,7 +40,7 @@ pub fn cloud_workflows_data_source(
                 query.filters.contains(&QueryFilter::Workflows) || !is_ai_enabled;
 
             let cloud_model = CloudModel::as_ref(app);
-            let candidates: Vec<WorkflowMatchCandidate> = Space::all_user_spaces(app)
+            let candidates: Vec<WorkflowMatchCandidate> = Space::all_user_spaces()
                 .into_iter()
                 .flat_map(|space| {
                     let source: WorkflowSource = space.into();

@@ -5,7 +5,6 @@ use warpui::{SingletonEntity, ViewContext, ViewHandle};
 
 use super::env_var_collection::{EnvVarCollectionAction, EnvVarCollectionView, VariableRowIndex};
 use crate::cloud_object::{CloudObject, GenericStringObjectFormat, Space};
-use crate::drive::drive_helpers::has_feature_gated_anonymous_user_reached_env_var_limit;
 use crate::drive::export::ExportManager;
 use crate::drive::CloudObjectTypeAndId;
 use crate::env_vars::active_env_var_collection_data::TrashStatus;
@@ -420,10 +419,6 @@ impl EnvVarCollectionView {
 
     pub(super) fn untrash_env_var_collection(&self, ctx: &mut ViewContext<Self>) {
         if let Some(env_var_collection_id) = self.active_env_var_collection_data.as_ref(ctx).id() {
-            if has_feature_gated_anonymous_user_reached_env_var_limit(ctx) {
-                return;
-            }
-
             UpdateManager::handle(ctx).update(ctx, move |update_manager, ctx| {
                 update_manager.untrash_object(
                     CloudObjectTypeAndId::GenericStringObject {

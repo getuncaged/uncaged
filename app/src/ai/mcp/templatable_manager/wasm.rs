@@ -210,14 +210,14 @@ impl TemplatableMCPServerManager {
         log::warn!("Updating a templatable MCP server installation is not supported in WASM");
     }
 
-    pub fn is_authorized_editor(&self, _template_uuid: Uuid, _ctx: &AppContext) -> bool {
+    pub fn is_authorized_editor(&self, _template_uuid: Uuid) -> bool {
         log::warn!(
             "Checking if a user is authorized to edit a templatable MCP server is not supported in WASM"
         );
         false
     }
 
-    pub fn is_author(&self, _template_uuid: Uuid, _ctx: &AppContext) -> bool {
+    pub fn is_author(&self, _template_uuid: Uuid) -> bool {
         log::warn!(
             "Checking if a user is the author of a templatable MCP server is not supported in WASM"
         );

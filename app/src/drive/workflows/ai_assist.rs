@@ -3,12 +3,10 @@ use serde::{Deserialize, Serialize};
 use warp_graphql::mutations::generate_metadata_for_command::{
     GenerateMetadataForCommandFailureType, GenerateMetadataForCommandSuccess,
 };
-use warpui::{SingletonEntity, ViewContext};
+use warpui::ViewContext;
 
 use super::arguments::ArgumentsState;
 use super::modal::{AiAssistState, WorkflowModal, WorkflowModalEvent};
-use crate::ai::AIRequestUsageModel;
-use crate::auth::AuthStateProvider;
 use crate::workflows::workflow::{Argument, Workflow};
 
 /// Generated command metadata from server.
@@ -92,59 +90,46 @@ impl WorkflowModal {
 
         ctx.spawn(
             async move { ai_client.generate_metadata_for_command(raw_request).await },
-            move |modal, response, ctx| {
-                match response {
-                    Ok(metadata) => {
-                        modal.ai_metadata_assist_state = AiAssistState::Generated;
-                        modal.enable_editors(ctx);
+            move |modal, response, ctx| match response {
+                Ok(metadata) => {
+                    modal.ai_metadata_assist_state = AiAssistState::Generated;
+                    modal.enable_editors(ctx);
 
-                        let arguments = metadata
-                            .arguments
-                            .into_iter()
-                            .map(|parameter| Argument {
-                                name: parameter.name,
-                                description: Some(parameter.description),
-                                default_value: Some(parameter.default_value),
-                                arg_type: Default::default(),
-                            })
-                            .collect_vec();
+                    let arguments = metadata
+                        .arguments
+                        .into_iter()
+                        .map(|parameter| Argument {
+                            name: parameter.name,
+                            description: Some(parameter.description),
+                            default_value: Some(parameter.default_value),
+                            arg_type: Default::default(),
+                        })
+                        .collect_vec();
 
-                        let workflow = Workflow::Command {
-                            name: metadata.title,
-                            description: Some(metadata.description),
-                            command: metadata.command,
-                            arguments,
-                            tags: vec![],
-                            source_url: None,
-                            author: None,
-                            author_url: None,
-                            shells: vec![],
-                            environment_variables: None,
-                        };
+                    let workflow = Workflow::Command {
+                        name: metadata.title,
+                        description: Some(metadata.description),
+                        command: metadata.command,
+                        arguments,
+                        tags: vec![],
+                        source_url: None,
+                        author: None,
+                        author_url: None,
+                        shells: vec![],
+                        environment_variables: None,
+                    };
 
-                        modal.populate_missing_field_with_suggestion(workflow, ctx);
-                        ctx.notify();
-                    }
-                    Err(err) => {
-                        let message = err.user_facing_message();
-                        if let GeneratedCommandMetadataError::RateLimited = err {
-                            let current_user_id = AuthStateProvider::as_ref(ctx)
-                                .get()
-                                .user_id()
-                                .unwrap_or_default();
-                            ctx.emit(WorkflowModalEvent::AiAssistUpgradeError(current_user_id));
-                        } else {
-                            ctx.emit(WorkflowModalEvent::AiAssistError(message.clone()));
-                        }
-
-                        modal.ai_metadata_assist_state = AiAssistState::PreRequest;
-                        modal.enable_editors(ctx);
-                        ctx.notify();
-                    }
+                    modal.populate_missing_field_with_suggestion(workflow, ctx);
+                    ctx.notify();
                 }
-                AIRequestUsageModel::handle(ctx).update(ctx, |request_usage_model, ctx| {
-                    request_usage_model.refresh_request_usage_async(ctx);
-                });
+                Err(err) => {
+                    let message = err.user_facing_message();
+                    ctx.emit(WorkflowModalEvent::AiAssistError(message.clone()));
+
+                    modal.ai_metadata_assist_state = AiAssistState::PreRequest;
+                    modal.enable_editors(ctx);
+                    ctx.notify();
+                }
             },
         );
 

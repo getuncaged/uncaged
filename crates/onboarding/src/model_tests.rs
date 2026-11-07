@@ -2,19 +2,11 @@ use ai::LLMId;
 use warp_core::features::FeatureFlag;
 use warpui_core::{App, ModelHandle};
 
-use crate::model::{AiSetupChoice, OnboardingAuthState, OnboardingStateModel, OnboardingStep};
+use crate::model::{AiSetupChoice, OnboardingStateModel, OnboardingStep};
 use crate::OnboardingIntention;
 
 fn add_test_model(app: &mut App) -> ModelHandle<OnboardingStateModel> {
-    app.add_model(|_| {
-        OnboardingStateModel::new(
-            Vec::new(),
-            LLMId::from("auto"),
-            false,
-            true,
-            OnboardingAuthState::FreeUser,
-        )
-    })
+    app.add_model(|_| OnboardingStateModel::new(Vec::new(), LLMId::from("auto"), true))
 }
 
 fn step(app: &App, model: &ModelHandle<OnboardingStateModel>) -> OnboardingStep {

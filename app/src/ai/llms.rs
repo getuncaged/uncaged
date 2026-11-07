@@ -13,9 +13,6 @@ use warpui::{AppContext, Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::custom_model_routers::{self, CustomModelRouter, ModelConfigError};
 use super::execution_profiles::profiles::AIExecutionProfilesModel;
-use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
-use crate::auth::AuthStateProvider;
-use crate::network::{NetworkStatus, NetworkStatusEvent, NetworkStatusKind};
 use crate::report_error;
 use crate::server::server_api::ServerApiProvider;
 use crate::user_config::{WarpConfig, WarpConfigUpdateEvent};
@@ -59,16 +56,13 @@ impl DisableReason {
     /// Returns `true` when this disable reason means the user cannot use the model
     /// and we should clear their stored preference.
     ///
-    /// `RequiresUpgrade` is BYOK-aware: if the user has a BYO API key for the
-    /// model's provider (`has_byok_key = true`), the server will still accept
-    /// the request, so we keep the selection.
-    ///
     /// `OutOfRequests` and `ProviderOutage` are transient and expected to
     /// resolve without user action, so we preserve the selection.
-    fn should_clear_preference(&self, has_byok_key: bool) -> bool {
+    fn should_clear_preference(&self) -> bool {
         match self {
-            DisableReason::AdminDisabled | DisableReason::Unavailable => true,
-            DisableReason::RequiresUpgrade => !has_byok_key,
+            DisableReason::AdminDisabled
+            | DisableReason::Unavailable
+            | DisableReason::RequiresUpgrade => true,
             DisableReason::OutOfRequests | DisableReason::ProviderOutage => false,
         }
     }
@@ -376,7 +370,7 @@ impl AvailableLLMs {
         self.info_for_id(id).filter(|info| {
             info.disable_reason
                 .as_ref()
-                .is_none_or(|reason| !reason.should_clear_preference(false))
+                .is_none_or(|reason| !reason.should_clear_preference())
         })
     }
 
@@ -566,25 +560,6 @@ pub struct LLMPreferences {
 impl LLMPreferences {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
         let models_by_feature = get_cached_models(ctx).unwrap_or_default();
-
-        ctx.subscribe_to_model(&NetworkStatus::handle(ctx), |me, _, event, ctx| {
-            if let NetworkStatusEvent::NetworkStatusChanged {
-                new_status: NetworkStatusKind::Online,
-            } = event
-            {
-                me.refresh_authed_models(ctx);
-            }
-        });
-
-        // TODO: Instead of querying this ad-hoc upon a successful log in, we should add the
-        // available LLMs query to the general workspace metadata query which is polled
-        // and hooked up to workspace changes. For that to work, each user would need to
-        // have a personal workspace. This is a stop-gap.
-        ctx.subscribe_to_model(&AuthManager::handle(ctx), |me, _, event, ctx| {
-            if let AuthManagerEvent::AuthComplete = event {
-                me.refresh_authed_models(ctx);
-            }
-        });
 
         // Re-reconcile disabled model preferences when BYOK keys change, since
         // RequiresUpgrade models may become usable or unusable.
@@ -1176,29 +1151,6 @@ impl LLMPreferences {
         *last_update.popup_visibility_state.lock() = UpdatePopupVisibilityState::Hidden;
     }
 
-    /// Fetches the latest set of models from the server for the currently logged in user, and updates the model.
-    pub fn refresh_authed_models(&self, ctx: &mut ModelContext<Self>) {
-        // Don't try to fetch auth'd models if the user is not logged in yet.
-        if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
-            return;
-        }
-
-        let ai_api_client = ServerApiProvider::as_ref(ctx).get_ai_client();
-        ctx.spawn(
-            async move { ai_api_client.get_feature_model_choices().await },
-            |me, result, ctx| match result {
-                Ok(update) => {
-                    if update != me.models_by_feature {
-                        me.on_server_update(update, ctx);
-                    }
-                }
-                Err(e) => {
-                    report_error!(e.context("Failed to fetch LLMs from server"));
-                }
-            },
-        );
-    }
-
     /// No auth required (i.e. to populate the pre-login onboarding picker).
     fn refresh_public_models(&self, ctx: &mut ModelContext<Self>) {
         let ai_api_client = ServerApiProvider::as_ref(ctx).get_ai_client();
@@ -1218,11 +1170,7 @@ impl LLMPreferences {
     }
 
     pub fn refresh_available_models(&self, ctx: &mut ModelContext<Self>) {
-        if AuthStateProvider::as_ref(ctx).get().is_logged_in() {
-            self.refresh_authed_models(ctx);
-        } else {
-            self.refresh_public_models(ctx);
-        }
+        self.refresh_public_models(ctx);
     }
 
     pub fn update_feature_model_choices(

@@ -24,7 +24,6 @@ use warp_core::features::FeatureFlag;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 
 use crate::ai::request_usage_model::RequestLimitInfo;
-use crate::auth::AuthStateProvider;
 use crate::report_if_error;
 use crate::settings::PrivacySettings;
 use crate::terminal::CLIAgent;
@@ -1432,15 +1431,10 @@ impl AISettings {
     }
 
     pub fn is_any_ai_enabled(&self, app: &AppContext) -> bool {
-        // Disable AI for anonymous and logged-out users.
-        let is_anonymous_or_logged_out = AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out();
-
-        // Uncaged: a configured local engine makes AI available with no
-        // Warp account (free-for-all, no login required).
+        // Uncaged: there are no accounts, so AI is available only through a configured local
+        // engine.
         *self.is_any_ai_enabled
-            && (crate::uncaged::engine_active() || !is_anonymous_or_logged_out)
+            && crate::uncaged::engine_active()
             && !self.is_ai_disabled_due_to_remote_session_org_policy(app)
     }
 

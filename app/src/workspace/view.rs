@@ -10052,19 +10052,6 @@ impl Workspace {
             WorkflowModalEvent::ViewInWarpDrive(id) => {
                 self.view_in_and_focus_warp_drive(*id, ctx);
             }
-            WorkflowModalEvent::AiAssistUpgradeError(user_id) => {
-                let upgrade_link = billing::upgrade_link(*user_id);
-
-                self.toast_stack.update(ctx, |view, ctx| {
-                    let new_toast =
-                        DismissibleToast::error("Looks like you're out of AI credits.".into())
-                            .with_link(
-                                ToastLink::new("Upgrade for more credits.".into())
-                                    .with_href(upgrade_link),
-                            );
-                    view.add_ephemeral_toast(new_toast, ctx);
-                });
-            }
         }
     }
 
@@ -13606,9 +13593,6 @@ impl Workspace {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            SettingsViewEvent::SignupAnonymousUser => {
-                self.initiate_user_signup(ctx);
-            }
             SettingsViewEvent::Pane(_) | SettingsViewEvent::StartResize => {}
             SettingsViewEvent::ShowToast { message, flavor } => {
                 self.toast_stack.update(ctx, |toast_stack, ctx| {
@@ -14705,9 +14689,6 @@ impl Workspace {
                     }
                     toast_stack.add_ephemeral_toast(toast, ctx);
                 });
-            }
-            pane_group::Event::SignupAnonymousUser => {
-                self.initiate_user_signup(ctx);
             }
             pane_group::Event::OpenThemeGallery => {
                 self.show_theme_gallery(ctx);

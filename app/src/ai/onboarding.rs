@@ -2,12 +2,9 @@
 
 use ai::LLMId;
 use onboarding::slides::OnboardingModelInfo;
-use onboarding::OnboardingAuthState;
 use warp_core::ui::icons::Icon;
-use warpui::{AppContext, SingletonEntity};
 
 use super::llms::{LLMInfo, LLMPreferences};
-use crate::auth::AuthStateProvider;
 
 impl From<&LLMInfo> for OnboardingModelInfo {
     fn from(llm: &LLMInfo) -> Self {
@@ -31,13 +28,4 @@ pub fn build_onboarding_models(prefs: &LLMPreferences) -> (Vec<OnboardingModelIn
         })
         .collect();
     (models, default_id)
-}
-
-pub fn current_onboarding_auth_state(ctx: &AppContext) -> OnboardingAuthState {
-    let auth_state = AuthStateProvider::as_ref(ctx).get();
-    if auth_state.is_anonymous_or_logged_out() {
-        return OnboardingAuthState::LoggedOut;
-    }
-    // Uncaged has no workspace billing, so no one is on a paid plan.
-    OnboardingAuthState::FreeUser
 }

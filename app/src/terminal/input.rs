@@ -133,7 +133,7 @@ use crate::ai::blocklist::agent_view::{
 };
 use crate::ai::blocklist::block::cli_controller::{CLISubagentController, CLISubagentEvent};
 use crate::ai::blocklist::block::status_bar::BlocklistAIStatusBar;
-use crate::ai::blocklist::prompt::prompt_alert::{PromptAlertEvent, PromptAlertView};
+use crate::ai::blocklist::prompt::prompt_alert::PromptAlertView;
 use crate::ai::blocklist::{
     ai_indicator_height, render_ai_agent_mode_icon, render_ai_follow_up_icon, AttachmentType,
     BlocklistAIActionModel, BlocklistAIContextEvent, BlocklistAIContextModel,
@@ -249,7 +249,7 @@ use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model::session::shell_quote_arg;
 use crate::terminal::package_installers::command_at_cursor_has_common_package_installer_prefix;
 use crate::terminal::universal_developer_input::AtContextMenuDisabledReason;
-use crate::terminal::view::inline_banner::{PromptSuggestionsEvent, PromptSuggestionsView};
+use crate::terminal::view::inline_banner::PromptSuggestionsView;
 use crate::terminal::view::CodeDiffAction;
 use crate::terminal::CLIAgent;
 use crate::ui_components::blended_colors;
@@ -811,7 +811,6 @@ pub enum Event {
     EditorFocused,
     UnhandledCmdEnter,
     CtrlEnter,
-    SignupAnonymousUser,
     OpenSettings(SettingsSection),
     #[cfg(feature = "local_fs")]
     OpenCodeInWarp {
@@ -1903,9 +1902,6 @@ impl Input {
                         ctx,
                     );
                 }
-                AgentInputFooterEvent::PromptAlert(prompt_alert_event) => {
-                    me.handle_prompt_alert(prompt_alert_event, ctx);
-                }
                 AgentInputFooterEvent::ModelSelectorOpened => {
                     me.close_overlays(false, ctx);
                 }
@@ -2608,11 +2604,8 @@ impl Input {
             },
         );
 
-        let prompt_suggestions_view = ctx
-            .add_typed_action_view(|ctx| PromptSuggestionsView::new(ai_input_model.clone(), ctx));
-        ctx.subscribe_to_view(&prompt_suggestions_view, move |me, _, event, ctx| {
-            me.handle_prompt_suggestions_event(event, ctx);
-        });
+        let prompt_suggestions_view =
+            ctx.add_view(|ctx| PromptSuggestionsView::new(ai_input_model.clone(), ctx));
 
         let slash_command_data_source = ctx.add_model(|ctx| {
             let args = slash_commands::DataSourceArgs {
@@ -5038,18 +5031,6 @@ impl Input {
         self.editor.update(ctx, |editor, ctx| {
             editor.user_initiated_insert(text, PlainTextEditorViewAction::Paste, ctx);
         });
-    }
-
-    fn handle_prompt_alert(
-        &mut self,
-        prompt_alert: &PromptAlertEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match prompt_alert {
-            PromptAlertEvent::SignupAnonymousUser => {
-                ctx.emit(Event::SignupAnonymousUser);
-            }
-        }
     }
 
     fn enable_auto_detection(&mut self, ctx: &mut ViewContext<Self>) {
@@ -11609,20 +11590,6 @@ impl Input {
         }
 
         if PromptAlertView::does_alert_block_ai_requests(ctx) {
-            AIRequestUsageModel::handle(ctx).update(ctx, |usage_model, ctx| {
-                // Rate limit requests to fetch the user's AI usage if triggered by enter
-                // keypress.
-                const USAGE_LIMIT_UPDATE_REQUEST_RATE_LIMIT: Duration = Duration::from_secs(10);
-
-                let last_update_time = usage_model.last_update_time();
-                if last_update_time
-                    .is_some_and(|time| time.elapsed() >= USAGE_LIMIT_UPDATE_REQUEST_RATE_LIMIT)
-                    || last_update_time.is_none()
-                {
-                    usage_model.refresh_request_usage_async(ctx);
-                }
-            });
-
             return;
         }
 
@@ -12664,16 +12631,6 @@ impl Input {
 
     pub fn should_show_universal_developer_input(&self, app: &AppContext) -> bool {
         InputSettings::as_ref(app).is_universal_developer_input_enabled(app)
-    }
-
-    fn handle_prompt_suggestions_event(
-        &mut self,
-        event: &PromptSuggestionsEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            PromptSuggestionsEvent::SignupAnonymousUser => ctx.emit(Event::SignupAnonymousUser),
-        }
     }
 
     /// Returns whether the input box is currently pinned to the top of the screen.

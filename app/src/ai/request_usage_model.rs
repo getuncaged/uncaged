@@ -10,7 +10,6 @@ use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::AIAgentExchangeId;
-use crate::auth::AuthStateProvider;
 use crate::server::server_api::ai::AIClient;
 use crate::settings::AISettings;
 use crate::workspaces::workspace::WorkspaceUid;
@@ -229,31 +228,6 @@ impl AIRequestUsageModel {
             bonus_grants: vec![],
             ambient_credits_banner_dismissed: get_cached_ambient_credits_banner_dismissed(ctx),
         }
-    }
-
-    pub fn last_update_time(&self) -> Option<Instant> {
-        self.last_update_time
-    }
-
-    /// Spawns a task to refresh the latest AI request usage and bonus grants, fetching from the server.
-    pub fn refresh_request_usage_async(&mut self, ctx: &mut ModelContext<Self>) {
-        if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
-            return;
-        }
-
-        let ai_client = self.ai_client.clone();
-        ctx.spawn(
-            async move { ai_client.get_request_limit_info().await },
-            |model, result, ctx| match result {
-                Ok(usage_info) => {
-                    model.bonus_grants = usage_info.bonus_grants;
-                    model.update_request_limit_info(usage_info.request_limit_info, ctx);
-                }
-                Err(e) => {
-                    log::warn!("Failed to retrieve initial request limit info: {e:#}");
-                }
-            },
-        );
     }
 
     pub fn update_request_limit_info(

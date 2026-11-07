@@ -26,8 +26,6 @@ use super::model_spec_scores::{
 use crate::ai::custom_model_routers::is_custom_router_id;
 use crate::ai::execution_profiles::model_menu_items::is_auto;
 use crate::ai::llms::{DisableReason, LLMId, LLMInfo, LLMPreferences, LLMSpec};
-use crate::auth::AuthStateProvider;
-use crate::billing;
 use crate::features::FeatureFlag;
 use crate::search::data_source::{Query, QueryFilter, QueryResult};
 use crate::search::mixer::DataSourceRunErrorWrapper;
@@ -545,23 +543,14 @@ impl SearchItem for ModelSearchItem {
             .with_child(scores);
 
         if self.disable_reason.as_ref() == Some(&DisableReason::RequiresUpgrade) {
-            let user_id = AuthStateProvider::as_ref(app)
-                .get()
-                .user_id()
-                .unwrap_or_default();
-            let upgrade_url = billing::upgrade_link(user_id);
-
             let mut display_name = self.display_text.clone();
             if let Some(first) = display_name.get_mut(..1) {
                 first.make_ascii_uppercase();
             }
 
-            let text_fragments = vec![
-                FormattedTextFragment::plain_text(format!(
-                    "{display_name} is not available for free users. "
-                )),
-                FormattedTextFragment::hyperlink("Upgrade", upgrade_url),
-            ];
+            let text_fragments = vec![FormattedTextFragment::plain_text(format!(
+                "{display_name} is not available for free users."
+            ))];
 
             let upgrade_text = FormattedTextElement::new(
                 FormattedText::new([FormattedTextLine::Line(text_fragments)]),
@@ -571,20 +560,6 @@ impl SearchItem for ModelSearchItem {
                 theme.disabled_ui_text_color().into_solid(),
                 HighlightedHyperlink::default(),
             )
-            .with_hyperlink_font_color(theme.accent().into_solid())
-            .register_default_click_handlers_with_action_support(|hyperlink_lens, event, ctx| {
-                match hyperlink_lens {
-                    warpui::elements::HyperlinkLens::Url(url) => {
-                        ctx.open_url(url);
-                    }
-                    warpui::elements::HyperlinkLens::Action(action_ref) => {
-                        if let Some(action) = action_ref.as_any().downcast_ref::<WorkspaceAction>()
-                        {
-                            event.dispatch_typed_action(action.clone());
-                        }
-                    }
-                }
-            })
             .finish();
 
             column = column.with_child(Container::new(upgrade_text).with_margin_top(12.).finish());

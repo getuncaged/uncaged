@@ -35,7 +35,7 @@ use uuid::Uuid;
 use warp_core::command::ExitCode;
 use warp_graphql::scalars::time::ServerTimestamp;
 use warp_multi_agent_api as api;
-use warpui::{AppContext, Entity, SingletonEntity};
+use warpui::{Entity, SingletonEntity};
 
 use self::model::{AgentConversation, AgentConversationData, Project};
 use crate::ai::blocklist::PersistedAIInput;
@@ -69,13 +69,10 @@ pub enum PersistenceScope {
 /// available.
 #[tracing::instrument(name = "persistence::initialize", skip_all, fields(tags.cloud_agent = true))]
 #[cfg_attr(not(feature = "local_fs"), allow(unused_variables))]
-pub fn initialize(
-    ctx: &mut AppContext,
-    scope: PersistenceScope,
-) -> (Option<Box<PersistedData>>, Option<WriterHandles>) {
+pub fn initialize(scope: PersistenceScope) -> (Option<Box<PersistedData>>, Option<WriterHandles>) {
     cfg_if::cfg_if! {
         if #[cfg(feature = "local_fs")] {
-            sqlite::initialize(ctx, scope)
+            sqlite::initialize(scope)
         } else {
             (None, None)
         }

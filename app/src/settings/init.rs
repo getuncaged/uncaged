@@ -10,7 +10,6 @@ use warpui_extras::user_preferences;
 use super::app_icon::AppIconSettings;
 use super::app_installation_detection::UserAppInstallDetectionSettings;
 use super::cloud_preferences::CloudPreferencesSettings;
-use super::initializer::SettingsInitializer;
 use super::native_preference::NativePreferenceSettings;
 use super::{
     AISettings, AccessibilitySettings, AliasExpansionSettings, AppEditorSettings,
@@ -112,13 +111,10 @@ pub fn init(
     startup_toml_parse_error: Option<user_preferences::Error>,
     ctx: &mut AppContext,
 ) -> UserDefaultsOnStartup {
-    ctx.add_singleton_model(|_| SettingsInitializer::new());
-
     register_all_settings(ctx);
 
-    // Uncaged: one-time reset of input autodetection. Must run here rather than beside the
-    // upstream migrations in `SettingsInitializer::handle_user_fetched`, which never executes in
-    // an account-free build. See the function's own docs.
+    // Uncaged: one-time reset of input autodetection, run on every launch. See the function's
+    // own docs.
     super::initializer::apply_uncaged_autodetection_reset(ctx);
 
     // One-time migration: copy public settings from the platform-native store

@@ -35,7 +35,7 @@ use warpui::{
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::blocklist::SerializedBlockListItem;
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
-use crate::ai::onboarding::{build_onboarding_models, current_onboarding_auth_state};
+use crate::ai::onboarding::build_onboarding_models;
 use crate::app_state::{AppState, PaneUuid, WindowSnapshot};
 use crate::appearance::Appearance;
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
@@ -1723,17 +1723,12 @@ impl RootView {
         let onboarding_view = ctx.add_typed_action_view(move |ctx| {
             let (models, default_model_id) = build_onboarding_models(LLMPreferences::as_ref(ctx));
 
-            let auth_state = current_onboarding_auth_state(ctx);
-
             AgentOnboardingView::new(
                 themes.clone(),
                 false, // Always use unskippable onboarding.
                 models,
                 default_model_id,
-                // Uncaged has no workspace, so nothing enforces autonomy settings.
-                false,
                 FeatureFlag::AgentView.is_enabled(),
-                auth_state,
                 ctx,
             )
         });
@@ -1752,27 +1747,6 @@ impl RootView {
 
                 LLMPreferencesEvent::UpdatedActiveAgentModeLLM
                 | LLMPreferencesEvent::UpdatedActiveCodingLLM => {}
-            },
-        );
-
-        let onboarding_view_for_auth = onboarding_view.clone();
-        ctx.subscribe_to_model(
-            &AuthManager::handle(ctx),
-            move |_, _auth_manager, event, ctx| {
-                if matches!(
-                    event,
-                    AuthManagerEvent::AuthComplete | AuthManagerEvent::SkippedLogin
-                ) {
-                    let auth_state = current_onboarding_auth_state(ctx);
-                    onboarding_view_for_auth.update(ctx, |onboarding_view, ctx| {
-                        onboarding_view.set_auth_state(auth_state, ctx);
-                    });
-                    if matches!(event, AuthManagerEvent::AuthComplete) {
-                        LLMPreferences::handle(ctx).update(ctx, |prefs, ctx| {
-                            prefs.refresh_available_models(ctx);
-                        });
-                    }
-                }
             },
         );
 

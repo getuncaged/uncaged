@@ -368,10 +368,8 @@ impl MCPServersListPageView {
             };
         let is_update_available = TemplatableMCPServerManager::as_ref(ctx)
             .is_update_available_for_installation(installation_uuid, ctx);
-        let is_authorized_editor =
-            TemplatableMCPServerManager::handle(ctx).read(ctx, |templatable_manager, ctx| {
-                templatable_manager.is_authorized_editor(installation.template_uuid(), ctx)
-            });
+        let is_authorized_editor = TemplatableMCPServerManager::as_ref(ctx)
+            .is_authorized_editor(installation.template_uuid());
         let should_show_update_symbol = is_authorized_editor && is_update_available;
 
         let title_chip_text = Self::get_title_chip_text(item_id, installation.template_uuid(), ctx);

@@ -1038,17 +1038,10 @@ impl Space {
         }
     }
 
-    /// The spaces the user has: the personal drive, plus objects shared with
-    /// them when there are any.
-    pub fn all_user_spaces(app: &AppContext) -> Vec<Space> {
-        let mut spaces = Vec::new();
-        if FeatureFlag::SharedWithMe.is_enabled()
-            && CloudModel::as_ref(app).has_directly_shared_objects(app)
-        {
-            spaces.push(Space::Shared);
-        }
-        spaces.push(Space::Personal);
-        spaces
+    /// The spaces the user has. Nothing is ever shared directly with Uncaged's local user, so
+    /// that is only the personal drive.
+    pub fn all_user_spaces() -> Vec<Space> {
+        vec![Space::Personal]
     }
 }
 

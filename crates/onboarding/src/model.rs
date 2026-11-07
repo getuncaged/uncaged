@@ -54,13 +54,6 @@ impl UICustomizationSettings {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum OnboardingAuthState {
-    LoggedOut,
-    FreeUser,
-    PayingUser,
-}
-
 #[derive(Clone, Debug)]
 pub enum SelectedSettings {
     Terminal {
@@ -156,7 +149,6 @@ pub(crate) enum OnboardingStateEvent {
     IntentionChanged,
     Completed,
     UpgradeRequested,
-    AuthStateChanged,
     NoAiConfirmationChanged,
 }
 
@@ -168,16 +160,12 @@ pub(crate) struct OnboardingStateModel {
     project_settings: ProjectOnboardingSettings,
     ui_customization: UICustomizationSettings,
     models: Vec<OnboardingModelInfo>,
-    /// Whether the workspace enforces autonomy settings, hiding the user selection UI.
-    workspace_enforces_autonomy: bool,
     /// Whether the AgentView feature flag is enabled.
     agent_modality_enabled: bool,
     /// The AI setup selected on the "Choose your AI setup" slide.
     ai_setup_choice: AiSetupChoice,
     /// The access method selected on the "Choose how to access AI" slide.
     ai_access_choice: AiAccessChoice,
-    /// Auth / billing state of the user.
-    auth_state: OnboardingAuthState,
     /// When set, the "Are you sure you don't want AI?" confirmation modal is
     /// shown; the value records which entry point triggered it.
     no_ai_confirmation: Option<NoAiConfirmationSource>,
@@ -188,9 +176,7 @@ impl OnboardingStateModel {
     pub(crate) fn new(
         models: Vec<OnboardingModelInfo>,
         default_model_id: LLMId,
-        workspace_enforces_autonomy: bool,
         agent_modality_enabled: bool,
-        auth_state: OnboardingAuthState,
     ) -> Self {
         Self {
             step: OnboardingStep::Intro,
@@ -199,29 +185,11 @@ impl OnboardingStateModel {
             project_settings: ProjectOnboardingSettings::default(),
             ui_customization: UICustomizationSettings::agent_defaults(),
             models,
-            workspace_enforces_autonomy,
             agent_modality_enabled,
             ai_setup_choice: AiSetupChoice::default(),
             ai_access_choice: AiAccessChoice::default(),
-            auth_state,
             no_ai_confirmation: None,
         }
-    }
-
-    pub(crate) fn auth_state(&self) -> OnboardingAuthState {
-        self.auth_state
-    }
-
-    pub(crate) fn set_auth_state(
-        &mut self,
-        auth_state: OnboardingAuthState,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if self.auth_state == auth_state {
-            return;
-        }
-        self.auth_state = auth_state;
-        ctx.emit(OnboardingStateEvent::AuthStateChanged);
     }
 
     pub(crate) fn settings(&self) -> SelectedSettings {
@@ -242,11 +210,7 @@ impl OnboardingStateModel {
                 SelectedSettings::AgentDrivenDevelopment {
                     agent_settings: AgentDevelopmentSettings {
                         selected_model_id: self.agent_settings.selected_model_id.clone(),
-                        autonomy: if self.workspace_enforces_autonomy {
-                            None
-                        } else {
-                            self.agent_settings.autonomy
-                        },
+                        autonomy: self.agent_settings.autonomy,
                         cli_agent_toolbar_enabled: self.agent_settings.cli_agent_toolbar_enabled,
                         session_default: self.agent_settings.session_default,
                         disable_oz: self.agent_settings.disable_oz,
@@ -274,10 +238,6 @@ impl OnboardingStateModel {
 
     pub(crate) fn project_settings(&self) -> &ProjectOnboardingSettings {
         &self.project_settings
-    }
-
-    pub(crate) fn workspace_enforces_autonomy(&self) -> bool {
-        self.workspace_enforces_autonomy
     }
 
     pub(crate) fn agent_modality_enabled(&self) -> bool {
@@ -473,18 +433,6 @@ impl OnboardingStateModel {
         ctx.notify();
     }
 
-    pub(crate) fn set_workspace_enforces_autonomy(
-        &mut self,
-        value: bool,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if self.workspace_enforces_autonomy == value {
-            return;
-        }
-        self.workspace_enforces_autonomy = value;
-        ctx.notify();
-    }
-
     pub(crate) fn models(&self) -> &Vec<OnboardingModelInfo> {
         &self.models
     }
@@ -566,7 +514,7 @@ impl OnboardingStateModel {
         autonomy: AgentAutonomy,
         ctx: &mut ModelContext<Self>,
     ) {
-        if self.workspace_enforces_autonomy || self.agent_settings.autonomy == Some(autonomy) {
+        if self.agent_settings.autonomy == Some(autonomy) {
             return;
         }
 

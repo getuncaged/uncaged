@@ -3,48 +3,23 @@ use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use warp_core::ui::appearance::Appearance;
 use warpui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Flex, FormattedTextElement,
-    HighlightedHyperlink, HyperlinkLens, MainAxisAlignment, MainAxisSize, ParentElement,
+    HighlightedHyperlink, MainAxisAlignment, MainAxisSize, ParentElement,
 };
-use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
+use warpui::{AppContext, Element, Entity, SingletonEntity, View, ViewContext};
 
 use crate::ai::blocklist::error_color;
 use crate::ai::AIRequestUsageModel;
-use crate::auth::AuthStateProvider;
-use crate::billing;
 use crate::network::NetworkStatus;
 use crate::ui_components::icons::Icon;
-use crate::workspace::WorkspaceAction;
-
-const ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PERCENTAGE: f32 = 0.5;
 
 const NO_CONNECTION_PRIMARY_TEXT: &str = "No internet connection";
-const ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PRIMARY_TEXT: &str = "";
-const ANONYMOUS_USER_REQUEST_LIMIT_HARD_GATE_PRIMARY_TEXT: &str = "At Limit -";
 const OUT_OF_REQUESTS_PRIMARY_TEXT: &str = "Out of credits";
-
-const ANONYMOUS_USER_REQUEST_LIMIT_ACTION_TEXT: &str = "Sign up for more AI credits";
-const UPGRADE_TEXT: &str = "Upgrade";
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PromptAlertAction {
-    SignUpClickedForAnonymousUser,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PromptAlertEvent {
-    SignupAnonymousUser,
-}
 
 /// The alert state of the chip that appears to the right of certain parts of the prompt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptAlertState {
     /// The user is offline (no connection).
     NoConnection,
-    /// An anonymous user has reached a certain percentage of requests used.
-    /// This doesn't use a primary text to avoid being too in-your-face.
-    AnonymousUserRequestLimitSoftGate,
-    /// An anonymous user has reached the request limit.
-    AnonymousUserRequestLimitHardGate,
     /// The user has reached the request limit.
     RequestLimitReached,
     /// No alert should be displayed.
@@ -90,24 +65,6 @@ impl PromptAlertView {
         }
 
         let request_usage_model = AIRequestUsageModel::as_ref(app);
-        let has_requests_remaining = request_usage_model.has_requests_remaining();
-        let auth_state = AuthStateProvider::as_ref(app).get();
-
-        // Next, if the user is anonymous, we check if they have reached a certain percentage of requests used.
-        if auth_state
-            .is_anonymous_user_feature_gated()
-            .unwrap_or_default()
-        {
-            let percentage_used = request_usage_model.request_percentage_used();
-
-            if percentage_used >= ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PERCENTAGE {
-                if has_requests_remaining {
-                    return PromptAlertState::AnonymousUserRequestLimitSoftGate;
-                } else {
-                    return PromptAlertState::AnonymousUserRequestLimitHardGate;
-                }
-            }
-        }
 
         // If there is ever any ai remaining, no alert
         if request_usage_model.has_any_ai_remaining() {
@@ -147,16 +104,6 @@ impl PromptAlertView {
                     NO_CONNECTION_PRIMARY_TEXT,
                 ));
             }
-            PromptAlertState::AnonymousUserRequestLimitSoftGate => {
-                text_fragments.push(FormattedTextFragment::plain_text(
-                    ANONYMOUS_USER_REQUEST_LIMIT_SOFT_GATE_PRIMARY_TEXT,
-                ));
-            }
-            PromptAlertState::AnonymousUserRequestLimitHardGate => {
-                text_fragments.push(FormattedTextFragment::plain_text(
-                    ANONYMOUS_USER_REQUEST_LIMIT_HARD_GATE_PRIMARY_TEXT,
-                ));
-            }
             PromptAlertState::RequestLimitReached => {
                 text_fragments.push(FormattedTextFragment::plain_text(
                     OUT_OF_REQUESTS_PRIMARY_TEXT,
@@ -165,47 +112,17 @@ impl PromptAlertView {
             PromptAlertState::NoAlert => {}
         }
     }
-
-    fn action_hyperlink(
-        &self,
-        state: &PromptAlertState,
-        text_fragments: &mut Vec<FormattedTextFragment>,
-        app: &AppContext,
-    ) {
-        let auth_state = AuthStateProvider::as_ref(app).get();
-
-        match state {
-            PromptAlertState::NoConnection => {}
-            PromptAlertState::AnonymousUserRequestLimitSoftGate
-            | PromptAlertState::AnonymousUserRequestLimitHardGate => {
-                text_fragments.push(FormattedTextFragment::plain_text("  "));
-                text_fragments.push(FormattedTextFragment::hyperlink_action(
-                    ANONYMOUS_USER_REQUEST_LIMIT_ACTION_TEXT,
-                    PromptAlertAction::SignUpClickedForAnonymousUser,
-                ));
-            }
-            PromptAlertState::RequestLimitReached => {
-                text_fragments.push(FormattedTextFragment::plain_text("  "));
-                let user_id = auth_state.user_id().unwrap_or_default();
-                let upgrade_url = billing::upgrade_link(user_id);
-                text_fragments.push(FormattedTextFragment::hyperlink(UPGRADE_TEXT, upgrade_url));
-            }
-            PromptAlertState::NoAlert => {}
-        }
-    }
 }
 
 fn does_alert_block_ai_requests(state: &PromptAlertState) -> bool {
     match state {
-        PromptAlertState::AnonymousUserRequestLimitSoftGate | PromptAlertState::NoAlert => false,
-        PromptAlertState::NoConnection
-        | PromptAlertState::AnonymousUserRequestLimitHardGate
-        | PromptAlertState::RequestLimitReached => true,
+        PromptAlertState::NoAlert => false,
+        PromptAlertState::NoConnection | PromptAlertState::RequestLimitReached => true,
     }
 }
 
 impl Entity for PromptAlertView {
-    type Event = PromptAlertEvent;
+    type Event = ();
 }
 
 impl View for PromptAlertView {
@@ -220,8 +137,6 @@ impl View for PromptAlertView {
 
         self.primary_text(&state, &mut text_fragments);
 
-        self.action_hyperlink(&state, &mut text_fragments, app);
-
         let formatted_text_element = FormattedTextElement::new(
             FormattedText::new([FormattedTextLine::Line(text_fragments)]),
             appearance.ui_font_size(),
@@ -233,22 +148,6 @@ impl View for PromptAlertView {
         .with_line_height_ratio(1.)
         .with_hyperlink_font_color(appearance.theme().ansi_fg_blue())
         .with_no_text_wrapping()
-        .register_default_click_handlers_with_action_support(|hyperlink_lens, event, ctx| {
-            match hyperlink_lens {
-                HyperlinkLens::Url(url) => {
-                    ctx.open_url(url);
-                }
-                HyperlinkLens::Action(action_ref) => {
-                    if let Some(action) = action_ref.as_any().downcast_ref::<PromptAlertAction>() {
-                        event.dispatch_typed_action(action.clone());
-                    } else if let Some(action) =
-                        action_ref.as_any().downcast_ref::<WorkspaceAction>()
-                    {
-                        event.dispatch_typed_action(action.clone());
-                    }
-                }
-            }
-        })
         .finish();
 
         let icon_size = appearance.ui_font_size();
@@ -275,17 +174,5 @@ impl View for PromptAlertView {
         Container::new(chip_row.finish())
             .with_margin_right(16.)
             .finish()
-    }
-}
-
-impl TypedActionView for PromptAlertView {
-    type Action = PromptAlertAction;
-
-    fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
-        match action {
-            PromptAlertAction::SignUpClickedForAnonymousUser => {
-                ctx.emit(PromptAlertEvent::SignupAnonymousUser);
-            }
-        }
     }
 }

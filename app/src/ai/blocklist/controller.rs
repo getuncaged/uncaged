@@ -48,7 +48,6 @@ use crate::ai::document::ai_document_model::{
     AIDocumentId, AIDocumentModel, AIDocumentUserEditStatus,
 };
 use crate::ai::llms::{LLMId, LLMPreferences};
-use crate::ai::AIRequestUsageModel;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::features::FeatureFlag;
 use crate::global_resource_handles::GlobalResourceHandlesProvider;
@@ -267,8 +266,6 @@ pub struct BlocklistAIController {
 
     /// The ID of the terminal view this controller is associated with.
     terminal_view_id: EntityId,
-
-    should_refresh_available_llms_on_stream_finish: bool,
 
     /// Ambient agent task ID attached to this controller. This is a property of the controller, and not an individual
     /// conversation, because the ambient agent task driver owns the entire Warp window working on a task, and any
@@ -534,7 +531,6 @@ impl BlocklistAIController {
             terminal_model,
             in_flight_response_streams: PendingResponseStreams::new(),
             terminal_view_id,
-            should_refresh_available_llms_on_stream_finish: false,
             ambient_agent_task_id: None,
             attachments_download_dir: None,
             pending_auto_resume_handles: HashMap::new(),
@@ -2583,18 +2579,9 @@ impl BlocklistAIController {
                 });
                 ctx.unsubscribe_from_model(response_stream);
 
-                if self.should_refresh_available_llms_on_stream_finish {
-                    self.should_refresh_available_llms_on_stream_finish = false;
-                    LLMPreferences::handle(ctx).update(ctx, |llm_preferences, ctx| {
-                        llm_preferences.refresh_authed_models(ctx);
-                    });
-                }
                 ctx.emit(BlocklistAIControllerEvent::FinishedReceivingOutput {
                     stream_id,
                     conversation_id,
-                });
-                AIRequestUsageModel::handle(ctx).update(ctx, |request_usage_model, ctx| {
-                    request_usage_model.refresh_request_usage_async(ctx);
                 });
             }
         }
@@ -2778,12 +2765,6 @@ impl BlocklistAIController {
                     );
                 });
             }
-        }
-
-        if finished_event.should_refresh_model_config {
-            LLMPreferences::handle(ctx).update(ctx, |llm_preferences, ctx| {
-                llm_preferences.refresh_authed_models(ctx);
-            });
         }
     }
 }

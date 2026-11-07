@@ -2,6 +2,7 @@ use warpui::platform::WindowStyle;
 use warpui::App;
 
 use super::*;
+use crate::auth::{AuthManager, AuthStateProvider};
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::network::NetworkStatus;
 use crate::server::cloud_objects::listener::Listener;

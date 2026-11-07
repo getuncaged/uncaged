@@ -9,7 +9,6 @@ use chrono::{DateTime, Utc};
 pub use cloud_object_client::GetCloudObjectResponse;
 pub use cloud_object_client::InitialLoadResponse;
 use futures::channel::oneshot::{self, Receiver};
-use futures::stream::AbortHandle;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -20,10 +19,9 @@ use warp_graphql::mcp_gallery_template::MCPGalleryTemplate;
 use warp_graphql::object_permissions::AccessLevel;
 use warp_graphql::scalars::time::ServerTimestamp;
 use warp_util::sync::Condition;
-use warpui::r#async::{FutureId, Timer};
+use warpui::r#async::FutureId;
 use warpui::{
-    duration_with_jitter, AppContext, Entity, ModelContext, ModelHandle, RequestState, RetryOption,
-    SingletonEntity,
+    AppContext, Entity, ModelContext, ModelHandle, RequestState, RetryOption, SingletonEntity,
 };
 
 use super::listener::ObjectUpdateMessage;
@@ -35,8 +33,6 @@ use crate::ai::execution_profiles::{AIExecutionProfile, CloudAIExecutionProfileM
 use crate::ai::facts::{AIFact, CloudAIFactModel};
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::mcp::templatable::{CloudTemplatableMCPServerModel, TemplatableMCPServer};
-use crate::auth::auth_manager::AuthManager;
-use crate::auth::AuthStateProvider;
 use crate::cloud_object::model::actions::{
     ObjectAction, ObjectActionHistory, ObjectActionType, ObjectActions,
 };
@@ -55,11 +51,6 @@ use crate::cloud_object::{
     ServerPreference, ServerTemplatableMCPServer, ServerWorkflowEnum, Space,
     UpdateCloudObjectResult,
 };
-use crate::drive::drive_helpers::{
-    is_feature_gated_anonymous_user_past_env_var_limit,
-    is_feature_gated_anonymous_user_past_notebook_limit,
-    is_feature_gated_anonymous_user_past_workflow_limit,
-};
 use crate::drive::folders::{CloudFolderModel, FolderId};
 use crate::drive::sharing::SharingAccessLevel;
 use crate::drive::CloudObjectTypeAndId;
@@ -71,9 +62,7 @@ use crate::server::ids::{
     parse_sqlite_id_to_uid, ClientId, HashableId, HashedSqliteId, ObjectUid, ServerId, SyncId,
     ToServerId,
 };
-use crate::server::retry_strategies::{
-    OUT_OF_BAND_REQUEST_RETRY_STRATEGY, PERIODIC_POLL, PERIODIC_POLL_RETRY_STRATEGY,
-};
+use crate::server::retry_strategies::OUT_OF_BAND_REQUEST_RETRY_STRATEGY;
 use crate::server::server_api::object::{GuestIdentifier, ObjectClient};
 use crate::server::sync_queue::{
     CreationFailureReason, GenericStringObjectToCreate, QueueItem, SyncQueue, SyncQueueEvent,
@@ -188,9 +177,6 @@ where
 pub struct UpdateManager {
     model_event_sender: Option<SyncSender<ModelEvent>>,
     object_client: Arc<dyn ObjectClient>,
-    next_poll_abort_handle: Option<AbortHandle>,
-    in_flight_request_abort_handle: Option<AbortHandle>,
-    should_poll_for_updated_objects: bool,
     spawned_futures: Vec<FutureId>,
     has_initial_load: Condition,
     /// Uncaged: whether Drive moves are applied locally (Oss channel) instead of
@@ -220,9 +206,6 @@ impl UpdateManager {
         Self {
             model_event_sender,
             object_client,
-            next_poll_abort_handle: None,
-            in_flight_request_abort_handle: None,
-            should_poll_for_updated_objects: false,
             spawned_futures: Default::default(),
             has_initial_load: Condition::new(),
             local_only_moves: matches!(ChannelState::channel(), Channel::Oss),
@@ -315,8 +298,6 @@ impl UpdateManager {
         if *force_refresh {
             self.refresh_updated_objects(ctx);
         }
-
-        self.start_polling_for_updated_objects(ctx);
     }
 
     fn handle_model_event(&mut self, event: &SyncQueueEvent, ctx: &mut ModelContext<Self>) {
@@ -624,15 +605,6 @@ impl UpdateManager {
         });
     }
 
-    pub fn start_polling_for_updated_objects(&mut self, ctx: &mut ModelContext<Self>) {
-        let is_online = NetworkStatus::as_ref(ctx).is_online();
-
-        if !self.should_poll_for_updated_objects && is_online {
-            self.should_poll_for_updated_objects = true;
-            self.poll_for_updated_objects(ctx);
-        }
-    }
-
     /// Out-of-band (from the regular poll) refresh of updated objects.
     pub fn refresh_updated_objects(&mut self, ctx: &mut ModelContext<Self>) {
         let object_client = self.object_client.clone();
@@ -662,84 +634,6 @@ impl UpdateManager {
         self.spawned_futures.push(spawned_handle.future_id());
     }
 
-    pub fn stop_polling_for_updated_objects(&mut self) {
-        self.should_poll_for_updated_objects = false;
-        self.abort_existing_poll();
-    }
-
-    fn abort_existing_poll(&mut self) {
-        if let Some(abort_handle) = self.in_flight_request_abort_handle.take() {
-            abort_handle.abort();
-        }
-
-        if let Some(abort_handle) = self.next_poll_abort_handle.take() {
-            abort_handle.abort();
-        }
-    }
-
-    fn poll_for_updated_objects(&mut self, ctx: &mut ModelContext<Self>) {
-        self.abort_existing_poll();
-
-        if !self.should_poll_for_updated_objects {
-            return;
-        }
-
-        // Don't poll when the user is logged out to avoid spamming auth errors in the logs.
-        // Polling will be restarted when the user logs in via `initiate_data_pollers`.
-        if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
-            self.should_poll_for_updated_objects = false;
-            return;
-        }
-
-        let object_client = self.object_client.clone();
-        let cloud_model = CloudModel::as_ref(ctx);
-        let versions_for_all_objects = cloud_model.get_versions_for_all_objects(ctx);
-
-        // If there's a force refresh for cloud objects pending, we'll execute the refresh now
-        let force_refresh = cloud_model.cloud_objects_force_refresh_pending();
-        // We retry a few times here in case there are any transient network errors.
-        let spawned_handle = ctx.spawn_with_retry_on_error(
-            move || {
-                let object_client = object_client.clone();
-                let cloned_objects_to_update = versions_for_all_objects.clone();
-                async move {
-                    object_client
-                        .fetch_changed_objects(cloned_objects_to_update, force_refresh)
-                        .await
-                }
-            },
-            PERIODIC_POLL_RETRY_STRATEGY,
-            move |update_manager, res, ctx| {
-                // Only poll if `spawn_with_retry_on_error` is not going to retry again so we don't end up with multiple
-                // polls running simultaneously.
-                let should_poll_again = !res.has_pending_retries();
-                update_manager.handle_fetch_changed_objects_with_request_state(
-                    res,
-                    force_refresh,
-                    ctx,
-                );
-
-                if should_poll_again {
-                    let next_poll_handle = ctx.spawn(
-                        async move {
-                            Timer::after(duration_with_jitter(
-                                PERIODIC_POLL,
-                                0.2, /* max_jitter_multiplier */
-                            ))
-                            .await
-                        },
-                        |update_manager, _, ctx| {
-                            update_manager.poll_for_updated_objects(ctx);
-                        },
-                    );
-                    update_manager.next_poll_abort_handle = Some(next_poll_handle.abort_handle());
-                }
-            },
-        );
-
-        self.in_flight_request_abort_handle = Some(spawned_handle.abort_handle());
-    }
-
     fn handle_network_status_changed(
         &mut self,
         event: &NetworkStatusEvent,
@@ -747,11 +641,8 @@ impl UpdateManager {
     ) {
         match event {
             NetworkStatusEvent::NetworkStatusChanged { new_status } => match new_status {
-                NetworkStatusKind::Online => {
-                    self.start_polling_for_updated_objects(ctx);
-                }
+                NetworkStatusKind::Online => {}
                 NetworkStatusKind::Offline => {
-                    self.stop_polling_for_updated_objects();
                     SyncQueue::handle(ctx).update(ctx, |queue, _ctx| queue.stop_dequeueing())
                 }
             },
@@ -3180,23 +3071,6 @@ impl UpdateManager {
         force_expand: bool,
         ctx: &mut ModelContext<Self>,
     ) {
-        let count = CloudModel::handle(ctx).read(ctx, |model, _| {
-            model
-                .active_non_welcome_notebooks_in_space(Space::Personal)
-                .count()
-        });
-        if AuthStateProvider::handle(ctx).read(ctx, |auth_state_provider, _ctx| {
-            is_feature_gated_anonymous_user_past_notebook_limit(
-                auth_state_provider.get(),
-                count + 1,
-            )
-        }) {
-            AuthManager::handle(ctx).update(ctx, |auth_manager: &mut AuthManager, ctx| {
-                auth_manager.anonymous_user_hit_drive_object_limit(ctx);
-            });
-            return;
-        };
-
         self.create_object(
             model,
             owner,
@@ -3249,23 +3123,6 @@ impl UpdateManager {
         force_expand: bool,
         ctx: &mut ModelContext<Self>,
     ) {
-        let count = CloudModel::handle(ctx).read(ctx, |model, _| {
-            model
-                .active_non_welcome_workflows_in_space(Space::Personal)
-                .count()
-        });
-        if AuthStateProvider::handle(ctx).read(ctx, |auth_state_provider, _ctx| {
-            is_feature_gated_anonymous_user_past_workflow_limit(
-                auth_state_provider.get(),
-                count + 1,
-            )
-        }) {
-            AuthManager::handle(ctx).update(ctx, |auth_manager: &mut AuthManager, ctx| {
-                auth_manager.anonymous_user_hit_drive_object_limit(ctx);
-            });
-            return;
-        };
-
         self.create_object(
             CloudWorkflowModel::new(workflow),
             owner,
@@ -3315,20 +3172,6 @@ impl UpdateManager {
         force_expand: bool,
         ctx: &mut ModelContext<Self>,
     ) {
-        let count = CloudModel::handle(ctx).read(ctx, |model, _| {
-            model
-                .active_non_welcome_env_var_collections_in_space(Space::Personal)
-                .count()
-        });
-        if AuthStateProvider::handle(ctx).read(ctx, |auth_state_provider, _ctx| {
-            is_feature_gated_anonymous_user_past_env_var_limit(auth_state_provider.get(), count + 1)
-        }) {
-            AuthManager::handle(ctx).update(ctx, |auth_manager: &mut AuthManager, ctx| {
-                auth_manager.anonymous_user_hit_drive_object_limit(ctx);
-            });
-            return;
-        };
-
         self.create_object(
             model,
             owner,
@@ -3472,18 +3315,15 @@ impl UpdateManager {
         M: CloudModelType<IdType = K, CloudObjectType = GenericCloudObject<K, M>> + 'static,
     {
         let object_id = SyncId::ClientId(client_id);
-        let auth_state = AuthStateProvider::as_ref(ctx).get();
-        let initial_editor = auth_state.user_id();
 
         // Update in-memory model.
         CloudModel::handle(ctx).update(ctx, |cloud_model, ctx| {
-            let mut object = GenericCloudObject::<K, M>::new_local(
+            let object = GenericCloudObject::<K, M>::new_local(
                 model.clone(),
                 owner,
                 initial_folder_id,
                 client_id,
             );
-            object.metadata.current_editor_uid = initial_editor.map(|uid| uid.as_string());
             cloud_model.create_object(object_id, object, ctx);
 
             if force_expand {
@@ -3920,10 +3760,9 @@ impl UpdateManager {
             return;
         };
 
-        let auth_state = AuthStateProvider::as_ref(ctx).get();
-        let user_uid = auth_state.user_id().unwrap_or_default();
+        // Uncaged's local user has no uid, so the editor is recorded with an empty one.
         if optimistically_grant_access {
-            self.set_notebook_current_editor(&notebook_id, Some(user_uid.as_string()), ctx);
+            self.set_notebook_current_editor(&notebook_id, Some(String::new()), ctx);
         }
         let cloud_object_client = self.object_client.clone();
         // Make the request.
@@ -3943,7 +3782,7 @@ impl UpdateManager {
                     if !optimistically_grant_access {
                         me.set_notebook_current_editor(
                             &notebook_id,
-                            Some(user_uid.as_string()),
+                            Some(String::new()),
                             ctx,
                         );
                         ctx.emit(UpdateManagerEvent::ObjectOperationComplete {

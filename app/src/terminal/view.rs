@@ -83,8 +83,7 @@ use inline_banner::{
     render_alias_expansion_banner, render_inline_notifications_discovery_banner,
     render_inline_notifications_error_banner, render_open_in_warp_banner,
     render_shell_process_terminated_banner, render_vim_mode_banner, AliasExpansionBanner,
-    AliasExpansionBannerAction, AnonymousUserAISignUpBannerState, AnonymousUserLoginBannerAction,
-    OpenInWarpBannerState, VimModeBannerAction,
+    AliasExpansionBannerAction, OpenInWarpBannerState, VimModeBannerAction,
 };
 pub use inline_banner::{NotificationsDiscoveryBannerAction, NotificationsErrorBannerAction};
 use instant::Instant;
@@ -244,10 +243,6 @@ use crate::ai::predict::prompt_suggestions::{
 };
 use crate::ai_assistant::{AskAIType, ASK_AI_ASSISTANT_TEXT};
 use crate::appearance::{Appearance, AppearanceEvent};
-use crate::auth::auth_manager::AuthManager;
-use crate::auth::auth_state::AuthState;
-use crate::auth::auth_view_modal::AuthViewVariant;
-use crate::auth::AuthStateProvider;
 use crate::autoupdate::{self, get_update_state, AutoupdateStage};
 use crate::banner::{
     Banner, BannerAction, BannerEvent, BannerState, BannerTextButton, BannerTextContent,
@@ -968,8 +963,6 @@ struct InlineBannersState {
     codebase_index_speedbump_banner: Option<CodebaseIndexSpeedbumpBannerState>,
 
     agent_setup_speedbump_banner: Option<AgentModeSetupSpeedbumpBannerState>,
-
-    anonymous_user_ai_sign_up_banner: Option<AnonymousUserAISignUpBannerState>,
 }
 
 impl InlineBannersState {
@@ -1573,7 +1566,6 @@ pub enum Event {
         buffer_text: String,
         results_tx: async_channel::Sender<Vec<ShellCompletion>>,
     },
-    SignupAnonymousUser,
 
     OpenThemeGallery,
     OpenConversationHistory,
@@ -2117,8 +2109,6 @@ pub struct TerminalView {
     mouse_down_block_index: Option<BlockIndex>,
 
     mouse_states: TerminalViewMouseStates,
-
-    auth_state: Arc<AuthState>,
 
     /// A sender used to handle messages for whenever the entire terminal view
     /// changes size.  Note that this size contains not just the content element
@@ -3619,7 +3609,6 @@ impl TerminalView {
             mouse_states: Default::default(),
             open_grid_link_tool_tip: None,
             open_rich_content_link_tool_tip: None,
-            auth_state: AuthStateProvider::as_ref(ctx).get().clone(),
             find_bar,
             resize_tx,
             pending_agent_scroll_target: None,
@@ -8470,41 +8459,6 @@ impl TerminalView {
         // No-op when local filesystem is unavailable.
     }
 
-    fn anonymous_user_ai_sign_up_banner_action(
-        &mut self,
-        action: AnonymousUserLoginBannerAction,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match action {
-            AnonymousUserLoginBannerAction::SignUp => {
-                ctx.emit(Event::SignupAnonymousUser);
-                self.remove_anonymous_user_ai_sign_up_banner(ctx);
-            }
-            AnonymousUserLoginBannerAction::Close => {
-                self.remove_anonymous_user_ai_sign_up_banner(ctx);
-            }
-        }
-    }
-
-    fn insert_anonymous_user_ai_sign_up_banner(&mut self, _ctx: &mut ViewContext<Self>) {
-        // Uncaged runs AI on the local engine with no account, so the "AI is
-        // unavailable for logged-out users" sign-up banner never applies.
-    }
-
-    fn remove_anonymous_user_ai_sign_up_banner(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(banner_state) = self
-            .inline_banners_state
-            .anonymous_user_ai_sign_up_banner
-            .take()
-        {
-            self.model
-                .lock()
-                .block_list_mut()
-                .remove_inline_banner(banner_state.id);
-            ctx.notify();
-        }
-    }
-
     /// Inserts a banner notifying the user that the shell process has terminated.
     fn insert_shell_process_terminated_banner(
         &mut self,
@@ -10525,12 +10479,6 @@ impl TerminalView {
         self.is_login_shell_bootstrapped = true;
         self.hide_slow_bootstrap_banner(ctx);
 
-        if self.auth_state.is_anonymous_or_logged_out()
-            && !FeatureFlag::OpenWarpNewSettingsModes.is_enabled()
-        {
-            self.insert_anonymous_user_ai_sign_up_banner(ctx);
-        }
-
         if self.should_display_vim_banner(&session, ctx) {
             self.insert_vim_mode_banner(ctx);
         }
@@ -10619,12 +10567,6 @@ impl TerminalView {
 
         self.ignore_next_set_title_event = true;
 
-        let auth_state = AuthStateProvider::as_ref(ctx).get();
-        let is_onboarded = auth_state.is_onboarded().unwrap_or(true);
-        let is_anonymous_or_logged_out = auth_state.is_anonymous_or_logged_out();
-        let should_show_onboarding = FeatureFlag::AgentOnboarding.is_enabled()
-            && !is_onboarded
-            && !is_anonymous_or_logged_out;
         let is_launch_modal_open = OneTimeModalModel::as_ref(ctx).is_oz_launch_modal_open();
 
         let has_plugin_instructions_block = self.rich_content_views.iter().any(|rc| {
@@ -10637,7 +10579,6 @@ impl TerminalView {
         if FeatureFlag::AgentView.is_enabled()
             && TerminalSettings::as_ref(ctx).should_show_zero_state_block(ctx)
             && !self.model.lock().block_list().is_restored_session()
-            && !should_show_onboarding
             && self.onboarding_callout_view.is_none()
             && !is_launch_modal_open
             && !is_subshell_or_ssh
@@ -17558,9 +17499,6 @@ impl TerminalView {
                 ctx.dispatch_typed_action(&PaneGroupAction::HandleFocusChange);
                 ctx.notify();
             }
-            InputEvent::SignupAnonymousUser => {
-                ctx.emit(Event::SignupAnonymousUser);
-            }
             InputEvent::OpenSettings(section) => {
                 ctx.emit(Event::OpenSettings(*section));
             }
@@ -19479,10 +19417,6 @@ impl TerminalView {
                 banner_state.id,
                 render_agent_mode_setup_banner(banner_state, appearance),
             );
-        }
-
-        if let Some(banner_state) = &self.inline_banners_state.anonymous_user_ai_sign_up_banner {
-            inline_banners.insert(banner_state.id, banner_state.render(appearance));
         }
 
         inline_banners
@@ -21749,7 +21683,6 @@ impl TypedActionView for TerminalView {
             | SetInputModeAgent
             | SetInputModeTerminal
             | HyperlinkClick { .. }
-            | AttemptLoginGatedFeature
             | StartFileDropTarget
             | StopFileDropTarget
             | RunNativeShellCompletions { .. }
@@ -21775,7 +21708,6 @@ impl TypedActionView for TerminalView {
             | AddProjectAtCurrentDirectory
             | CodebaseIndexSpeedbumpBanner(_)
             | AgentModeSetupSpeedbumpBanner(_)
-            | AnonymousUserAISignUpBanner(_)
             | DismissCodeToolbeltTooltip
             | SummarizeConversation
             | ToggleLongRunningCommandControl
@@ -22153,23 +22085,8 @@ impl TypedActionView for TerminalView {
             OpenInWarpBanner(action) => self.handle_open_in_warp_banner_action(*action, ctx),
             OpenBlockFilterEditor(block_index) => self.open_block_filter_editor(*block_index, ctx),
             VimModeBanner(action) => self.handle_vim_banner_action(*action, ctx),
-            OnboardingFlow(version) => {
-                // Don't show onboarding if the user is anonymous
-                if self.auth_state.is_anonymous_or_logged_out() {
-                    return;
-                };
-
-                match version {
-                    OnboardingVersion::Agent(agent_version) => {
-                        // The first Agent Modality callout expects terminal mode. If the
-                        // default session mode is Agent (e.g. cloud-synced settings),
-                        // the tab may already be in agent view — exit it first.
-                        // This also removes any zero-state welcome blocks.
-                        self.exit_agent_view(ctx);
-                        self.start_agent_onboarding_tutorial(*agent_version, ctx);
-                    }
-                }
-            }
+            // The guided tour only ran for signed-in users, and Uncaged has no accounts.
+            OnboardingFlow(_) => {}
             ImportSettings => {
                 #[cfg(feature = "local_fs")]
                 {
@@ -22284,12 +22201,6 @@ impl TypedActionView for TerminalView {
             HyperlinkClick(hyperlink) => {
                 ctx.notify();
                 ctx.open_url(&hyperlink.url);
-            }
-            AttemptLoginGatedFeature => {
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    auth_manager
-                        .attempt_login_gated_feature(AuthViewVariant::RequireLoginCloseable, ctx)
-                });
             }
             StartFileDropTarget => {
                 let Some(session) = self
@@ -22452,9 +22363,6 @@ impl TypedActionView for TerminalView {
             }
             AgentModeSetupSpeedbumpBanner(action) => {
                 self.agent_mode_setup_speedbump_banner_action(*action, ctx)
-            }
-            AnonymousUserAISignUpBanner(action) => {
-                self.anonymous_user_ai_sign_up_banner_action(*action, ctx);
             }
             ResumeConversation => {
                 // With Agent View, we want to resume the conversation the user is currently viewing,

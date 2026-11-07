@@ -16,7 +16,7 @@ use crate::ai::ambient_agents::{AgentSource, AmbientAgentTask, AmbientAgentTaskI
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::history_model::{AIConversationMetadata, BlocklistAIHistoryModel};
 use crate::ai::conversation_navigation::ConversationNavigationData;
-use crate::auth::{AuthStateProvider, UserUid};
+use crate::auth::UserUid;
 use crate::util::time_format::human_readable_precise_duration;
 use crate::workspace::RestoreConversationLayout;
 use crate::workspaces::user_profiles::{UserProfileWithUID, UserProfiles};
@@ -165,12 +165,8 @@ pub struct AgentConversationCapabilities {
 }
 
 impl AgentConversationEntry {
-    pub(super) fn matches_filters(
-        &self,
-        filters: &AgentManagementFilters,
-        app: &AppContext,
-    ) -> bool {
-        self.matches_owner_and_creator(&filters.owners, &filters.creator, app)
+    pub(super) fn matches_filters(&self, filters: &AgentManagementFilters) -> bool {
+        self.matches_owner_and_creator(&filters.owners, &filters.creator)
             && self.matches_status(&filters.status)
             && self.matches_source(&filters.source)
             && self.matches_created_on(&filters.created_on)
@@ -183,18 +179,13 @@ impl AgentConversationEntry {
         &self,
         owner_filter: &OwnerFilter,
         creator_filter: &CreatorFilter,
-        app: &AppContext,
     ) -> bool {
-        let current_user_id = AuthStateProvider::as_ref(app)
-            .get()
-            .user_id()
-            .map(|uid| uid.as_string());
-
         let passes_owner = match owner_filter {
             OwnerFilter::All => true,
             OwnerFilter::PersonalOnly => {
                 if self.backing.has_ambient_run {
-                    self.display.creator.uid == current_user_id
+                    // Uncaged's local user has no uid, so only uid-less runs are its own.
+                    self.display.creator.uid.is_none()
                 } else {
                     true
                 }
@@ -306,17 +297,6 @@ pub(super) fn task_creator_name(task: &AmbientAgentTask, app: &AppContext) -> Op
 
 pub(super) fn task_creator_uid(task: &AmbientAgentTask) -> Option<String> {
     task.creator.as_ref().map(|creator| creator.uid.clone())
-}
-
-fn current_user_name(app: &AppContext) -> Option<String> {
-    AuthStateProvider::as_ref(app).get().username_for_display()
-}
-
-fn current_user_uid(app: &AppContext) -> Option<String> {
-    AuthStateProvider::as_ref(app)
-        .get()
-        .user_id()
-        .map(|uid| uid.to_string())
 }
 
 fn task_session_id(task: &AmbientAgentTask) -> Option<SessionId> {
@@ -438,9 +418,10 @@ fn conversation_creator(
         };
     }
 
+    // Uncaged's local user has no account name or uid.
     AgentConversationPrincipal {
-        name: current_user_name(app),
-        uid: current_user_uid(app),
+        name: None,
+        uid: None,
         principal_type: Some(PrincipalType::User),
     }
 }

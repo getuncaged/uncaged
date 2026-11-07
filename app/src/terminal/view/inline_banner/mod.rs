@@ -3,7 +3,6 @@
 //! the Blocklist (between blocks) while app banners are pinned to the top of the window.
 mod agent_mode_setup;
 mod alias_expansion;
-mod anonymous_user_ai_sign_up;
 mod notifications_discovery;
 mod notifications_error;
 mod open_in_warp;
@@ -14,7 +13,6 @@ mod vim_mode;
 
 pub use agent_mode_setup::*;
 pub use alias_expansion::*;
-pub use anonymous_user_ai_sign_up::*;
 pub use notifications_discovery::*;
 pub use notifications_error::*;
 pub use open_in_warp::*;

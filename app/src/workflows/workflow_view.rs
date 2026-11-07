@@ -36,10 +36,7 @@ use super::aliases::WorkflowAliases;
 use super::command_parser::WorkflowCommandDisplayData;
 use super::{CloudWorkflowModel, WorkflowSource, WorkflowType, WorkflowViewMode};
 use crate::ai::blocklist::secret_redaction::find_secrets_in_text;
-use crate::ai::AIRequestUsageModel;
 use crate::appearance::Appearance;
-use crate::auth::auth_state::AuthState;
-use crate::auth::{AuthStateProvider, UserUid};
 use crate::cloud_object::breadcrumbs::ContainingObject;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::model::view::CloudViewModel;
@@ -47,10 +44,8 @@ use crate::cloud_object::{
     CloudObject, CloudObjectEventEntrypoint, ObjectType, Owner, Revision, Space,
 };
 use crate::drive::cloud_object_styling::warp_drive_icon_color;
-use crate::drive::drive_helpers::has_feature_gated_anonymous_user_reached_workflow_limit;
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
-use crate::drive::workflows::ai_assist::GeneratedCommandMetadataError;
 use crate::drive::workflows::arguments::ArgumentsState;
 use crate::drive::workflows::enum_creation_dialog::{
     EnumCreationDialog, EnumCreationDialogEvent, WorkflowEnumData,
@@ -89,11 +84,11 @@ use crate::ui_components::icons::Icon;
 #[cfg(target_family = "wasm")]
 use crate::uri::web_intent_parser::open_url_on_desktop;
 use crate::util::bindings::CustomAction;
-use crate::view_components::{DismissibleToast, ToastLink, ToastType};
+use crate::view_components::{DismissibleToast, ToastType};
 use crate::workflows::workflow::{Argument, Workflow};
 use crate::workflows::CloudWorkflow;
-use crate::workspace::{ToastStack, WorkspaceAction};
-use crate::{billing, FeatureFlag};
+use crate::workspace::ToastStack;
+use crate::FeatureFlag;
 
 mod alias_argument_selector;
 mod alias_bar;
@@ -301,7 +296,6 @@ pub struct WorkflowView {
     default_argument_id: usize,
     pub(super) ai_metadata_assist_state: AiAssistState,
     revision_ts: Option<Revision>,
-    pub(super) auth_state: Arc<AuthState>,
     pub(super) ai_client: Arc<dyn AIClient>,
     owner: Option<Owner>,
     initial_folder_id: Option<SyncId>,
@@ -448,7 +442,6 @@ impl WorkflowView {
             initial_folder_id: None,
             revision_ts: None,
             command_display_data: WorkflowCommandDisplayData::new_empty(),
-            auth_state: AuthStateProvider::as_ref(ctx).get().clone(),
             ai_client,
             pending_argument_editor_row: None,
             show_enum_creation_dialog: false,
@@ -1972,10 +1965,6 @@ impl WorkflowView {
     }
 
     fn untrash_object(&self, ctx: &mut ViewContext<Self>) {
-        if has_feature_gated_anonymous_user_reached_workflow_limit(ctx) {
-            return;
-        }
-
         UpdateManager::handle(ctx).update(ctx, move |update_manager, ctx| {
             update_manager.untrash_object(
                 CloudObjectTypeAndId::from_id_and_type(self.workflow_id, ObjectType::Workflow),
@@ -2559,84 +2548,52 @@ impl WorkflowView {
 
         ctx.spawn(
             async move { ai_client.generate_metadata_for_command(raw_request).await },
-            move |pane, response, ctx| {
-                match response {
-                    Ok(metadata) => {
-                        pane.ai_metadata_assist_state = AiAssistState::Generated;
-                        pane.enable_editors(ctx);
+            move |pane, response, ctx| match response {
+                Ok(metadata) => {
+                    pane.ai_metadata_assist_state = AiAssistState::Generated;
+                    pane.enable_editors(ctx);
 
-                        let arguments = metadata
-                            .arguments
-                            .into_iter()
-                            .map(|parameter| Argument {
-                                name: parameter.name,
-                                description: Some(parameter.description),
-                                default_value: Some(parameter.default_value),
-                                arg_type: Default::default(),
-                            })
-                            .collect_vec();
+                    let arguments = metadata
+                        .arguments
+                        .into_iter()
+                        .map(|parameter| Argument {
+                            name: parameter.name,
+                            description: Some(parameter.description),
+                            default_value: Some(parameter.default_value),
+                            arg_type: Default::default(),
+                        })
+                        .collect_vec();
 
-                        let workflow = Workflow::Command {
-                            name: metadata.title,
-                            description: Some(metadata.description),
-                            command: metadata.command,
-                            arguments,
-                            tags: vec![],
-                            source_url: None,
-                            author: None,
-                            author_url: None,
-                            shells: vec![],
-                            environment_variables: None,
-                        };
+                    let workflow = Workflow::Command {
+                        name: metadata.title,
+                        description: Some(metadata.description),
+                        command: metadata.command,
+                        arguments,
+                        tags: vec![],
+                        source_url: None,
+                        author: None,
+                        author_url: None,
+                        shells: vec![],
+                        environment_variables: None,
+                    };
 
-                        pane.populate_missing_field_with_suggestion(workflow, ctx);
-                        ctx.notify();
-                    }
-                    Err(err) => {
-                        let message = err.user_facing_message();
-                        if let GeneratedCommandMetadataError::RateLimited = err {
-                            let current_user_id = pane.auth_state.user_id().unwrap_or_default();
-                            pane.display_upgrade_error(current_user_id, ctx);
-                        } else {
-                            pane.display_error_toast(message.clone(), ctx);
-                        }
-
-                        pane.ai_metadata_assist_state = AiAssistState::PreRequest;
-                        pane.enable_editors(ctx);
-                        ctx.notify();
-                    }
+                    pane.populate_missing_field_with_suggestion(workflow, ctx);
+                    ctx.notify();
                 }
-                AIRequestUsageModel::handle(ctx).update(ctx, |request_usage_model, ctx| {
-                    request_usage_model.refresh_request_usage_async(ctx);
-                });
+                Err(err) => {
+                    let message = err.user_facing_message();
+                    pane.display_error_toast(message.clone(), ctx);
+
+                    pane.ai_metadata_assist_state = AiAssistState::PreRequest;
+                    pane.enable_editors(ctx);
+                    ctx.notify();
+                }
             },
         );
 
         self.ai_metadata_assist_state = AiAssistState::RequestInFlight;
         self.disable_editors(ctx);
         ctx.notify();
-    }
-
-    fn display_upgrade_error(&mut self, user_id: UserUid, ctx: &mut ViewContext<Self>) {
-        let upgrade_link = billing::upgrade_link(user_id);
-
-        let window_id = ctx.window_id();
-        let toast_link = if self.auth_state.is_anonymous_or_logged_out() {
-            ToastLink::new("Upgrade for more credits.".into())
-                .with_onclick_action(WorkspaceAction::AttemptLoginGatedAIUpgrade)
-        } else {
-            ToastLink::new("Upgrade for more credits.".into()).with_href(upgrade_link)
-        };
-
-        crate::workspace::ToastStack::handle(ctx).update(ctx, |stack, ctx| {
-            stack.add_ephemeral_toast(
-                DismissibleToast::error("Looks like you're out of AI credits.".into())
-                    .with_link(toast_link),
-                window_id,
-                ctx,
-            );
-            ctx.notify();
-        });
     }
 
     // Populate only the missing field in the workflow editor with the generated suggestion from AI.

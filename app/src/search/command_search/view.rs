@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::ops::Range;
-use std::sync::Arc;
 use std::time::Duration;
 
 use async_channel::Sender;
@@ -32,10 +31,6 @@ use super::warp_ai::WarpAIDataSource;
 use super::workflows::{cloud_workflows_data_source, WorkflowsDataSource};
 use super::zero_state::{CommandSearchZeroStateEvent, CommandSearchZeroStateView};
 use crate::appearance::Appearance;
-use crate::auth::auth_manager::AuthManager;
-use crate::auth::auth_state::AuthState;
-use crate::auth::auth_view_modal::AuthViewVariant;
-use crate::auth::AuthStateProvider;
 use crate::completer::SessionContext;
 use crate::drive::settings::WarpDriveSettings;
 use crate::search::command_search::searcher::{CommandSearchItemAction, CommandSearchMixer};
@@ -93,7 +88,6 @@ pub enum CommandSearchAction {
     },
     Close,
     Resize,
-    AttemptLoginGatedUpgrade,
 }
 
 struct CommandSearchViewState {
@@ -110,7 +104,6 @@ pub struct CommandSearchView {
     zero_state_handle: ViewHandle<CommandSearchZeroStateView>,
     handle: WeakViewHandle<Self>,
     menu_positioning: MenuPositioning,
-    auth_state: Arc<AuthState>,
     state: CommandSearchViewState,
     visible_results_range_sender: Sender<Range<usize>>,
     resizable_state_handle: ResizableStateHandle,
@@ -182,7 +175,6 @@ impl CommandSearchView {
             });
 
         Self {
-            auth_state: AuthStateProvider::as_ref(ctx).get().clone(),
             zero_state_handle,
             menu_positioning: Default::default(),
             handle: ctx.handle(),
@@ -750,12 +742,6 @@ impl TypedActionView for CommandSearchView {
                 self.handle_result_selected(*result_action.clone(), ctx)
             }
             Resize => ctx.emit(CommandSearchEvent::Resize),
-            AttemptLoginGatedUpgrade => {
-                AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    auth_manager
-                        .attempt_login_gated_feature(AuthViewVariant::RequireLoginCloseable, ctx)
-                });
-            }
         }
     }
 }
