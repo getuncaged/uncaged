@@ -15,10 +15,6 @@ pub mod task;
 pub use task::{
     AgentSource, AmbientAgentLiveSessionState, AmbientAgentTask, AmbientAgentTaskState,
 };
-pub const OUT_OF_CREDITS_TASK_FAILURE_MESSAGE: &str =
-    "Out of credits. Upgrade your Warp plan to continue running cloud agents.";
-pub const SERVER_OVERLOADED_TASK_FAILURE_MESSAGE: &str =
-    "Uncaged is temporarily overloaded. Please try again shortly.";
 
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid task ID: {0}")]

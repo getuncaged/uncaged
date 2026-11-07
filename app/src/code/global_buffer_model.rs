@@ -1328,13 +1328,6 @@ impl GlobalBufferModel {
     }
 
     // ── Public accessors ──────────────────────────────────────────────
-
-    /// Returns the buffer text content for a given `FileId`.
-    pub fn content_for_file(&self, file_id: FileId, ctx: &warpui::AppContext) -> Option<String> {
-        let state = self.buffers.get(&file_id)?;
-        let buffer = state.buffer.upgrade(ctx)?;
-        Some(buffer.as_ref(ctx).text().into_string())
-    }
 }
 
 impl Entity for GlobalBufferModel {

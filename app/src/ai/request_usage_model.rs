@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Utc};
 use cloud_objects::time::ServerTimestamp;
 use serde::{Deserialize, Serialize};
 use warpui::{Entity, SingletonEntity};
@@ -132,10 +132,6 @@ impl AIRequestUsageModel {
         self.request_limit_info.num_requests_used_since_refresh
     }
 
-    pub fn request_percentage_used(&self) -> f32 {
-        self.requests_used() as f32 / self.request_limit() as f32
-    }
-
     pub fn request_limit(&self) -> usize {
         self.request_limit_info.limit
     }
@@ -157,20 +153,8 @@ impl AIRequestUsageModel {
         self.request_limit_info.next_refresh_time.utc()
     }
 
-    pub fn next_refresh_time_local(&self) -> DateTime<Local> {
-        self.next_refresh_time().with_timezone(&Local)
-    }
-
     pub fn is_unlimited(&self) -> bool {
         self.request_limit_info.is_unlimited
-    }
-
-    pub fn refresh_duration_to_string(&self) -> String {
-        match self.request_limit_info.request_limit_refresh_duration {
-            RequestLimitRefreshDuration::Weekly => "weekly".to_string(),
-            RequestLimitRefreshDuration::Monthly => "monthly".to_string(),
-            RequestLimitRefreshDuration::EveryTwoWeeks => "biweekly".to_string(),
-        }
     }
 }
 

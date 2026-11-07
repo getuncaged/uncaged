@@ -9,36 +9,10 @@ use super::history_model::{
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::agent::task::TaskId;
 use crate::ai::agent::{
-    AIAgentExchangeId, AIAgentInput, AIAgentOutputMessageType, LifecycleEventType,
-    ReceivedMessageInput,
+    AIAgentExchangeId, AIAgentInput, AIAgentOutputMessageType, ReceivedMessageInput,
 };
 
 const MAX_RETRY_ATTEMPTS: i32 = 3;
-const MAX_PENDING_LIFECYCLE_EVENTS_PER_TARGET: usize = 200;
-
-/// Stage associated with a lifecycle error detail.
-/// This keeps persisted/runtime metadata consistent across API payloads and DB rows.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum LifecycleEventDetailStage {
-    Runtime,
-}
-
-#[derive(Debug, Clone, Default)]
-pub(super) struct LifecycleEventDetailPayload {
-    pub(crate) stage: Option<LifecycleEventDetailStage>,
-    pub(crate) reason: Option<String>,
-    pub(crate) error_message: Option<String>,
-    pub(crate) blocked_action: Option<String>,
-}
-
-impl LifecycleEventDetailStage {
-    /// Canonical lowercase representation used in persistence/API payloads.
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Runtime => "runtime",
-        }
-    }
-}
 
 /// Type-specific queued data.
 #[derive(Debug, Clone)]
@@ -188,55 +162,6 @@ impl OrchestrationEventService {
         {
             ctx.emit(OrchestrationEventServiceEvent::EventsReady { conversation_id });
         }
-    }
-
-    fn enqueue_lifecycle_event(
-        &mut self,
-        target_conversation_id: AIConversationId,
-        pending: PendingEvent,
-    ) {
-        // Lifecycle queues are maintained separately per target conversation.
-        // Coalescing and cap enforcement happen before queue insertion.
-        let dropped_for_cap = {
-            let queue = self
-                .pending_events
-                .entry(target_conversation_id)
-                .or_default();
-            let _ = coalesce_lifecycle_events(queue, &pending);
-            queue.push(pending);
-            enforce_lifecycle_queue_cap(queue, MAX_PENDING_LIFECYCLE_EVENTS_PER_TARGET)
-        };
-        if !dropped_for_cap.is_empty() {
-            log::warn!(
-                "Dropped {} coalescable lifecycle events due to queue cap for target conversation {target_conversation_id:?}",
-                dropped_for_cap.len()
-            );
-        }
-    }
-
-    /// Accepts pre-built events from the v2 streamer and enqueues them
-    /// for drain by the controller via the normal injection path.
-    /// Lifecycle events go through coalescing and cap enforcement.
-    pub fn enqueue_event_batch(
-        &mut self,
-        conversation_id: AIConversationId,
-        events: Vec<PendingEvent>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if events.is_empty() {
-            return;
-        }
-        for event in events {
-            if matches!(event.detail, PendingEventDetail::Lifecycle { .. }) {
-                self.enqueue_lifecycle_event(conversation_id, event);
-            } else {
-                self.pending_events
-                    .entry(conversation_id)
-                    .or_default()
-                    .push(event);
-            }
-        }
-        ctx.emit(OrchestrationEventServiceEvent::EventsReady { conversation_id });
     }
 
     #[cfg(any(test, not(target_family = "wasm")))]
@@ -479,77 +404,6 @@ fn did_event_round_trip_through_server(
         PendingEventDetail::Lifecycle { event } => {
             echoed_lifecycle_event_ids.contains(event.event_id.as_str())
         }
-    }
-}
-
-pub(super) fn build_lifecycle_event(
-    event_id: String,
-    sender_agent_id: String,
-    event_type: LifecycleEventType,
-    occurred_at: prost_types::Timestamp,
-    detail_payload: &LifecycleEventDetailPayload,
-) -> api::AgentEvent {
-    // Build the API envelope that is forwarded to recipients and stored in memory.
-    // This keeps `occurred_at` attached
-    // to the event itself (not inferred at formatting time).
-    let detail = lifecycle_event_detail_from_type(event_type, detail_payload);
-    api::AgentEvent {
-        event_id,
-        occurred_at: Some(occurred_at),
-        event: Some(api::agent_event::Event::LifecycleEvent(
-            api::agent_event::LifecycleEvent {
-                sender_agent_id,
-                detail,
-            },
-        )),
-    }
-}
-
-#[allow(deprecated)]
-fn lifecycle_event_detail_from_type(
-    event_type: LifecycleEventType,
-    detail_payload: &LifecycleEventDetailPayload,
-) -> Option<api::agent_event::lifecycle_event::Detail> {
-    match event_type {
-        LifecycleEventType::InProgress => {
-            Some(api::agent_event::lifecycle_event::Detail::InProgress(()))
-        }
-        LifecycleEventType::Succeeded => {
-            Some(api::agent_event::lifecycle_event::Detail::Succeeded(()))
-        }
-        LifecycleEventType::Failed => Some(api::agent_event::lifecycle_event::Detail::Failed(
-            api::agent_event::lifecycle_event::Failed {
-                reason: detail_payload.reason.clone().unwrap_or_default(),
-                error_message: detail_payload.error_message.clone().unwrap_or_default(),
-            },
-        )),
-        // Legacy variants delegate to their new equivalents.
-        LifecycleEventType::Started => {
-            Some(api::agent_event::lifecycle_event::Detail::InProgress(()))
-        }
-        LifecycleEventType::Idle => Some(api::agent_event::lifecycle_event::Detail::Succeeded(())),
-        LifecycleEventType::Restarted => {
-            Some(api::agent_event::lifecycle_event::Detail::InProgress(()))
-        }
-        LifecycleEventType::Cancelled => {
-            Some(api::agent_event::lifecycle_event::Detail::Cancelled(()))
-        }
-        LifecycleEventType::Blocked => Some(api::agent_event::lifecycle_event::Detail::Blocked(
-            api::agent_event::lifecycle_event::Blocked {
-                blocked_action: detail_payload.blocked_action.clone().unwrap_or_default(),
-            },
-        )),
-        LifecycleEventType::Errored => Some(api::agent_event::lifecycle_event::Detail::Errored(
-            api::agent_event::lifecycle_event::Errored {
-                stage: detail_payload
-                    .stage
-                    .map(|stage| stage.as_str().to_string())
-                    .unwrap_or_default(),
-                reason: detail_payload.reason.clone().unwrap_or_default(),
-                error_message: detail_payload.error_message.clone().unwrap_or_default(),
-            },
-        )),
-        LifecycleEventType::Unspecified => None,
     }
 }
 

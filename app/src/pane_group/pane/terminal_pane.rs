@@ -1,11 +1,8 @@
 //! Implementation of terminal panes.
 use std::sync::mpsc::SyncSender;
 
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use base64::Engine as _;
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
-use warp_multi_agent_api as multi_agent_api;
 use warpui::{
     AppContext, EntityId, ModelHandle, SingletonEntity, ViewContext, ViewHandle, WindowId,
 };
@@ -22,7 +19,6 @@ use crate::ai::blocklist::BlocklistAIHistoryEvent;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, StartAgentRequest};
 use crate::ai::conversation_utils;
 use crate::ai::llms::LLMPreferences;
-use crate::ai::skills::SkillManager;
 use crate::app_state::{LeafContents, TerminalPaneSnapshot};
 use crate::code::buffer_location::LocalOrRemotePath;
 use crate::pane_group::child_agent::{
@@ -60,52 +56,6 @@ pub struct TerminalPane {
     /// by the `PaneStack`, since the terminal manager is the associated data for
     /// the backing pane view.
     view: ViewHandle<TerminalPaneView>,
-}
-
-fn resolve_runtime_skills(
-    skill_references: &[ai::skills::SkillReference],
-    ctx: &AppContext,
-) -> Result<Vec<String>, Vec<String>> {
-    let skill_manager = SkillManager::as_ref(ctx);
-    let mut runtime_skills = Vec::with_capacity(skill_references.len());
-    let mut unresolved_references = Vec::new();
-
-    for reference in skill_references {
-        let Some(skill) = skill_manager.active_skill_by_reference(reference, ctx) else {
-            unresolved_references.push(reference.to_string());
-            continue;
-        };
-        runtime_skills.push(serialize_proto_to_base64(&multi_agent_api::Skill::from(
-            skill.clone(),
-        )));
-    }
-
-    if unresolved_references.is_empty() {
-        Ok(runtime_skills)
-    } else {
-        Err(unresolved_references)
-    }
-}
-
-fn serialize_proto_to_base64<M: prost::Message>(message: &M) -> String {
-    BASE64_STANDARD.encode(message.encode_to_vec())
-}
-
-/// Overrides the child's preferred agent-mode LLM. `None` is a no-op
-/// (inherits the parent's LLM via `propagate_parent_agent_settings`).
-#[cfg(not(target_family = "wasm"))]
-fn apply_child_model_id_override(
-    child_terminal_view_id: EntityId,
-    model_id: Option<&str>,
-    ctx: &mut ViewContext<PaneGroup>,
-) {
-    let Some(model_id) = model_id.map(str::trim).filter(|m| !m.is_empty()) else {
-        return;
-    };
-    let llm_id: ai::LLMId = model_id.into();
-    LLMPreferences::handle(ctx).update(ctx, |llm_prefs, ctx| {
-        llm_prefs.update_preferred_agent_mode_llm(&llm_id, child_terminal_view_id, ctx);
-    });
 }
 
 impl TerminalPane {

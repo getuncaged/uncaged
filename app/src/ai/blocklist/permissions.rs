@@ -524,16 +524,6 @@ impl BlocklistAIPermissions {
             .computer_use
     }
 
-    pub fn get_computer_use_setting(
-        &self,
-        ctx: &AppContext,
-        terminal_view_id: Option<EntityId>,
-    ) -> crate::ai::execution_profiles::ComputerUsePermission {
-        let active_profile =
-            AIExecutionProfilesModel::as_ref(ctx).active_profile(terminal_view_id, ctx);
-        self.get_computer_use_setting_for_profile(ctx, *active_profile.id())
-    }
-
     pub fn get_ask_user_question_setting_for_profile(
         &self,
         ctx: &AppContext,

@@ -41,7 +41,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ::settings::{Setting, ToggleableSetting};
 use ai::index::full_source_code_embedding::manager::CodebaseIndexManager;
 #[cfg(target_os = "macos")]
-use anyhow::Result;
 use autoupdate::AutoupdateStage;
 #[cfg(target_os = "macos")]
 use command::blocking::Command;
@@ -519,8 +518,6 @@ const TAB_CONTENT_POSITION_ID: &str = "workspace_view:tab_content";
 
 const WELCOME_TIPS_POSITION_ID: &str = "welcome_tips_pill";
 const ELLIPSE_SVG_PATH: &str = "bundled/svg/ellipse.svg";
-
-const AI_ASSISTANT_BUTTON_ID: &str = "workspace_view:ai_assistant_button";
 
 const VERSION_DEPRECATION_BANNER_TEXT: &str = "Your app is out of date and some features may not work as expected. Please update immediately.";
 
@@ -4169,44 +4166,6 @@ impl Workspace {
         tab.color()
     }
 
-    /// Finds the pane containing a terminal viewing the given ambient agent conversation,
-    /// returning None if the ambient conversation is not open in any tab.
-    fn find_pane_with_ambient_agent_conversation(
-        &self,
-        task_id: AmbientAgentTaskId,
-        ctx: &AppContext,
-    ) -> Option<(usize, PaneViewLocator)> {
-        // First, check ActiveAgentViewsModel for the terminal view that has this task registered.
-        // This is the authoritative source since it's updated when the session is joined.
-        let active_terminal_view_id =
-            ActiveAgentViewsModel::as_ref(ctx).get_terminal_view_id_for_ambient_task(task_id);
-
-        self.tabs.iter().enumerate().find_map(|(index, tab)| {
-            let pane_group = tab.pane_group.as_ref(ctx);
-            let pane_id = pane_group.visible_pane_ids().into_iter().find(|pane_id| {
-                pane_group
-                    .terminal_view_from_pane_id(*pane_id, ctx)
-                    .is_some_and(|tv| {
-                        // Check if this is the terminal view registered in ActiveAgentViewsModel
-                        if active_terminal_view_id == Some(tv.id()) {
-                            return true;
-                        }
-                        // Fall back to checking the terminal view directly.
-                        tv.as_ref(ctx).ambient_agent_task_id_for_details_panel() == Some(task_id)
-                    })
-            });
-            pane_id.map(|pane_id| {
-                (
-                    index,
-                    PaneViewLocator {
-                        pane_group_id: tab.pane_group.id(),
-                        pane_id,
-                    },
-                )
-            })
-        })
-    }
-
     /// Gets all sessions in the current workspace.
     pub fn workspace_sessions<'a>(
         &'a self,
@@ -7499,32 +7458,6 @@ impl Workspace {
             if let Some(terminal_view_handle) = active_session_handle {
                 terminal_view_handle.update(ctx, |terminal_view, ctx| {
                     terminal_view.set_pending_command(&command, ctx);
-                });
-            }
-        }
-    }
-
-    /// Show an ephemeral success toast or persistent failure toast for a CLI command operation.
-    #[cfg(target_os = "macos")]
-    fn handle_cli_command_result(
-        &mut self,
-        result: Result<()>,
-        success_toast: DismissibleToast<WorkspaceAction>,
-        failure_message: &str,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match result {
-            Ok(()) => {
-                self.toast_stack.update(ctx, |toast_stack, ctx| {
-                    toast_stack.add_ephemeral_toast(success_toast, ctx);
-                });
-            }
-            Err(error) => {
-                let error_message = format!("{failure_message}: {error}");
-                log::warn!("{error_message}");
-                self.toast_stack.update(ctx, |toast_stack, ctx| {
-                    let toast = DismissibleToast::error(error_message);
-                    toast_stack.add_persistent_toast(toast, ctx);
                 });
             }
         }
@@ -15718,14 +15651,6 @@ impl Workspace {
                 }
             });
         }
-    }
-
-    /// Determines if the changelog is currently being shown or if the changelog request is
-    /// in-flight
-    ///
-    fn is_changelog_open_or_pending(&self, ctx: &mut ViewContext<Self>) -> bool {
-        self.current_workspace_state.is_resource_center_open
-            || self.changelog_model.as_ref(ctx).is_check_pending()
     }
 
     pub(crate) fn focus_active_tab(&mut self, ctx: &mut ViewContext<Self>) {

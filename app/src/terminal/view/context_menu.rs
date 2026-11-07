@@ -219,17 +219,6 @@ impl TerminalView {
             })
     }
 
-    fn conversation_debug_request_id(
-        &self,
-        conversation_id: AIConversationId,
-        ctx: &AppContext,
-    ) -> Option<ServerOutputId> {
-        BlocklistAIHistoryModel::as_ref(ctx)
-            .conversation(&conversation_id)
-            .and_then(|conversation| conversation.root_task_exchanges().last())
-            .and_then(|exchange| exchange.output_status.server_output_id())
-    }
-
     fn copy_debugging_menu_items(
         &self,
         conversation_token: ServerConversationToken,
@@ -284,50 +273,6 @@ impl TerminalView {
             .ai_block_for_exchange(&ai_exchange_id)
             .and_then(|ai_block_handle| ai_block_handle.as_ref(ctx).server_output_id(ctx));
         self.copy_debugging_menu_items(conversation_token.clone(), server_output_id)
-    }
-
-    fn conversation_menu_items(
-        &self,
-        conversation_id: AIConversationId,
-        ctx: &mut ViewContext<Self>,
-    ) -> Vec<MenuItem<TerminalAction>> {
-        let mut items = Vec::new();
-
-        items.push(
-            MenuItemFields::new("Copy conversation text")
-                .with_on_select_action(TerminalAction::ContextMenu(
-                    ContextMenuAction::CopyConversationText { conversation_id },
-                ))
-                .into_item(),
-        );
-
-        items.push(
-            MenuItemFields::new("Fork")
-                .with_on_select_action(TerminalAction::ContextMenu(
-                    ContextMenuAction::ForkAIConversation { conversation_id },
-                ))
-                .into_item(),
-        );
-
-        if let Some(conversation_token) = self.conversation_server_token(conversation_id, ctx) {
-            let server_output_id = self.conversation_debug_request_id(conversation_id, ctx);
-            let debugging_items =
-                self.copy_debugging_menu_items(conversation_token, server_output_id);
-            if !debugging_items.is_empty() {
-                if !items.is_empty() {
-                    items.push(MenuItem::Separator);
-                }
-                for (button_text, action) in debugging_items {
-                    items.push(
-                        MenuItemFields::new(button_text)
-                            .with_on_select_action(TerminalAction::ContextMenu(action))
-                            .into_item(),
-                    );
-                }
-            }
-        }
-
-        items
     }
 
     pub(super) fn open_ai_block_overflow_context_menu(

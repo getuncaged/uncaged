@@ -243,14 +243,6 @@ impl OnboardingStateModel {
         self.agent_modality_enabled
     }
 
-    /// Whether the DES-816 V3 onboarding flow (the "Choose your AI setup" fork on the
-    /// AI-first path) is active. True for all users when the new settings-modes flow
-    /// is enabled, since new users always enter a world where Warp-provided AI is not free.
-    pub(crate) fn ai_setup_flow_active(&self) -> bool {
-        use warp_core::features::FeatureFlag;
-        FeatureFlag::OpenWarpNewSettingsModes.is_enabled()
-    }
-
     pub(crate) fn ai_setup_choice(&self) -> AiSetupChoice {
         self.ai_setup_choice
     }

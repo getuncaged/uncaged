@@ -86,11 +86,6 @@ impl WarningBoxConfig {
         self.width = Some(width);
         self
     }
-
-    pub fn with_button(mut self, button: WarningBoxButtonConfig) -> Self {
-        self.button = Some(button);
-        self
-    }
 }
 pub fn render_warning_box(config: WarningBoxConfig, appearance: &Appearance) -> Box<dyn Element> {
     let theme = appearance.theme();

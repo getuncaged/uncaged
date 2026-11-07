@@ -60,12 +60,6 @@ pub(crate) enum DiffStateErrorKind {
     #[error("repository path is invalid")]
     RepositoryPathInvalid,
 
-    // ── Remote daemon application-level outcomes ────────────────────────
-    /// The remote daemon reported `DiffState::Loaded` but no `GitDiffData`
-    /// accompanied it. Only constructed by `RemoteDiffStateModel`.
-    #[error("server returned empty diff data")]
-    EmptyDiffData,
-
     // ── Unclassified ────────────────────────────────────────────────────
     /// Unrecognized error. Add a dedicated variant once a new pattern is
     /// identified from the raw text recorded in telemetry.
@@ -139,14 +133,6 @@ impl DiffStateError {
         }
     }
 
-    /// Build the [`DiffStateErrorKind::EmptyDiffData`] error, reported when the
-    /// remote daemon claims `DiffState::Loaded` but sends no diff data.
-    pub(crate) fn empty_diff_data() -> Self {
-        let kind = DiffStateErrorKind::EmptyDiffData;
-        let cause = anyhow::anyhow!("{kind}");
-        Self { kind, cause }
-    }
-
     /// Logs the raw underlying error locally, then reports the sanitized
     /// [`DiffStateError`] through the normal reporting path.
     pub(crate) fn report_and_log(&self) {
@@ -169,8 +155,7 @@ impl ErrorExt for DiffStateError {
         match self.kind {
             // Caller / engineering bugs — surface to Sentry at error level.
             DiffStateErrorKind::InvalidEmptyPathspec
-            | DiffStateErrorKind::InvalidGitStatusOutput
-            | DiffStateErrorKind::EmptyDiffData => true,
+            | DiffStateErrorKind::InvalidGitStatusOutput => true,
             // Unknown errors defer to the anyhow chain so registered
             // transient/non-actionable causes (network, transient I/O, etc.)
             // log at warn level instead of paging us via Sentry.
@@ -202,7 +187,6 @@ impl IsTransientError for DiffStateError {
             DiffStateErrorKind::RepositoryPathNotAccessible
             | DiffStateErrorKind::GitRevisionUnavailable
             | DiffStateErrorKind::GitHeadTreeInvalid
-            | DiffStateErrorKind::EmptyDiffData
             | DiffStateErrorKind::Unknown => true,
             // Caller bugs, invalid inputs, missing tools, and user-actionable
             // environment setup issues won't resolve by retrying the same

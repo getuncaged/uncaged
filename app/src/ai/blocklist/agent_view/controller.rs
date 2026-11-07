@@ -797,14 +797,6 @@ impl AgentViewController {
         Ok(conversation_id)
     }
 
-    /// Exits the active agent view without any confirmation.
-    ///
-    /// Uncaged: identical to [`Self::exit_agent_view`]; kept for call-site
-    /// clarity now that no exit path asks for confirmation.
-    pub(crate) fn exit_agent_view_without_confirmation(&mut self, ctx: &mut ModelContext<Self>) {
-        self.exit_agent_view_internal(false, ctx);
-    }
-
     /// Exits the active agent view, if there is one.
     ///
     /// Uncaged: exiting is a mode switch, not a navigation -- it never asks for

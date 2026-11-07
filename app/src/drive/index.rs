@@ -378,8 +378,6 @@ struct MouseStateHandles {
     sorting_button_mouse_state: MouseStateHandle,
     trash_row_mouse_state: MouseStateHandle,
     exit_trash_button_mouse_state: MouseStateHandle,
-    anonymous_sign_up_button_mouse_state: MouseStateHandle,
-    anonymous_object_limit_close_button_mouse_state: MouseStateHandle,
     search_button_mouse_state: MouseStateHandle,
     gist_sync_button_mouse_state: MouseStateHandle,
 }

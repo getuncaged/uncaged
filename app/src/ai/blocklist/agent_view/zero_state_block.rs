@@ -768,8 +768,6 @@ mod styles {
     pub const CONTAINER_VERTICAL_PADDING: f32 = 16.;
     pub const TITLE_MARGIN_BOTTOM: f32 = 8.;
     pub const SECTION_HEADER_MARGIN_BOTTOM: f32 = 8.;
-    pub const DESCRIPTION_LINE_MARGIN_BOTTOM: f32 = 6.;
-    pub const CREDITS_BANNER_FONT_SIZE: f32 = 12.;
 
     pub fn title_font_size(appearance: &Appearance) -> f32 {
         appearance.monospace_font_size() + 6.

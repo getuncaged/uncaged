@@ -1,4 +1,4 @@
-use warpui::{Entity, ModelContext, SingletonEntity};
+use warpui::{Entity, SingletonEntity};
 
 /// Singleton model that tracks GPU state.
 #[derive(Debug, Default, Clone)]
@@ -10,19 +10,6 @@ impl GPUState {
     /// Creates a new GPUState with default values
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Marks the low power GPU as available and stable
-    pub(super) fn set_has_lower_power_gpu(
-        &mut self,
-        has_low_power_gpu: bool,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.has_low_power_gpu = has_low_power_gpu;
-
-        if has_low_power_gpu {
-            ctx.emit(GPUStateEvent::LowPowerGPUAvailable);
-        }
     }
 
     /// Returns whether the low power GPU is available for use

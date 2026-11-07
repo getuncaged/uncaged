@@ -23,15 +23,6 @@ pub fn auth_secret_types_for_harness(harness: Harness) -> &'static [AuthSecretTy
     }
 }
 
-pub fn learn_more_url_for_harness(harness: Harness) -> &'static str {
-    match harness {
-        Harness::Claude => CLAUDE_LEARN_MORE_URL,
-        Harness::Codex => CODEX_LEARN_MORE_URL,
-        _ => DEFAULT_LEARN_MORE_URL,
-    }
-}
-
-const DEFAULT_LEARN_MORE_URL: &str = crate::brand::README_URL;
 const CODEX_LEARN_MORE_URL: &str = crate::brand::README_URL;
 const CLAUDE_LEARN_MORE_URL: &str = crate::brand::README_URL;
 

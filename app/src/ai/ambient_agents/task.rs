@@ -208,29 +208,6 @@ impl RunExecution<'_> {
     }
 }
 
-/// Represents a single attachment input from the client (e.g., file upload)
-#[derive(Clone, Debug, Serialize)]
-pub struct AttachmentInput {
-    pub file_name: String,
-    pub mime_type: String,
-    pub data: String, // base64-encoded data
-}
-
-/// Information about a task attachment retrieved from the server
-#[derive(Clone, Debug)]
-pub struct TaskAttachment {
-    pub file_id: String,
-    pub filename: String,
-    pub download_url: String,
-    pub mime_type: String,
-}
-
-/// Returns the trimmed orchestrator agent name, or `None` when empty / whitespace-only.
-pub fn normalize_orchestrator_agent_name(raw: &str) -> Option<String> {
-    let trimmed = raw.trim();
-    (!trimmed.is_empty()).then(|| trimmed.to_string())
-}
-
 impl AmbientAgentTask {
     pub fn run_id(&self) -> AmbientAgentTaskId {
         self.task_id
@@ -370,24 +347,6 @@ pub enum AmbientAgentTaskState {
 }
 
 impl AmbientAgentTaskState {
-    /// Returns the query param value for the server API.
-    pub fn as_query_param(&self) -> Option<&str> {
-        match self {
-            AmbientAgentTaskState::Queued => Some("QUEUED"),
-            AmbientAgentTaskState::Pending => Some("PENDING"),
-            AmbientAgentTaskState::Claimed => Some("CLAIMED"),
-            AmbientAgentTaskState::InProgress => Some("INPROGRESS"),
-            AmbientAgentTaskState::Succeeded => Some("SUCCEEDED"),
-            AmbientAgentTaskState::Failed => Some("FAILED"),
-            AmbientAgentTaskState::Error => Some("ERROR"),
-            AmbientAgentTaskState::Blocked => Some("BLOCKED"),
-            AmbientAgentTaskState::Cancelled => Some("CANCELLED"),
-            // Unknown states are only for resilient deserialization and should not be
-            // sent back as filter values.
-            AmbientAgentTaskState::Unknown => None,
-        }
-    }
-
     pub fn is_working(&self) -> bool {
         match self {
             AmbientAgentTaskState::Queued

@@ -98,18 +98,6 @@ impl TemplatableMCPServerManager {
         log::warn!("MCP server spawning not supported in WASM");
     }
 
-    /// Spawns a CLI-spawned ephemeral MCP server.
-    ///
-    /// This is a no-op in WASM, as MCP servers are not supported in WASM.
-    #[allow(dead_code)]
-    pub fn spawn_cli_ephemeral_server(
-        &mut self,
-        _installation: TemplatableMCPServerInstallation,
-        _ctx: &mut ModelContext<Self>,
-    ) {
-        log::warn!("Ephemeral MCP server spawning not supported in WASM");
-    }
-
     /// Shuts down a running MCP server.
     ///
     /// This is a no-op in WASM, as MCP servers are not supported in WASM.
@@ -270,14 +258,5 @@ impl TemplatableMCPServerManager {
 
     pub fn has_oauth_credentials_for_file_based_server(&self, _hash: u64) -> bool {
         false
-    }
-
-    pub fn extract_server_info<T: std::cmp::Eq + std::hash::Hash>(
-        &self,
-        _template_fn: fn(&TemplatableMCPServer) -> Option<T>,
-        _installation_fn: fn(&TemplatableMCPServerInstallation) -> Option<T>,
-        _app: &AppContext,
-    ) -> HashSet<T> {
-        Default::default()
     }
 }

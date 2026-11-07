@@ -100,11 +100,6 @@ impl<'a> CopyableTextFieldConfig<'a> {
         self.last_copied_at = last_copied_at;
         self
     }
-    /// Sets the placement of the copy button relative to the text.
-    pub fn with_copy_button_placement(mut self, placement: CopyButtonPlacement) -> Self {
-        self.copy_button_placement = placement;
-        self
-    }
 
     /// Sets the cross-axis alignment of the row.
     pub fn with_cross_axis_alignment(mut self, alignment: CrossAxisAlignment) -> Self {

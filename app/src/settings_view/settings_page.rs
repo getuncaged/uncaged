@@ -67,7 +67,6 @@ const SETTINGS_CARD_SPACING: f32 = 16.;
 pub(super) const ROW_CONTROL_GAP: f32 = 24.;
 const ALTERNATING_LIST_CLOSE_BUTTON_DIAMETER: f32 = 20.0;
 const ALTERNATING_LIST_ITEM_PADDING: f32 = 8.0;
-const GREY_TEXT_OPACITY: u8 = 60;
 /// Below this width a page scrolls sideways; above it, rows reflow to fit.
 const MIN_PAGE_WIDTH: f32 = 340.;
 /// The widest the page's column of cards (and the title above it) grows; below this it fills the panel, so pages follow the
@@ -1444,17 +1443,6 @@ impl<V: warpui::View> PageType<V> {
                 ..
             } => {
                 *highlighted_widget_id = None;
-            }
-        }
-    }
-
-    /// Set the minimum page width for narrow panes.
-    pub fn set_min_page_width(&mut self, width: f32) {
-        match self {
-            Self::Monolith { min_page_width, .. }
-            | Self::Uncategorized { min_page_width, .. }
-            | Self::Categorized { min_page_width, .. } => {
-                *min_page_width = width;
             }
         }
     }

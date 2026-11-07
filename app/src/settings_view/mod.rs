@@ -22,7 +22,6 @@ use warp_core::channel::ChannelState;
 use warp_core::context_flag::ContextFlag;
 use warp_core::features::FeatureFlag;
 use warp_core::settings::ToggleableSetting as _;
-use warp_core::ui::theme::color::internal_colors;
 use warp_editor::editor::NavigationKey;
 use warpui::elements::{
     Align, ChildAnchor, ChildView, Clipped, ClippedScrollStateHandle, ClippedScrollable,
@@ -145,38 +144,6 @@ pub(super) fn render_beta_chip(appearance: &Appearance) -> Box<dyn Element> {
     .with_vertical_padding(1.)
     .with_margin_left(8.)
     .finish()
-}
-
-/// Renders a horizontal row of pill-shaped chips for model labels.
-/// Used by custom inference endpoint cards and the remove confirmation dialog.
-pub(super) fn render_model_chips(
-    labels: impl IntoIterator<Item = String>,
-    appearance: &Appearance,
-    text_color: warp_core::ui::theme::Fill,
-) -> Box<dyn Element> {
-    use warpui::ui_components::chip::Chip;
-    use warpui::ui_components::components::{UiComponent, UiComponentStyles};
-
-    let theme = appearance.theme();
-    let chip_border = internal_colors::neutral_4(theme).into();
-    let chip_style = UiComponentStyles {
-        background: None,
-        border_color: Some(chip_border),
-        border_width: Some(1.),
-        border_radius: Some(CornerRadius::with_all(Radius::Pixels(
-            warp_core::ui::radius::SMALL,
-        ))),
-        font_family_id: Some(appearance.ui_font_family()),
-        font_size: Some(appearance.ui_font_size()),
-        font_color: Some(text_color.into_solid()),
-        ..Default::default()
-    };
-
-    let mut chips = Flex::row().with_spacing(8.);
-    for label in labels {
-        chips.add_child(Chip::new(label, chip_style).build().finish());
-    }
-    chips.finish()
 }
 
 #[derive(PartialEq)]

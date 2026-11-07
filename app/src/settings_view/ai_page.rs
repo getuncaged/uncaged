@@ -137,7 +137,6 @@ const PROMPT_SUGGESTIONS_DESCRIPTION: &str = "Let AI suggest natural language pr
 const SUGGESTED_CODE_BANNERS_DESCRIPTION: &str = "Let AI suggest code diffs and queries as inline banners in the blocklist, based on recent commands and their outputs.";
 const SHARED_BLOCK_TITLE_GENERATION_DESCRIPTION: &str =
     "Let AI generate a title for your shared block based on the command and output.";
-const WISPR_FLOW_URL: &str = "https://wisprflow.ai/";
 
 pub fn init_actions_from_parent_view<T: Action + Clone>(
     app: &mut AppContext,
@@ -5504,7 +5503,6 @@ struct AIFactWidget {
     rules_link_index: HighlightedHyperlink,
     manage_rules_button: MouseStateHandle,
     rule_suggestions_toggle: SwitchStateHandle,
-    warp_drive_context_toggle: SwitchStateHandle,
 }
 
 impl AIFactWidget {
@@ -5574,32 +5572,6 @@ impl AIFactWidget {
 
         let description = render_ai_setting_description(
             "Let AI suggest rules to save based on your interactions.",
-            ai_settings.is_any_ai_enabled(app),
-            app,
-        );
-
-        Flex::column()
-            .with_child(toggle)
-            .with_child(description)
-            .finish()
-    }
-
-    fn render_warp_drive_context_toggle(
-        &self,
-        ai_settings: &AISettings,
-        app: &warpui::AppContext,
-    ) -> Box<dyn Element> {
-        let toggle = render_ai_setting_toggle(
-            "Warp Drive as agent context",
-            AISettingsPageAction::ToggleWarpDriveContext,
-            *ai_settings.warp_drive_context_enabled,
-            ai_settings.is_any_ai_enabled(app),
-            self.warp_drive_context_toggle.clone(),
-            app,
-        );
-
-        let description = render_ai_setting_description(
-            "The Warp Agent can leverage your Warp Drive Contents to tailor responses to your personal and team developer workflows and environments. This includes any Workflows, Notebooks, and Environment Variables.",
             ai_settings.is_any_ai_enabled(app),
             app,
         );

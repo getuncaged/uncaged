@@ -569,15 +569,6 @@ impl TemplatableMCPServerManager {
         });
     }
 
-    /// Get all runnable MCP servers (templatable installations).
-    pub fn get_all_runnable_mcp_servers(ctx: &AppContext) -> Vec<(Uuid, String)> {
-        TemplatableMCPServerManager::as_ref(ctx)
-            .get_installed_templatable_servers()
-            .iter()
-            .map(|(uuid, installation)| (*uuid, installation.templatable_mcp_server().name.clone()))
-            .collect()
-    }
-
     /// Get all cloud synced MCP servers (templatable templates).
     pub fn get_all_cloud_synced_mcp_servers(ctx: &AppContext) -> HashMap<Uuid, String> {
         TemplatableMCPServerManager::as_ref(ctx)
@@ -592,28 +583,6 @@ impl TemplatableMCPServerManager {
         TemplatableMCPServerManager::as_ref(app)
             .get_installed_server_name(uuid)
             .or_else(|| TemplatableMCPServerManager::as_ref(app).get_template_server_name(uuid))
-    }
-
-    /// Extracts some piece of server info for all servers (template & installation) and returns it in a HashSet.
-    pub fn extract_server_info<T: std::cmp::Eq + std::hash::Hash>(
-        &self,
-        template_fn: fn(&TemplatableMCPServer) -> Option<T>,
-        installation_fn: fn(&TemplatableMCPServerInstallation) -> Option<T>,
-        _app: &AppContext,
-    ) -> HashSet<T> {
-        let template_results = self
-            .get_all_templatable_mcp_servers()
-            .into_iter()
-            .filter_map(template_fn);
-
-        let installation_results = self
-            .get_installed_templatable_servers()
-            .values()
-            .filter_map(installation_fn);
-
-        template_results
-            .chain(installation_results)
-            .collect::<HashSet<T>>()
     }
 
     fn get_installed_server_name(&self, installation_uuid: &Uuid) -> Option<String> {
@@ -667,16 +636,6 @@ impl TemplatableMCPServerManager {
             },
             ctx,
         );
-    }
-
-    /// Spawns an ephemeral MCP server started via the CLI (`oz agent run --mcp`).
-    pub fn spawn_cli_ephemeral_server(
-        &mut self,
-        installation: TemplatableMCPServerInstallation,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.cli_spawned_server_uuids.insert(installation.uuid());
-        self.spawn_ephemeral_server(installation, ctx);
     }
 
     /// Spawns a new MCP server from a given installation UUID.

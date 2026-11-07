@@ -601,36 +601,6 @@ impl TerminalView {
         }
     }
 
-    /// Submits `text` as a prompt to the active CLI agent on this terminal by
-    /// writing it to the PTY using the agent-specific submission strategy
-    /// (the same pipeline as the CLI agent rich input composer).
-    ///
-    /// Intended for callers that produce prompts outside the rich input
-    /// editor (e.g. shared-session viewer follow-up prompts). Returns
-    /// without writing if there is no active CLI agent session or the text
-    /// is empty.
-    #[cfg(feature = "local_tty")]
-    pub(crate) fn submit_text_to_cli_agent_pty(
-        &mut self,
-        text: String,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let Some(agent) = CLIAgentSessionsModel::as_ref(ctx)
-            .session(self.view_id)
-            .map(|s| s.agent)
-        else {
-            return;
-        };
-
-        let text_bytes = text.into_bytes();
-        if text_bytes.is_empty() {
-            return;
-        }
-
-        let strategy = rich_input_submit_strategy(agent);
-        self.write_cli_agent_text_then_submit(text_bytes, strategy, ctx);
-    }
-
     /// Simulates clipboard image paste for each pending image attachment by
     /// writing the image to the system clipboard and sending Ctrl+V to the PTY.
     /// After all images are pasted, the text prompt is sent via the normal

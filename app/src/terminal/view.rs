@@ -189,7 +189,6 @@ use crate::ai::blocklist::agent_view::{
     AgentViewController, AgentViewControllerEvent, AgentViewDisplayMode, AgentViewEntryOrigin,
     AgentViewHeaderDisabledTheme, AgentViewHeaderTheme, AgentViewZeroStateBlock,
     AgentViewZeroStateEvent, EphemeralMessageModel, InlineAgentViewHeader, OrchestrationPillBar,
-    ENTER_OR_EXIT_CONFIRMATION_WINDOW,
 };
 use crate::ai::blocklist::block::cli::{CLISubagentView, CLISubagentViewEvent};
 use crate::ai::blocklist::block::cli_controller::{
@@ -3725,33 +3724,6 @@ impl TerminalView {
         self.block_completed_callbacks.push(Box::new(callback));
     }
 
-    fn set_pending_cloud_mode_start_callback(
-        &mut self,
-        callback: TerminalViewCallback,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.clear_pending_cloud_mode_start_callback();
-        self.pending_cloud_mode_start_callback = Some(callback);
-
-        self.pending_cloud_mode_start_abort_handle = Some(ctx.spawn_abortable(
-            // Reuse the same timeout as agent-view confirmation prompts so a pending cloud-mode
-            // start cannot outlive the user-visible confirmation window semantics.
-            Timer::after(ENTER_OR_EXIT_CONFIRMATION_WINDOW),
-            |me, _, _ctx| {
-                me.pending_cloud_mode_start_callback = None;
-                me.pending_cloud_mode_start_abort_handle = None;
-            },
-            |_, _| (),
-        ));
-    }
-
-    fn clear_pending_cloud_mode_start_callback(&mut self) {
-        if let Some(handle) = self.pending_cloud_mode_start_abort_handle.take() {
-            handle.abort();
-        }
-        self.pending_cloud_mode_start_callback = None;
-    }
-
     fn maybe_run_pending_cloud_mode_start_callback(&mut self, ctx: &mut ViewContext<Self>) {
         let Some(callback) = self.pending_cloud_mode_start_callback.take() else {
             return;
@@ -3822,19 +3794,6 @@ impl TerminalView {
     {
         self.conversation_completed_callbacks
             .push(Box::new(callback));
-    }
-
-    /// Handles `conversation_id`'s turn finishing with `finish_reason`: fires
-    /// the pane-level finished callbacks and drains the conversation's queued
-    /// prompts.
-    fn handle_finished_conversation(
-        &mut self,
-        conversation_id: AIConversationId,
-        finish_reason: FinishReason,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        self.fire_conversation_finished_callbacks(finish_reason, ctx);
-        self.drain_queued_prompts(conversation_id, finish_reason, ctx);
     }
 
     /// Fires the pane-level one-shot callbacks registered via
@@ -11178,14 +11137,6 @@ impl TerminalView {
         self.settings_import_onboarding_block = None;
 
         let _ = ctx;
-    }
-
-    /// Returns the save position ID for the agent view zero state, if one exists.
-    fn agent_view_zero_state_save_position_id(&self, app: &AppContext) -> Option<String> {
-        self.agent_view_controller
-            .as_ref(app)
-            .agent_view_state()
-            .zero_state_position_id()
     }
 
     /// Gets the selected text from the terminal, if any.
