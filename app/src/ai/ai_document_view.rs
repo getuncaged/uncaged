@@ -99,7 +99,6 @@ pub enum AIDocumentAction {
     CreateWarpDriveNotebook,
     RevertToDocumentVersion,
     SendUpdatedPlan,
-    CopyLink(String),
     CopyPlanId,
     ShowInWarpDrive,
     AttachToActiveSession,
@@ -1085,19 +1084,6 @@ impl TypedActionView for AIDocumentView {
             }
             AIDocumentAction::Export => self.export(ctx),
             AIDocumentAction::CreateWarpDriveNotebook => self.create_warp_drive_notebook(ctx),
-            AIDocumentAction::CopyLink(link) => {
-                ctx.clipboard()
-                    .write(ClipboardContent::plain_text(link.to_owned()));
-
-                let window_id = ctx.window_id();
-                ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    toast_stack.add_ephemeral_toast(
-                        DismissibleToast::success("Link copied to clipboard".to_string()),
-                        window_id,
-                        ctx,
-                    );
-                });
-            }
             AIDocumentAction::CopyPlanId => {
                 ctx.clipboard()
                     .write(ClipboardContent::plain_text(self.document_id.to_string()));
@@ -1249,16 +1235,11 @@ impl BackingView for AIDocumentView {
     ) -> Vec<MenuItem<Self::PaneHeaderOverflowMenuAction>> {
         let mut menu_items = vec![];
 
-        // Only show shareable link when the document is synced to Warp Drive
-        if let Some(link) =
-            AIDocumentModel::as_ref(ctx).get_document_warp_drive_object_link(&self.document_id, ctx)
+        // Only show "Show in Warp Drive" when the document was synced to Warp Drive
+        if AIDocumentModel::as_ref(ctx)
+            .get_document_warp_drive_object_link(&self.document_id, ctx)
+            .is_some()
         {
-            menu_items.push(
-                MenuItemFields::new("Copy link")
-                    .with_on_select_action(AIDocumentAction::CopyLink(link))
-                    .with_icon(Icon::Link)
-                    .into_item(),
-            );
             menu_items.push(
                 MenuItemFields::new("Show in Warp Drive")
                     .with_on_select_action(AIDocumentAction::ShowInWarpDrive)

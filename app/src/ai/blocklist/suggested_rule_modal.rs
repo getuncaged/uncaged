@@ -25,7 +25,6 @@ use crate::editor::{
     PropagateAndNoOpNavigationKeys, SingleLineEditorOptions, TextOptions,
 };
 use crate::modal::{Modal, ModalEvent};
-use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::SyncId;
 use crate::ui_components::blended_colors;
@@ -227,21 +226,6 @@ impl SuggestedRuleView {
             me.handle_cloud_model_event(event, ctx);
         });
 
-        let network_status = NetworkStatus::handle(ctx);
-        ctx.subscribe_to_model(&network_status, |me, _, _event, ctx| {
-            let is_edit_allowed = me.is_edit_allowed(ctx);
-            let tooltip = if !is_edit_allowed {
-                Some("Editing is disabled while offline.".to_string())
-            } else {
-                None
-            };
-            me.edit_button.update(ctx, |edit_button, ctx| {
-                edit_button.set_disabled(!is_edit_allowed, ctx);
-                edit_button.set_tooltip(tooltip, ctx);
-            });
-            ctx.notify();
-        });
-
         let appearance = Appearance::as_ref(ctx);
         let font_family = appearance.ui_font_family();
         let font_size = appearance.ui_font_size();
@@ -323,15 +307,6 @@ impl SuggestedRuleView {
         self.reset_rule(ctx);
         ctx.focus_self();
         ctx.notify();
-    }
-
-    pub fn is_edit_allowed(&self, ctx: &mut ViewContext<Self>) -> bool {
-        let Some(SuggestedRuleAndId { sync_id, .. }) = &self.rule_and_id else {
-            return false;
-        };
-
-        let is_online = NetworkStatus::as_ref(ctx).is_online();
-        is_online || sync_id.into_server().is_none()
     }
 
     fn handle_editor_event(&mut self, event: &EditorEvent, ctx: &mut ViewContext<Self>) {

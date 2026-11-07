@@ -16,7 +16,7 @@ use warpui::elements::{
     Empty, Flex, Hoverable, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
     OffsetType, ParentAnchor, ParentElement, ParentOffsetBounds, PositionedElementAnchor,
     PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition, ScrollTarget,
-    ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, Text, XAxisAnchor, YAxisAnchor,
+    ScrollToPositionMode, ScrollbarWidth, Shrinkable, Stack, XAxisAnchor, YAxisAnchor,
 };
 use warpui::fonts::Weight;
 use warpui::keymap::FixedBinding;
@@ -55,7 +55,6 @@ use crate::editor::{EditorView, Event as EditorEvent, SingleLineEditorOptions};
 use crate::env_vars::CloudEnvVarCollection;
 use crate::features::FeatureFlag;
 use crate::menu::{Event, Menu, MenuItem, MenuItemFields};
-use crate::network::NetworkStatus;
 use crate::notebooks::CloudNotebookModel;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ClientId, ObjectUid, SyncId};
@@ -121,11 +120,6 @@ const HOVER_PREVIEW_Y_OFFSET: f32 = 0.;
 const LOADING_ICON_WIDTH: f32 = 16.;
 const LOADING_ICON_HEIGHT: f32 = 16.;
 const MENU_WIDTH: f32 = 194.;
-const CLOUD_OFFLINE_ICON_WIDTH: f32 = 20.;
-const CLOUD_OFFLINE_ICON_HEIGHT: f32 = 18.;
-const OFFLINE_BANNER_ICON_SPACING: f32 = 8.;
-const OFFLINE_BANNER_PADDING_HORIZONTAL: f32 = 16.;
-const OFFLINE_BANNER_PADDING_VERTICAL: f32 = 4.;
 
 const FOLDER_LABEL: &str = "Folder";
 const NOTEBOOK_LABEL: &str = "Notebook";
@@ -139,7 +133,6 @@ const INDEX_AGENT_MODE_WORKFLOW_LABEL: &str = "New prompt";
 const INDEX_ENV_VAR_COLLECTION_LABEL: &str = "New environment variables";
 
 const IMPORT_LABEL: &str = "Import";
-const OFFLINE_BANNER_TEXT: &str = "You are offline. Some files will be read only.";
 
 pub const DRIVE_INDEX_VIEW_POSITION_ID: &str = "drive_index_view_id";
 
@@ -211,7 +204,6 @@ pub enum DriveIndexAction {
     CopyObjectToClipboard(CloudObjectTypeAndId),
     CopyWorkflowId(CloudObjectTypeAndId),
     DuplicateObject(CloudObjectTypeAndId),
-    CopyObjectLinkToClipboard(String),
     OpenObjectLinkOnDesktop(Url),
     ExportObject(CloudObjectTypeAndId),
     ToggleNewAssetsMenu(Space),
@@ -743,11 +735,6 @@ impl DriveIndex {
             Self::handle_cloud_view_model_event,
         );
 
-        let network_status = NetworkStatus::handle(ctx);
-        ctx.subscribe_to_model(&network_status, |_me, _, _event, ctx| {
-            ctx.notify();
-        });
-
         let menu = ctx.add_typed_action_view(|_ctx| {
             Menu::new()
                 .prevent_interaction_with_other_elements()
@@ -837,10 +824,6 @@ impl DriveIndex {
         CloudModel::as_ref(app)
             .get_by_uid(&cloud_object_type_and_id.uid())
             .is_some()
-    }
-
-    fn is_online(&self, app: &AppContext) -> bool {
-        NetworkStatus::as_ref(app).is_online()
     }
 
     pub fn scroll_item_into_view(&mut self, item_id: WarpDriveItemId, ctx: &mut ViewContext<Self>) {
@@ -1118,8 +1101,7 @@ impl DriveIndex {
         // The "+" icon for adding new objects.
         let DriveIndexSection::Space(space) = section;
         let can_create_objects = match space {
-            Space::Personal => true,
-            Space::Team { .. } => self.is_online(app),
+            Space::Personal | Space::Team { .. } => true,
             Space::Shared => false,
         };
         if can_create_objects {
@@ -1282,8 +1264,8 @@ impl DriveIndex {
             )
             .with_text_label("Empty trash".to_string());
 
-        // Only show Empty Trash button when online, do not show for Shared space
-        if self.is_online(app) && space != &Space::Shared {
+        // Do not show Empty Trash button for Shared space
+        if space != &Space::Shared {
             // Disable Empty Trash button if trash is empty
             let cloud_model = CloudModel::as_ref(app);
             if cloud_model
@@ -1869,62 +1851,11 @@ impl DriveIndex {
         Some(rendered_space.into_iter())
     }
 
-    fn render_offline_banner(&self, app: &AppContext) -> Box<dyn Element> {
-        let appearance = Appearance::as_ref(app);
-
-        Container::new(
-            Flex::row()
-                .with_child(
-                    Container::new(
-                        ConstrainedBox::new(
-                            Icon::CloudOffline
-                                .to_warpui_icon(
-                                    appearance
-                                        .theme()
-                                        .sub_text_color(appearance.theme().surface_2()),
-                                )
-                                .finish(),
-                        )
-                        .with_width(CLOUD_OFFLINE_ICON_WIDTH)
-                        .with_height(CLOUD_OFFLINE_ICON_HEIGHT)
-                        .finish(),
-                    )
-                    .with_padding_right(OFFLINE_BANNER_ICON_SPACING)
-                    .finish(),
-                )
-                .with_child(
-                    Shrinkable::new(
-                        1.,
-                        Text::new_inline(
-                            OFFLINE_BANNER_TEXT,
-                            appearance.ui_font_family(),
-                            appearance.ui_font_size(),
-                        )
-                        .finish(),
-                    )
-                    .finish(),
-                )
-                .with_main_axis_alignment(MainAxisAlignment::Center)
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .finish(),
-        )
-        .with_background(appearance.theme().surface_2())
-        .with_padding_left(OFFLINE_BANNER_PADDING_HORIZONTAL)
-        .with_padding_right(OFFLINE_BANNER_PADDING_HORIZONTAL)
-        .with_padding_top(OFFLINE_BANNER_PADDING_VERTICAL)
-        .with_padding_bottom(OFFLINE_BANNER_PADDING_VERTICAL)
-        .finish()
-    }
-
     fn render_all_sections(&self, app: &AppContext) -> impl Iterator<Item = Box<dyn Element>> {
         let appearance = Appearance::as_ref(app);
         let cloud_model = CloudModel::as_ref(app);
 
         let mut sections = vec![];
-
-        if !self.is_online(app) {
-            sections.push(self.render_offline_banner(app));
-        }
 
         for section in self.sections.iter() {
             // items_in_space includes the header of the space as well as all the untrashed cloud objects.
@@ -1957,7 +1888,7 @@ impl DriveIndex {
         sections.into_iter()
     }
 
-    fn render_title(&self, appearance: &Appearance, app: &AppContext) -> Box<dyn Element> {
+    fn render_title(&self, appearance: &Appearance) -> Box<dyn Element> {
         let text = Container::new(
             appearance
                 .ui_builder()
@@ -1982,7 +1913,7 @@ impl DriveIndex {
 
         let mut title_right_side = Flex::row();
 
-        if self.show_warp_drive_loading_icon && self.is_online(app) {
+        if self.show_warp_drive_loading_icon {
             title_right_side.add_child(self.render_warp_drive_loading_icon(appearance));
         }
 
@@ -2642,8 +2573,7 @@ impl DriveIndex {
                 &CloudObjectTypeAndId::from_id_and_type(folder_id, ObjectType::Folder),
                 ctx,
             ),
-            CloudObjectLocation::Space(_) => self.is_online(ctx),
-            CloudObjectLocation::Trash => self.is_online(ctx),
+            CloudObjectLocation::Space(_) | CloudObjectLocation::Trash => true,
         };
 
         if is_drop_target_valid {
@@ -2898,23 +2828,20 @@ impl DriveIndex {
             return;
         }
 
-        let is_online = self.is_online(ctx);
         let state = self.section_states.get_mut(&section_key);
         if let Some(state) = state {
             let mut menu_items = vec![];
 
-            if is_online {
-                menu_items.push(
-                    MenuItemFields::new(FOLDER_LABEL)
-                        .with_on_select_action(DriveIndexAction::create_object(
-                            DriveObjectType::Folder,
-                            *space,
-                            None,
-                        ))
-                        .with_icon(Icon::Folder)
-                        .into_item(),
-                );
-            }
+            menu_items.push(
+                MenuItemFields::new(FOLDER_LABEL)
+                    .with_on_select_action(DriveIndexAction::create_object(
+                        DriveObjectType::Folder,
+                        *space,
+                        None,
+                    ))
+                    .with_icon(Icon::Folder)
+                    .into_item(),
+            );
 
             menu_items.push(
                 MenuItemFields::new(WORKFLOW_LABEL)
@@ -3101,96 +3028,79 @@ impl DriveIndex {
                 warp_core::channel::Channel::Oss
             ) || matches!(folder_id, SyncId::ServerId(_));
             if folder_actions_allowed {
-                if self.is_online(app) {
-                    if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
+                if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
+                    menu_items.push(
+                        MenuItemFields::new(INDEX_FOLDER_LABEL)
+                            .with_on_select_action(DriveIndexAction::create_object(
+                                DriveObjectType::Folder,
+                                *space,
+                                Some(*folder_id),
+                            ))
+                            .with_icon(Icon::Folder)
+                            .into_item(),
+                    );
+                    menu_items.push(
+                        MenuItemFields::new(INDEX_WORKFLOW_LABEL)
+                            .with_on_select_action(DriveIndexAction::create_object(
+                                DriveObjectType::Workflow,
+                                *space,
+                                Some(*folder_id),
+                            ))
+                            .with_icon(Icon::Workflow)
+                            .into_item(),
+                    );
+
+                    if FeatureFlag::AgentModeWorkflows.is_enabled() {
                         menu_items.push(
-                            MenuItemFields::new(INDEX_FOLDER_LABEL)
+                            MenuItemFields::new(INDEX_AGENT_MODE_WORKFLOW_LABEL)
                                 .with_on_select_action(DriveIndexAction::create_object(
-                                    DriveObjectType::Folder,
+                                    DriveObjectType::AgentModeWorkflow,
                                     *space,
                                     Some(*folder_id),
                                 ))
-                                .with_icon(Icon::Folder)
-                                .into_item(),
-                        );
-                        menu_items.push(
-                            MenuItemFields::new(INDEX_WORKFLOW_LABEL)
-                                .with_on_select_action(DriveIndexAction::create_object(
-                                    DriveObjectType::Workflow,
-                                    *space,
-                                    Some(*folder_id),
-                                ))
-                                .with_icon(Icon::Workflow)
-                                .into_item(),
-                        );
-
-                        if FeatureFlag::AgentModeWorkflows.is_enabled() {
-                            menu_items.push(
-                                MenuItemFields::new(INDEX_AGENT_MODE_WORKFLOW_LABEL)
-                                    .with_on_select_action(DriveIndexAction::create_object(
-                                        DriveObjectType::AgentModeWorkflow,
-                                        *space,
-                                        Some(*folder_id),
-                                    ))
-                                    .with_icon(Icon::Prompt)
-                                    .into_item(),
-                            );
-                        }
-
-                        menu_items.push(
-                            MenuItemFields::new(INDEX_NOTEBOOK_LABEL)
-                                .with_on_select_action(DriveIndexAction::create_object(
-                                    DriveObjectType::Notebook {
-                                        is_ai_document: false,
-                                    },
-                                    *space,
-                                    Some(*folder_id),
-                                ))
-                                .with_icon(Icon::Notebook)
-                                .into_item(),
-                        );
-
-                        menu_items.push(
-                            MenuItemFields::new(INDEX_ENV_VAR_COLLECTION_LABEL)
-                                .with_on_select_action(DriveIndexAction::create_object(
-                                    DriveObjectType::EnvVarCollection,
-                                    *space,
-                                    Some(*folder_id),
-                                ))
-                                .with_icon(Icon::EnvVarCollection)
-                                .into_item(),
-                        );
-
-                        menu_items.push(MenuItem::Separator);
-                    }
-                    if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
-                        menu_items.push(
-                            MenuItemFields::new("Rename")
-                                .with_on_select_action(
-                                    DriveIndexAction::OpenCloudObjectNamingDialog {
-                                        space: *space,
-                                        object_type: DriveObjectType::Folder,
-                                        initial_folder_id: Some(*folder_id),
-                                        cloud_object_type_and_id: Some(*cloud_object_type_and_id),
-                                    },
-                                )
-                                .with_icon(Icon::Rename)
+                                .with_icon(Icon::Prompt)
                                 .into_item(),
                         );
                     }
+
+                    menu_items.push(
+                        MenuItemFields::new(INDEX_NOTEBOOK_LABEL)
+                            .with_on_select_action(DriveIndexAction::create_object(
+                                DriveObjectType::Notebook {
+                                    is_ai_document: false,
+                                },
+                                *space,
+                                Some(*folder_id),
+                            ))
+                            .with_icon(Icon::Notebook)
+                            .into_item(),
+                    );
+
+                    menu_items.push(
+                        MenuItemFields::new(INDEX_ENV_VAR_COLLECTION_LABEL)
+                            .with_on_select_action(DriveIndexAction::create_object(
+                                DriveObjectType::EnvVarCollection,
+                                *space,
+                                Some(*folder_id),
+                            ))
+                            .with_icon(Icon::EnvVarCollection)
+                            .into_item(),
+                    );
+
+                    menu_items.push(MenuItem::Separator);
                 }
-
-                if let Some(object) = object {
-                    if let Some(object_link) = object.object_link() {
-                        menu_items.push(
-                            MenuItemFields::new("Copy link")
-                                .with_on_select_action(DriveIndexAction::CopyObjectLinkToClipboard(
-                                    object_link,
-                                ))
-                                .with_icon(Icon::Link)
-                                .into_item(),
-                        );
-                    }
+                if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
+                    menu_items.push(
+                        MenuItemFields::new("Rename")
+                            .with_on_select_action(DriveIndexAction::OpenCloudObjectNamingDialog {
+                                space: *space,
+                                object_type: DriveObjectType::Folder,
+                                initial_folder_id: Some(*folder_id),
+                                cloud_object_type_and_id: Some(*cloud_object_type_and_id),
+                            })
+                            .with_icon(Icon::Rename)
+                            .into_item(),
+                    );
                 }
 
                 if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
@@ -3328,16 +3238,6 @@ impl DriveIndex {
                     | ObjectType::GenericStringObject(GenericStringObjectFormat::Json(
                         JsonObjectType::EnvVarCollection,
                     )) => {
-                        if let Some(object_link) = object.object_link() {
-                            menu_items.push(
-                                MenuItemFields::new("Copy link")
-                                    .with_on_select_action(
-                                        DriveIndexAction::CopyObjectLinkToClipboard(object_link),
-                                    )
-                                    .with_icon(Icon::Link)
-                                    .into_item(),
-                            );
-                        }
                         if !warpui::platform::is_mobile_device()
                             && !ContextFlag::HideOpenOnDesktopButton.is_enabled()
                             && *UserAppInstallDetectionSettings::as_ref(app)
@@ -3358,10 +3258,8 @@ impl DriveIndex {
                                 }
                             }
                         }
-                        // Only allow duplicate if in Personal space, or Team space when online
-                        if matches!(space, Space::Personal)
-                            || (self.is_online(app) && matches!(space, Space::Team { .. }))
-                        {
+                        // Only allow duplicate if in Personal or Team space
+                        if matches!(space, Space::Personal | Space::Team { .. }) {
                             menu_items.push(
                                 MenuItemFields::new("Duplicate")
                                     .with_on_select_action(DriveIndexAction::DuplicateObject(
@@ -3711,7 +3609,7 @@ impl View for DriveIndex {
 
         match self.index_variant {
             DriveIndexVariant::MainIndex => {
-                drive.add_child(self.render_title(appearance, app));
+                drive.add_child(self.render_title(appearance));
                 drive.add_child(Shrinkable::new(1., index_content).finish());
             }
             DriveIndexVariant::Trash => {
@@ -4062,10 +3960,6 @@ impl TypedActionView for DriveIndex {
                         }
                     }
                 }
-            }
-            DriveIndexAction::CopyObjectLinkToClipboard(link) => {
-                ctx.clipboard()
-                    .write(ClipboardContent::plain_text(link.to_owned()));
             }
             #[cfg(target_family = "wasm")]
             DriveIndexAction::OpenObjectLinkOnDesktop(url) => {

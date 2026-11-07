@@ -3,31 +3,25 @@ use std::path::PathBuf;
 use warp_core::ui::appearance::Appearance;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 use warpui::elements::{
-    Align, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container,
-    CrossAxisAlignment, Expanded, Flex, MainAxisAlignment, MainAxisSize, ParentElement,
-    ScrollbarWidth,
+    Align, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox, Container, Flex,
+    MainAxisSize, ParentElement, ScrollbarWidth,
 };
-use warpui::ui_components::components::UiComponent;
 use warpui::{
     AppContext, Element, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle,
 };
 
 use super::{AIFact, CloudAIFact, CloudAIFactModel};
-use crate::network::NetworkStatus;
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::server::ids::SyncId;
-use crate::ui_components::icons::Icon;
 
 pub mod rule;
 pub mod rule_editor;
 mod style;
 use rule::*;
 use rule_editor::*;
-
-const OFFLINE_TEXT: &str = "You are offline. Some rules will be read only.";
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub enum AIFactPage {
@@ -174,49 +168,6 @@ impl AIFactView {
         self.focus(ctx);
         ctx.notify();
     }
-
-    fn render_offline_banner(&self, appearance: &Appearance) -> Box<dyn Element> {
-        Container::new(
-            Flex::row()
-                .with_child(
-                    ConstrainedBox::new(
-                        Icon::CloudOffline
-                            .to_warpui_icon(
-                                appearance
-                                    .theme()
-                                    .sub_text_color(appearance.theme().surface_2()),
-                            )
-                            .finish(),
-                    )
-                    .with_width(style::ICON_SIZE)
-                    .with_height(style::ICON_SIZE)
-                    .finish(),
-                )
-                .with_child(
-                    Expanded::new(
-                        1.,
-                        Container::new(
-                            appearance
-                                .ui_builder()
-                                .wrappable_text(OFFLINE_TEXT, true)
-                                .build()
-                                .finish(),
-                        )
-                        .with_margin_left(style::ICON_MARGIN)
-                        .finish(),
-                    )
-                    .finish(),
-                )
-                .with_main_axis_alignment(MainAxisAlignment::Center)
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .finish(),
-        )
-        .with_background(appearance.theme().surface_2())
-        .with_vertical_padding(4.)
-        .with_horizontal_padding(style::PANE_PADDING)
-        .with_margin_bottom(style::ITEM_BOTTOM_MARGIN)
-        .finish()
-    }
 }
 
 impl Entity for AIFactView {
@@ -240,9 +191,6 @@ impl View for AIFactView {
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let mut col = Flex::column().with_main_axis_size(MainAxisSize::Min);
-        if !is_online(app) {
-            col.add_child(self.render_offline_banner(appearance));
-        }
         match self.current_page {
             AIFactPage::Rules => col.add_child(ChildView::new(&self.rule_view).finish()),
             AIFactPage::RuleEditor { .. } => {
@@ -320,8 +268,4 @@ impl BackingView for AIFactView {
     fn set_focus_handle(&mut self, focus_handle: PaneFocusHandle, _ctx: &mut ViewContext<Self>) {
         self.focus_handle = Some(focus_handle);
     }
-}
-
-pub fn is_online(app: &AppContext) -> bool {
-    NetworkStatus::as_ref(app).is_online()
 }

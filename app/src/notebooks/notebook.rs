@@ -11,7 +11,6 @@ use warp_core::context_flag::ContextFlag;
 use warp_editor::editor::NavigationKey;
 use warp_editor::model::CoreEditorModel;
 use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
-use warpui::clipboard::ClipboardContent;
 use warpui::elements::{
     Align, Clipped, ConstrainedBox, Container, CrossAxisAlignment, DispatchEventResult, Empty,
     EventHandler, Flex, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
@@ -56,7 +55,6 @@ use crate::editor::{
 };
 use crate::features::FeatureFlag;
 use crate::menu::{MenuItem, MenuItemFields};
-use crate::network::{NetworkStatus, NetworkStatusEvent};
 use crate::notebooks::editor::model::NotebooksEditorModel;
 use crate::notebooks::editor::rich_text_styles;
 use crate::notebooks::CloudNotebook;
@@ -239,7 +237,6 @@ pub enum NotebookAction {
     Trash,
     Untrash,
     CopyToPersonal,
-    CopyLink(String),
     OpenLinkOnDesktop(Url),
     Export,
     AttachPlanAsContext(AIDocumentId),
@@ -276,11 +273,6 @@ impl NotebookView {
                 me.handle_appearance_change(ctx)
             }
         });
-
-        ctx.subscribe_to_model(
-            &NetworkStatus::handle(ctx),
-            Self::handle_network_status_event,
-        );
 
         let active_notebook_data = ctx.add_model(ActiveNotebookData::new);
         ctx.subscribe_to_model(&active_notebook_data, Self::handle_active_notebook_event);
@@ -1114,16 +1106,6 @@ impl NotebookView {
             );
         }
 
-        // Add "Copy Link" to menu
-        if let Some(link) = self.notebook_link(ctx) {
-            menu_items.push(
-                MenuItemFields::new("Copy link")
-                    .with_on_select_action(NotebookAction::CopyLink(link))
-                    .with_icon(icons::Icon::Link)
-                    .into_item(),
-            );
-        }
-
         if !warpui::platform::is_mobile_device()
             && !ContextFlag::HideOpenOnDesktopButton.is_enabled()
             && *UserAppInstallDetectionSettings::as_ref(ctx)
@@ -1164,9 +1146,7 @@ impl NotebookView {
         }
 
         // Add "Trash" to menu
-        if self.is_online(ctx)
-            && (!FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash())
-        {
+        if !FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash() {
             menu_items.push(
                 MenuItemFields::new("Trash")
                     .with_on_select_action(NotebookAction::Trash)
@@ -1176,22 +1156,6 @@ impl NotebookView {
         }
 
         menu_items
-    }
-
-    fn handle_network_status_event(
-        &mut self,
-        _handle: ModelHandle<NetworkStatus>,
-        event: &NetworkStatusEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let NetworkStatusEvent::NetworkStatusChanged { new_status: _ } = event;
-        self.pane_configuration.update(ctx, |pane_config, ctx| {
-            pane_config.refresh_pane_header_overflow_menu_items(ctx)
-        });
-    }
-
-    fn is_online(&self, app: &AppContext) -> bool {
-        NetworkStatus::as_ref(app).is_online()
     }
 
     /// Takes a given `notebook_id`, and tries to load it into view after initial load completes.
@@ -1767,19 +1731,6 @@ impl TypedActionView for NotebookView {
             NotebookAction::Trash => self.trash_object(ctx),
             NotebookAction::Untrash => self.untrash_notebook(ctx),
             NotebookAction::CopyToPersonal => self.copy_to_personal(ctx),
-            NotebookAction::CopyLink(link) => {
-                ctx.clipboard()
-                    .write(ClipboardContent::plain_text(link.to_owned()));
-
-                let window_id = ctx.window_id();
-                ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                    toast_stack.add_ephemeral_toast(
-                        DismissibleToast::success("Link copied to clipboard".to_string()),
-                        window_id,
-                        ctx,
-                    );
-                });
-            }
             NotebookAction::MoveToSpace {
                 cloud_object_type_and_id,
                 new_space,

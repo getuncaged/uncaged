@@ -1,6 +1,5 @@
 use pathfinder_geometry::vector::{vec2f, Vector2F};
 use warp_core::features::FeatureFlag;
-use warpui::clipboard::ClipboardContent;
 use warpui::elements::{
     Align, AnchorPair, ChildAnchor, Clipped, ClippedScrollStateHandle, ClippedScrollable,
     ConstrainedBox, Container, CrossAxisAlignment, DispatchEventResult, EventHandler, Fill, Flex,
@@ -36,7 +35,6 @@ use crate::env_vars::{
 };
 use crate::external_secrets::SecretManager;
 use crate::menu::MenuItem;
-use crate::network::{NetworkStatus, NetworkStatusEvent};
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
@@ -320,7 +318,6 @@ pub enum EnvVarCollectionAction {
     DeleteVariable(VariableRowIndex),
     // Overflow menu actions
     Untrash,
-    CopyLink(String),
     Duplicate,
     Trash,
     Export,
@@ -496,11 +493,6 @@ impl EnvVarCollectionView {
         ctx.observe(
             &active_env_var_collection_data,
             Self::handle_active_env_var_collection_change,
-        );
-
-        ctx.subscribe_to_model(
-            &NetworkStatus::handle(ctx),
-            Self::handle_network_status_event,
         );
 
         let title_editor = Self::create_editor_handle(
@@ -986,22 +978,6 @@ impl EnvVarCollectionView {
             .max_by_key(|error| error.secret_level.priority())
     }
 
-    pub(super) fn is_online(&self, app: &AppContext) -> bool {
-        NetworkStatus::as_ref(app).is_online()
-    }
-
-    fn handle_network_status_event(
-        &mut self,
-        _handle: ModelHandle<NetworkStatus>,
-        event: &NetworkStatusEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        let NetworkStatusEvent::NetworkStatusChanged { new_status: _ } = event;
-        self.pane_configuration.update(ctx, |pane_config, ctx| {
-            pane_config.refresh_pane_header_overflow_menu_items(ctx)
-        });
-    }
-
     pub fn set_saving_status(&mut self, status: SavingStatus, ctx: &mut ViewContext<Self>) {
         self.active_env_var_collection_data
             .update(ctx, |data, _| data.saving_status = status);
@@ -1429,10 +1405,6 @@ impl TypedActionView for EnvVarCollectionView {
                 self.delete_row(*index, ctx);
             }
             EnvVarCollectionAction::Untrash => self.untrash_env_var_collection(ctx),
-            EnvVarCollectionAction::CopyLink(link) => {
-                ctx.clipboard()
-                    .write(ClipboardContent::plain_text(link.to_owned()));
-            }
             EnvVarCollectionAction::Duplicate => self.duplicate_env_var_collection(ctx),
             EnvVarCollectionAction::Trash => self.trash_env_var_collection(ctx),
             EnvVarCollectionAction::Export => self.export_env_var_collection(ctx),

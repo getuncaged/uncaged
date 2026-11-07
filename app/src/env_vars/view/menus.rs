@@ -4,7 +4,7 @@ use warpui::keymap::Trigger;
 use warpui::{SingletonEntity, ViewContext, ViewHandle};
 
 use super::env_var_collection::{EnvVarCollectionAction, EnvVarCollectionView, VariableRowIndex};
-use crate::cloud_object::{CloudObject, GenericStringObjectFormat, Space};
+use crate::cloud_object::{GenericStringObjectFormat, Space};
 use crate::drive::export::ExportManager;
 use crate::drive::CloudObjectTypeAndId;
 use crate::env_vars::active_env_var_collection_data::TrashStatus;
@@ -16,7 +16,7 @@ use crate::ui_components::icons::Icon;
 use crate::util::bindings::{
     keybinding_name_to_display_string, trigger_to_keystroke, CustomAction,
 };
-use crate::{AppContext, CloudModel, FeatureFlag};
+use crate::{AppContext, FeatureFlag};
 
 const PANE_MENU_WIDTH: f32 = 200.;
 
@@ -368,16 +368,6 @@ impl EnvVarCollectionView {
             return menu_items;
         }
 
-        // Add "Copy Link" to menu
-        if let Some(link) = self.env_var_collection_link(ctx) {
-            menu_items.push(
-                MenuItemFields::new("Copy link")
-                    .with_on_select_action(EnvVarCollectionAction::CopyLink(link))
-                    .with_icon(Icon::Link)
-                    .into_item(),
-            );
-        }
-
         // Add "Duplicate" to menu
         if space != Some(Space::Shared) {
             menu_items.push(
@@ -389,9 +379,7 @@ impl EnvVarCollectionView {
         }
 
         // Add "Trash" to menu
-        if self.is_online(ctx)
-            && (!FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash())
-        {
+        if !FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash() {
             menu_items.push(
                 MenuItemFields::new("Trash")
                     .with_on_select_action(EnvVarCollectionAction::Trash)
@@ -409,12 +397,6 @@ impl EnvVarCollectionView {
         );
 
         menu_items
-    }
-
-    pub(super) fn env_var_collection_link(&self, ctx: &AppContext) -> Option<String> {
-        self.env_var_collection_id(ctx)
-            .and_then(|id| CloudModel::as_ref(ctx).get_env_var_collection(&id))
-            .map(|env_var_collection| env_var_collection.object_link())?
     }
 
     pub(super) fn untrash_env_var_collection(&self, ctx: &mut ViewContext<Self>) {

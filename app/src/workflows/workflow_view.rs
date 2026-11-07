@@ -58,7 +58,6 @@ use crate::editor::{
     SingleLineEditorOptions, TextOptions, TextStyleOperation,
 };
 use crate::menu::{MenuItem, MenuItemFields};
-use crate::network::NetworkStatus;
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
@@ -197,7 +196,6 @@ pub enum WorkflowAction {
     Save,
     Cancel,
     Duplicate,
-    CopyLink(String),
     OpenLinkOnDesktop(Url),
     Trash,
     Untrash,
@@ -1644,10 +1642,6 @@ impl WorkflowView {
         ctx.emit(WorkflowViewEvent::Pane(PaneEvent::FocusSelf));
     }
 
-    fn is_online(&self, app: &AppContext) -> bool {
-        NetworkStatus::as_ref(app).is_online()
-    }
-
     /// Whether or not opening links in the desktop app is supported.
     fn can_open_on_desktop(&self, app: &AppContext) -> bool {
         !ContextFlag::HideOpenOnDesktopButton.is_enabled()
@@ -2698,10 +2692,6 @@ impl TypedActionView for WorkflowView {
             WorkflowAction::RunWorkflow => self.copy_to_command_line(ctx),
             WorkflowAction::CopyContent => self.copy_content(ctx),
             WorkflowAction::Duplicate => self.duplicate_object(ctx),
-            WorkflowAction::CopyLink(link) => {
-                ctx.clipboard()
-                    .write(ClipboardContent::plain_text(link.to_owned()));
-            }
             #[cfg(target_family = "wasm")]
             WorkflowAction::OpenLinkOnDesktop(url) => {
                 open_url_on_desktop(url);
@@ -2733,16 +2723,6 @@ impl BackingView for WorkflowView {
     fn pane_header_overflow_menu_items(&self, ctx: &AppContext) -> Vec<MenuItem<WorkflowAction>> {
         let mut menu_items = Vec::new();
 
-        // Add "Copy Link" to menu
-        if let Some(link) = self.workflow_link(ctx) {
-            menu_items.push(
-                MenuItemFields::new("Copy link")
-                    .with_on_select_action(WorkflowAction::CopyLink(link))
-                    .with_icon(Icon::Link)
-                    .into_item(),
-            );
-        }
-
         if self.can_open_on_desktop(ctx) {
             if let Some(link) = self.workflow_link(ctx) {
                 if let Ok(url) = Url::parse(&link) {
@@ -2770,9 +2750,7 @@ impl BackingView for WorkflowView {
 
         // Add "Trash" to menu
         let access_level = self.access_level(ctx);
-        if self.is_online(ctx)
-            && (!FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash())
-        {
+        if !FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash() {
             menu_items.push(
                 MenuItemFields::new("Trash")
                     .with_on_select_action(WorkflowAction::Trash)

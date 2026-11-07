@@ -42,7 +42,6 @@ use crate::editor::{
     TextStyleOperation,
 };
 use crate::menu::{Event, Menu, MenuItem, MenuItemFields};
-use crate::network::NetworkStatus;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::{ClientId, SyncId};
 use crate::themes::theme::AnsiColorIdentifier;
@@ -586,7 +585,7 @@ impl WorkflowModal {
     }
 
     fn open_overflow_menu(&mut self, ctx: &mut ViewContext<Self>) {
-        let menu_items = self.menu_items(ctx);
+        let menu_items = self.menu_items();
         // We need to set items every time the menu is opened because we don't know whether the Trash action is available
         ctx.update_view(&self.menu, |menu, ctx| {
             menu.set_items(menu_items, ctx);
@@ -645,28 +644,17 @@ impl WorkflowModal {
         }
     }
 
-    fn menu_items(&self, app: &AppContext) -> Vec<MenuItem<WorkflowModalAction>> {
-        let mut menu_items = Vec::new();
-
-        // Add "Copy workflow text" to menu
-        menu_items.push(
+    fn menu_items(&self) -> Vec<MenuItem<WorkflowModalAction>> {
+        vec![
             MenuItemFields::new("Copy workflow text")
                 .with_on_select_action(WorkflowModalAction::CopyObjectToClipboard)
                 .with_icon(Icon::CopyMenuItem)
                 .into_item(),
-        );
-
-        // Add "Trash" to menu
-        if self.is_online(app) {
-            menu_items.push(
-                MenuItemFields::new("Trash")
-                    .with_on_select_action(WorkflowModalAction::TrashObject)
-                    .with_icon(Icon::Trash)
-                    .into_item(),
-            );
-        }
-
-        menu_items
+            MenuItemFields::new("Trash")
+                .with_on_select_action(WorkflowModalAction::TrashObject)
+                .with_icon(Icon::Trash)
+                .into_item(),
+        ]
     }
 
     pub fn should_show_unsaved_changes_dialog(&self, app: &AppContext) -> bool {
@@ -1297,10 +1285,6 @@ impl WorkflowModal {
         self.show_unsaved_changes_dialog
             || self.errors.has_any_error()
             || self.show_enum_creation_dialog
-    }
-
-    fn is_online(&self, app: &AppContext) -> bool {
-        NetworkStatus::as_ref(app).is_online()
     }
 
     fn render_header_menu_and_close(&self, appearance: &Appearance) -> Box<dyn Element> {
