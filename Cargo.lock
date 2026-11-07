@@ -2090,7 +2090,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "serde_regex",
  "settings",
  "settings_value",
  "uuid",

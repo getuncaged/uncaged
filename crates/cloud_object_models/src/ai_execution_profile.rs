@@ -1,4 +1,6 @@
+use std::borrow::Cow;
 use std::path::PathBuf;
+use std::sync::{Arc, OnceLock};
 
 use ai::LLMId;
 use cloud_objects::cloud_object::{
@@ -7,7 +9,7 @@ use cloud_objects::cloud_object::{
 use cloud_objects::ids::GenericStringObjectId;
 use lazy_static::lazy_static;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
 
@@ -202,6 +204,76 @@ impl AskUserQuestionPermission {
     }
 }
 
+/// A regex that is compiled the first time it is matched against.
+///
+/// Compiling a regex is slow in unoptimized builds, and the execution profiles and AI settings
+/// loaded at startup hold dozens of command rules that are rarely matched. A pattern is still
+/// validated when it is created, by compiling it, unless it is one of the built-in default rules,
+/// which are known to compile. Serializes, compares and debug-prints like [`Regex`].
+#[derive(Clone)]
+struct LazyRegex {
+    pattern: String,
+    /// Shared between clones, so a rule copied into several settings compiles once.
+    compiled: Arc<OnceLock<Regex>>,
+}
+
+impl LazyRegex {
+    fn new(pattern: String) -> Result<Self, regex::Error> {
+        let compiled = OnceLock::new();
+        if !is_default_rule_pattern(&pattern) {
+            let _ = compiled.set(Regex::new(&pattern)?);
+        }
+        Ok(Self {
+            pattern,
+            compiled: Arc::new(compiled),
+        })
+    }
+
+    fn as_str(&self) -> &str {
+        &self.pattern
+    }
+
+    fn is_match(&self, haystack: &str) -> bool {
+        self.compiled
+            .get_or_init(|| {
+                Regex::new(&self.pattern).expect("default command rules are valid regexes")
+            })
+            .is_match(haystack)
+    }
+}
+
+impl std::fmt::Debug for LazyRegex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Regex").field(&self.as_str()).finish()
+    }
+}
+
+impl Serialize for LazyRegex {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.as_str().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for LazyRegex {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let pattern = <Cow<str>>::deserialize(deserializer)?;
+        Self::new(pattern.into_owned()).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Whether `pattern` is one of the default allowlist or denylist rules with its anchors.
+fn is_default_rule_pattern(pattern: &str) -> bool {
+    pattern
+        .strip_prefix('^')
+        .and_then(|rule| rule.strip_suffix('$'))
+        .is_some_and(|rule| {
+            DEFAULT_COMMAND_EXECUTION_ALLOWLIST_RULES
+                .iter()
+                .chain(DEFAULT_COMMAND_EXECUTION_DENYLIST_RULES)
+                .any(|default_rule| *default_rule == rule)
+        })
+}
+
 /// Predicate types to match commands that can be executed by Agent Mode.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 enum AgentModeCommandExecutionPredicateType {
@@ -209,14 +281,13 @@ enum AgentModeCommandExecutionPredicateType {
     ///
     /// We want regex rules to apply to the entire cmd string so we anchor them
     /// (there isn't any efficient way to apply to the entire cmd string at match-time).
-    #[serde(with = "serde_regex")]
-    AnchoredRegex(Regex),
+    AnchoredRegex(LazyRegex),
 }
 
 impl AgentModeCommandExecutionPredicateType {
     fn new_regex(regex: &str) -> Result<Self, regex::Error> {
         // Redundant anchors aren't a problem so we can unconditionally add them.
-        let anchored_regex = Regex::new(&format!("^{regex}$"))?;
+        let anchored_regex = LazyRegex::new(format!("^{regex}$"))?;
         Ok(Self::AnchoredRegex(anchored_regex))
     }
 
@@ -295,10 +366,38 @@ impl settings_value::SettingsValue for AgentModeCommandExecutionPredicate {
     }
 }
 
-lazy_static! {
-    static ref OPTIONAL_ARGS_REGEX: Regex =
-        Regex::new(r"(\s.*)?").expect("Can parse optional args regex");
-}
+/// Rules of the default command execution allowlist, without anchors. `(\s.*)?` matches the
+/// command's optional arguments.
+const DEFAULT_COMMAND_EXECUTION_ALLOWLIST_RULES: &[&str] = &[
+    r"cat(\s.*)?",
+    r"echo(\s.*)?",
+    "find .*",
+    r"grep(\s.*)?",
+    r"ls(\s.*)?",
+    "which .*",
+];
+
+/// Rules of the default command execution denylist, without anchors.
+const DEFAULT_COMMAND_EXECUTION_DENYLIST_RULES: &[&str] = &[
+    r"bash(\s.*)?",
+    r"fish(\s.*)?",
+    r"pwsh(\s.*)?",
+    r"sh(\s.*)?",
+    r"zsh(\s.*)?",
+    r"curl(\s.*)?",
+    r"eval(\s.*)?",
+    r"exec(\s.*)?",
+    r"source(\s.*)?",
+    r"wget(\s.*)?",
+    r"dig(\s.*)?",
+    r"nslookup(\s.*)?",
+    r"host(\s.*)?",
+    r"ssh(\s.*)?",
+    r"scp(\s.*)?",
+    r"rsync(\s.*)?",
+    r"telnet(\s.*)?",
+    r"rm(\s.*)?",
+];
 
 cfg_if::cfg_if! {
     if #[cfg(test)] {
@@ -309,36 +408,22 @@ cfg_if::cfg_if! {
             pub static ref DEFAULT_COMMAND_EXECUTION_DENYLIST: Vec<AgentModeCommandExecutionPredicate> = vec![];
         }
     } else {
-        lazy_static! {
-            pub static ref DEFAULT_COMMAND_EXECUTION_ALLOWLIST: Vec<AgentModeCommandExecutionPredicate> = vec![
-                AgentModeCommandExecutionPredicate::new_regex(&format!("cat{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default cat rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("echo{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default echo rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex("find .*").expect("Can parse default find rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("grep{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default grep rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("ls{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default ls rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex("which .*").expect("Can parse default which rule into regex"),
-            ];
+        fn default_predicates(rules: &[&str]) -> Vec<AgentModeCommandExecutionPredicate> {
+            rules
+                .iter()
+                .map(|rule| {
+                    AgentModeCommandExecutionPredicate::new_regex(rule)
+                        .unwrap_or_else(|err| panic!("Can parse default {rule} rule into regex: {err}"))
+                })
+                .collect()
+        }
 
-            pub static ref DEFAULT_COMMAND_EXECUTION_DENYLIST: Vec<AgentModeCommandExecutionPredicate> = vec![
-                AgentModeCommandExecutionPredicate::new_regex(&format!("bash{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default bash rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("fish{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default fish rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("pwsh{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default pwsh rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("sh{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default sh rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("zsh{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default zsh rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("curl{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default curl rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("eval{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default eval rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("exec{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default exec rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("source{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default source rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("wget{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default wget rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("dig{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default dig rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("nslookup{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default nslookup rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("host{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default host rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("ssh{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default ssh rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("scp{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default scp rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("rsync{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default rsync rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("telnet{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default telnet rule into regex"),
-                AgentModeCommandExecutionPredicate::new_regex(&format!("rm{}", OPTIONAL_ARGS_REGEX.as_str())).expect("Can parse default rm rule into regex"),
-            ];
+        lazy_static! {
+            pub static ref DEFAULT_COMMAND_EXECUTION_ALLOWLIST: Vec<AgentModeCommandExecutionPredicate> =
+                default_predicates(DEFAULT_COMMAND_EXECUTION_ALLOWLIST_RULES);
+
+            pub static ref DEFAULT_COMMAND_EXECUTION_DENYLIST: Vec<AgentModeCommandExecutionPredicate> =
+                default_predicates(DEFAULT_COMMAND_EXECUTION_DENYLIST_RULES);
         }
     }
 }
@@ -517,3 +602,7 @@ pub type CloudAIExecutionProfile =
 pub type CloudAIExecutionProfileModel = GenericStringModel<AIExecutionProfile, JsonSerializer>;
 pub type ServerAIExecutionProfile =
     GenericServerObject<GenericStringObjectId, CloudAIExecutionProfileModel>;
+
+#[cfg(test)]
+#[path = "ai_execution_profile_tests.rs"]
+mod tests;
