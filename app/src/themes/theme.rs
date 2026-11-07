@@ -202,15 +202,6 @@ impl ThemeKind {
         let theme_name = format!("{self}").to_lowercase();
         theme_name.contains(&query.to_lowercase())
     }
-
-    pub(crate) fn is_custom_theme_reference_syncable(&self) -> bool {
-        match self {
-            ThemeKind::Custom(custom_theme) | ThemeKind::CustomBase16(custom_theme) => {
-                custom_theme_path_is_portable(&custom_theme.path, &crate::user_config::themes_dir())
-            }
-            _ => true,
-        }
-    }
 }
 
 #[derive(

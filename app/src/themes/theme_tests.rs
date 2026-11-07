@@ -19,14 +19,6 @@ fn custom_theme_from_file_value_path(path: &str) -> CustomTheme {
     CustomTheme::from_file_value(&custom_theme_json(path)).unwrap()
 }
 
-fn assert_custom_theme_is_syncable(custom_theme: CustomTheme) {
-    assert!(ThemeKind::Custom(custom_theme).is_custom_theme_reference_syncable());
-}
-
-fn assert_custom_theme_is_not_syncable(custom_theme: CustomTheme) {
-    assert!(!ThemeKind::Custom(custom_theme).is_custom_theme_reference_syncable());
-}
-
 fn custom_theme_path_for_storage(path: &Path, theme_root: &Path) -> PathBuf {
     if path_is_absolute_or_foreign_absolute(path) {
         return portable_custom_theme_storage_string(path, theme_root)
@@ -222,7 +214,6 @@ fn custom_theme_serde_reads_portable_raw_path_under_theme_root() {
             .join("catppuccin")
             .join("mocha.yml")
     );
-    assert_custom_theme_is_syncable(custom);
 }
 
 #[test]
@@ -240,7 +231,6 @@ fn custom_theme_serde_preserves_unportable_raw_paths() {
         let custom = custom_theme_from_serde_path(raw_path);
 
         assert_eq!(custom.path(), PathBuf::from(raw_path));
-        assert_custom_theme_is_not_syncable(custom);
     }
 }
 
@@ -254,7 +244,6 @@ fn custom_theme_settings_value_reads_portable_raw_path_under_theme_root() {
             .join("catppuccin")
             .join("mocha.yml")
     );
-    assert_custom_theme_is_syncable(custom);
 }
 
 #[test]
@@ -272,7 +261,6 @@ fn custom_theme_settings_value_preserves_unportable_raw_paths() {
         let custom = custom_theme_from_file_value_path(raw_path);
 
         assert_eq!(custom.path(), PathBuf::from(raw_path));
-        assert_custom_theme_is_not_syncable(custom);
     }
 }
 

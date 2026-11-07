@@ -8,14 +8,12 @@ use warpui_extras::user_preferences::UserPreferences;
 
 use super::{PrivatePreferences, SupportedPlatforms};
 
-type UpdateFn = Box<dyn FnMut(String, bool, &mut AppContext) -> Result<()>>;
+type UpdateFn = Box<dyn FnMut(String, &mut AppContext) -> Result<()>>;
 
 /// Loads a value into memory without persisting. Parameters: (serialized_value, explicitly_set, ctx).
 type LoadFn = Box<dyn FnMut(String, bool, &mut AppContext) -> Result<()>>;
 
 type EqualsFn = Box<dyn Fn(&str, &str) -> Result<bool>>;
-
-type IsSyncableFn = Box<dyn Fn(&AppContext) -> bool>;
 
 /// Intermediate data collected for each setting during reload, before
 /// calling the mutable `load_fns`.
@@ -71,11 +69,6 @@ pub struct SettingsManager {
     /// like HashSet serialize to ordered json arrays, but don't have
     /// a defined order.
     equals_fns: HashMap<String, EqualsFn>,
-
-    /// Functions for checking whether a setting is currently syncable
-    /// based on its value. Settings that want custom logic here should define
-    /// the current_value_is_syncable method.
-    is_syncable_fns: HashMap<String, IsSyncableFn>,
 }
 
 pub enum SettingsEvent {
@@ -84,8 +77,7 @@ pub enum SettingsEvent {
 
 impl SettingsManager {
     /// Registers a function that updates a setting with the given storage key
-    /// to have a new value. Also tracks whether that storage key is for a cloud-synced
-    /// setting and what platforms it's supported on.
+    /// to have a new value. Also tracks what platforms the setting is supported on.
     #[allow(clippy::too_many_arguments)]
     pub fn register_setting(
         &mut self,
@@ -97,10 +89,9 @@ impl SettingsManager {
         toml_key: &'static str,
         max_table_depth: Option<u32>,
         is_private: bool,
-        update_fn: impl FnMut(String, bool, &mut AppContext) -> Result<()> + 'static,
+        update_fn: impl FnMut(String, &mut AppContext) -> Result<()> + 'static,
         load_fn: impl FnMut(String, bool, &mut AppContext) -> Result<()> + 'static,
         equals_fn: impl Fn(&str, &str) -> Result<bool> + 'static,
-        is_syncable_fn: impl Fn(&AppContext) -> bool + 'static,
     ) {
         self.update_fns
             .insert(storage_key.to_owned(), Box::new(update_fn));
@@ -108,8 +99,6 @@ impl SettingsManager {
             .insert(storage_key.to_owned(), Box::new(load_fn));
         self.equals_fns
             .insert(storage_key.to_owned(), Box::new(equals_fn));
-        self.is_syncable_fns
-            .insert(storage_key.to_owned(), Box::new(is_syncable_fn));
         self.settings.insert(
             storage_key.to_owned(),
             SettingsInfo {
@@ -135,20 +124,6 @@ impl SettingsManager {
             .iter()
             .filter(|(_, info)| !info.is_private)
             .map(|(key, _)| key.as_str())
-    }
-
-    /// Returns whether the setting with the given storage key has a value that is currently
-    /// syncable to the cloud.
-    pub fn is_current_value_syncable(&self, storage_key: &str, app: &AppContext) -> Result<bool> {
-        self.is_syncable_fns
-            .get(storage_key)
-            .map(|cb| Ok(cb(app)))
-            .unwrap_or_else(|| {
-                Err(anyhow!(
-                    "no is_syncable fn registered for storage key {}",
-                    storage_key
-                ))
-            })
     }
 
     /// Returns the supported platforms for this storage key.
@@ -206,30 +181,14 @@ impl SettingsManager {
         &mut self,
         storage_key: &str,
         new_value: String,
-        from_cloud_sync: bool,
         ctx: &mut AppContext,
     ) -> Result<()> {
         self.update_fns
             .get_mut(storage_key)
-            .map(|update_fn| update_fn(new_value, from_cloud_sync, ctx))
+            .map(|update_fn| update_fn(new_value, ctx))
             .unwrap_or_else(|| {
                 Err(anyhow!(
                     "no update fn registered for storage key {}",
-                    storage_key
-                ))
-            })
-    }
-
-    /// Returns whether the two serialized settings with the given storage key
-    /// have equal values.  This isn't a direct string comparison, or even a comparison
-    /// of JSON values, but a comparison using the Setting.value()'s equality method.
-    pub fn are_equal_settings(&self, storage_key: &str, left: &str, right: &str) -> Result<bool> {
-        self.equals_fns
-            .get(storage_key)
-            .map(|equality_fn| equality_fn(left, right))
-            .unwrap_or_else(|| {
-                Err(anyhow!(
-                    "no equals fn registered for storage key {}",
                     storage_key
                 ))
             })

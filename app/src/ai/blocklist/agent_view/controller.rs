@@ -162,7 +162,6 @@ pub enum AgentViewEntryOrigin {
     /// Entered agent view by selecting a conversation from the inline history menu.
     InlineHistoryMenu,
     InlineConversationMenu,
-    OnboardingCallout,
     ConversationListView,
     /// Entered agent view because the default session mode setting is Agent.
     DefaultSessionMode,

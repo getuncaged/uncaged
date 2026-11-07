@@ -295,24 +295,6 @@ macro_rules! define_setting {
                 Ok(())
             }
 
-            fn set_value_from_cloud_sync(
-                &mut self,
-                new_value: Self::Value,
-                ctx: &mut $crate::warpui_core::ModelContext<Self::Group>,
-            ) -> anyhow::Result<()> {
-                use $crate::ChangeEventReason;
-                let changed_in_storage =
-                    Self::write_to_preferences(&new_value, Self::preferences_for_setting(ctx))?;
-                if self.value() != &new_value || changed_in_storage {
-                    self.inner = self.validate(new_value);
-                    self.is_explicitly_set = true;
-                    ctx.emit($crate::macros::concat_idents!(EventName = $group, ChangedEvent { EventName::$name {
-                        change_event_reason: ChangeEventReason::CloudSync,
-                    }}));
-                }
-                Ok(())
-            }
-
             fn set_value(
                 &mut self,
                 new_value: Self::Value,
@@ -554,23 +536,6 @@ macro_rules! implement_setting_for_enum {
                 Ok(())
             }
 
-            fn set_value_from_cloud_sync(
-                &mut self,
-                new_value: Self::Value,
-                ctx: &mut $crate::warpui_core::ModelContext<Self::Group>,
-            ) -> anyhow::Result<()> {
-                use $crate::ChangeEventReason;
-                let changed_in_storage =
-                    Self::write_to_preferences(&new_value, Self::preferences_for_setting(ctx))?;
-                if self.value() != &new_value || changed_in_storage {
-                    *self = self.validate(new_value);
-                    ctx.emit($crate::macros::concat_idents!(EventName = $group, ChangedEvent { EventName::$name {
-                        change_event_reason: ChangeEventReason::CloudSync,
-                    }}));
-                }
-                Ok(())
-            }
-
             fn set_value(
                 &mut self,
                 new_value: Self::Value,
@@ -799,7 +764,6 @@ macro_rules! generate_settings_event_fn {
                     // Register callbacks for updating individual settings model by storage key
                     let settings_group_update_clone = settings_group.clone();
                     let settings_group_load_clone = settings_group.clone();
-                    let settings_group_is_syncable_clone = settings_group.clone();
                     let serialized_default_value =
                         serde_json::to_string(&$setting::default_value())
                             .expect("default should serialize");
@@ -818,10 +782,10 @@ macro_rules! generate_settings_event_fn {
                         $setting::toml_key(),
                         $setting::max_table_depth(),
                         $setting::is_private(),
-                        move |value, from_cloud_sync, ctx| {
+                        move |value, ctx| {
                             use $crate::_settings_value::SettingsValue as _;
                             // Try SettingsValue first (handles snake_case enums etc.),
-                            // then fall back to serde for cloud sync values.
+                            // then fall back to serde.
                             let value = serde_json::from_str::<serde_json::Value>(&value)
                                 .ok()
                                 .and_then(|json_val| {
@@ -835,11 +799,7 @@ macro_rules! generate_settings_event_fn {
                                 ));
                             };
                             settings_group_update_clone.update(ctx, |settings_group, ctx| {
-                                if from_cloud_sync {
-                                    settings_group.$var.set_value_from_cloud_sync(value, ctx)
-                                } else {
-                                    settings_group.$var.set_value(value, ctx)
-                                }
+                                settings_group.$var.set_value(value, ctx)
                             })
                         },
                         move |value, explicitly_set, ctx| {
@@ -877,12 +837,6 @@ macro_rules! generate_settings_event_fn {
                             let left_setting = $setting::new(Some(parse(left)?));
                             let right_setting = $setting::new(Some(parse(right)?));
                             Ok(left_setting.value() == right_setting.value())
-                        },
-                        move |ctx| {
-                            settings_group_is_syncable_clone
-                                .as_ref(ctx)
-                                .$var
-                                .current_value_is_syncable()
                         },
                     );
                 });

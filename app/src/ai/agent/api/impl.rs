@@ -54,11 +54,6 @@ pub async fn generate_multi_agent_output(
         redaction::redact_inputs(&mut params.input);
     }
 
-    let api_keys = api_keys_with_warp_credit_fallback_setting(
-        params.api_keys,
-        params.allow_use_of_warp_credits,
-    );
-
     let request = api::Request {
         task_context: Some(api::request::TaskContext {
             tasks: params.tasks,
@@ -88,7 +83,7 @@ pub async fn generate_multi_agent_output(
             supports_suggest_prompt: true,
             supports_read_image_files: FeatureFlag::ReadImageFiles.is_enabled(),
             supports_reasoning_message: true,
-            api_keys,
+            api_keys: None,
             autonomy_level: params.autonomy_level.into(),
             isolation_level: params.isolation_level.into(),
             web_search_enabled: params.web_search_enabled,
@@ -102,7 +97,7 @@ pub async fn generate_multi_agent_output(
             supports_bundled_skills: FeatureFlag::BundledSkills.is_enabled(),
             supports_research_agent: params.research_agent_enabled,
             supports_orchestration_v2: supports_orchestration_v2(params.orchestration_enabled),
-            custom_model_providers: params.custom_model_providers,
+            custom_model_providers: None,
             custom_model_routers: params.custom_model_routers,
             // Background computer use is not supported by the local client yet.
             supports_background_computer_use: false,
@@ -163,23 +158,6 @@ const NO_MODEL_CONNECTED: &str =
 fn no_model_connected_stream() -> ResponseStream {
     let error = Arc::new(AIApiError::Other(anyhow::anyhow!(NO_MODEL_CONNECTED)));
     Box::pin(futures::stream::iter([Err(error)]))
-}
-
-fn api_keys_with_warp_credit_fallback_setting(
-    api_keys: Option<api::request::settings::ApiKeys>,
-    allow_use_of_warp_credits: bool,
-) -> Option<api::request::settings::ApiKeys> {
-    match api_keys {
-        Some(mut api_keys) => {
-            api_keys.allow_use_of_warp_credits = allow_use_of_warp_credits;
-            Some(api_keys)
-        }
-        None if allow_use_of_warp_credits => Some(api::request::settings::ApiKeys {
-            allow_use_of_warp_credits: true,
-            ..Default::default()
-        }),
-        None => None,
-    }
 }
 
 fn supports_orchestration_v2(orchestration_enabled: bool) -> bool {

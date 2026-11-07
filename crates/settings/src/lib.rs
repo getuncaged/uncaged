@@ -181,9 +181,6 @@ impl SupportedPlatforms {
 /// An enum representing the reason for a change event.
 #[derive(Debug, Clone, Copy)]
 pub enum ChangeEventReason {
-    /// The change was initiated from a cloud sync
-    CloudSync,
-
     /// The change was initiated from a local setting change
     LocalChange,
 
@@ -264,12 +261,6 @@ pub trait Setting {
     /// user-editable file.
     fn is_private() -> bool;
 
-    /// Returns whether the current value of this setting should be synced.
-    /// Specific settings can implement this to filter which values should be synced.
-    fn current_value_is_syncable(&self) -> bool {
-        true
-    }
-
     /// Returns the current value of the setting.  This may be different from
     /// the value persisted in storage.
     fn value(&self) -> &Self::Value;
@@ -297,14 +288,6 @@ pub trait Setting {
         new_value: Self::Value,
         explicitly_set: bool,
         ctx: &mut ModelContext<Self::Group>,
-    ) -> anyhow::Result<()>;
-
-    /// Sets the value of the setting persisting it to storage. The change event indicates
-    /// that the update was initiated from a cloud sync.
-    fn set_value_from_cloud_sync(
-        &mut self,
-        new_value: Self::Value,
-        ctx: &mut warpui_core::ModelContext<Self::Group>,
     ) -> anyhow::Result<()>;
 
     /// Sets the value of the setting persisting it to storage.

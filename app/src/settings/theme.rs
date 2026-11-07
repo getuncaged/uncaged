@@ -43,20 +43,6 @@ define_settings_group!(ThemeSettings, settings: [
     },
 ]);
 
-impl Theme {
-    fn current_value_is_syncable(&self) -> bool {
-        self.value().is_custom_theme_reference_syncable()
-    }
-}
-
-impl SystemThemes {
-    fn current_value_is_syncable(&self) -> bool {
-        let selected = self.value();
-        selected.light.is_custom_theme_reference_syncable()
-            && selected.dark.is_custom_theme_reference_syncable()
-    }
-}
-
 /// Returns a derived value for whether to respect the system theme based on
 /// the current theme settings.
 pub fn respect_system_theme(theme_settings: &ThemeSettings) -> RespectSystemTheme {
@@ -83,7 +69,3 @@ pub fn derived_theme_kind(theme_settings: &ThemeSettings, system_theme: SystemTh
 pub fn active_theme_kind(theme_settings: &ThemeSettings, app: &AppContext) -> ThemeKind {
     derived_theme_kind(theme_settings, app.system_theme())
 }
-
-#[cfg(test)]
-#[path = "theme_tests.rs"]
-mod tests;
