@@ -778,7 +778,6 @@ impl UserWorkspaces {
         // PrivacySettings can't observe UserWorkspaces for updates, as it's initialized too early in
         // the app initialization flow. So, we update it manually whenever teams data changes.
         PrivacySettings::handle(ctx).update(ctx, |settings, ctx| {
-            settings.set_is_telemetry_force_enabled(self.is_telemetry_force_enabled());
             settings.set_enterprise_secret_redaction_settings(
                 self.is_enterprise_secret_redaction_enabled(),
                 self.get_enterprise_secret_redaction_regex_list(),
@@ -1395,12 +1394,6 @@ impl UserWorkspaces {
         self.current_workspace()
             .map(|workspace| workspace.settings.usage_based_pricing_settings.clone())
             .unwrap_or_default()
-    }
-
-    pub fn is_telemetry_force_enabled(&self) -> bool {
-        self.current_team()
-            .map(|team| team.organization_settings.telemetry_settings.force_enabled)
-            .unwrap_or(false)
     }
 
     pub fn is_enterprise_secret_redaction_enabled(&self) -> bool {

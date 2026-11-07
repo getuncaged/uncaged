@@ -70,7 +70,6 @@ impl ServerExperiment {
                 // EnvVars is now always enabled; no-op.
             }
             Self::AgentModeAnalyticsExperiment => {
-                FeatureFlag::AgentModeAnalytics.set_enabled(true);
                 FeatureFlag::AIRules.set_enabled(true);
                 FeatureFlag::SuggestedRules.set_enabled(true);
             }

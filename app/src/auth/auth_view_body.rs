@@ -7,8 +7,8 @@ use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
 use warpui::clipboard::ClipboardContent;
 use warpui::color::ColorU;
 use warpui::elements::{
-    Align, Border, Container, CornerRadius, CrossAxisAlignment, Dismiss, Fill, Flex,
-    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, Radius, Stack,
+    Border, Container, CornerRadius, CrossAxisAlignment, Dismiss, Fill, Flex, MainAxisAlignment,
+    MainAxisSize, MouseStateHandle, ParentElement, Radius, Stack,
 };
 use warpui::fonts::Weight;
 use warpui::keymap::FixedBinding;
@@ -131,7 +131,6 @@ pub enum AuthViewBodyAction {
     SignupAnonymousUser,
     ShowOverlay(AuthViewOverlay),
     HideOverlay,
-    ToggleTelemetry,
     ToggleCloudConversationStorage,
     Close,
 }
@@ -241,7 +240,6 @@ impl AuthViewBody {
 
     fn privacy_settings_actions(&self) -> PrivacySettingsActions<AuthViewBodyAction> {
         PrivacySettingsActions {
-            toggle_telemetry: AuthViewBodyAction::ToggleTelemetry,
             toggle_cloud_conversation_storage: AuthViewBodyAction::ToggleCloudConversationStorage,
             hide_overlay: AuthViewBodyAction::HideOverlay,
         }
@@ -349,68 +347,45 @@ impl AuthViewBody {
         .with_margin_bottom(8.)
         .finish();
 
-        let disclaimer_line_2 = if FeatureFlag::GlobalAIAnalyticsBanner.is_enabled() {
-            Align::new(
+        let disclaimer_line_2 = Flex::column()
+            .with_child(
                 ui_builder
-                    .link(
-                        "Privacy Settings".into(),
-                        None,
-                        Some(Box::new(|ctx| {
-                            ctx.dispatch_typed_action(AuthViewBodyAction::ShowOverlay(
-                                AuthViewOverlay::PrivacySettings,
-                            ));
-                        })),
-                        self.mouse_state_handles
-                            .privacy_settings_mouse_state_handle
-                            .clone(),
-                    )
-                    .soft_wrap(false)
+                    .paragraph("If you'd like to opt out of analytics and AI features,")
+                    .with_style(disclaimer_styles)
                     .build()
                     .finish(),
             )
-            .left()
-            .finish()
-        } else {
-            Flex::column()
-                .with_child(
-                    ui_builder
-                        .paragraph("If you'd like to opt out of analytics and AI features,")
-                        .with_style(disclaimer_styles)
-                        .build()
-                        .finish(),
-                )
-                .with_child(
-                    Flex::row()
-                        .with_child(
-                            ui_builder
-                                .paragraph("you can adjust your ")
-                                .with_style(disclaimer_styles)
-                                .build()
-                                .finish(),
-                        )
-                        .with_child(
-                            ui_builder
-                                .link(
-                                    "Privacy Settings".into(),
-                                    None,
-                                    Some(Box::new(|ctx| {
-                                        ctx.dispatch_typed_action(AuthViewBodyAction::ShowOverlay(
-                                            AuthViewOverlay::PrivacySettings,
-                                        ));
-                                    })),
-                                    self.mouse_state_handles
-                                        .privacy_settings_mouse_state_handle
-                                        .clone(),
-                                )
-                                .soft_wrap(false)
-                                .with_style(link_styles)
-                                .build()
-                                .finish(),
-                        )
-                        .finish(),
-                )
-                .finish()
-        };
+            .with_child(
+                Flex::row()
+                    .with_child(
+                        ui_builder
+                            .paragraph("you can adjust your ")
+                            .with_style(disclaimer_styles)
+                            .build()
+                            .finish(),
+                    )
+                    .with_child(
+                        ui_builder
+                            .link(
+                                "Privacy Settings".into(),
+                                None,
+                                Some(Box::new(|ctx| {
+                                    ctx.dispatch_typed_action(AuthViewBodyAction::ShowOverlay(
+                                        AuthViewOverlay::PrivacySettings,
+                                    ));
+                                })),
+                                self.mouse_state_handles
+                                    .privacy_settings_mouse_state_handle
+                                    .clone(),
+                            )
+                            .soft_wrap(false)
+                            .with_style(link_styles)
+                            .build()
+                            .finish(),
+                    )
+                    .finish(),
+            )
+            .finish();
 
         vec![disclaimer_line_1, disclaimer_line_2]
     }
@@ -900,14 +875,6 @@ impl TypedActionView for AuthViewBody {
             }
             AuthViewBodyAction::HideOverlay => {
                 self.active_overlay = None;
-                ctx.notify();
-            }
-            AuthViewBodyAction::ToggleTelemetry => {
-                let privacy_settings_handle = PrivacySettings::handle(ctx);
-                ctx.update_model(&privacy_settings_handle, |privacy_settings, ctx| {
-                    privacy_settings
-                        .set_is_telemetry_enabled(!privacy_settings.is_telemetry_enabled, ctx);
-                });
                 ctx.notify();
             }
             AuthViewBodyAction::ToggleCloudConversationStorage => {

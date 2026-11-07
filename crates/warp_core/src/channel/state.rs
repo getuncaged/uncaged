@@ -44,9 +44,8 @@ impl ChannelState {
                 // Uncaged: fail closed. Every Warp endpoint points at an
                 // unroutable sentinel so nothing can reach app.warp.dev even via
                 // a code path we missed — defense-in-depth behind the per-site
-                // gates. telemetry/autoupdate are already None.
+                // gates. autoupdate is already None.
                 server_config: WarpServerConfig::uncaged_sentinel(),
-                telemetry_config: None,
                 autoupdate_config: None,
                 mcp_static_config: None,
             },
@@ -162,14 +161,6 @@ impl ChannelState {
 
     pub fn logfile_name() -> Cow<'static, str> {
         CHANNEL_STATE.lock().config.logfile_name.clone()
-    }
-
-    /// Returns whether this build has a telemetry config and can therefore ship
-    /// telemetry events. Builds like OpenWarp intentionally ship with
-    /// `telemetry_config: None`, in which case UI that controls telemetry
-    /// should be hidden since the toggle has no effect.
-    pub fn is_telemetry_available() -> bool {
-        CHANNEL_STATE.lock().config.telemetry_config.is_some()
     }
 
     pub fn releases_base_url() -> Cow<'static, str> {

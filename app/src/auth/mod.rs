@@ -40,7 +40,6 @@ use crate::server::sync_queue::SyncQueue;
 use crate::session_management::{RunningSessionSummary, SessionNavigationData};
 use crate::settings::{
     CloudPreferencesSettings, PrivacySettings, CRASH_REPORTING_ENABLED_DEFAULTS_KEY,
-    TELEMETRY_ENABLED_DEFAULTS_KEY,
 };
 use crate::terminal::general_settings::GeneralSettings;
 use crate::ui_sources::PaletteSource;
@@ -256,13 +255,6 @@ fn remove_cloud_persisted_settings(app: &mut AppContext) {
                 log::error!("Failed to remove cloud synced setting from user defaults: {e:?}");
             }
         });
-    }
-
-    if let Err(e) = app
-        .private_user_preferences()
-        .remove_value(TELEMETRY_ENABLED_DEFAULTS_KEY)
-    {
-        log::error!("Failed to remove Telemetry Enabled Defaults Key from user defaults: {e:?}");
     }
 
     if let Err(e) = app

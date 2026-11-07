@@ -14,12 +14,10 @@ use super::session_settings::SessionSettings;
 use super::settings::TerminalSettings;
 use super::view::{create_size_info_for_blocklist, WARP_PROMPT_HEIGHT_LINES};
 use super::{color, ShellLaunchState, SizeInfo, TerminalModel};
-use crate::ai::blocklist::telemetry_banner::should_collect_ai_ugc_telemetry;
 use crate::ai::blocklist::SerializedBlockListItem;
 use crate::appearance::Appearance;
 use crate::pane_group::pane::DetachType;
 use crate::settings::{BlockVisibilitySettings, DebugSettings, InputModeSettings};
-use crate::PrivacySettings;
 
 pub trait TerminalManager: Any {
     /// Returns the backing terminal model.
@@ -96,8 +94,6 @@ pub(super) fn create_terminal_model(
     let sizes = compute_block_size(initial_size, ctx);
 
     let obfuscate_secrets = get_secret_obfuscation_mode(ctx);
-    let is_ai_ugc_telemetry_enabled =
-        should_collect_ai_ugc_telemetry(ctx, PrivacySettings::as_ref(ctx).is_telemetry_enabled);
 
     TerminalModel::new(
         restored_blocks.map(|v| v.as_slice()),
@@ -111,7 +107,6 @@ pub(super) fn create_terminal_model(
         honor_ps1,
         is_inverted,
         obfuscate_secrets,
-        is_ai_ugc_telemetry_enabled,
         startup_directory,
         shell_state,
     )

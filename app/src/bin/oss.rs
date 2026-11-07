@@ -20,7 +20,6 @@ fn main() -> Result<()> {
             // drives Agent Mode from the local uncaged_engine and needs none of
             // these hosts. See WarpServerConfig::uncaged_sentinel.
             server_config: WarpServerConfig::uncaged_sentinel(),
-            telemetry_config: None,
             autoupdate_config: None,
             mcp_static_config: None,
         },

@@ -9,7 +9,6 @@ query GetUserSettings($requestContext: RequestContext!) {
         settings {
           isCloudConversationStorageEnabled
           isCrashReportingEnabled
-          isTelemetryEnabled
         }
       }
     }
@@ -53,5 +52,4 @@ crate::client::define_operation! {
 pub struct UserSettings {
     pub is_cloud_conversation_storage_enabled: bool,
     pub is_crash_reporting_enabled: bool,
-    pub is_telemetry_enabled: bool,
 }

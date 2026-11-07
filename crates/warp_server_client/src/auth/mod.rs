@@ -66,7 +66,6 @@ struct AgentIdentitiesResponse {
 pub struct SyncedUserSettings {
     pub is_cloud_conversation_storage_enabled: bool,
     pub is_crash_reporting_enabled: bool,
-    pub is_telemetry_enabled: bool,
 }
 
 /// Protocol-level results of fetching the current user.
@@ -127,8 +126,6 @@ pub trait AuthClient: Send + Sync {
     /// object exists but is missing required fields, or if the request itself fails,
     /// this returns an error.
     async fn get_user_settings(&self) -> Result<Option<SyncedUserSettings>>;
-
-    async fn set_is_telemetry_enabled(&self, value: bool) -> Result<()>;
 
     async fn set_is_crash_reporting_enabled(&self, value: bool) -> Result<()>;
 
@@ -336,24 +333,12 @@ impl AuthClient for AuthClientImpl {
                         is_cloud_conversation_storage_enabled: settings
                             .is_cloud_conversation_storage_enabled,
                         is_crash_reporting_enabled: settings.is_crash_reporting_enabled,
-                        is_telemetry_enabled: settings.is_telemetry_enabled,
                     }))
             }
             warp_graphql::queries::get_user_settings::UserResult::Unknown => {
                 Err(anyhow!("Unable to fetch user settings"))
             }
         }
-    }
-
-    async fn set_is_telemetry_enabled(&self, value: bool) -> Result<()> {
-        self.update_settings(
-            UpdateUserSettingsInput {
-                telemetry_enabled: Some(value),
-                ..Default::default()
-            },
-            "failed to set telemetry enabled",
-        )
-        .await
     }
 
     async fn set_is_crash_reporting_enabled(&self, value: bool) -> Result<()> {
