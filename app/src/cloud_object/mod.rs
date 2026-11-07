@@ -140,18 +140,6 @@ pub trait CloudObject: Debug {
         Space::from_owner(self.permissions().owner)
     }
 
-    /// Whether or not this object can be "left". For shared objects, this removes all ACLs for the
-    /// current user. Only top-level items in the shared space can be left.
-    fn can_leave(&self, app: &AppContext) -> bool {
-        if self.space() == Space::Shared {
-            self.metadata()
-                .folder_id
-                .is_none_or(|parent| CloudModel::as_ref(app).get_folder(&parent).is_none())
-        } else {
-            false
-        }
-    }
-
     /// Returns the name of the containing "object" for this object.
     /// This could be a folder, or in the case of top-level objects,
     /// the name of the space it belongs to.

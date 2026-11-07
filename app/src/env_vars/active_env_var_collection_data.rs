@@ -105,13 +105,9 @@ impl ActiveEnvVarCollectionData {
             ObjectOperation::Trash | ObjectOperation::Untrash => {
                 ctx.emit(ActiveEnvVarCollectionDataEvent::TrashStatusChanged);
             }
-            ObjectOperation::MoveToFolder
-            | ObjectOperation::MoveToDrive
-            | ObjectOperation::TakeEditAccess
+            ObjectOperation::TakeEditAccess
             | ObjectOperation::Delete { .. }
-            | ObjectOperation::EmptyTrash
-            | ObjectOperation::UpdatePermissions
-            | ObjectOperation::Leave => {}
+            | ObjectOperation::EmptyTrash => {}
         }
     }
 

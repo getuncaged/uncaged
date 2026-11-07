@@ -49,15 +49,11 @@ pub enum OperationSuccessType {
 pub enum ObjectOperation {
     Create { initiated_by: InitiatedBy },
     Update,
-    MoveToFolder,
-    MoveToDrive,
     Trash,
     TakeEditAccess,
     Untrash,
     Delete { initiated_by: InitiatedBy },
     EmptyTrash,
-    UpdatePermissions,
-    Leave,
 }
 
 #[derive(Clone, Debug)]

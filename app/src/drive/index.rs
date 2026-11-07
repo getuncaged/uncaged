@@ -3322,34 +3322,6 @@ impl DriveIndex {
                 }
             }
 
-            // TODO: move this out of the -else- branch. Right now, we don't support bulk actions.
-            match space {
-                Space::Personal => {
-                    if can_move_or_trash
-                        && (!FeatureFlag::SharedWithMe.is_enabled()
-                            || access_level.can_move_drive())
-                    {
-                        menu_items.extend(self.sections.iter().filter_map(|section| {
-                            let DriveIndexSection::Space(space) = section;
-                            match space {
-                                Space::Personal | Space::Shared => None,
-                                Space::Team { .. } => Some(
-                                    MenuItemFields::new(format!("Move to {}", space.name()))
-                                        .with_on_select_action(DriveIndexAction::MoveObject {
-                                            cloud_object_type_and_id: *cloud_object_type_and_id,
-                                            new_space: *space,
-                                        })
-                                        .with_icon(Icon::Move)
-                                        .into_item(),
-                                ),
-                            }
-                        }));
-                    }
-                }
-                Space::Shared => {} // TODO: Revisit these menu items with sharing in mind
-                Space::Team { .. } => {} // TODO: When we do team -> personal sharing
-            }
-
             if let Some(object) = object {
                 match object.object_type() {
                     ObjectType::Workflow

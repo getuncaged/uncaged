@@ -131,9 +131,6 @@ impl ActiveNotebookData {
             | (ObjectOperation::Untrash, OperationSuccessType::Success) => {
                 ctx.emit(ActiveNotebookDataEvent::TrashStatusChanged);
             }
-            (ObjectOperation::MoveToDrive, OperationSuccessType::Success) => {
-                ctx.emit(ActiveNotebookDataEvent::MovedToSpace);
-            }
             _ => {}
         }
     }
@@ -320,8 +317,6 @@ pub enum ActiveNotebookDataEvent {
     Created,
     /// This notebook was trashed or untrashed (used for refreshing pane overflow items)
     TrashStatusChanged,
-    // This notebook was moved to a shared space.
-    MovedToSpace,
 }
 
 /// Whether or not a notebook is trashed.
