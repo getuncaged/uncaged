@@ -183,9 +183,7 @@
                 install -Dm755 "$out/bin/warp-oss" "${installDir}/warp-oss"
                 rm -f "$out/bin/warp-oss"
 
-                patchShebangs \
-                  ./script/prepare_bundled_resources \
-                  ./script/copy_conditional_skills
+                patchShebangs ./script/prepare_bundled_resources
 
                 SKIP_SETTINGS_SCHEMA=1 ./script/prepare_bundled_resources \
                   "${resourcesDir}" \

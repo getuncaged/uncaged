@@ -5,8 +5,8 @@ This file provides guidance when working with code in this repository.
 ## Development Commands
 
 ### Build and Run
-- `cargo run` - Build and run Warp locally
-- `cargo bundle --bin warp` - Bundle the main app
+- `cargo run` - Build and run Uncaged locally (the `warp-oss` binary)
+- `./script/bundle app --channel oss --selfsign --debug --arch aarch64` - Bundle a local macOS debug app
 
 ### Running with local warp-server
 To connect Warp client to a local warp-server instance:

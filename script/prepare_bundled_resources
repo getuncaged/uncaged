@@ -13,7 +13,7 @@
 #                           Resources will be copied to subdirectories within
 #                           this path (e.g., $DEST_DIR/skills).
 #   channel:                (Optional) Release channel (local, dev, preview,
-#                           stable). Used to include channel-gated skills.
+#                           stable).
 #   cargo_profile:          (Optional) Cargo build profile to use when
 #                           generating the settings schema. Reusing the same
 #                           profile as the main build avoids recompiling deps.
@@ -69,18 +69,6 @@ if [ -n "$GIT_RELEASE_TAG" ]; then
   echo "Writing bundled Warp version metadata to $VERSION_METADATA_PATH"
   mkdir -p "$VERSION_METADATA_DIR"
   printf '{\n  "warp_version": "%s"\n}\n' "$GIT_RELEASE_TAG" > "$VERSION_METADATA_PATH"
-fi
-
-# Copy channel-gated skills matching the current release channel.
-GATED_SRC="$REPO_ROOT/resources/channel-gated-skills"
-DEST_SKILLS="$DEST_DIR/bundled/skills"
-
-if [ -n "$CHANNEL" ] && [ -d "$GATED_SRC" ]; then
-  echo "Copying channel-gated skills for channel '$CHANNEL'..."
-  "$SCRIPT_DIR/copy_conditional_skills" \
-    "$CHANNEL" \
-    "$GATED_SRC" \
-    "$DEST_SKILLS"
 fi
 
 # Generate third-party license attribution.
