@@ -152,12 +152,9 @@ const MAX_IMAGE_BYTES: u64 = 16 * 1024 * 1024;
 
 /// The client used for every gallery request.
 ///
-/// Deliberately a plain `reqwest::Client` rather than `http_client::Client`. That wrapper sets
-/// `include_warp_http_headers` unconditionally on native, attaching `X-Warp-Client-Id`,
-/// `X-Warp-Client-Version` and OS details to every request — fine for our own services, but this
-/// talks to GitHub, and an account-free terminal has no business handing a third party a stable
-/// client identifier just to download a colour scheme. It also sets no user agent, which GitHub's
-/// API rejects.
+/// A plain `reqwest::Client` rather than `http_client::Client`, so gallery requests carry their
+/// own timeout. It sets the generic product user agent, which GitHub's API requires, and nothing
+/// that identifies the install.
 fn client() -> Result<reqwest::Client> {
     reqwest::Client::builder()
         .timeout(REQUEST_TIMEOUT)

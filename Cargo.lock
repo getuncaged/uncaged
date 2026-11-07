@@ -5064,7 +5064,6 @@ dependencies = [
  "bytes",
  "cfg-if",
  "futures",
- "gloo",
  "http",
  "log",
  "oauth2",

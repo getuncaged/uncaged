@@ -72,9 +72,8 @@ struct GhAsset {
     state: String,
 }
 
-/// A plain `reqwest::Client`, deliberately not `http_client::Client` — that
-/// wrapper attaches Warp client headers (including an install identifier),
-/// which must never be sent anywhere from this build.
+/// A plain `reqwest::Client` rather than `http_client::Client`, so this
+/// client can carry its own timeout and redirect policy.
 ///
 /// The redirect policy is part of the security boundary: a release response
 /// names its own download URL, and `browser_download_url` redirects to an
