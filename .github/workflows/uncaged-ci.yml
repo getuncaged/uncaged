@@ -76,8 +76,8 @@ jobs:
         run: cargo build --bin warp-oss
 
       # The tree is clippy-clean, so lints gate the job. Two runs, because each
-      # feature set compiles code the other doesn't (local_tty without
-      # remote_tty, cloud_environments tests, release_bundle). dead_code is
+      # feature set compiles code the other doesn't (cloud_environments
+      # tests, release_bundle). dead_code is
       # allowed: features removed in the account-free fork leave plenty behind.
       - name: cargo clippy (default features)
         timeout-minutes: 40

@@ -215,7 +215,6 @@ warpui_extras = { workspace = true, features = ["default", "user_preferences-tom
 syntax_tree.workspace = true
 languages.workspace = true
 warp_terminal.workspace = true
-websocket.workspace = true
 wgpu = { workspace = true, optional = true }
 natural_language_detection.workspace = true
 onboarding.workspace = true
@@ -703,8 +702,6 @@ mcp_debugging_ids = []
 notebook_parameter = []
 oz_changelog_updates = []
 personal_cloud_objects = []
-# Remote-backed tty that connects to a PTY-like interface via a server.
-remote_tty = []
 # Fix for cursor reflow bug during window resize, from Alacritty resizing logic.
 resize_fix = []
 pluggable_notifications = []

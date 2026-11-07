@@ -31,7 +31,6 @@ use shell::ShellStarter;
 pub use self::terminal_manager::{get_shell_starter, TerminalManager};
 #[cfg(windows)]
 pub use self::terminal_view_adaptor::shutdown_all_pty_event_loops;
-#[cfg(not(feature = "remote_tty"))]
 pub(crate) use self::terminal_view_adaptor::{
     create_terminal_view_surface, terminal_view_restored_blocks, TerminalViewSurfaceConfig,
 };
