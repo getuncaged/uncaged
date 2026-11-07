@@ -1,6 +1,8 @@
 use chrono::NaiveDate;
+use warp_multi_agent_api::response_event::stream_finished;
 
 use super::*;
+use crate::persistence::model::ModelTokenUsage;
 
 fn data_with_parent(parent: Option<&str>) -> String {
     match parent {
@@ -174,4 +176,98 @@ fn eviction_is_deterministic() {
     let e2 = select_conversations_to_evict(&rows, 2);
     assert_eq!(e1, e2);
     assert_eq!(e1, vec!["c".to_string(), "d".to_string()]);
+}
+
+/// An encoded `Task` written by the build before the agent protocol was
+/// vendored (git `warp_multi_agent_api` at ac1af73). It sets every field of
+/// every message type reachable from `Task` (to a bounded depth), with one
+/// `Message` per (oneof variant, seed) pair so every variant of every nested
+/// oneof appears at least once.
+const PRE_VENDOR_TASK: &[u8] = include_bytes!("testdata/agent_task.pb");
+
+/// FNV-1a hash of `format!("{task:#?}")` for [`PRE_VENDOR_TASK`] as decoded by
+/// the pre-vendoring build (the text itself is about 3 MB).
+const PRE_VENDOR_TASK_DEBUG_FNV1A: u64 = 0xa84be34e4dea9baf;
+
+/// `conversation_data` JSON written by the pre-vendoring build, with every
+/// field of `AgentConversationData` set.
+const PRE_VENDOR_CONVERSATION_DATA: &str = include_str!("testdata/conversation_data.json");
+
+/// The `stream_finished::ConversationUsageMetadata` the pre-vendoring build
+/// derived from [`PRE_VENDOR_CONVERSATION_DATA`] (see [`usage_proto`]).
+const PRE_VENDOR_CONVERSATION_USAGE: &[u8] = include_bytes!("testdata/conversation_usage.pb");
+
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf29ce484222325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+    })
+}
+
+/// Converts the persisted usage back to the proto the way the pre-vendoring
+/// fixture generator did.
+#[allow(deprecated)]
+fn usage_proto(data: &AgentConversationData) -> stream_finished::ConversationUsageMetadata {
+    let usage = data.conversation_usage_metadata.as_ref().unwrap();
+    stream_finished::ConversationUsageMetadata {
+        context_window_usage: usage.context_window_usage,
+        summarized: usage.was_summarized,
+        credits_spent: usage.credits_spent,
+        platform_credits_spent: usage.platform_credits_spent,
+        token_usage: usage
+            .token_usage
+            .iter()
+            .map(ModelTokenUsage::to_proto_combined)
+            .collect(),
+        tool_usage_metadata: Some((&usage.tool_usage_metadata).into()),
+        warp_token_usage: usage
+            .token_usage
+            .iter()
+            .filter_map(ModelTokenUsage::to_proto_warp_usage)
+            .collect(),
+        byok_token_usage: usage
+            .token_usage
+            .iter()
+            .filter_map(ModelTokenUsage::to_proto_byok_usage)
+            .collect(),
+        custom_endpoint_token_usage: usage
+            .token_usage
+            .iter()
+            .filter_map(ModelTokenUsage::to_proto_custom_endpoint_usage)
+            .collect(),
+        context_window_segments: usage
+            .context_window_segments
+            .iter()
+            .map(Into::into)
+            .collect(),
+        ..Default::default()
+    }
+}
+
+/// Tasks persisted before the agent protocol was vendored decode to the same
+/// value and re-encode to the same bytes.
+#[test]
+fn pre_vendor_task_blob_decodes_identically() {
+    let task = api::Task::decode(PRE_VENDOR_TASK).expect("pre-vendor task decodes");
+    assert_eq!(task.messages.len(), 21 * 36);
+    assert_eq!(task.encode_to_vec(), PRE_VENDOR_TASK);
+    assert_eq!(
+        fnv1a(format!("{task:#?}").as_bytes()),
+        PRE_VENDOR_TASK_DEBUG_FNV1A
+    );
+}
+
+/// `conversation_data` written before the agent protocol was vendored decodes
+/// to the same value, and its usage converts to the same proto.
+#[test]
+fn pre_vendor_conversation_data_decodes_identically() {
+    let data: AgentConversationData = serde_json::from_str(PRE_VENDOR_CONVERSATION_DATA)
+        .expect("pre-vendor conversation_data decodes");
+    assert_eq!(
+        serde_json::to_value(&data).unwrap(),
+        serde_json::from_str::<serde_json::Value>(PRE_VENDOR_CONVERSATION_DATA).unwrap()
+    );
+    let expected =
+        stream_finished::ConversationUsageMetadata::decode(PRE_VENDOR_CONVERSATION_USAGE)
+            .expect("pre-vendor usage decodes");
+    assert_eq!(usage_proto(&data), expected);
 }

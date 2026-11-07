@@ -180,12 +180,12 @@ the Warp-only pieces stripped for the `oss` channel:
   `app/channels/oss/dev.uncaged.WarpOss.desktop`.
 
 Runner tooling installed by the workflow: `dpkg-dev`+`fakeroot` (deb), `rpm`
-(rpm), `libfuse2`+`linuxdeploy` (AppImage), `protoc`, and the graphics/X11 dev
+(rpm), `libfuse2`+`linuxdeploy` (AppImage), and the graphics/X11 dev
 libs. **Arch `.pkg.tar.zst`** needs `makepkg`, which is not present on
 `ubuntu-latest`; the workflow builds it only when `makepkg` is available and
 otherwise logs a skip. **aarch64** builds natively on GitHub's `ubuntu-24.04-arm`
 runner (free for public repos), mirroring the x86_64 job — same deps, the same
-`arduino/setup-protoc`, the same bundle driver. Kept best-effort so a slow or
+bundle driver. Kept best-effort so a slow or
 flaky arm64 build never blocks a release. (It previously ran under QEMU
 emulation, which silently used the host x86_64 toolchain and never truly
 targeted arm64.)

@@ -100,10 +100,9 @@ jobs:
         with:
           key: macos-release-${{ matrix.arch }}
 
-      # create-dmg builds the DMG; protobuf (protoc) is needed by the cargo build
-      # (warp-proto-apis build script).
-      - name: Install create-dmg + protobuf
-        run: brew install create-dmg protobuf
+      # create-dmg builds the DMG.
+      - name: Install create-dmg
+        run: brew install create-dmg
 
       # script/macos/bundle runs `cargo bundle` (the .app) and, via
       # script/prepare_bundled_resources, `cargo about` (third-party license
@@ -176,12 +175,6 @@ jobs:
             libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
             libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev \
             dpkg-dev fakeroot rpm libfuse2 wget zstd libarchive-tools
-
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "25.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install linuxdeploy (for AppImage)
         run: |
@@ -273,11 +266,11 @@ jobs:
   # --- Linux aarch64: native arm64 runner ----------------------------------
   # Built on GitHub's native arm64 Linux runner (ubuntu-24.04-arm, free for
   # public repos), mirroring the x86_64 job exactly — same apt deps, the same
-  # arduino/setup-protoc, the same bundle driver. This replaced an earlier
+  # bundle driver. This replaced an earlier
   # QEMU-emulated docker approach that silently ran the HOST x86_64 rustup
   # toolchain (uname -m reports x86_64 under binfmt and $HOME leaked to
-  # /home/runner), so the build never actually targeted arm64 and could not
-  # see the container's protoc. Still best-effort: it never blocks a release.
+  # /home/runner), so the build never actually targeted arm64. Still
+  # best-effort: it never blocks a release.
   linux-aarch64:
     name: Build Linux packages (aarch64, best-effort)
     runs-on: ubuntu-24.04-arm
@@ -301,12 +294,6 @@ jobs:
             libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev \
             dpkg-dev fakeroot rpm libfuse2 wget zstd libarchive-tools
 
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "25.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install linuxdeploy (for AppImage)
         run: |
           set -euo pipefail
@@ -328,8 +315,8 @@ jobs:
         run: cargo install --locked cargo-about@0.8.4
 
       # Native arm64 build (no cross sysroot, no QEMU): the runner IS aarch64, so
-      # the pinned rustup toolchain, protoc (from setup-protoc), and the bundle
-      # driver all behave exactly like the x86_64 job. makepkg isn't present, so
+      # the pinned rustup toolchain and the bundle driver behave exactly like
+      # the x86_64 job. makepkg isn't present, so
       # the Arch package is skipped gracefully.
       - name: Build Linux packages (deb, rpm, AppImage) — aarch64
         run: |
@@ -394,12 +381,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           lfs: true
-
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "25.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
@@ -477,12 +458,6 @@ jobs:
         uses: actions/checkout@v7
         with:
           lfs: true
-
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "25.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y

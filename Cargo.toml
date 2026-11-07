@@ -28,6 +28,8 @@ publish = false
 # Local workspace crates. This lets us reference them in other crates without specifying a path.
 ai = { path = "crates/ai" }
 uncaged_engine = { path = "crates/uncaged_engine" }
+# The library is named `warp_multi_agent_api` (the path callers import).
+warp_multi_agent_api = { path = "crates/uncaged_agent_api", package = "uncaged_agent_api" }
 asset_cache = { path = "crates/asset_cache" }
 asset_macro = { path = "crates/asset_macro" }
 channel_versions = { path = "crates/channel_versions", default-features = false }
@@ -204,7 +206,6 @@ pathfinder_geometry = "0.5.1"
 pin-project = "1.0.10"
 pprof = "0.15.0"
 prost = "0.14.3"
-prost-build = "0.14.3"
 prost-reflect = "0.16.3"
 prost-types = "0.14.3"
 qrcode = { version = "0.14.1", default-features = false }
@@ -293,7 +294,6 @@ version-compare = "0.1"
 vte = { git = "https://github.com/warpdotdev/vte.git", rev = "4b399c87b63ba88f45709edaa6383fc519f6c900", default-features = false }
 walkdir = "2"
 warp-workflows = { git = "https://github.com/warpdotdev/workflows", rev = "793a98ddda6ef19682aed66364faebd2829f0e01" }
-warp_multi_agent_api = { git = "https://github.com/warpdotdev/warp-proto-apis.git", rev = "ac1af7303d2931b0fb485be650a1fbc8b80d5667" }
 wasm-bindgen = "0.2.89"
 wasm-bindgen-futures = "0.4.42"
 web-sys = { version = "0.3.69", features = [
@@ -493,10 +493,6 @@ tink-hybrid = { git = "https://github.com/warpdotdev/tink-rust", rev = "54b9ac9a
 
 tikv-jemallocator = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
 tikv-jemalloc-sys = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
-
-[patch."https://github.com/warpdotdev/warp-proto-apis.git"]
-# Uncomment for local development of warp-proto-apis
-# warp_multi_agent_api = { path = "../warp-proto-apis/apis/multi_agent/v1/gen/rust" }
 
 [patch."https://github.com/warpdotdev/session-sharing-protocol.git"]
 # Uncomment for local development of session-sharing-protocol

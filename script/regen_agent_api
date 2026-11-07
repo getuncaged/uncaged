@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# Regenerates the checked-in Rust bindings of the agent protocol
+# (`crates/uncaged_agent_api/src/generated/`) from the `.proto` sources in
+# `crates/uncaged_agent_api/proto/`.
+#
+# Dev-only: this needs `protoc` (>= 3.15) on PATH. The `uncaged_agent_api` crate
+# itself builds from the checked-in output and needs neither protoc nor a build
+# script. Run this after editing a `.proto` file and commit the result.
+#
+# The generator is the same prost-build configuration the upstream
+# `warp_multi_agent_api` crate ran from its build.rs, pinned to the versions in
+# our Cargo.lock so the output stays identical.
+
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+CRATE_DIR="$PWD/crates/uncaged_agent_api"
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "$WORK_DIR"' EXIT
+
+if ! command -v protoc >/dev/null 2>&1; then
+  echo "protoc not found on PATH (install it, e.g. 'brew install protobuf')." >&2
+  exit 1
+fi
+
+mkdir -p "$WORK_DIR/src"
+
+cat > "$WORK_DIR/Cargo.toml" <<'EOF'
+[package]
+name = "regen_agent_api"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+prost-build = "=0.14.3"
+prost-reflect-build = "=0.16.0"
+regex = "1.11.1"
+EOF
+
+cat > "$WORK_DIR/src/main.rs" <<'EOF'
+use std::env;
+use std::fs;
+use std::path::PathBuf;
+
+use regex::Regex;
+
+fn main() -> std::io::Result<()> {
+    let mut args = env::args_os().skip(1);
+    let proto_dir = PathBuf::from(args.next().expect("proto dir"));
+    let out_dir = PathBuf::from(args.next().expect("output dir"));
+    let staging_dir = PathBuf::from(args.next().expect("staging dir"));
+    fs::create_dir_all(&staging_dir)?;
+
+    // protoc (and prost) do not speak protobuf editions here; rewrite the
+    // sources to the equivalent proto3 the way the upstream build.rs did.
+    let re_features = Regex::new(r"option features.*").unwrap();
+    let re_reserved = Regex::new(r"reserved\s+([a-zA-Z_][a-zA-Z0-9_]*);").unwrap();
+
+    let mut entries = proto_dir
+        .read_dir()?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.sort();
+
+    let mut proto_files = Vec::new();
+    for proto in entries {
+        if proto.extension().is_none_or(|ext| ext != "proto") {
+            continue;
+        }
+        let content = fs::read_to_string(&proto)?;
+        let content = re_features
+            .replace_all(&content, "")
+            .replace(r#"edition = "2023";"#, r#"syntax = "proto3";"#)
+            .replace(r#"import "google/protobuf/go_features.proto";"#, "");
+        // Quote reserved identifiers.
+        let content = re_reserved.replace_all(&content, "reserved \"$1\";");
+
+        let staged = staging_dir.join(proto.file_name().unwrap());
+        fs::write(&staged, content.as_bytes())?;
+        proto_files.push(staged);
+    }
+
+    let mut config = prost_build::Config::new();
+    config.out_dir(&out_dir);
+    prost_reflect_build::Builder::new()
+        .file_descriptor_set_path(out_dir.join("file_descriptor_set.bin"))
+        .descriptor_pool("crate::DESCRIPTOR_POOL")
+        .compile_protos_with_config(config, &proto_files, &[staging_dir])
+}
+EOF
+
+CARGO_TARGET_DIR="$WORK_DIR/target" cargo run --quiet --manifest-path "$WORK_DIR/Cargo.toml" -- \
+  "$CRATE_DIR/proto" "$CRATE_DIR/src/generated" "$WORK_DIR/proto"
+
+echo "Regenerated $CRATE_DIR/src/generated"

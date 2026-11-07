@@ -45,10 +45,10 @@ jobs:
           # Git LFS — fetch them so the build has its resources.
           lfs: true
 
-      # `warp_multi_agent_api`'s build script needs protoc (proto3), and the
-      # macOS runner doesn't ship it — the Linux/Windows jobs install it too.
-      # (This was latent: the fmt check below used to fail first, so the build
-      # step never ran to hit the missing compiler.)
+      # The all-features clippy run below enables the `nld_classifier_*`
+      # features, whose `candle-onnx` build script runs prost-build and so
+      # needs protoc; the macOS runner doesn't ship it. Default-feature and
+      # release builds (Linux/Windows jobs, bundles) don't need it.
       - name: Install protoc
         uses: arduino/setup-protoc@v3
         with:
@@ -132,14 +132,6 @@ jobs:
             libx11-dev libxcb1-dev libxi-dev libxcursor-dev \
             libxkbcommon-x11-dev libwayland-dev libegl1-mesa-dev
 
-      # protoc >= 3.15 is required (proto3 optional fields); Ubuntu's apt
-      # package is too old, so install a modern release from protobuf.
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "25.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install pinned Rust toolchain
         run: |
           rustup show active-toolchain || rustup toolchain install
@@ -170,14 +162,8 @@ jobs:
         with:
           lfs: true
 
-      # Windows needs protoc on PATH; extra native deps (e.g. LLVM/clang for
-      # bindgen) may be required and are left as a follow-up.
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "25.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-
+      # Extra native deps (e.g. LLVM/clang for bindgen) may be required and
+      # are left as a follow-up.
       - name: Install pinned Rust toolchain
         run: |
           rustup show active-toolchain || rustup toolchain install
