@@ -5,9 +5,6 @@ use std::sync::mpsc::SyncSender;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
-#[cfg(not(target_family = "wasm"))]
-use session_sharing_protocol::sharer::SessionSourceType;
-use url::Url;
 use warp_cli::agent::Harness;
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
@@ -40,6 +37,13 @@ use crate::code::buffer_location::LocalOrRemotePath;
 use crate::pane_group::child_agent::{
     create_error_child_agent_conversation, ErrorChildAgentConversationRequest,
 };
+// Imports below are only consumed by the non-wasm `launch_local_*_child`
+// dispatch helpers; gating them keeps the wasm build warning-clean.
+#[cfg(not(target_family = "wasm"))]
+use crate::pane_group::child_agent::{
+    create_hidden_child_agent_conversation, HiddenChildAgentConversation,
+    HiddenChildAgentConversationRequest, HiddenChildAgentTaskContext,
+};
 #[cfg(feature = "local_fs")]
 use crate::pane_group::CodeSource;
 use crate::pane_group::Event::OpenConversationHistory;
@@ -51,11 +55,6 @@ use crate::server::server_api::ServerApiProvider;
 use crate::session_management::SessionNavigationData;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::general_settings::GeneralSettings;
-use crate::terminal::shared_session::manager::{Manager, ManagerEvent};
-use crate::terminal::shared_session::role_change_modal::RoleChangeOpenSource;
-#[cfg(not(target_family = "wasm"))]
-use crate::terminal::shared_session::SharedSessionSource;
-use crate::terminal::shared_session::{join_link, SharedSessionStatus};
 use crate::terminal::view::ambient_agent::should_disable_snapshot;
 use crate::terminal::view::Event;
 use crate::terminal::{TerminalManager, TerminalView};
@@ -63,16 +62,6 @@ use crate::view_components::ToastFlavor;
 use crate::workspace::sync_inputs::SyncedInputState;
 use crate::workspace::{PaneViewLocator, WorkspaceRegistry};
 use crate::AIExecutionProfilesModel;
-// Imports below are only consumed by the non-wasm `launch_local_*_child`
-// dispatch helpers; gating them keeps the wasm build warning-clean.
-#[cfg(not(target_family = "wasm"))]
-use crate::{
-    pane_group::child_agent::{
-        create_hidden_child_agent_conversation, HiddenChildAgentConversation,
-        HiddenChildAgentConversationRequest, HiddenChildAgentTaskContext,
-    },
-    terminal::shared_session::IsSharedSessionCreator,
-};
 
 pub type TerminalPaneView = PaneView<TerminalView>;
 
@@ -137,50 +126,6 @@ fn apply_child_model_id_override(
     LLMPreferences::handle(ctx).update(ctx, |llm_prefs, ctx| {
         llm_prefs.update_preferred_agent_mode_llm(&llm_id, child_terminal_view_id, ctx);
     });
-}
-
-/// Returns the host terminal's `SharedSessionSource`, or `None` if it is
-/// not currently a shared-session creator. Reads the underlying
-/// `TerminalModel` directly via the host's `TerminalView`.
-#[cfg(not(target_family = "wasm"))]
-pub(in crate::pane_group) fn host_terminal_shared_session_source_type(
-    parent_terminal_view: &ViewHandle<TerminalView>,
-    ctx: &AppContext,
-) -> Option<SharedSessionSource> {
-    let model = parent_terminal_view.as_ref(ctx).model.lock();
-    if let Some(source) = model.shared_session_source() {
-        return Some(source.clone());
-    }
-    if let SharedSessionStatus::SharePendingPreBootstrap { source } = model.shared_session_status()
-    {
-        return Some(source.clone());
-    }
-    None
-}
-
-/// Builds the `IsSharedSessionCreator` for a child pane spawned by
-/// `run_agents(local)`. Returns `Yes` (stamped with the child's `task_id`)
-/// when the host carries an orchestrator `task_id`. The host's variant kind
-/// is preserved so cloud-only UI stays gated on `AmbientAgent`.
-#[cfg(not(target_family = "wasm"))]
-pub(in crate::pane_group) fn inherit_share_for_local_child(
-    host_source: Option<&SharedSessionSource>,
-    child_task_id: AmbientAgentTaskId,
-) -> IsSharedSessionCreator {
-    let Some(host_source) = host_source else {
-        return IsSharedSessionCreator::No;
-    };
-    if host_source.orchestrator_task_id().is_none() {
-        return IsSharedSessionCreator::No;
-    }
-    let child_task_id_str = child_task_id.to_string();
-    let source = match &host_source.source_type {
-        SessionSourceType::User => SharedSessionSource::user(Some(child_task_id_str)),
-        SessionSourceType::AmbientAgent { .. } => {
-            SharedSessionSource::ambient_agent(Some(child_task_id_str))
-        }
-    };
-    IsSharedSessionCreator::Yes { source }
 }
 
 impl TerminalPane {
@@ -289,7 +234,6 @@ impl TerminalPane {
             view.last_focus_ts(),
             view.is_read_only(),
             window_id,
-            view.model.lock().shared_session_status().clone(),
         )
     }
 
@@ -343,21 +287,6 @@ impl PaneContent for TerminalPane {
         }
 
         let terminal_view_id = self.terminal_view(ctx).id();
-        let manager_model = Manager::handle(ctx);
-        ctx.subscribe_to_model(&manager_model, move |group, model_handle, event, ctx| {
-            if let ManagerEvent::JoinedSession {
-                session_id: _,
-                view_id,
-            } = event
-            {
-                // only take action if the view id is ours
-                if *view_id == terminal_view_id {
-                    let url = retrieve_shared_session_link(model_handle.as_ref(ctx), view_id);
-                    group.handle_pane_link_updated(terminal_pane_id.into(), url, ctx);
-                }
-            }
-        });
-
         #[cfg(feature = "local_fs")]
         {
             ctx.subscribe_to_model(
@@ -366,16 +295,6 @@ impl PaneContent for TerminalPane {
                     let Some(model_event_sender) = group.model_event_sender.clone() else {
                         return;
                     };
-
-                    let is_shared_ambient_agent_session = group
-                        .terminal_view_from_pane_id(terminal_pane_id, ctx)
-                        .map(|view| {
-                            view.as_ref(ctx)
-                                .model
-                                .lock()
-                                .is_shared_ambient_agent_session()
-                        })
-                        .unwrap_or(false);
 
                     let pane_uuid = group
                         .terminal_session_by_id(terminal_pane_id)
@@ -386,7 +305,6 @@ impl PaneContent for TerminalPane {
                         terminal_pane_id,
                         pane_uuid,
                         model_event_sender,
-                        is_shared_ambient_agent_session,
                         ctx,
                     );
                 },
@@ -462,9 +380,7 @@ impl PaneContent for TerminalPane {
             .map(|(_, view)| view.id())
             .collect::<Vec<_>>();
         for (manager, view) in contents {
-            // Notify the view that it's being detached so it can react appropriately
-            // (e.g. the shared-session viewer tears down its network only when the detach
-            // is not reversible).
+            // Notify the view that it's being detached so it can react appropriately.
             manager.update(ctx, |terminal_manager, ctx| {
                 terminal_manager.on_view_detached(detach_type, ctx);
             });
@@ -502,8 +418,6 @@ impl PaneContent for TerminalPane {
                 .clone(),
         );
 
-        ctx.unsubscribe_to_model(&Manager::handle(ctx));
-
         #[cfg(feature = "local_fs")]
         {
             ctx.unsubscribe_to_model(&BlocklistAIHistoryModel::handle(ctx));
@@ -517,9 +431,9 @@ impl PaneContent for TerminalPane {
         // Capture the current input_config from the AI input model
         let current_input_config = view.input_config(app.as_ref());
 
-        if view.model.lock().shared_session_status().is_viewer() {
+        if view.model.lock().is_dummy_cloud_mode_session() {
             // We save and restore ambient agent sessions
-            // (restoring the shared session if it's still open and the conversation transcript otherwise).
+            // (restoring the conversation transcript if there is one).
             if let Some(ambient_model) = view.ambient_agent_view_model() {
                 let ambient_model = ambient_model.as_ref(app);
                 let task_id = ambient_model.task_id();
@@ -662,22 +576,11 @@ impl PaneContent for TerminalPane {
             return Err(ShareableLinkError::Expected);
         }
 
-        // Check for shared session status
-        let session_status = lock.shared_session_status();
-        match session_status {
-            SharedSessionStatus::NotShared => Ok(ShareableLink::Base),
-            SharedSessionStatus::ActiveViewer { role: _ } => {
-                let manager = Manager::as_ref(ctx);
-                let terminal_view_id = self.terminal_view(ctx).id();
-                if let Some(url) = retrieve_shared_session_link(manager, &terminal_view_id) {
-                    Ok(ShareableLink::Pane { url })
-                } else {
-                    Err(ShareableLinkError::Unexpected(String::from(
-                        "Failed to retreive shared session link",
-                    )))
-                }
-            }
-            _ => Err(ShareableLinkError::Expected),
+        // A cloud mode pane has no link until its conversation is available.
+        if lock.is_dummy_cloud_mode_session() {
+            Err(ShareableLinkError::Expected)
+        } else {
+            Ok(ShareableLink::Base)
         }
     }
 
@@ -688,17 +591,6 @@ impl PaneContent for TerminalPane {
     fn is_pane_being_dragged(&self, ctx: &AppContext) -> bool {
         self.view.as_ref(ctx).is_being_dragged()
     }
-}
-
-fn retrieve_shared_session_link(manager: &Manager, terminal_view_id: &EntityId) -> Option<Url> {
-    let Some(session_id) = manager.session_id(terminal_view_id) else {
-        log::warn!("Failed to get join link args for updating browser url");
-        return None;
-    };
-    if let Ok(url) = Url::parse(&join_link(&session_id)) {
-        return Some(url);
-    }
-    None
 }
 
 #[derive(Clone, Copy)]
@@ -1183,56 +1075,6 @@ fn handle_terminal_view_event(
             Event::ToggleCodeReviewPane(arg) => {
                 ctx.emit(pane_group::Event::ToggleCodeReviewPane(arg.clone()));
             }
-            Event::OpenShareSessionModal { open_source } => {
-                group.open_share_session_modal(terminal_pane_id, *open_source, ctx)
-            }
-            // When the host's manual share stops, also stop the share on
-            // any local children whose share was auto-created via
-            // `inherit_share_for_local_child`. Skipped on wasm because the
-            // transitive-share tracker is only populated on non-wasm
-            // dispatch paths.
-            #[cfg(not(target_family = "wasm"))]
-            Event::StopSharingCurrentSession { .. } => {
-                group.stop_transitively_shared_child_shares(pane_id, ctx);
-            }
-            Event::OpenShareSessionDeniedModal => {
-                group.open_share_session_denied_modal(terminal_pane_id, ctx);
-            }
-            Event::FocusSession => {
-                group.focus_pane(terminal_pane_id.into(), true, ctx);
-                ctx.emit(pane_group::Event::FocusPaneGroup);
-            }
-            Event::OpenSharedSessionRoleChangeModal { source } => match source {
-                RoleChangeOpenSource::ViewerRequest { role } => {
-                    group.open_shared_session_viewer_request_modal(terminal_pane_id, *role, ctx)
-                }
-                RoleChangeOpenSource::SharerResponse {
-                    participant_id,
-                    role_request_id,
-                    role,
-                } => group.open_shared_session_sharer_response_modal(
-                    terminal_pane_id,
-                    participant_id.clone(),
-                    role_request_id.clone(),
-                    *role,
-                    ctx,
-                ),
-                RoleChangeOpenSource::SharerGrant { participant_id } => group
-                    .open_shared_session_sharer_grant_modal(
-                        terminal_pane_id,
-                        participant_id.clone(),
-                        ctx,
-                    ),
-            },
-            Event::CloseSharedSessionRoleChangeModal(source) => {
-                group.close_shared_session_role_change_modal(*source, ctx);
-            }
-            Event::RoleRequestInFlight { role_request_id } => {
-                group.set_shared_session_role_change_modal_request_id(role_request_id.clone(), ctx);
-            }
-            Event::RoleRequestCancelled(role_request_id) => {
-                group.remove_shared_session_role_request(role_request_id.clone(), ctx);
-            }
             Event::OpenWarpDriveObjectInPane(uid) => {
                 ctx.emit(pane_group::Event::OpenWarpDriveObjectInPane(uid.clone()));
             }
@@ -1481,18 +1323,6 @@ fn handle_terminal_view_event(
                     );
                 }
             }
-            Event::EnsureSharedSessionViewerChildPane {
-                conversation_id,
-                session_id,
-            } => {
-                // Emitted by `OrchestrationViewerModel` when a child of the
-                // orchestrator currently being viewed first surfaces a
-                // joinable `session_id`. Materializes a dedicated hidden
-                // shared-session viewer pane for the child so subsequent pill
-                // clicks land on a populated agent view rather than an empty
-                // cloud-mode shell.
-                group.ensure_shared_session_viewer_child_pane(*conversation_id, *session_id, ctx);
-            }
             Event::OpenChildAgentInNewTab { conversation_id } => {
                 // Pane group can't add tabs; forward to the workspace.
                 if group.ensure_hidden_child_agent_pane_for_conversation(*conversation_id, ctx) {
@@ -1565,7 +1395,7 @@ fn dispatch_start_agent_conversation(
             harness_type: None,
             model_id,
         } => {
-            launch_local_no_harness_child(group, parent_pane_id, request, model_id, ctx);
+            launch_local_no_harness_child(parent_pane_id, request, model_id, ctx);
         }
         #[cfg(not(target_family = "wasm"))]
         StartAgentExecutionMode::Local {
@@ -1632,9 +1462,7 @@ fn dispatch_start_agent_conversation(
 /// dispatches the prompt. Asynchronously creates the server-side `ai_tasks`
 /// row via `AIClient::create_agent_task` at dispatch time, mirroring the
 /// third-party-harness path (see [`launch_local_harness_child`]). The
-/// resulting `task_id` is stamped onto the child's `AIConversation` (so the
-/// per-`Network` share-reporter in `local_tty/terminal_manager.rs` can link
-/// the shared session id to the child task once the shell bootstraps) and
+/// resulting `task_id` is stamped onto the child's `AIConversation` and
 /// onto the child's `BlocklistAIController` via the
 /// `HiddenChildAgentTaskContext` (so the agent UI reflects it). On failure
 /// the child surfaces as an error conversation instead.
@@ -1644,7 +1472,6 @@ fn dispatch_start_agent_conversation(
 /// path through `create_error_child_agent_conversation` instead.
 #[cfg(not(target_family = "wasm"))]
 fn launch_local_no_harness_child(
-    group: &mut PaneGroup,
     parent_pane_id: PaneId,
     request: StartAgentRequest,
     model_id: Option<String>,
@@ -1657,13 +1484,6 @@ fn launch_local_no_harness_child(
     let parent_conversation_id = request.parent_conversation_id;
     let parent_run_id = request.parent_run_id.clone();
     let prompt = request.prompt.clone();
-
-    // Snapshot the host terminal's shared-session source before the spawn
-    // so we can cascade it onto the child's source type once the spawn
-    // returns.
-    let host_source = group
-        .terminal_view_from_pane_id(parent_pane_id, ctx)
-        .and_then(|view| host_terminal_shared_session_source_type(&view, ctx));
 
     let prompt_for_create = prompt.clone();
     let agent_name_for_create = agent_name.clone();
@@ -1683,9 +1503,6 @@ fn launch_local_no_harness_child(
         },
         move |group, result, ctx| match result {
             Ok(child_task_id) => {
-                let is_shared_session_creator =
-                    inherit_share_for_local_child(host_source.as_ref(), child_task_id);
-
                 if let Some(HiddenChildAgentConversation {
                     terminal_view: new_terminal_view,
                     terminal_view_id,
@@ -1703,18 +1520,12 @@ fn launch_local_no_harness_child(
                             task_id: child_task_id,
                             working_dir: None,
                         }),
-                        is_shared_session_creator,
                     },
                     ctx,
                 ) {
                     apply_child_model_id_override(terminal_view_id, model_id.as_deref(), ctx);
 
-                    // Stamp the task id on the child conversation directly
-                    // so the share-reporter in
-                    // `local_tty/terminal_manager.rs` can resolve it from
-                    // the selected conversation when the share handshake
-                    // succeeds. Mirrors the pattern used by
-                    // `OrchestrationViewerModel::apply_children_fetch`.
+                    // Stamp the task id on the child conversation directly.
                     BlocklistAIHistoryModel::handle(ctx).update(ctx, |model, ctx| {
                         if let Some(conversation) = model.conversation_mut(&conversation_id) {
                             conversation.set_task_id(child_task_id);
@@ -1806,12 +1617,6 @@ fn launch_local_harness_child(
         .terminal_view_from_pane_id(parent_pane_id, ctx)
         .and_then(|terminal_view| terminal_view.as_ref(ctx).active_session_shell_type(ctx));
 
-    // Snapshot the host's shared-session source before the spawn so we can
-    // cascade it onto the prepared child task.
-    let host_source = group
-        .terminal_view_from_pane_id(parent_pane_id, ctx)
-        .and_then(|view| host_terminal_shared_session_source_type(&view, ctx));
-
     let model_id_for_harness_env = model_id.clone();
     let agent_name_for_task = agent_name.clone();
     let _ = ctx.spawn(
@@ -1836,8 +1641,6 @@ fn launch_local_harness_child(
                     run_id,
                     task_id,
                 } = launch;
-                let is_shared_session_creator =
-                    inherit_share_for_local_child(host_source.as_ref(), task_id);
                 if let Some(HiddenChildAgentConversation {
                     terminal_view: new_terminal_view,
                     terminal_view_id,
@@ -1852,7 +1655,6 @@ fn launch_local_harness_child(
                         orchestration_harness: Some(orchestration_harness),
                         env_vars,
                         task_context: None,
-                        is_shared_session_creator,
                     },
                     ctx,
                 ) {
@@ -2140,7 +1942,6 @@ fn handle_ai_history_event(
     terminal_pane_id: TerminalPaneId,
     pane_uuid: Option<Vec<u8>>,
     model_event_sender: SyncSender<ModelEvent>,
-    is_shared_ambient_agent_session: bool,
     ctx: &mut ViewContext<PaneGroup>,
 ) {
     use std::sync::Arc;
@@ -2215,12 +2016,6 @@ fn handle_ai_history_event(
                     created_ts: Some(exchange.start_time.naive_utc()),
                 }
             });
-
-            // Do not persist AI queries from shared ambient agent sessions that we've viewed,
-            // as these were sent as part of an ambient agent run and shouldn't polute the up arrow history.
-            if is_shared_ambient_agent_session {
-                return;
-            }
 
             // Only query-bearing inputs (e.g. user queries) are persisted for
             // up-arrow history. Early return and skip writing for exchanges that
@@ -2323,11 +2118,6 @@ fn handle_ai_history_event(
         | BlocklistAIHistoryEvent::ConversationOwnershipTransferred { .. }
         | BlocklistAIHistoryEvent::NewConversationRequestComplete { .. }
         | BlocklistAIHistoryEvent::OrchestrationConfigUpdated { .. }
-        | BlocklistAIHistoryEvent::ConversationUsageMetadataUpdated { .. }
-        | BlocklistAIHistoryEvent::LocalSharedSessionEstablished { .. } => (),
+        | BlocklistAIHistoryEvent::ConversationUsageMetadataUpdated { .. } => (),
     }
 }
-
-#[cfg(all(test, not(target_family = "wasm")))]
-#[path = "terminal_pane_tests.rs"]
-mod tests;

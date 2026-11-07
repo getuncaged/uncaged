@@ -32,7 +32,6 @@ use crate::terminal::ligature_settings::LigatureSettings;
 use crate::terminal::safe_mode_settings::SafeModeSettings;
 use crate::terminal::session_settings::{SessionSettings, SessionSettingsChangedEvent};
 use crate::terminal::settings::TerminalSettings;
-use crate::terminal::shared_session::settings::SharedSessionSettings;
 use crate::terminal::warpify::settings::WarpifySettings;
 use crate::terminal::BlockListSettings;
 use crate::undo_close::UndoCloseSettings;
@@ -92,7 +91,6 @@ pub fn register_all_settings(ctx: &mut AppContext) {
     UndoCloseSettings::register(ctx);
     SshSettings::register(ctx);
     VimBannerSettings::register(ctx);
-    SharedSessionSettings::register(ctx);
     WarpDriveSettings::register(ctx);
     WorkflowAliases::register(ctx);
     EmacsBindingsSettings::register(ctx);

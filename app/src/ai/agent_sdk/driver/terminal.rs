@@ -3,21 +3,16 @@ use std::ffi::OsString;
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
 use futures::channel::oneshot;
-use session_sharing_protocol::common::{Role, SessionId};
-use session_sharing_protocol::sharer::SessionRetentionReason;
-use warp_cli::share::{ShareAccessLevel, ShareRequest, ShareSubject};
 use warp_completer::completer::CommandOutput;
 use warp_core::command::ExitCode;
-use warp_core::features::FeatureFlag;
 use warp_terminal::model::grid::Dimensions;
 use warp_util::path::ShellFamily;
 use warpui::r#async::FutureExt;
-use warpui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity as _, ViewHandle};
+use warpui::{AppContext, Entity, ModelContext, ModelHandle, ViewHandle};
 
 use super::AgentDriverError;
 use crate::ai::ambient_agents::AmbientAgentTaskId;
@@ -30,11 +25,9 @@ use crate::terminal::model::grid::RespectDisplayedOutput;
 use crate::terminal::model::index::Point;
 use crate::terminal::model::session::ExecuteCommandOptions;
 use crate::terminal::model::RespectObfuscatedSecrets;
-use crate::terminal::shared_session::{self, IsSharedSessionCreator, SharedSessionSource};
 use crate::terminal::shell::ShellType;
-use crate::terminal::view::{ConversationRestorationInNewPaneType, Event};
+use crate::terminal::view::ConversationRestorationInNewPaneType;
 use crate::terminal::TerminalView;
-use crate::workspaces::user_workspaces::UserWorkspaces;
 
 /// Describes why a terminal session bootstrap failed.
 #[derive(Debug)]
@@ -78,37 +71,12 @@ impl std::fmt::Display for BootstrapError {
 
 impl std::error::Error for BootstrapError {}
 
-/// Describes why an agent's session-sharing request failed.
-#[derive(Debug, thiserror::Error)]
-pub(crate) enum ShareSessionError {
-    /// Connection to the session-sharing server failed.
-    #[error("Internal error")]
-    Internal(#[source] Arc<anyhow::Error>),
-    /// The server rejected the session-sharing request.
-    #[error("{0}")]
-    Failed(String),
-    /// Session sharing is disabled for this user or team.
-    #[error(
-        "Session sharing is not enabled. This is likely because an administrator has disabled session sharing for your team."
-    )]
-    Disabled,
-    /// The session-sharing request timed out.
-    #[error("Timed out waiting for session sharing to start")]
-    Timeout,
-    /// The session-sharing channel was dropped before completing.
-    #[error("Session sharing was interrupted")]
-    Interrupted,
-}
-
 const TERMINAL_SESSION_BOOTSTRAP_TIMEOUT: Duration = Duration::from_secs(60);
-/// The total time to wait for session sharing to start, including retries.
-const TERMINAL_SESSION_SHARE_DELAY: Duration = Duration::from_secs(20);
 
 /// Options for creating the terminal view before constructing a [`TerminalDriver`].
 pub(crate) struct TerminalDriverOptions {
     pub working_dir: PathBuf,
     pub env_vars: HashMap<OsString, OsString>,
-    pub should_share: bool,
     pub task_id: Option<AmbientAgentTaskId>,
     pub conversation_restoration: Option<ConversationRestorationInNewPaneType>,
 }
@@ -117,18 +85,12 @@ pub(crate) struct TerminalDriverOptions {
 pub(crate) enum TerminalDriverEvent {
     /// Terminal bootstrap is taking unusually long.
     SlowBootstrap,
-    /// The terminal session has established a shared session.
-    EstablishedSharedSession {
-        session_id: session_sharing_protocol::common::SessionId,
-        join_url: String,
-    },
 }
 
 /// Manages the terminal session lifecycle for the agent driver.
 ///
 /// Responsibilities:
 /// - Monitoring for terminal bootstrapping to be done
-/// - Configuring session sharing and applying guest requests
 /// - Executing commands in the session
 /// - Detecting block completion
 pub(crate) struct TerminalDriver {
@@ -139,12 +101,6 @@ pub(crate) struct TerminalDriver {
     bootstrap_tx: Option<oneshot::Sender<Result<(), BootstrapError>>>,
     /// Receiver half consumed by `wait_for_session_bootstrapped`.
     bootstrap_rx: Option<oneshot::Receiver<Result<(), BootstrapError>>>,
-    /// The session ID once sharing has been established.
-    shared_session_id: Option<SessionId>,
-    /// Receiver for the session sharing result. Present when sharing is expected
-    /// and `wait_for_session_shared` has not yet been called.
-    session_share_rx: Option<oneshot::Receiver<Result<(), ShareSessionError>>>,
-    pending_share_requests: Vec<ShareRequest>,
     waiting_command: Option<oneshot::Sender<ExitCode>>,
 
     /// State for the pending command we're expecting to start executing.
@@ -165,18 +121,9 @@ fn create_terminal_view(
     options: TerminalDriverOptions,
     ctx: &mut AppContext,
 ) -> Result<ViewHandle<TerminalView>, AgentDriverError> {
-    let is_shared_session_creator = if options.should_share {
-        IsSharedSessionCreator::Yes {
-            source: SharedSessionSource::ambient_agent(options.task_id.map(|t| t.to_string())),
-        }
-    } else {
-        IsSharedSessionCreator::No
-    };
-
     let (_, root_view) = open_new_with_workspace_source(
         NewWorkspaceSource::Session {
             options: Box::new(NewTerminalOptions {
-                is_shared_session_creator,
                 initial_directory: Some(options.working_dir),
                 env_vars: options.env_vars,
                 conversation_restoration: options.conversation_restoration,
@@ -203,63 +150,32 @@ impl TerminalDriver {
         options: TerminalDriverOptions,
         ctx: &mut AppContext,
     ) -> Result<ModelHandle<Self>, AgentDriverError> {
-        let should_share = options.should_share;
         let task_id = options.task_id;
         let working_dir = options.working_dir.clone();
         let terminal_view = create_terminal_view(options, ctx)?;
-        Ok(ctx.add_model(|ctx| Self::new(terminal_view, should_share, task_id, working_dir, ctx)))
+        Ok(ctx.add_model(|ctx| Self::new(terminal_view, task_id, working_dir, ctx)))
     }
 
     /// Wrap an already-created terminal view in a new `TerminalDriver` model.
     ///
     /// Unlike [`Self::create`], this does not open a new window — it reuses an
-    /// existing view (e.g. a docker sandbox pane). Session sharing is disabled
-    /// and no task ID is associated.
+    /// existing view (e.g. a docker sandbox pane). No task ID is associated.
     pub(crate) fn create_from_existing_view(
         terminal_view: ViewHandle<TerminalView>,
         ctx: &mut AppContext,
     ) -> ModelHandle<Self> {
-        ctx.add_model(|ctx| Self::new(terminal_view, false, None, PathBuf::default(), ctx))
+        ctx.add_model(|ctx| Self::new(terminal_view, None, PathBuf::default(), ctx))
     }
 
-    /// Set up event subscriptions and session-sharing conditions for an
-    /// already-created terminal view.
+    /// Set up event subscriptions for an already-created terminal view.
     fn new(
         terminal_view: ViewHandle<TerminalView>,
-        should_share: bool,
         task_id: Option<AmbientAgentTaskId>,
         working_dir: PathBuf,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        // Create a oneshot channel for session sharing when sharing is expected.
-        // When sharing is disabled (or running against ngrok), leave both halves
-        // as None so that `wait_for_session_shared` returns immediately.
-        let sharing_expected =
-            should_share && !warp_core::channel::ChannelState::server_root_url().contains("ngrok");
-        let (mut session_share_tx, session_share_rx) = if sharing_expected {
-            if !FeatureFlag::CreatingSharedSessions.is_enabled() {
-                // Session sharing was requested but the feature is not enabled for this
-                // user/team (typically an enterprise/admin setting). Fail immediately
-                // with a clear error rather than waiting for a timeout.
-                log::warn!(
-                    "Session sharing requested but the CreatingSharedSessions feature flag \
-                     is not enabled. This is likely due to a team administrator disabling \
-                     session sharing."
-                );
-                let (tx, rx) = oneshot::channel();
-                let _ = tx.send(Err(ShareSessionError::Disabled));
-                (None, Some(rx))
-            } else {
-                log::info!("Waiting for requested session sharing to start");
-                let (tx, rx) = oneshot::channel();
-                (Some(tx), Some(rx))
-            }
-        } else {
-            (None, None)
-        };
-
         // Set the task_id and attachments download dir on the AI controller right away
-        // so they're available for session sharing and file downloads.
+        // so they're available for file downloads.
         // Only set the download dir when a task_id is present (cloud mode),
         // since attachments require a task to fetch presigned URLs.
         if let Some(tid) = task_id {
@@ -273,7 +189,7 @@ impl TerminalDriver {
         }
 
         ctx.subscribe_to_view(&terminal_view, move |me, _, event, ctx| {
-            me.handle_terminal_view_event(event, &mut session_share_tx, ctx);
+            me.handle_terminal_view_event(event, ctx);
         });
 
         let (bootstrap_tx_inner, bootstrap_rx) = oneshot::channel::<Result<(), BootstrapError>>();
@@ -298,9 +214,6 @@ impl TerminalDriver {
             terminal_view,
             bootstrap_tx,
             bootstrap_rx: Some(bootstrap_rx),
-            shared_session_id: None,
-            session_share_rx,
-            pending_share_requests: Vec::new(),
             waiting_command: None,
             pending_command_start: None,
         }
@@ -318,71 +231,6 @@ impl TerminalDriver {
         f: impl FnOnce(&mut TerminalView, &mut warpui::ViewContext<TerminalView>),
     ) {
         self.terminal_view.update(ctx, f);
-    }
-
-    /// Request that the terminal session be shared with the given participants.
-    ///
-    /// This has no effect if the session is not being shared.
-    pub fn add_share_requests(
-        &mut self,
-        share_requests: impl IntoIterator<Item = ShareRequest>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.pending_share_requests.extend(share_requests);
-        if self.shared_session_id.is_some() {
-            self.apply_share_requests(ctx);
-        }
-    }
-
-    /// Apply pending session-sharing guest requests.
-    fn apply_share_requests(&mut self, ctx: &mut ModelContext<Self>) {
-        if self.pending_share_requests.is_empty() {
-            return;
-        }
-
-        let share_requests = std::mem::take(&mut self.pending_share_requests);
-        self.terminal_view.update(ctx, |terminal_view, ctx| {
-            let mut viewer_emails = Vec::new();
-            let mut editor_emails = Vec::new();
-
-            for request in share_requests {
-                let role = match request.access_level {
-                    ShareAccessLevel::View => Role::Reader,
-                    ShareAccessLevel::Edit => Role::Executor,
-                };
-
-                match request.subject {
-                    ShareSubject::Team => {
-                        if let Some(team_uid) = UserWorkspaces::as_ref(ctx).current_team_uid() {
-                            terminal_view.update_session_team_permissions(
-                                Some(role),
-                                team_uid.to_string(),
-                                ctx,
-                            );
-                        }
-                    }
-                    ShareSubject::Public => {
-                        // Apply an anyone-with-link ACL at the requested role.
-                        // This uses the same path as the share modal's
-                        // "anyone with link" toggle. The workspace-level
-                        // anyone-with-link setting on the server still gates
-                        // whether the ACL write succeeds.
-                        terminal_view.update_session_link_permissions(Some(role), ctx);
-                    }
-                    ShareSubject::User { email } => match request.access_level {
-                        ShareAccessLevel::View => viewer_emails.push(email),
-                        ShareAccessLevel::Edit => editor_emails.push(email),
-                    },
-                }
-            }
-
-            if !viewer_emails.is_empty() {
-                terminal_view.add_guests(viewer_emails, Role::Reader, ctx);
-            }
-            if !editor_emails.is_empty() {
-                terminal_view.add_guests(editor_emails, Role::Executor, ctx);
-            }
-        });
     }
 
     /// Submit `text` to the active CLI agent on the terminal PTY using the
@@ -614,70 +462,6 @@ impl TerminalDriver {
             result
         }
     }
-
-    /// Returns a future that resolves when (optional) session sharing has started.
-    ///
-    /// This is separate from `wait_for_session_bootstrapped` so that callers can:
-    /// - wait for terminal bootstrap early (e.g. before starting MCP servers)
-    /// - wait for session sharing later (e.g. right before running visible commands)
-    pub fn wait_for_session_shared(
-        &mut self,
-    ) -> impl Future<Output = Result<(), AgentDriverError>> {
-        let rx = self.session_share_rx.take();
-
-        async move {
-            let Some(rx) = rx else {
-                // Sharing is disabled or already resolved.
-                return Ok(());
-            };
-
-            match rx.with_timeout(TERMINAL_SESSION_SHARE_DELAY).await {
-                Ok(Ok(Ok(()))) => Ok(()),
-                Ok(Ok(Err(error))) => {
-                    log::error!("Session sharing failed: {error}");
-                    Err(AgentDriverError::ShareSessionFailed { error })
-                }
-                Ok(Err(_canceled)) => {
-                    log::error!("Session sharing channel dropped");
-                    Err(AgentDriverError::ShareSessionFailed {
-                        error: ShareSessionError::Interrupted,
-                    })
-                }
-                Err(_timeout) => {
-                    log::error!(
-                        "Timed out waiting for session sharing to start after {}s",
-                        TERMINAL_SESSION_SHARE_DELAY.as_secs()
-                    );
-                    Err(AgentDriverError::ShareSessionFailed {
-                        error: ShareSessionError::Timeout,
-                    })
-                }
-            }
-        }
-    }
-
-    pub fn extend_shared_session_retention(
-        &mut self,
-        reason: SessionRetentionReason,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.terminal_view.update(ctx, |terminal, ctx| {
-            if !terminal
-                .model
-                .lock()
-                .shared_session_status()
-                .is_active_sharer()
-            {
-                log::warn!(
-                    "Tried to extend shared session retention before sharing was active: {reason:?}"
-                );
-                return;
-            }
-
-            log::info!("Emitting request to extend shared session retention: {reason:?}");
-            ctx.emit(Event::ExtendSessionRetention { reason });
-        });
-    }
 }
 
 /// The first DFA match returned by
@@ -725,7 +509,6 @@ impl TerminalDriver {
     fn handle_terminal_view_event(
         &mut self,
         event: &crate::terminal::view::Event,
-        session_share_tx: &mut Option<oneshot::Sender<Result<(), ShareSessionError>>>,
         ctx: &mut ModelContext<Self>,
     ) {
         match event {
@@ -755,29 +538,6 @@ impl TerminalDriver {
             }
             crate::terminal::view::Event::SlowBootstrap => {
                 ctx.emit(TerminalDriverEvent::SlowBootstrap);
-            }
-            crate::terminal::view::Event::EstablishedSharedSession { session_id } => {
-                self.shared_session_id = Some(*session_id);
-                if let Some(tx) = session_share_tx.take() {
-                    let _ = tx.send(Ok(()));
-                }
-
-                // Apply any pending share requests now that the session is established.
-                self.apply_share_requests(ctx);
-
-                ctx.emit(TerminalDriverEvent::EstablishedSharedSession {
-                    session_id: *session_id,
-                    join_url: shared_session::join_link(session_id),
-                });
-            }
-            crate::terminal::view::Event::FailedToShareSession { reason, cause } => {
-                if let Some(tx) = session_share_tx.take() {
-                    let error = match cause {
-                        Some(cause) => ShareSessionError::Internal(cause.clone()),
-                        None => ShareSessionError::Failed(reason.clone()),
-                    };
-                    let _ = tx.send(Err(error));
-                }
             }
             crate::terminal::view::Event::ExecuteCommand(event) => {
                 if let Some((_expected_command, sender)) = self
@@ -813,7 +573,3 @@ impl TerminalDriver {
         }
     }
 }
-
-#[cfg(test)]
-#[path = "terminal_tests.rs"]
-mod tests;

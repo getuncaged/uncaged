@@ -34,7 +34,6 @@ use crate::terminal::model::block::BlockMetadata;
 #[cfg(not(target_family = "wasm"))]
 use crate::terminal::model::session::SessionType;
 use crate::terminal::model::session::Sessions;
-use crate::terminal::shared_session::permissions_manager::SessionPermissionsManager;
 use crate::ui_components::icons::Icon;
 
 pub enum AtContextMenuDisabledReason {
@@ -106,7 +105,6 @@ impl AtContextMenuDisabledReason {
         // no categories available.
         if AIContextMenu::get_categories_for_mode(
             input_config.input_type.is_ai() || !input_config.is_locked,
-            false,
             false, /* is_in_ambient_agent */
             false, /* is_cli_agent_input */
             ctx,
@@ -289,10 +287,6 @@ impl InputModeToggle {
             me.notify_and_notify_children(ctx);
         });
 
-        // Keep the control disabled state in sync with role changes
-        ctx.subscribe_to_model(&SessionPermissionsManager::handle(ctx), |me, _, _, ctx| {
-            me.update_segmented_control_disabled_state(ctx);
-        });
         // Keep the control disabled state in sync with agent control state
         ctx.subscribe_to_model(&cli_subagent_controller, move |me, _, _, ctx| {
             me.update_segmented_control_disabled_state(ctx);
@@ -330,20 +324,14 @@ impl InputModeToggle {
     }
 
     pub fn update_segmented_control_disabled_state(&mut self, ctx: &mut ViewContext<Self>) {
-        let (is_reader, is_agent_in_control) = {
-            let terminal_model = self.terminal_model.lock();
-            (
-                terminal_model.shared_session_status().is_reader(),
-                terminal_model
-                    .block_list()
-                    .active_block()
-                    .is_active_and_long_running(),
-            )
-        };
+        let is_agent_in_control = self
+            .terminal_model
+            .lock()
+            .block_list()
+            .active_block()
+            .is_active_and_long_running();
 
-        let tooltip = if is_reader {
-            Some("Request edit access to change input mode".to_string())
-        } else if is_agent_in_control {
+        let tooltip = if is_agent_in_control {
             Some("Input mode locked while agent is monitoring a command".to_string())
         } else {
             None

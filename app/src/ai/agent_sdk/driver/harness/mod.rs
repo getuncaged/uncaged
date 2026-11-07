@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
@@ -12,7 +11,7 @@ use tempfile::NamedTempFile;
 use warp_cli::agent::Harness;
 use warp_cli::{
     OZ_CLI_ENV, OZ_HARNESS_ENV, OZ_PARENT_RUN_ID_ENV, OZ_RUN_ID_ENV, SERVER_ROOT_URL_OVERRIDE_ENV,
-    SESSION_SHARING_SERVER_URL_OVERRIDE_ENV, WS_SERVER_URL_OVERRIDE_ENV,
+    WS_SERVER_URL_OVERRIDE_ENV,
 };
 use warp_core::channel::ChannelState;
 use warp_managed_secrets::ManagedSecretValue;
@@ -392,15 +391,6 @@ fn task_env_vars_for_harness_name(
             WS_SERVER_URL_OVERRIDE_ENV,
             ChannelState::ws_server_url().into_owned(),
         );
-        if let Some(url) = ChannelState::session_sharing_server_url()
-            .map(Cow::into_owned)
-            .filter(|url| !url.is_empty())
-        {
-            env_vars.insert(
-                OsString::from(SESSION_SHARING_SERVER_URL_OVERRIDE_ENV),
-                OsString::from(url),
-            );
-        }
     }
 
     env_vars

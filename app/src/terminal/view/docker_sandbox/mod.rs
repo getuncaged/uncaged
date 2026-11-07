@@ -51,8 +51,6 @@ use crate::terminal::local_tty::{
 };
 #[cfg(feature = "remote_tty")]
 use crate::terminal::remote_tty::TerminalManager as RemoteTtyTerminalManager;
-#[cfg(all(feature = "local_tty", not(feature = "remote_tty")))]
-use crate::terminal::shared_session::IsSharedSessionCreator;
 #[cfg(feature = "local_tty")]
 use crate::terminal::TerminalManager;
 
@@ -106,7 +104,6 @@ fn create_docker_sandbox_view(
             let terminal_init = LocalTtyTerminalManager::<TerminalView>::create_model(
                 None,
                 HashMap::new(),
-                IsSharedSessionCreator::No,
                 None, /* restored_blocks */
                 user_default_shell_unsupported_banner_model_handle,
                 initial_size,

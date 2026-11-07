@@ -3476,12 +3476,11 @@ pub struct FindContext<'a> {
 pub fn render_user_avatar(
     user_display_name: &str,
     profile_image_path: Option<&String>,
-    avatar_color: Option<ColorU>,
     app: &AppContext,
 ) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);
     let theme = appearance.theme();
-    let accent: ColorU = avatar_color.unwrap_or_else(|| blended_colors::accent(theme).into());
+    let accent: ColorU = blended_colors::accent(theme).into();
     let size = icon_size(app);
 
     if let Some(url) = profile_image_path {

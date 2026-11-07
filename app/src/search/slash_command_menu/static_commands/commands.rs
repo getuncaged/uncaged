@@ -454,15 +454,6 @@ pub const USAGE: StaticCommand = StaticCommand {
     argument: None,
 };
 
-pub const REMOTE_CONTROL: StaticCommand = StaticCommand {
-    name: "/remote-control",
-    description: "Start remote control for this session",
-    icon_path: "bundled/svg/phone-01.svg",
-    availability: Availability::AI_ENABLED.union(Availability::NOT_CLOUD_AGENT),
-    auto_enter_ai_mode: false,
-    argument: None,
-};
-
 pub const COST: StaticCommand = StaticCommand {
     name: "/cost",
     description: "Toggle credit usage details",
@@ -620,12 +611,6 @@ fn all_commands() -> Vec<StaticCommand> {
 
     if FeatureFlag::LocalDockerSandbox.is_enabled() {
         commands.push(CREATE_DOCKER_SANDBOX);
-    }
-
-    if FeatureFlag::CreatingSharedSessions.is_enabled()
-        && FeatureFlag::HOARemoteControl.is_enabled()
-    {
-        commands.push(REMOTE_CONTROL);
     }
 
     if FeatureFlag::Changelog.is_enabled() {

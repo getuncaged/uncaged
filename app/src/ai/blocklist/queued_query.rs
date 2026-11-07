@@ -564,27 +564,6 @@ impl QueuedQueryModel {
         });
     }
 
-    /// Restores a fired row when submission fails after the row was removed.
-    pub(crate) fn restore_fired_row(
-        &mut self,
-        conversation_id: AIConversationId,
-        insert_index: usize,
-        query: QueuedQuery,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let state = self.queues.entry(conversation_id).or_default();
-        let query_id = query.id;
-        if state.queue.iter().any(|queued| queued.id == query_id) {
-            return;
-        }
-        let insert_index = insert_index.min(state.queue.len());
-        state.queue.insert(insert_index, query);
-        ctx.emit(QueuedQueryEvent::Appended {
-            conversation_id,
-            query_id,
-        });
-    }
-
     /// Returns the attachments captured on the queued row `query_id` within `conversation_id`'s
     /// queue, or an empty slice if no such row exists. Used by the send path to attach a fired
     /// queued prompt's images/files without removing the row first.

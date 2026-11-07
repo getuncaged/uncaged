@@ -302,8 +302,7 @@ impl StartAgentExecutor {
             | BlocklistAIHistoryEvent::UpdatedConversationArtifacts { .. }
             | BlocklistAIHistoryEvent::ConversationOwnershipTransferred { .. } => {}
             BlocklistAIHistoryEvent::OrchestrationConfigUpdated { .. }
-            | BlocklistAIHistoryEvent::ConversationUsageMetadataUpdated { .. }
-            | BlocklistAIHistoryEvent::LocalSharedSessionEstablished { .. } => {}
+            | BlocklistAIHistoryEvent::ConversationUsageMetadataUpdated { .. } => {}
         }
     }
 

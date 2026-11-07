@@ -42,18 +42,6 @@ pub enum FeatureFlag {
     /// menu bar.
     ToggleBootstrapBlock,
 
-    /// A runtime flag to enable the creation of shared sessions.
-    ///
-    /// It is enabled if the logged in user is part of a paying team
-    /// or part of the allowlist (via [`ServerExperiment::SessionSharingExperiment`]).
-    ///
-    /// We also use [`ServerExperiment::SessionSharingControl`] as a
-    /// killswitch for abuse prevention.
-    CreatingSharedSessions,
-
-    /// Enables the joining / viewing of shared sessions (_not_ creation).
-    ViewingSharedSessions,
-
     /// Enabling context chips functionality for prompt
     ContextChips,
 
@@ -135,17 +123,9 @@ pub enum FeatureFlag {
     /// a shell other than the default shell.
     ShellSelector,
 
-    /// Enables writing to long-running commands in shared sessions.
-    SharedSessionWriteToLongRunningCommands,
-
     /// Lazily builds scenes at render time instead of eagerly when a view
     /// changes.
     LazySceneBuilding,
-
-    /// Enables support for ACLs in Session Sharing. Should be disabled if the
-    /// corresponding `use_acls` flag in the session sharing server is disabled.
-    /// https://github.com/warpdotdev/session-sharing-server/blob/b6590ebd0b0e7f6847d6b2228b4e77d63939ce22/server/Cargo.toml#L13
-    SessionSharingAcls,
 
     /// Enables the full-screen "zen mode" setting, where we hide the tab bar if there's only one
     /// tab.
@@ -441,9 +421,6 @@ pub enum FeatureFlag {
 
     /// Enables asynchronous find in terminal, running search on a background thread.
     AsyncFind,
-
-    /// Enables using Agent Mode in shared sessions.
-    AgentSharedSessions,
 
     /// Enables auto-opening code review pane on first agent change and its setting UI.
     AutoOpenCodeReviewPane,
@@ -818,9 +795,6 @@ pub enum FeatureFlag {
     /// Enables commit, push, and create-PR actions in the code review panel.
     GitOperationsInCodeReview,
 
-    /// Gates the remote control chip and `/remote-control` slash command in the CLI agent footer.
-    HOARemoteControl,
-
     /// Trims trailing blank rows from CLI agent block output so unused vertical
     /// space is not rendered while the agent is running.
     TrimTrailingBlankLines,
@@ -911,7 +885,6 @@ pub const LOCAL_FLAGS: &[FeatureFlag] = &[FeatureFlag::LocalClaudeCodexChildHarn
 /// time, these will move on to PREVIEW_FLAGS before being launched.
 pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::ToggleBootstrapBlock,
-    FeatureFlag::CreatingSharedSessions,
     FeatureFlag::RemoveAutosuggestionDuringTabCompletions,
     FeatureFlag::ResizeFix,
     FeatureFlag::AgentModeWorkflows,
@@ -1040,9 +1013,6 @@ impl FeatureFlag {
         // very least, the feature flag should be removed from the Preview changelog by removing it from PREVIEW_FLAGS.
         // ** ONLY Preview-exclusive features should be added to this list! **
         match self {
-            AgentSharedSessions => {
-                Some("Enables viewing agent conversations within shared sessions.")
-            }
             CodeReviewFind => Some("Enables the find bar in the code review pane."),
             BlocklistMarkdownImages => {
                 Some("Enables rendering markdown images inline in AI block list responses.")

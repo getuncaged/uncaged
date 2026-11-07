@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use url::Url;
-use uuid::Uuid;
 #[cfg(target_family = "wasm")]
 use warp_core::context_flag::ContextFlag;
 
@@ -11,7 +10,6 @@ use crate::ChannelState;
 #[derive(Debug)]
 /// Represents an intent parsed from a web url
 pub enum WebIntent {
-    SessionView(Url),
     ConversationView(Url),
     DriveObject(Url),
     SettingsView(Url),
@@ -47,33 +45,6 @@ impl WebIntent {
                         return Ok(WebIntent::CloudAgentHome(Url::parse(&format!(
                             "{url_scheme}://action/new_cloud_agent_conversation?source=web_home"
                         ))?));
-                    }
-                    // For sessions, we expect the URL to be in the format: {scheme}/session/{session_id}
-                    "session" => {
-                        if segments.len() != 2 {
-                            return Err(anyhow!("Attempting to parse invalid url: {}", url));
-                        }
-
-                        let session_id = segments[1];
-
-                        // Validate that the session ID is a UUID. If it's not, this isn't a
-                        // valid shared-session URL and we should return an error so the
-                        // caller can ignore it.
-                        if Uuid::parse_str(session_id).is_err() {
-                            return Err(anyhow!("Attempting to parse invalid url: {}", url));
-                        }
-
-                        let mut session_intent = Url::parse(
-                            format!("{url_scheme}://shared_session/{session_id}").as_str(),
-                        )
-                        .map_err(|_| anyhow!("Attempting to parse invalid url: {}", url))?;
-
-                        // Preserve any query parameters (e.g. pwd, preview) from the original URL.
-                        if let Some(query) = url.query() {
-                            session_intent.set_query(Some(query));
-                        }
-
-                        return Ok(WebIntent::SessionView(session_intent));
                     }
                     // For conversations, we expect the URL to be in the format: {scheme}/conversation/{conversation_id}
                     "conversation" => {
@@ -150,7 +121,6 @@ impl WebIntent {
     /// Convert this web intent into the underlying native desktop URL.
     pub fn into_intent_url(self) -> Url {
         match self {
-            WebIntent::SessionView(url) => url,
             WebIntent::ConversationView(url) => url,
             WebIntent::DriveObject(url) => url,
             WebIntent::SettingsView(url) => url,
@@ -175,7 +145,6 @@ pub fn open_url_on_desktop(url: &Url) {
     match WebIntent::try_from_url(url) {
         Ok(WebIntent::ConversationView(intent))
         | Ok(WebIntent::DriveObject(intent))
-        | Ok(WebIntent::SessionView(intent))
         | Ok(WebIntent::CloudAgentHome(intent))
         | Ok(WebIntent::Action(intent)) => {
             crate::platform::wasm::emit_event(crate::platform::wasm::WarpEvent::OpenOnNative {
@@ -191,7 +160,6 @@ pub fn open_url_on_desktop(url: &Url) {
 #[cfg(target_family = "wasm")]
 fn set_context_flags_from_url(url: Url) {
     match WebIntent::try_from_url(&url) {
-        Ok(WebIntent::SessionView(_)) => ContextFlag::set_shared_session_only(),
         Ok(WebIntent::ConversationView(_)) => ContextFlag::set_conversation_only(),
         Ok(WebIntent::DriveObject(_)) => ContextFlag::set_warp_drive_link_only(),
         Ok(WebIntent::SettingsView(_)) => ContextFlag::set_settings_link_only(),

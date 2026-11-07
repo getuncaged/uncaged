@@ -10,8 +10,6 @@ use super::ServerExperiment;
 impl Display for ServerExperiment {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            Self::SessionSharingControl => "SESSION_SHARING_CONTROL",
-            Self::SessionSharingExperiment => "SESSION_SHARING_EXPERIMENT",
             Self::DisableAgentModeExperiment => "DISABLE_AGENT_MODE_EXPERIMENT",
             Self::EnvVarsEarlyAccessExperiment => "ENV_VARS_EARLY_ACCESS_EXPERIMENT",
             Self::AgentModeAnalyticsExperiment => "AGENT_MODE_ANALYTICS_EXPERIMENT",
@@ -42,8 +40,6 @@ impl Display for ServerExperiment {
 impl ServerExperiment {
     pub fn from_string(s: String) -> Result<Self> {
         match s.as_str() {
-            "SESSION_SHARING_CONTROL" => Ok(Self::SessionSharingControl),
-            "SESSION_SHARING_EXPERIMENT" => Ok(Self::SessionSharingExperiment),
             "DISABLE_AGENT_MODE_EXPERIMENT" => Ok(Self::DisableAgentModeExperiment),
             "ENV_VARS_EARLY_ACCESS_EXPERIMENT" => Ok(Self::EnvVarsEarlyAccessExperiment),
             "AGENT_MODE_ANALYTICS_EXPERIMENT" => Ok(Self::AgentModeAnalyticsExperiment),
@@ -73,8 +69,6 @@ impl TryFrom<Experiment> for ServerExperiment {
 
     fn try_from(value: Experiment) -> Result<Self, Self::Error> {
         match value {
-            Experiment::SessionSharingExperiment => Ok(Self::SessionSharingExperiment),
-            Experiment::SessionSharingControl => Ok(Self::SessionSharingControl),
             Experiment::BuildPlanAutoReloadControl => Ok(Self::BuildPlanAutoReloadControl),
             Experiment::BuildPlanAutoReloadBannerToggle => {
                 Ok(Self::BuildPlanAutoReloadBannerToggle)

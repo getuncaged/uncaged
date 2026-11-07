@@ -11,7 +11,9 @@ use warp_core::settings::macros::define_settings_group;
 use warp_core::settings::{RespectUserSyncSetting, SupportedPlatforms, SyncToCloud};
 pub use working_directory_config::*;
 
-use crate::ai::blocklist::agent_view::toolbar_item::AgentToolbarItemKind;
+use crate::ai::blocklist::agent_view::toolbar_item::{
+    deserialize_toolbar_items, AgentToolbarItemKind,
+};
 use crate::context_chips::prompt::PromptSelection;
 use crate::context_chips::ContextChipKind;
 
@@ -195,7 +197,9 @@ pub enum AgentToolbarChipSelection {
     Default,
     #[schemars(description = "Use a custom arrangement of toolbar items.")]
     Custom {
+        #[serde(deserialize_with = "deserialize_toolbar_items")]
         left: Vec<AgentToolbarItemKind>,
+        #[serde(deserialize_with = "deserialize_toolbar_items")]
         right: Vec<AgentToolbarItemKind>,
     },
 }
@@ -245,7 +249,9 @@ pub enum CLIAgentToolbarChipSelection {
     Default,
     #[schemars(description = "Use a custom arrangement of toolbar items.")]
     Custom {
+        #[serde(deserialize_with = "deserialize_toolbar_items")]
         left: Vec<AgentToolbarItemKind>,
+        #[serde(deserialize_with = "deserialize_toolbar_items")]
         right: Vec<AgentToolbarItemKind>,
     },
 }
@@ -316,15 +322,6 @@ define_settings_group!(SessionSettings, settings: [
         supported_platforms: SupportedPlatforms::ALL,
         sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
         private: true,
-    },
-    should_confirm_close_session: ShouldConfirmCloseSession {
-        type: bool,
-        default: true,
-        supported_platforms: SupportedPlatforms::ALL,
-        sync_to_cloud: SyncToCloud::Globally(RespectUserSyncSetting::Yes),
-        private: false,
-        toml_path: "general.should_confirm_close_session",
-        description: "Whether to show a confirmation dialog when closing a session.",
     },
     // Value is saved here but not shown in ui (can't be toggled in settings)
     should_confirm_shared_session_edit_access: ShouldConfirmSharedSessionEditAccess {
@@ -426,3 +423,7 @@ settings::macros::implement_setting_for_enum!(
     max_table_depth: 1,
     description: "Controls the working directory used when opening new sessions.",
 );
+
+#[cfg(test)]
+#[path = "session_settings_tests.rs"]
+mod tests;

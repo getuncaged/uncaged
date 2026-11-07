@@ -127,7 +127,6 @@ pub struct WarpDriveRow<'a> {
     can_move: bool,
     styles: WarpDriveItemStyles,
     menu_open: bool,
-    share_dialog_open: bool,
     is_selected: bool,
     is_focused: bool,
     overflow_on_left: bool,
@@ -145,7 +144,6 @@ impl<'a> WarpDriveRow<'a> {
         can_move: bool,
         has_menu_items: bool,
         menu_open: bool,
-        share_dialog_open: bool,
         is_selected: bool,
         is_focused: bool,
         sync_queue_is_dequeueing: bool,
@@ -223,7 +221,6 @@ impl<'a> WarpDriveRow<'a> {
             can_move,
             styles: WarpDriveItemStyles::default(appearance),
             menu_open,
-            share_dialog_open,
             is_selected,
             is_focused,
             overflow_on_left: matches!(menu_direction, MenuDirection::Left),
@@ -241,7 +238,6 @@ impl<'a> WarpDriveRow<'a> {
         can_move: bool,
         has_menu_items: bool,
         menu_open: bool,
-        share_dialog_open: bool,
         is_selected: bool,
         is_focused: bool,
         sync_queue_is_dequeueing: bool,
@@ -258,7 +254,6 @@ impl<'a> WarpDriveRow<'a> {
             can_move,
             has_menu_items,
             menu_open,
-            share_dialog_open,
             is_selected,
             is_focused,
             sync_queue_is_dequeueing,
@@ -737,11 +732,7 @@ impl UiComponent for WarpDriveRow<'_> {
                 // If an object is both selected and focused, show focused background
                 let container_background_fill = if is_dragging || self.is_focused {
                     self.styles.dragged.background
-                } else if mouse_state.is_hovered()
-                    || self.menu_open
-                    || self.is_selected
-                    || self.share_dialog_open
-                {
+                } else if mouse_state.is_hovered() || self.menu_open || self.is_selected {
                     self.styles.hovered.background
                 } else {
                     None

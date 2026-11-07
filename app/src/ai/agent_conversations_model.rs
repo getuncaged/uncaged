@@ -1189,21 +1189,6 @@ impl AgentConversationsModel {
         self.tasks.insert(task.task_id, task);
     }
 
-    pub(crate) fn mark_task_execution_ended(
-        &mut self,
-        task_id: AmbientAgentTaskId,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let Some(task) = self.tasks.get_mut(&task_id) else {
-            return;
-        };
-        let was_active = task.has_active_execution();
-        task.is_sandbox_running = false;
-        if was_active {
-            ctx.emit(AgentConversationsModelEvent::TasksUpdated);
-        }
-    }
-
     /// Returns normalized, owned entries for agent management/navigation surfaces.
     pub fn get_entries(
         &self,
@@ -1342,12 +1327,6 @@ impl AgentConversationsModel {
                 .get(&task_id)
                 .map(AmbientAgentTask::active_live_session_state)
             {
-                Some(AmbientAgentLiveSessionState::Attachable { session_id }) => {
-                    return Some(WorkspaceAction::OpenOrAttachAmbientAgentConversation {
-                        session_id,
-                        task_id,
-                    });
-                }
                 Some(AmbientAgentLiveSessionState::ActiveUnattachable) => {
                     return active_views_model
                         .get_terminal_view_id_for_ambient_task(task_id)
@@ -1357,7 +1336,9 @@ impl AgentConversationsModel {
                             },
                         );
                 }
-                Some(AmbientAgentLiveSessionState::Inactive) | None => {}
+                Some(AmbientAgentLiveSessionState::Attachable { .. })
+                | Some(AmbientAgentLiveSessionState::Inactive)
+                | None => {}
             }
 
             if let Some(terminal_view_id) =
@@ -1581,7 +1562,6 @@ impl AgentConversationsModel {
             | BlocklistAIHistoryEvent::NewConversationRequestComplete { .. }
             | BlocklistAIHistoryEvent::OrchestrationConfigUpdated { .. }
             | BlocklistAIHistoryEvent::ConversationUsageMetadataUpdated { .. }
-            | BlocklistAIHistoryEvent::LocalSharedSessionEstablished { .. }
             | BlocklistAIHistoryEvent::UpdatedConversationMetadata { .. } => {}
 
             BlocklistAIHistoryEvent::ConversationServerTokenAssigned { .. } => {

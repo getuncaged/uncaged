@@ -2,14 +2,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use session_sharing_protocol::common::SessionId;
 use ui_components::lightbox;
 use warp_util::path::LineAndColumnArg;
 use warpui::accessibility::AccessibilityVerbosity;
 use warpui::geometry::rect::RectF;
 use warpui::geometry::vector::Vector2F;
 use warpui::platform::{Cursor, SystemTheme};
-use warpui::{EntityId, WeakViewHandle, WindowId};
+use warpui::{EntityId, WindowId};
 
 use super::global_actions::{ForkFromExchange, ForkedConversationDestination};
 use super::tab_settings::{
@@ -29,13 +28,10 @@ use crate::auth::auth_manager::LoginGatedFeature;
 use crate::drive::items::WarpDriveItemId;
 use crate::drive::CloudObjectTypeAndId;
 use crate::palette::PaletteMode;
-use crate::pane_group::PaneGroup;
 use crate::prompt::editor_modal::OpenSource as PromptEditorOpenSource;
 use crate::search;
 use crate::server::ids::SyncId;
-use crate::server::telemetry::{
-    AddTabWithShellSource, AgentModeEntrypoint, PaletteSource, SharingDialogSource,
-};
+use crate::server::telemetry::{AddTabWithShellSource, AgentModeEntrypoint, PaletteSource};
 use crate::settings_view::{SettingsAction as SettingsTabAction, SettingsSection};
 use crate::tab::{NewSessionMenuItem, SelectedTabColor};
 use crate::tab_configs::TabConfig;
@@ -460,19 +456,6 @@ pub enum WorkspaceAction {
     #[cfg(target_family = "wasm")]
     OpenLinkOnDesktop(url::Url),
     ReopenClosedSession,
-    OpenShareSessionModal(usize),
-    StopSharingSessionFromTabMenu {
-        terminal_view_id: EntityId,
-    },
-    StopSharingAllSessionsInTab {
-        pane_group: WeakViewHandle<PaneGroup>,
-    },
-    CopySharedSessionLinkFromTab {
-        tab_index: usize,
-    },
-    OpenSharedSessionQrCode {
-        session_id: SessionId,
-    },
     AddWindow,
     AddWindowWithShell {
         shell: AvailableShell,
@@ -483,11 +466,6 @@ pub enum WorkspaceAction {
     FocusRightPanel,
     /// An action to view a newly created/edited workflow in WD from the toast
     ViewObjectInWarpDrive(WarpDriveItemId),
-    /// Open the object's sharing settings in WD.
-    OpenObjectSharingSettings {
-        object_id: CloudObjectTypeAndId,
-        source: SharingDialogSource,
-    },
     UndoTrash(CloudObjectTypeAndId),
     /// Open a local path in the file explorer.
     OpenInExplorer {
@@ -793,11 +771,6 @@ pub enum WorkspaceAction {
         conversation_id: AIConversationId,
         terminal_view_id: Option<EntityId>,
     },
-    /// Open the canonical ambient agent conversation pane and attach it to a live session.
-    OpenOrAttachAmbientAgentConversation {
-        session_id: SessionId,
-        task_id: AmbientAgentTaskId,
-    },
     /// Load cloud conversation data into a transcript viewer.
     /// Used when CloudConversations is enabled and the sandbox is not running.
     OpenConversationTranscriptViewer {
@@ -908,7 +881,6 @@ impl From<&WorkspaceAction> for LoginGatedFeature {
             CreateTeamFolder => "Creating a team folder",
             CreateTeamEnvVarCollection => "Creating a team environment variable collection",
             CreateTeamAIPrompt => "Creating a team prompt",
-            OpenShareSessionModal(_) => "Sharing a session",
             _ => "Unknown reason",
         }
     }
@@ -925,7 +897,6 @@ impl WorkspaceAction {
                 | CreateTeamFolder
                 | CreateTeamEnvVarCollection
                 | CreateTeamAIPrompt
-                | OpenShareSessionModal(_)
         )
     }
 
@@ -1138,11 +1109,6 @@ impl WorkspaceAction {
             | SignupAnonymousUser
             | LogOut
             | OpenLink(_)
-            | OpenShareSessionModal(_)
-            | StopSharingSessionFromTabMenu { .. }
-            | StopSharingAllSessionsInTab { .. }
-            | CopySharedSessionLinkFromTab { .. }
-            | OpenSharedSessionQrCode { .. }
             | ReopenClosedSession
             | FocusLeftPanel
             | FocusRightPanel
@@ -1160,7 +1126,6 @@ impl WorkspaceAction {
             | UndoTrash(_)
             | OpenFilePath { .. }
             | ViewObjectInWarpDrive(_)
-            | OpenObjectSharingSettings { .. }
             | TerminateApp
             | SignInAnonymousWebUser
             | TabHoverWidthStart { .. }
@@ -1194,7 +1159,6 @@ impl WorkspaceAction {
             | ShowRewindConfirmationDialog { .. }
             | ExecuteRewindAIConversation { .. }
             | ExecuteDeleteConversation { .. }
-            | OpenOrAttachAmbientAgentConversation { .. }
             | OpenConversationTranscriptViewer { .. }
             | OpenLightbox { .. }
             | UpdateLightboxImage { .. }

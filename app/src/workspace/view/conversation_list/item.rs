@@ -6,12 +6,10 @@ use warp_core::ui::theme::WarpTheme;
 use warp_util::path::user_friendly_path;
 use warpui::color::ColorU;
 use warpui::elements::{
-    AnchorPair, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
-    CrossAxisAlignment, DispatchEventResult, Element, Empty, EventHandler, Expanded,
-    Fill as ElementFill, Flex, Highlight, Hoverable, MainAxisAlignment, MainAxisSize,
-    MouseInBehavior, MouseStateHandle, OffsetPositioning, OffsetType, ParentAnchor, ParentElement,
-    ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius, SavePosition,
-    Stack, Text, XAxisAnchor, YAxisAnchor,
+    ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, DispatchEventResult,
+    Element, Empty, EventHandler, Expanded, Fill as ElementFill, Flex, Highlight, Hoverable,
+    MainAxisAlignment, MainAxisSize, MouseInBehavior, MouseStateHandle, OffsetPositioning,
+    ParentAnchor, ParentElement, ParentOffsetBounds, Radius, SavePosition, Stack, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::platform::Cursor;
@@ -26,7 +24,6 @@ use crate::ai::agent_conversations_model::{
     AgentConversationEntry, AgentConversationEntryId, AgentConversationProvenance,
 };
 use crate::appearance::Appearance;
-use crate::drive::sharing::dialog::SharingDialog;
 use crate::editor::EditorView;
 use crate::menu::Menu;
 use crate::ui_components::icons::Icon;
@@ -44,9 +41,6 @@ const ICON_SPACING: f32 = 4.;
 /// or not a row has one.
 const STATUS_DOT_SIZE: f32 = 6.;
 const STATUS_SLOT_WIDTH: f32 = 14.;
-
-/// Offset for the sharing dialog from the item row
-const DIALOG_OFFSET_PIXELS: f32 = -16.;
 
 /// Generate a position ID for a conversation list item
 fn conversation_item_position_id(id: &AgentConversationEntryId) -> String {
@@ -93,8 +87,6 @@ pub struct ItemProps<'a> {
     pub is_renaming: bool,
     pub can_rename: bool,
     pub rename_editor: Option<&'a ViewHandle<EditorView>>,
-    pub sharing_dialog: &'a ViewHandle<SharingDialog>,
-    pub is_share_dialog_open: bool,
     pub list_position_id: &'a str,
     pub tooltip_opens_right: bool,
 }
@@ -113,8 +105,6 @@ pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
         is_renaming,
         can_rename,
         rename_editor,
-        sharing_dialog,
-        is_share_dialog_open,
         list_position_id,
         tooltip_opens_right,
     } = props;
@@ -368,33 +358,9 @@ pub fn render_item(props: ItemProps<'_>, app: &AppContext) -> Box<dyn Element> {
         )
         .finish();
 
-    // Wrap in a stack to support the sharing dialog overlay
     let position_id = conversation_item_position_id(&conversation_id);
-    let mut item_stack = Stack::new().with_child(event_handler);
 
-    // Add the sharing dialog as a positioned overlay when open for this item
-    if is_share_dialog_open {
-        // Position the dialog to the right of the item row
-        item_stack.add_positioned_overlay_child(
-            ChildView::new(sharing_dialog).finish(),
-            OffsetPositioning::from_axes(
-                PositioningAxis::relative_to_stack_child(
-                    &position_id,
-                    PositionedElementOffsetBounds::WindowBySize,
-                    OffsetType::Pixel(DIALOG_OFFSET_PIXELS),
-                    AnchorPair::new(XAxisAnchor::Right, XAxisAnchor::Left),
-                ),
-                PositioningAxis::relative_to_stack_child(
-                    &position_id,
-                    PositionedElementOffsetBounds::WindowByPosition,
-                    OffsetType::Pixel(DIALOG_OFFSET_PIXELS),
-                    AnchorPair::new(YAxisAnchor::Middle, YAxisAnchor::Middle),
-                ),
-            ),
-        );
-    }
-
-    ConstrainedBox::new(SavePosition::new(item_stack.finish(), &position_id).finish())
+    ConstrainedBox::new(SavePosition::new(event_handler, &position_id).finish())
         .with_height(LIST_ROW_HEIGHT)
         .finish()
 }

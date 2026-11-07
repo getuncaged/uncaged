@@ -159,7 +159,6 @@ pub struct AgentConversationBackingData {
 pub struct AgentConversationCapabilities {
     pub can_open: bool,
     pub can_copy_link: bool,
-    pub can_share: bool,
     pub can_delete: bool,
     pub can_fork_locally: bool,
     pub can_cancel: bool,
@@ -534,9 +533,6 @@ pub(super) fn entry_for_task(
         capabilities: AgentConversationCapabilities {
             can_open,
             can_copy_link,
-            can_share: task.conversation_id().is_some()
-                || local_conversation_id
-                    .is_some_and(|id| history_model.can_conversation_be_shared(&id)),
             can_delete: false,
             can_fork_locally: local_conversation_id.is_some(),
             can_cancel: status.is_cancellable(),
@@ -647,7 +643,6 @@ fn entry_for_conversation_parts(
                 history_model,
             )
             .is_some(),
-            can_share: history_model.can_conversation_be_shared(&conversation_id),
             can_delete: has_local_persisted_data,
             can_fork_locally: has_local_persisted_data,
             can_cancel: status.is_cancellable(),

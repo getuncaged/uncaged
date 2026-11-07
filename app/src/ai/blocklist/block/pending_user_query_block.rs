@@ -147,7 +147,6 @@ impl View for PendingUserQueryBlock {
         let avatar = Container::new(render_user_avatar(
             &self.user_display_name,
             self.profile_image_path.as_ref(),
-            None,
             app,
         ))
         .with_margin_right(16.)

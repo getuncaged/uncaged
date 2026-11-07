@@ -24,7 +24,6 @@ use crate::server::server_api::ServerApiProvider;
 use crate::server::sync_queue::{QueueItem, SyncQueue};
 use crate::server::telemetry::context_provider::AppTelemetryContextProvider;
 use crate::settings_view::keybindings::KeybindingChangedNotifier;
-use crate::terminal::shared_session::permissions_manager::SessionPermissionsManager;
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::workflows::workflow::Workflow;
 use crate::workflows::{CloudWorkflow, CloudWorkflowModel};
@@ -50,7 +49,6 @@ fn initialize_app(app: &mut App) {
     app.add_singleton_model(CloudViewModel::mock);
     app.add_singleton_model(|_| ObjectActions::new(Vec::new()));
     app.add_singleton_model(|_| UserProfiles::new(Vec::new()));
-    app.add_singleton_model(SessionPermissionsManager::new);
     app.add_singleton_model(|_| KeybindingChangedNotifier::mock());
     app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
     #[cfg(feature = "voice_input")]
@@ -132,27 +130,25 @@ fn test_retry_menu_item_visibility() {
         // Uncaged (Oss): the Drive is local, so local (ClientId) objects can be trashed too.
         index.update(&mut app, |index, ctx| {
             let menu_items = index.menu_items(&Space::Personal, &warp_drive_item_id, ctx);
-            assert_eq!(menu_items.len(), 6);
+            assert_eq!(menu_items.len(), 5);
             assert_eq!(label_for_menu_item(&menu_items[0]), "Edit");
             assert_eq!(label_for_menu_item(&menu_items[1]), "Copy workflow text");
-            assert_eq!(label_for_menu_item(&menu_items[2]), "Share");
-            assert_eq!(label_for_menu_item(&menu_items[3]), "Duplicate");
-            assert_eq!(label_for_menu_item(&menu_items[4]), "Export");
-            assert_eq!(label_for_menu_item(&menu_items[5]), "Trash");
+            assert_eq!(label_for_menu_item(&menu_items[2]), "Duplicate");
+            assert_eq!(label_for_menu_item(&menu_items[3]), "Export");
+            assert_eq!(label_for_menu_item(&menu_items[4]), "Trash");
         });
 
         // when the object is in error, it should show up
         set_object_in_error(&mut app, &cloud_object_type_and_id);
         index.update(&mut app, |index, ctx| {
             let menu_items = index.menu_items(&Space::Personal, &warp_drive_item_id, ctx);
-            assert_eq!(menu_items.len(), 7);
+            assert_eq!(menu_items.len(), 6);
             assert_eq!(label_for_menu_item(&menu_items[0]), "Retry");
             assert_eq!(label_for_menu_item(&menu_items[1]), "Edit");
             assert_eq!(label_for_menu_item(&menu_items[2]), "Copy workflow text");
-            assert_eq!(label_for_menu_item(&menu_items[3]), "Share");
-            assert_eq!(label_for_menu_item(&menu_items[4]), "Duplicate");
-            assert_eq!(label_for_menu_item(&menu_items[5]), "Export");
-            assert_eq!(label_for_menu_item(&menu_items[6]), "Trash");
+            assert_eq!(label_for_menu_item(&menu_items[3]), "Duplicate");
+            assert_eq!(label_for_menu_item(&menu_items[4]), "Export");
+            assert_eq!(label_for_menu_item(&menu_items[5]), "Trash");
         });
 
         // but if we're offline, it shouldn't show up (Trash stays: local trashing needs no network)
@@ -161,13 +157,12 @@ fn test_retry_menu_item_visibility() {
         });
         index.update(&mut app, |index, ctx| {
             let menu_items = index.menu_items(&Space::Personal, &warp_drive_item_id, ctx);
-            assert_eq!(menu_items.len(), 6);
+            assert_eq!(menu_items.len(), 5);
             assert_eq!(label_for_menu_item(&menu_items[0]), "Edit");
             assert_eq!(label_for_menu_item(&menu_items[1]), "Copy workflow text");
-            assert_eq!(label_for_menu_item(&menu_items[2]), "Share");
-            assert_eq!(label_for_menu_item(&menu_items[3]), "Duplicate");
-            assert_eq!(label_for_menu_item(&menu_items[4]), "Export");
-            assert_eq!(label_for_menu_item(&menu_items[5]), "Trash");
+            assert_eq!(label_for_menu_item(&menu_items[2]), "Duplicate");
+            assert_eq!(label_for_menu_item(&menu_items[3]), "Export");
+            assert_eq!(label_for_menu_item(&menu_items[4]), "Trash");
         });
     })
 }

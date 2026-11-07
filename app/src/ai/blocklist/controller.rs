@@ -6,7 +6,6 @@
 pub mod input_context;
 mod pending_response_streams;
 pub mod response_stream;
-pub(super) mod shared_session;
 mod slash_command;
 use std::collections::{HashMap, HashSet};
 #[cfg(not(target_family = "wasm"))]
@@ -21,7 +20,6 @@ use input_context::{input_context_for_request, parse_context_attachments};
 use itertools::Itertools;
 use parking_lot::FairMutex;
 use pending_response_streams::PendingResponseStreams;
-use session_sharing_protocol::common::ParticipantId;
 pub use slash_command::*;
 use warp_core::assertions::safe_assert;
 use warp_multi_agent_api::{message, Task, ToolType};
@@ -187,7 +185,6 @@ pub struct RequestInput {
     pub coding_model_id: LLMId,
     pub cli_agent_model_id: LLMId,
     pub computer_use_model_id: LLMId,
-    pub shared_session_response_initiator: Option<ParticipantId>,
     pub request_start_ts: DateTime<Local>,
     pub supported_tools_override: Option<Vec<ToolType>>,
 }
@@ -197,18 +194,12 @@ impl RequestInput {
         inputs: Vec<AIAgentInput>,
         task_id: TaskId,
         active_session: &ModelHandle<ActiveSession>,
-        shared_session_response_initiator: Option<ParticipantId>,
         conversation_id: AIConversationId,
         terminal_view_id: EntityId,
         app: &AppContext,
     ) -> Self {
-        let mut me = Self::new_with_common_fields(
-            conversation_id,
-            active_session,
-            shared_session_response_initiator,
-            terminal_view_id,
-            app,
-        );
+        let mut me =
+            Self::new_with_common_fields(conversation_id, active_session, terminal_view_id, app);
         me.input_messages.insert(task_id, inputs);
         me
     }
@@ -217,18 +208,12 @@ impl RequestInput {
         action_results: Vec<AIAgentActionResult>,
         context: Arc<[AIAgentContext]>,
         active_session: &ModelHandle<ActiveSession>,
-        shared_session_response_initiator: Option<ParticipantId>,
         conversation_id: AIConversationId,
         terminal_view_id: EntityId,
         app: &AppContext,
     ) -> Self {
-        let mut me = Self::new_with_common_fields(
-            conversation_id,
-            active_session,
-            shared_session_response_initiator,
-            terminal_view_id,
-            app,
-        );
+        let mut me =
+            Self::new_with_common_fields(conversation_id, active_session, terminal_view_id, app);
         for result in action_results.into_iter() {
             me.input_messages
                 .entry(result.task_id.clone())
@@ -253,7 +238,6 @@ impl RequestInput {
     fn new_with_common_fields(
         conversation_id: AIConversationId,
         active_session: &ModelHandle<ActiveSession>,
-        shared_session_response_initiator: Option<ParticipantId>,
         terminal_view_id: EntityId,
         app: &AppContext,
     ) -> Self {
@@ -287,7 +271,6 @@ impl RequestInput {
             coding_model_id,
             cli_agent_model_id,
             computer_use_model_id,
-            shared_session_response_initiator,
             request_start_ts: Local::now(),
             supported_tools_override: None,
         }
@@ -310,8 +293,6 @@ pub struct BlocklistAIController {
     terminal_view_id: EntityId,
 
     should_refresh_available_llms_on_stream_finish: bool,
-
-    shared_session_state: shared_session::SharedSessionState,
 
     /// Ambient agent task ID attached to this controller. This is a property of the controller, and not an individual
     /// conversation, because the ambient agent task driver owns the entire Warp window working on a task, and any
@@ -611,7 +592,6 @@ impl BlocklistAIController {
             in_flight_response_streams: PendingResponseStreams::new(),
             terminal_view_id,
             should_refresh_available_llms_on_stream_finish: false,
-            shared_session_state: shared_session::SharedSessionState::default(),
             ambient_agent_task_id: None,
             attachments_download_dir: None,
             pending_auto_resume_handles: HashMap::new(),
@@ -632,18 +612,9 @@ impl BlocklistAIController {
         &mut self,
         input_query: InputQuery,
         entrypoint_type: EntrypointType,
-        // The shared session participant who initiated this query
-        // (None if this is not a shared session).
-        shared_session_participant_id: Option<ParticipantId>,
         is_queued_prompt: bool,
         ctx: &mut ModelContext<Self>,
     ) {
-        // Store the participant who initiated this query before sending
-        // so that send_query can use it when creating the exchange.
-        if let Some(participant_id) = shared_session_participant_id {
-            self.set_current_response_initiator(participant_id);
-        }
-
         let query = input_query.query().to_owned();
         let (conversation_id, task_id) = match input_query.which_task {
             WhichTask::NewConversation => {
@@ -823,7 +794,6 @@ impl BlocklistAIController {
                 inputs,
                 task_id,
                 &self.active_session,
-                self.get_current_response_initiator(),
                 conversation_id,
                 self.terminal_view_id,
                 ctx,
@@ -931,14 +901,12 @@ impl BlocklistAIController {
         query: String,
         static_query_type: Option<StaticQueryType>,
         entrypoint_type: EntrypointType,
-        participant_id: Option<ParticipantId>,
         ctx: &mut ModelContext<Self>,
     ) {
         self.send_user_query_in_new_conversation_internal(
             query,
             static_query_type,
             entrypoint_type,
-            participant_id,
             /*is_queued_prompt*/ false,
             /*queued_query_id*/ None,
             ctx,
@@ -954,7 +922,6 @@ impl BlocklistAIController {
         query: String,
         static_query_type: Option<StaticQueryType>,
         entrypoint_type: EntrypointType,
-        participant_id: Option<ParticipantId>,
         queued_query_id: QueuedQueryId,
         ctx: &mut ModelContext<Self>,
     ) {
@@ -962,7 +929,6 @@ impl BlocklistAIController {
             query,
             static_query_type,
             entrypoint_type,
-            participant_id,
             /*is_queued_prompt*/ true,
             Some(queued_query_id),
             ctx,
@@ -975,12 +941,10 @@ impl BlocklistAIController {
         query: String,
         static_query_type: Option<StaticQueryType>,
         entrypoint_type: EntrypointType,
-        participant_id: Option<ParticipantId>,
         is_queued_prompt: bool,
         queued_query_id: Option<QueuedQueryId>,
         ctx: &mut ModelContext<Self>,
     ) {
-        let participant_id = participant_id.or_else(|| self.get_sharer_participant_id());
         let running_command = {
             let terminal_model = self.terminal_model.lock();
             get_running_command(&terminal_model)
@@ -1017,7 +981,6 @@ impl BlocklistAIController {
                     queued_query_id,
                 },
                 entrypoint_type,
-                participant_id,
                 is_queued_prompt,
                 ctx,
             );
@@ -1034,7 +997,6 @@ impl BlocklistAIController {
                     queued_query_id,
                 },
                 entrypoint_type,
-                participant_id,
                 is_queued_prompt,
                 ctx,
             );
@@ -1052,7 +1014,6 @@ impl BlocklistAIController {
         self.send_user_query_in_conversation_internal(
             query,
             conversation_id,
-            None,
             false,
             HashMap::new(),
             EntrypointType::AgentInitiated,
@@ -1067,13 +1028,11 @@ impl BlocklistAIController {
         &mut self,
         query: String,
         conversation_id: AIConversationId,
-        participant_id: Option<ParticipantId>,
         ctx: &mut ModelContext<Self>,
     ) {
         self.send_user_query_in_conversation_internal(
             query,
             conversation_id,
-            participant_id,
             false, // skip_running_command_detection
             HashMap::new(),
             EntrypointType::UserInitiated,
@@ -1091,14 +1050,12 @@ impl BlocklistAIController {
         &mut self,
         query: String,
         conversation_id: AIConversationId,
-        participant_id: Option<ParticipantId>,
         queued_query_id: QueuedQueryId,
         ctx: &mut ModelContext<Self>,
     ) {
         self.send_user_query_in_conversation_internal(
             query,
             conversation_id,
-            participant_id,
             false, // skip_running_command_detection
             HashMap::new(),
             EntrypointType::UserInitiated,
@@ -1113,14 +1070,12 @@ impl BlocklistAIController {
         &mut self,
         query: String,
         conversation_id: AIConversationId,
-        participant_id: Option<ParticipantId>,
         additional_attachments: HashMap<String, AIAgentAttachment>,
         ctx: &mut ModelContext<Self>,
     ) {
         self.send_user_query_in_conversation_internal(
             query,
             conversation_id,
-            participant_id,
             false, // skip_running_command_detection
             additional_attachments,
             EntrypointType::UserInitiated,
@@ -1138,13 +1093,11 @@ impl BlocklistAIController {
         &mut self,
         query: String,
         conversation_id: AIConversationId,
-        participant_id: Option<ParticipantId>,
         ctx: &mut ModelContext<Self>,
     ) {
         self.send_user_query_in_conversation_internal(
             query,
             conversation_id,
-            participant_id,
             true, // skip_running_command_detection
             HashMap::new(),
             EntrypointType::UserInitiated,
@@ -1159,7 +1112,6 @@ impl BlocklistAIController {
         &mut self,
         query: String,
         conversation_id: AIConversationId,
-        participant_id: Option<ParticipantId>,
         skip_running_command_detection: bool,
         additional_attachments: HashMap<String, AIAgentAttachment>,
         entrypoint_type: EntrypointType,
@@ -1167,15 +1119,6 @@ impl BlocklistAIController {
         queued_query_id: Option<QueuedQueryId>,
         ctx: &mut ModelContext<Self>,
     ) {
-        let is_viewer = self
-            .terminal_model
-            .lock()
-            .shared_session_status()
-            .is_viewer();
-        if is_viewer {
-            log::error!("Viewers should never attempt to send queries directly");
-        }
-
         // Ensure we capture all pending context blocks before promoting and attaching them to the conversation.
         let context_block_ids = self
             .context_model
@@ -1258,8 +1201,6 @@ impl BlocklistAIController {
                 }
             }
         }
-
-        let participant_id = participant_id.or_else(|| self.get_sharer_participant_id());
         self.send_query(
             InputQuery {
                 which_task: WhichTask::Task {
@@ -1275,7 +1216,6 @@ impl BlocklistAIController {
                 queued_query_id,
             },
             entrypoint_type,
-            participant_id,
             is_queued_prompt,
             ctx,
         );
@@ -1287,7 +1227,6 @@ impl BlocklistAIController {
         query_type: ZeroStatePromptSuggestionType,
         ctx: &mut ModelContext<Self>,
     ) {
-        let participant_id = self.get_sharer_participant_id();
         self.send_query(
             InputQuery {
                 which_task: WhichTask::NewConversation,
@@ -1300,7 +1239,6 @@ impl BlocklistAIController {
                 queued_query_id: None,
             },
             EntrypointType::ZeroStateAgentModePromptSuggestion,
-            participant_id,
             /*is_queued_prompt*/ false,
             ctx,
         );
@@ -1312,7 +1250,6 @@ impl BlocklistAIController {
         ai_input: AIAgentInput,
         ctx: &mut ModelContext<Self>,
     ) {
-        let participant_id = self.get_sharer_participant_id();
         let which_task = match self.context_model.as_ref(ctx).selected_conversation_id(ctx) {
             Some(id) => {
                 let Some(conversation) = BlocklistAIHistoryModel::as_ref(ctx).conversation(&id)
@@ -1337,7 +1274,6 @@ impl BlocklistAIController {
                 queued_query_id: None,
             },
             EntrypointType::UserInitiated,
-            participant_id,
             /*is_queued_prompt*/ false,
             ctx,
         )
@@ -1452,8 +1388,6 @@ impl BlocklistAIController {
             vec![],
             ctx,
         );
-
-        let participant_id = self.get_sharer_participant_id();
         let trigger_type = trigger.as_ref().map(PassiveSuggestionTriggerType::from);
         log::debug!(
             "[passive-suggestions] sending result: trigger={}, trigger_type={:?}",
@@ -1476,7 +1410,6 @@ impl BlocklistAIController {
             EntrypointType::TriggerPassiveSuggestion {
                 trigger: trigger_type,
             },
-            participant_id,
             /*is_queued_prompt*/ false,
             ctx,
         );
@@ -1557,7 +1490,6 @@ impl BlocklistAIController {
             finished_results,
             context,
             &self.active_session,
-            self.get_current_response_initiator(),
             conversation_id,
             self.terminal_view_id,
             ctx,
@@ -1859,7 +1791,6 @@ impl BlocklistAIController {
                     inputs,
                     task_id,
                     &self.active_session,
-                    self.get_current_response_initiator(),
                     conversation_id,
                     self.terminal_view_id,
                     ctx,
@@ -1981,7 +1912,6 @@ impl BlocklistAIController {
                 inputs,
                 task_id,
                 &self.active_session,
-                self.get_current_response_initiator(),
                 conversation_id,
                 self.terminal_view_id,
                 ctx,
@@ -2057,7 +1987,6 @@ impl BlocklistAIController {
                 }],
                 new_conversation.get_root_task_id().clone(),
                 &self.active_session,
-                self.get_current_response_initiator(),
                 new_conversation.id(),
                 self.terminal_view_id,
                 ctx,
@@ -2170,7 +2099,6 @@ impl BlocklistAIController {
             inputs,
             task_id,
             &self.active_session,
-            self.get_current_response_initiator(),
             conversation_id,
             self.terminal_view_id,
             ctx,
@@ -2224,7 +2152,6 @@ impl BlocklistAIController {
                 inputs,
                 new_conversation.get_root_task_id().clone(),
                 &self.active_session,
-                self.get_current_response_initiator(),
                 new_conversation.id(),
                 self.terminal_view_id,
                 ctx,
@@ -2727,36 +2654,6 @@ impl BlocklistAIController {
                 let history_model = BlocklistAIHistoryModel::handle(ctx);
                 match event {
                     Ok(event) => {
-                        // If this controller is part of a shared session, forward the entire response event to viewers first.
-                        if FeatureFlag::AgentSharedSessions.is_enabled() {
-                            let mut model = self.terminal_model.lock();
-                            if model.shared_session_status().is_sharer() {
-                                // Get the participant who initiated this response, falling back to the sharer if needed.
-                                let participant_id = self
-                                    .get_current_response_initiator()
-                                    .or_else(|| self.get_sharer_participant_id());
-
-                                // For forked conversations (e.g. when loading from cloud), include
-                                // the original conversation token so viewers can link the new
-                                // server-assigned token to their existing conversation.
-                                //
-                                // This token is cleared after the first Init event (see below),
-                                // so it's only sent once per forked conversation.
-                                let forked_from_token = history_model
-                                    .as_ref(ctx)
-                                    .conversation(&conversation_id)
-                                    .and_then(|conv| {
-                                        conv.forked_from_server_conversation_token()
-                                            .map(|t| t.as_str().to_string())
-                                    });
-
-                                model.send_agent_response_for_shared_session(
-                                    &event,
-                                    participant_id,
-                                    forked_from_token,
-                                );
-                            }
-                        }
                         let Some(event) = event.r#type else {
                             return;
                         };
@@ -2947,18 +2844,6 @@ impl BlocklistAIController {
                 }
 
                 if let Some(stream_cancellation) = &cancellation {
-                    // If this is a shared session, send a synthetic StreamFinished event to notify viewers
-                    // of any user-initiated cancellation. We skip internal cancellations that preserve
-                    // the conversation's InProgress status, such as follow-ups and CLI subagent user
-                    // takeover, because those do not end the conversation.
-                    if FeatureFlag::AgentSharedSessions.is_enabled()
-                        && !stream_cancellation
-                            .reason
-                            .should_preserve_in_progress_status()
-                    {
-                        self.send_cancellation_to_viewers(ctx);
-                    }
-
                     history_model.update(ctx, |history_model, ctx| {
                         history_model.mark_response_stream_cancelled(
                             &stream_id,

@@ -64,3 +64,12 @@ fn test_apply_latest_state() {
         });
     });
 }
+
+#[test]
+fn removed_session_sharing_experiments_are_not_recognized() {
+    // Session sharing was removed; rows cached with these names must be dropped on load (the
+    // sqlite reader filters out experiments that fail to parse) instead of failing.
+    assert!(ServerExperiment::from_string("SESSION_SHARING_CONTROL".to_owned()).is_err());
+    assert!(ServerExperiment::from_string("SESSION_SHARING_EXPERIMENT".to_owned()).is_err());
+    assert!(ServerExperiment::from_string("DISABLE_AGENT_MODE_EXPERIMENT".to_owned()).is_ok());
+}

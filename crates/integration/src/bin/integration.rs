@@ -44,7 +44,6 @@ pub fn main() -> Result<()> {
                 // black-hole server traffic.
                 server_root_url: "http://192.0.2.0:9".into(),
                 rtc_server_url: "ws://192.0.2.0:9/graphql/v2".into(),
-                session_sharing_server_url: None,
             },
             oz_config: OzConfig {
                 // Use an IP in the IANA testing range, with the TCP discard port, to
@@ -378,7 +377,6 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
     register_test!(test_block_filtering_clear_blocklist);
 
     register_test!(test_autosuggestions_are_hidden_when_opening_tab_completions);
-    register_test!(test_latest_buffer_operations);
 
     register_test!(test_pass_control_sequences_to_long_running_block);
     register_test!(test_settings_file_migration_from_native_store);

@@ -10,9 +10,7 @@ use warp_core::ui::appearance::Appearance;
 use warp_terminal::model::BlockId;
 use warpui::elements::Align;
 use warpui::prelude::{Empty, Vector2F};
-use warpui::{
-    AppContext, Element, EntityId, ModelHandle, SingletonEntity, ViewContext, ViewHandle,
-};
+use warpui::{AppContext, Element, ModelHandle, SingletonEntity, ViewContext, ViewHandle};
 
 use super::loading_screen::{
     render_cloud_mode_cancelled_screen, render_cloud_mode_error_screen,
@@ -24,12 +22,10 @@ use crate::ai::agent::display_user_query_with_mode;
 #[cfg(not(target_family = "wasm"))]
 use crate::ai::agent_sdk::driver::harness::auth_check_command_for;
 use crate::ai::ambient_agents::telemetry::{CloudAgentTelemetryEvent, CloudModeEntryPoint};
-use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
 use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::ai::conversation_details_panel::ConversationDetailsData;
 use crate::ai::AIRequestUsageModel;
 use crate::pane_group::TerminalViewResources;
-use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::view::rich_content::{RichContentInsertionPosition, RichContentMetadata};
 use crate::terminal::view::{
     ConversationDetailsPanelAutoOpenPolicy, Event as TerminalViewEvent, TerminalView,
@@ -142,12 +138,10 @@ impl TerminalView {
                 // Pane chrome (e.g. cloud indicator, task id) must update on viewer surfaces
                 // too, so this runs above the viewer short-circuit below.
                 self.update_pane_configuration(ctx);
-                // Only the spawner's view handles `DispatchedAgent`. Viewer surfaces (shared
-                // ambient agent session or transcript viewer) have no submitted prompt to render
-                // and should not insert cloud-mode rich content here.
-                let is_viewer = self.is_shared_ambient_agent_session()
-                    || self.model.lock().is_conversation_transcript_viewer();
-                if is_viewer {
+                // Only the spawner's view handles `DispatchedAgent`. Viewer surfaces (transcript
+                // viewer) have no submitted prompt to render and should not insert cloud-mode
+                // rich content here.
+                if self.model.lock().is_conversation_transcript_viewer() {
                     ctx.notify();
                     return;
                 }
@@ -278,7 +272,6 @@ impl TerminalView {
             AmbientAgentViewModelEvent::ShowCloudAgentCapacityModal => {
                 if FeatureFlag::CloudMode.is_enabled()
                     && ambient_agent_view_model.as_ref(ctx).is_ambient_agent()
-                    && !self.model.lock().is_shared_ambient_agent_session()
                 {
                     ctx.emit(crate::terminal::view::Event::ShowCloudAgentCapacityModal {
                         variant: CloudAgentCapacityModalVariant::ConcurrentLimit,
@@ -290,7 +283,6 @@ impl TerminalView {
             AmbientAgentViewModelEvent::ShowAICreditModal => {
                 if FeatureFlag::CloudMode.is_enabled()
                     && ambient_agent_view_model.as_ref(ctx).is_ambient_agent()
-                    && !self.model.lock().is_shared_ambient_agent_session()
                 {
                     self.show_out_of_credits_modal(ctx);
                 }
@@ -334,9 +326,6 @@ impl TerminalView {
                 ctx.notify();
             }
             AmbientAgentViewModelEvent::ViewerHarnessResolved => {
-                // Once we know which harness we're using from the server, try and enter the agent
-                // view if we haven't already.
-                self.sync_agent_view_for_shared_third_party_viewer(ctx);
                 self.update_pane_configuration(ctx);
                 ctx.emit(TerminalViewEvent::TerminalViewStateChanged);
                 ctx.notify();
@@ -408,11 +397,6 @@ impl TerminalView {
                         );
                     }
                 }
-
-                // Force a fresh viewer size report to the sharer so the harness CLI (e.g.
-                // the claude TUI) starts at our terminal's actual dimensions instead of
-                // whatever the sandbox PTY was sized to during setup.
-                self.force_report_viewer_terminal_size(ctx);
                 ctx.emit(TerminalViewEvent::TerminalViewStateChanged);
                 ctx.notify();
             }
@@ -528,85 +512,6 @@ impl TerminalView {
             RichContentInsertionPosition::BeforeBlockIndex(block_index),
             ctx,
         );
-    }
-
-    /// Returns whether this view is a live shared-session viewer for a non-Oz cloud run.
-    fn is_third_party_cloud_agent_viewer(&self, ctx: &AppContext) -> bool {
-        // The ambient model's harness resolves asynchronously after join, when we fetch the task.
-        // Until then, use the synced CLI-agent session (which we get on shared session join, if the
-        // CLI agent is currently active) as the live third-party harness signal.
-        let has_ambient_third_party_harness = self
-            .ambient_agent_view_model
-            .as_ref()
-            .is_some_and(|model| model.as_ref(ctx).is_third_party_harness());
-        let has_cli_agent_session = FeatureFlag::AgentHarness.is_enabled() && {
-            CLIAgentSessionsModel::as_ref(ctx)
-                .session(self.view_id)
-                .is_some()
-        };
-        let is_shared_ambient_agent_session = self.is_shared_ambient_agent_session();
-
-        (has_ambient_third_party_harness || has_cli_agent_session)
-            && is_shared_ambient_agent_session
-    }
-
-    /// Syncs agent view for a live shared-session viewer of a non-oz cloud run, so every
-    /// viewer lands in the same agent-view chrome regardless of which entry point opened the
-    /// conversation. Called from two independent signals that race:
-    /// - `ViewerHarnessUpdated`: ambient model resolved the harness from the task fetch
-    /// - `apply_cli_agent_state_update`: CLI session synced on viewer join/reconnect
-    ///
-    /// Transcript viewer entry is handled directly in `load_data_into_transcript_viewer` so
-    /// the snapshot block exists before we retag — we intentionally do not trigger that path
-    /// here.
-    pub(crate) fn sync_agent_view_for_shared_third_party_viewer(
-        &mut self,
-        ctx: &mut ViewContext<Self>,
-    ) -> Option<AIConversationId> {
-        if !self.is_third_party_cloud_agent_viewer(ctx) {
-            return None;
-        }
-        if let Some(conversation_id) = self
-            .agent_view_controller
-            .as_ref(ctx)
-            .agent_view_state()
-            .active_conversation_id()
-        {
-            return Some(conversation_id);
-        }
-        self.enter_agent_view_for_new_conversation(
-            None,
-            AgentViewEntryOrigin::ThirdPartyCloudAgent,
-            ctx,
-        );
-
-        let vehicle_conversation_id = self
-            .agent_view_controller
-            .as_ref(ctx)
-            .agent_view_state()
-            .active_conversation_id()?;
-
-        // Retag existing non-setup blocks so the harness content passes the agent view filter.
-        self.model
-            .lock()
-            .block_list_mut()
-            .attach_non_startup_blocks_to_conversation(vehicle_conversation_id);
-
-        // Retag rich content inserted in terminal mode (setup-commands summary, tombstone, …)
-        // so it stays visible under the vehicle conversation. Rich content with
-        // `agent_view_conversation_id == None` is hidden in full-screen agent view by
-        // `RichContentItem::should_hide_for_agent_view_state`.
-        let ids_to_retag: Vec<EntityId> = self
-            .rich_content_views
-            .iter()
-            .filter(|rc| rc.agent_view_conversation_id().is_none())
-            .map(|rc| rc.view_id())
-            .collect();
-        for view_id in ids_to_retag {
-            self.set_rich_content_agent_view_conversation_id(view_id, vehicle_conversation_id);
-        }
-
-        Some(vehicle_conversation_id)
     }
 
     /// Returns `true` when the block's command is the CLI for the run's configured
@@ -771,13 +676,8 @@ impl TerminalView {
         };
 
         // TODO: Use self.size_info
-        let (terminal_view, terminal_manager) = super::create_cloud_mode_view(
-            resources,
-            Vector2F::zero(),
-            ctx.window_id(),
-            true, // root orchestrator viewer
-            ctx,
-        );
+        let (terminal_view, terminal_manager) =
+            super::create_cloud_mode_view(resources, Vector2F::zero(), ctx.window_id(), ctx);
 
         // Only insert an ambient agent entry block once the agent is actually dispatched.
         // This avoids persisting an empty "New cloud agent" entry when the user enters cloud mode

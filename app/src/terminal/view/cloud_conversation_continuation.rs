@@ -1,5 +1,6 @@
 use warp_cli::agent::Harness;
-use warpui::{AppContext, EntityId, SingletonEntity};
+use warp_core::features::FeatureFlag;
+use warpui::{AppContext, EntityId, SingletonEntity, ViewContext};
 
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{
@@ -14,6 +15,12 @@ use crate::ai::blocklist::BlocklistAIHistoryModel;
 use crate::auth::AuthStateProvider;
 use crate::cloud_object::{Owner, ServerGuestSubject};
 use crate::drive::sharing::SharingAccessLevel;
+use crate::editor::InteractionState;
+use crate::terminal::view::conversation_ended_tombstone_view::{
+    ConversationEndedTombstoneEvent, ConversationEndedTombstoneView,
+};
+use crate::terminal::view::{PendingUserQueryKind, RichContentInsertionPosition, TerminalView};
+use crate::terminal::TerminalModel;
 use crate::workspaces::user_workspaces::UserWorkspaces;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -274,6 +281,224 @@ fn local_conversation_id_for_local_continuation(
         .find(|conversation| conversation.server_conversation_token() == Some(conversation_token))
         .map(|conversation| conversation.id())
         .or_else(|| history_model.find_conversation_id_by_server_token(conversation_token))
+}
+
+impl TerminalView {
+    pub(in crate::terminal::view) fn cloud_conversation_continuation_ui_state(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<CloudConversationContinuationUiState> {
+        let task_id = {
+            let model = self.model.lock();
+            if !FeatureFlag::CloudModeSetupV2.is_enabled()
+                || !FeatureFlag::HandoffCloudCloud.is_enabled()
+            {
+                return None;
+            }
+
+            let is_cloud_conversation_surface = model.is_conversation_transcript_viewer()
+                || self
+                    .ambient_agent_view_model
+                    .as_ref()
+                    .is_some_and(|model| model.as_ref(ctx).is_ambient_agent());
+            if !is_cloud_conversation_surface {
+                return None;
+            }
+
+            self.ambient_agent_task_id_for_details_panel_from_model(&model, ctx)
+        };
+        let Some(task_id) = task_id else {
+            return conversation_failed_before_task_creation(
+                self.id(),
+                BlocklistAIHistoryModel::as_ref(ctx),
+            )
+            .then_some(CloudConversationContinuationUiState::Tombstone { cta: None });
+        };
+        match resolve_cloud_conversation_continuation_ui_state(self.id(), task_id, ctx) {
+            Ok(state) => Some(state),
+            Err(error) => error
+                .should_fallback_to_tombstone()
+                .then_some(CloudConversationContinuationUiState::Tombstone { cta: None }),
+        }
+    }
+
+    pub(in crate::terminal::view) fn blocks_cloud_followups_for_ambient_agent_session_from_model(
+        &self,
+        model: &TerminalModel,
+        ctx: &AppContext,
+    ) -> bool {
+        if self
+            .ambient_agent_view_model
+            .as_ref()
+            .is_some_and(|model| model.as_ref(ctx).blocks_cloud_followups())
+        {
+            return true;
+        }
+
+        let Some(task_id) = self.ambient_agent_task_id_for_details_panel_from_model(model, ctx)
+        else {
+            return false;
+        };
+
+        AgentConversationsModel::as_ref(ctx)
+            .get_task_data(&task_id)
+            .is_some_and(|task| task.blocks_cloud_followups())
+    }
+
+    pub(crate) fn owned_ambient_agent_task_id(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<AmbientAgentTaskId> {
+        let task_id = self.ambient_agent_task_id_for_details_panel(ctx)?;
+        self.is_current_user_creator_of_ambient_task(task_id, ctx)
+            .then_some(task_id)
+    }
+
+    fn is_current_user_creator_of_ambient_task(
+        &self,
+        task_id: AmbientAgentTaskId,
+        ctx: &AppContext,
+    ) -> bool {
+        let Some(current_user_uid) = self.auth_state.user_id().map(|uid| uid.as_string()) else {
+            return false;
+        };
+
+        AgentConversationsModel::as_ref(ctx)
+            .get_task_data(&task_id)
+            .and_then(|task| task.creator.map(|creator| creator.uid))
+            .is_some_and(|creator_uid| creator_uid == current_user_uid)
+    }
+
+    pub(in crate::terminal::view) fn enable_cloud_followup_input(
+        &mut self,
+        task_id: AmbientAgentTaskId,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.pending_cloud_followup_task_id = Some(task_id);
+        self.input.update(ctx, |input, ctx| {
+            input.reset_after_cloud_followup_submission(ctx);
+            input.set_input_mode_agent(true, ctx);
+            input.editor().update(ctx, |editor, ctx| {
+                editor.set_interaction_state(InteractionState::Editable, ctx);
+            });
+        });
+        self.update_pane_configuration(ctx);
+        ctx.notify();
+    }
+
+    fn enable_cloud_followup_input_after_conversation_end(
+        &mut self,
+        task_id: AmbientAgentTaskId,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.remove_conversation_ended_tombstone(ctx);
+        self.enable_cloud_followup_input(task_id, ctx);
+    }
+
+    fn start_cloud_followup_from_tombstone(
+        &mut self,
+        task_id: AmbientAgentTaskId,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if !FeatureFlag::HandoffCloudCloud.is_enabled() {
+            return;
+        }
+
+        let Some(ambient_agent_view_model) = self.ambient_agent_view_model.as_ref() else {
+            self.show_error_toast("Couldn't continue this cloud task.".to_string(), ctx);
+            return;
+        };
+
+        if ambient_agent_view_model.as_ref(ctx).task_id() != Some(task_id) {
+            self.show_error_toast("Couldn't continue this cloud task.".to_string(), ctx);
+            return;
+        }
+        self.enable_cloud_followup_input_after_conversation_end(task_id, ctx);
+        self.focus_input_box(ctx);
+        ctx.notify();
+    }
+
+    pub(crate) fn insert_conversation_ended_tombstone_with_cta(
+        &mut self,
+        tombstone_cta: Option<TombstoneCta>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if self.conversation_ended_tombstone_view_id.is_some() {
+            self.remove_conversation_ended_tombstone(ctx);
+        }
+        let task_id = self.ambient_agent_task_id_for_details_panel(ctx);
+        let terminal_view_id = self.id();
+
+        let tombstone_view_handle = ctx.add_typed_action_view(|ctx| {
+            ConversationEndedTombstoneView::new(ctx, terminal_view_id, task_id, tombstone_cta)
+        });
+        ctx.subscribe_to_view(&tombstone_view_handle, |me, _, event, ctx| match event {
+            ConversationEndedTombstoneEvent::ContinueInCloud { task_id } => {
+                me.start_cloud_followup_from_tombstone(*task_id, ctx);
+            }
+        });
+        let tombstone_view_id = tombstone_view_handle.id();
+        // The cloud-mode queued-prompt block is pinned to the bottom so it stays below any
+        // streaming agent output. When inserting the conversation-ended tombstone we want the
+        // tombstone below the queued prompt instead, so unpin the queued prompt first.
+        if self.pending_user_query_kind == Some(PendingUserQueryKind::CloudMode) {
+            if let Some(pending_query_view_id) = self.pending_user_query_view_id {
+                self.model
+                    .lock()
+                    .block_list_mut()
+                    .unpin_rich_content_from_bottom(pending_query_view_id);
+            }
+        }
+        let insertion_position = self
+            .pending_user_query_view_id
+            .map(RichContentInsertionPosition::AfterRichContent)
+            .unwrap_or(RichContentInsertionPosition::Append {
+                insert_below_long_running_block: true,
+            });
+        self.insert_rich_content(None, tombstone_view_handle, None, insertion_position, ctx);
+        self.conversation_ended_tombstone_view_id = Some(tombstone_view_id);
+    }
+
+    pub(crate) fn insert_conversation_ended_tombstone_with_resolved_cta(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if !FeatureFlag::HandoffCloudCloud.is_enabled() {
+            self.insert_conversation_ended_tombstone_with_cta(None, ctx);
+            return;
+        }
+
+        match self.cloud_conversation_continuation_ui_state(ctx) {
+            Some(CloudConversationContinuationUiState::Tombstone { cta }) => {
+                self.insert_conversation_ended_tombstone_with_cta(cta, ctx);
+            }
+            Some(CloudConversationContinuationUiState::FollowupInput) => {
+                if let Some(task_id) = self.ambient_agent_task_id_for_details_panel(ctx) {
+                    self.enable_cloud_followup_input_after_conversation_end(task_id, ctx);
+                } else {
+                    self.insert_conversation_ended_tombstone_with_cta(None, ctx);
+                }
+            }
+            None => {
+                self.insert_conversation_ended_tombstone_with_cta(None, ctx);
+            }
+        }
+    }
+
+    pub(in crate::terminal::view) fn remove_conversation_ended_tombstone(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let Some(view_id) = self.conversation_ended_tombstone_view_id.take() else {
+            return;
+        };
+        self.model
+            .lock()
+            .block_list_mut()
+            .remove_rich_content(view_id);
+        self.rich_content_views.retain(|rc| rc.view_id() != view_id);
+        ctx.notify();
+    }
 }
 
 #[cfg(test)]

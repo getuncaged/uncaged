@@ -4,7 +4,6 @@ pub(crate) mod auto_handoff;
 pub mod bonus_grant_notification_model;
 #[cfg(target_os = "macos")]
 pub(crate) mod cli_install;
-mod close_session_confirmation_dialog;
 pub(crate) mod cross_window_tab_drag;
 pub mod delete_conversation_confirmation_dialog;
 mod global_actions;
@@ -307,7 +306,7 @@ pub fn init(app: &mut AppContext) {
             CustomAction::NewFile,
             WorkspaceAction::NewCodeFile,
             "New File",
-            id!("Workspace") & !id!("Workspace_ViewOnlySharedSession"),
+            id!("Workspace"),
         ),
     ]);
 
@@ -1132,7 +1131,7 @@ pub fn init(app: &mut AppContext) {
                 source: PaletteSource::Keybinding,
             },
         )
-        .with_context_predicate(id!("Workspace") & !id!("Workspace_ViewOnlySharedSession"))
+        .with_context_predicate(id!("Workspace"))
         .with_custom_action(CustomAction::FilesPalette),
         EditableBinding::new(
             "workspace:open_launch_config_save_modal",

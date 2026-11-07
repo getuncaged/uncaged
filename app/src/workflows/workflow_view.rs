@@ -49,7 +49,7 @@ use crate::cloud_object::{
 use crate::drive::cloud_object_styling::warp_drive_icon_color;
 use crate::drive::drive_helpers::has_feature_gated_anonymous_user_reached_workflow_limit;
 use crate::drive::items::WarpDriveItemId;
-use crate::drive::sharing::{ContentEditability, ShareableObject, SharingAccessLevel};
+use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
 use crate::drive::workflows::ai_assist::GeneratedCommandMetadataError;
 use crate::drive::workflows::arguments::ArgumentsState;
 use crate::drive::workflows::enum_creation_dialog::{
@@ -78,7 +78,7 @@ use crate::server::ids::{ClientId, ServerId, SyncId};
 use crate::server::server_api::ai::AIClient;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::telemetry::{
-    CloudObjectTelemetryMetadata, SharingDialogSource, TelemetryCloudObjectType, TelemetryEvent,
+    CloudObjectTelemetryMetadata, TelemetryCloudObjectType, TelemetryEvent,
 };
 use crate::settings::app_installation_detection::{
     UserAppInstallDetectionSettings, UserAppInstallStatus,
@@ -235,11 +235,6 @@ pub enum WorkflowViewEvent {
     CreatedWorkflow(SyncId),
     UpdatedWorkflow(SyncId),
     ViewInWarpDrive(WarpDriveItemId),
-    OpenDriveObjectShareDialog {
-        cloud_object_type_and_id: CloudObjectTypeAndId,
-        invitee_email: Option<String>,
-        source: SharingDialogSource,
-    },
     RunWorkflow {
         workflow: Arc<WorkflowType>,
         source: WorkflowSource,
@@ -746,12 +741,6 @@ impl WorkflowView {
         if let ContainerConfiguration::Pane(pane_config) = &mut self.container_configuration {
             pane_config.update(ctx, |pane_config, ctx| {
                 pane_config.set_title(workflow_name, ctx);
-                if let Some(server_id) = workflow.id.into_server() {
-                    pane_config.set_shareable_object(
-                        Some(ShareableObject::WarpDriveObject(server_id)),
-                        ctx,
-                    );
-                }
             });
         }
 
@@ -838,18 +827,6 @@ impl WorkflowView {
                 WarpDriveItemId::Object(CloudObjectTypeAndId::Folder(focused_folder_id)),
                 ctx,
             );
-        }
-
-        if let Some(invitee_email) = settings.invitee_email.clone() {
-            let object_id_to_share = settings
-                .focused_folder_id
-                .map(|id| CloudObjectTypeAndId::Folder(SyncId::ServerId(id)))
-                .unwrap_or(CloudObjectTypeAndId::Workflow(workflow.id));
-            ctx.emit(WorkflowViewEvent::OpenDriveObjectShareDialog {
-                cloud_object_type_and_id: object_id_to_share,
-                invitee_email: Some(invitee_email),
-                source: SharingDialogSource::InviteeRequest,
-            });
         }
 
         if matches!(mode, WorkflowViewMode::View) {
@@ -3252,7 +3229,7 @@ impl BackingView for WorkflowView {
 
     fn render_header_content(
         &self,
-        _ctx: &view::HeaderRenderContext<'_>,
+        _ctx: &view::HeaderRenderContext,
         app: &AppContext,
     ) -> view::HeaderContent {
         let mut content =

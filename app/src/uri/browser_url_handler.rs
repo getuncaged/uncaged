@@ -81,6 +81,6 @@ fn get_base_app_url() -> Option<Url> {
 fn should_preserve_current_url_on_base_fallback(url: &Url) -> bool {
     matches!(
         WebIntent::try_from_url(url),
-        Ok(WebIntent::ConversationView(_) | WebIntent::SessionView(_))
+        Ok(WebIntent::ConversationView(_))
     )
 }

@@ -421,7 +421,6 @@ fn non_ambient_entry_uses_display_harness() {
         capabilities: AgentConversationCapabilities {
             can_open: true,
             can_copy_link: false,
-            can_share: false,
             can_delete: false,
             can_fork_locally: false,
             can_cancel: false,

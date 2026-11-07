@@ -1771,7 +1771,7 @@ impl BackingView for ExecutionProfileEditorView {
 
     fn render_header_content(
         &self,
-        _ctx: &view::HeaderRenderContext<'_>,
+        _ctx: &view::HeaderRenderContext,
         _app: &AppContext,
     ) -> view::HeaderContent {
         view::HeaderContent::Standard(view::StandardHeader {

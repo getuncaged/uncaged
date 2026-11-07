@@ -15,7 +15,7 @@ use warp_cli::mcp::MCPSpec;
 use warp_cli::skill::SkillSpec;
 use warp_cli::{
     OZ_CLI_ENV, OZ_HARNESS_ENV, OZ_PARENT_RUN_ID_ENV, OZ_RUN_ID_ENV, SERVER_ROOT_URL_OVERRIDE_ENV,
-    SESSION_SHARING_SERVER_URL_OVERRIDE_ENV, WS_SERVER_URL_OVERRIDE_ENV,
+    WS_SERVER_URL_OVERRIDE_ENV,
 };
 use warp_core::channel::ChannelState;
 use warp_graphql::mutations::create_managed_mcp_client_config::{
@@ -532,21 +532,6 @@ fn task_env_vars_include_parent_run_id_when_present() {
         );
     } else {
         assert!(!env_vars.contains_key(&OsString::from(WS_SERVER_URL_OVERRIDE_ENV)));
-    }
-
-    if overrides_allowed {
-        match ChannelState::session_sharing_server_url() {
-            Some(url) if !url.is_empty() => assert_eq!(
-                env_vars.get(&OsString::from(SESSION_SHARING_SERVER_URL_OVERRIDE_ENV)),
-                Some(&OsString::from(url.into_owned()))
-            ),
-            _ => {
-                assert!(!env_vars
-                    .contains_key(&OsString::from(SESSION_SHARING_SERVER_URL_OVERRIDE_ENV)))
-            }
-        }
-    } else {
-        assert!(!env_vars.contains_key(&OsString::from(SESSION_SHARING_SERVER_URL_OVERRIDE_ENV)));
     }
 }
 

@@ -2386,15 +2386,6 @@ impl BlocklistAIHistoryModel {
         self.all_conversations_metadata.get(conversation_id)
     }
 
-    /// Returns whether a conversation can be shared.
-    ///
-    /// A conversation can be shared if we have server metadata available
-    /// (either from a loaded conversation or from conversation metadata).
-    pub fn can_conversation_be_shared(&self, conversation_id: &AIConversationId) -> bool {
-        self.get_server_conversation_metadata(conversation_id)
-            .is_some()
-    }
-
     /// Returns the server conversation metadata, used by the sharing dialog.
     ///
     /// This checks:
@@ -2921,13 +2912,6 @@ pub enum BlocklistAIHistoryEvent {
     ConversationUsageMetadataUpdated {
         conversation_id: AIConversationId,
     },
-
-    /// Emitted when a sharer-owned conversation establishes a local
-    /// shared session.
-    LocalSharedSessionEstablished {
-        conversation_id: AIConversationId,
-        session_id: session_sharing_protocol::common::SessionId,
-    },
 }
 
 impl BlocklistAIHistoryEvent {
@@ -3012,8 +2996,6 @@ impl BlocklistAIHistoryEvent {
             // orchestrator footer reading descendant credits) can't be
             // disambiguated by a single owner pane.
             BlocklistAIHistoryEvent::ConversationUsageMetadataUpdated { .. } => None,
-            // Conversation-scoped; subscribers resolve the owning view via conversation_id.
-            BlocklistAIHistoryEvent::LocalSharedSessionEstablished { .. } => None,
         }
     }
 }

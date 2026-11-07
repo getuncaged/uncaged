@@ -2,8 +2,6 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use session_sharing_protocol::common::{ParticipantId, Role, SessionId as SharedSessionId};
-use session_sharing_protocol::sharer::{SessionEndedReason, SessionSourceType};
 use strum_macros::{EnumDiscriminants, EnumIter};
 use warp_completer::completer::MatchType;
 use warp_core::command::ExitCode;
@@ -63,7 +61,6 @@ use crate::terminal::model::block::BlockId;
 use crate::terminal::model::session::SessionId;
 use crate::terminal::model::terminal_model::BlockSelectionCardinality;
 use crate::terminal::settings::AltScreenPaddingMode;
-use crate::terminal::shared_session::SharedSessionActionSource;
 use crate::terminal::shell::ShellType;
 use crate::terminal::view::inline_banner::{
     ZeroStatePromptSuggestionTriggeredFrom, ZeroStatePromptSuggestionType,
@@ -353,41 +350,6 @@ impl From<rmcp::RmcpError> for MCPServerTelemetryError {
             _ => Self::InternalError(err.to_string()),
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenedSharingDialogEvent {
-    pub source: SharingDialogSource,
-
-    /// Metadata for the object being shared, if it's a Warp Drive object.
-    #[serde(flatten)]
-    pub object_metadata: Option<CloudObjectTelemetryMetadata>,
-
-    /// Metadata for the session being shared, if there is one.
-    pub session_id: Option<SharedSessionId>,
-}
-
-/// How the user opened the Warp Drive sharing dialog.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum SharingDialogSource {
-    /// The sharing button in the pane header.
-    PaneHeader,
-    /// The per-pane command palette entry (includes keybindings).
-    CommandPalette,
-    /// The Warp Drive index context menu.
-    DriveIndex,
-    /// The sharing dialog was auto-opened from shared session creation.
-    StartedSessionShare,
-    /// The user intented into Warp with an email address to invite.
-    InviteeRequest,
-    /// The user jumped from an inherited ACL to its definition on a parent object.
-    InheritedPermission,
-    /// The onboarding block shown after users create new personal objects.
-    OnboardingBlock,
-    /// The conversation list overflow menu.
-    ConversationList,
-    /// The AI block context menu.
-    AIBlockContextMenu,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -1595,7 +1557,6 @@ pub enum TelemetryEvent {
     },
     QuitModalShown {
         running_processes: u32,
-        shared_sessions: u32,
         modal_for: CloseTarget,
     },
     QuitModalCancel {
@@ -1757,44 +1718,12 @@ pub enum TelemetryEvent {
     },
     DuplicateObject(TelemetryCloudObjectType),
     ExportObject(TelemetryCloudObjectType),
-    DriveSharingOnboardingBlockShown,
     CommandFileRun,
     PageUpDownInEditorPressed {
         // Key pressed when nothing is in the editor (no-op)
         is_empty_editor: bool,
         // Is PageDown. Otherwise is PageUp
         is_down: bool,
-    },
-    /// Emitted on start share attempt, not on success.
-    StartedSharingCurrentSession {
-        includes_scrollback: bool,
-        source: SharedSessionActionSource,
-    },
-    StoppedSharingCurrentSession {
-        source: SharedSessionActionSource,
-        reason: SessionEndedReason,
-    },
-    JoinedSharedSession {
-        session_id: SharedSessionId,
-        source_type: SessionSourceType,
-    },
-    SharedSessionModalUpgradePressed,
-    /// Emitted when a shared session sharer cancels granting a role
-    /// (currently only applies when granting executor mode).
-    SharerCancelledGrantRole {
-        role: Role,
-    },
-    /// Emitted when a shared session sharer checks "dont show again"
-    /// in confirmation modal when granting a role.
-    SharerGrantModalDontShowAgain,
-    JumpToSharedSessionParticipant {
-        jumped_to: ParticipantId,
-    },
-    CopiedSharedSessionLink {
-        source: SharedSessionActionSource,
-    },
-    WebSessionOpenedOnDesktop {
-        source: SharedSessionActionSource,
     },
     WebCloudObjectOpenedOnDesktop {
         object_metadata: CloudObjectTelemetryMetadata,
@@ -2248,7 +2177,6 @@ pub enum TelemetryEvent {
         conversation_id: AIConversationId,
         server_output_id: Option<ServerOutputId>,
     },
-    OpenedSharingDialog(OpenedSharingDialogEvent),
     ToggleLigatureRendering {
         enabled: bool,
     },
@@ -3132,11 +3060,8 @@ impl TelemetryEvent {
             }
             TelemetryEvent::QuitModalShown {
                 running_processes,
-                shared_sessions,
                 modal_for,
-            } => Some(
-                json!({ "running_processes": running_processes, "shared_sessions": shared_sessions, "modal_for": modal_for }),
-            ),
+            } => Some(json!({ "running_processes": running_processes, "modal_for": modal_for })),
             TelemetryEvent::QuitModalCancel {
                 nav_palette,
                 modal_for,
@@ -3320,13 +3245,6 @@ impl TelemetryEvent {
                 is_empty_editor,
                 is_down,
             } => Some(json!({"is_empty_editor": is_empty_editor, "is_down": is_down})),
-            TelemetryEvent::StartedSharingCurrentSession {
-                includes_scrollback,
-                source,
-            } => Some(json!({ "includes_scrollback": includes_scrollback, "source": source })),
-            TelemetryEvent::StoppedSharingCurrentSession { source, reason } => {
-                Some(json!({ "source": source, "reason": reason }))
-            }
             TelemetryEvent::UnsupportedShell { shell } => Some(json!({ "shell": shell })),
             TelemetryEvent::CopyObjectToClipboard(object_type) => {
                 Some(json!({ "object_type": object_type }))
@@ -3356,21 +3274,6 @@ impl TelemetryEvent {
                 Some(json!({"enabled": enabled}))
             }
             TelemetryEvent::ToggleSshWarpification { enabled } => Some(json!({"enabled": enabled})),
-            TelemetryEvent::JoinedSharedSession {
-                session_id,
-                source_type,
-            } => Some(json!({
-                "session_id": session_id,
-                "source_type": source_type,
-            })),
-            TelemetryEvent::SharerCancelledGrantRole { role } => Some(json!({ "role": role })),
-            TelemetryEvent::JumpToSharedSessionParticipant { jumped_to } => {
-                Some(json!({ "jumped_to": jumped_to }))
-            }
-            TelemetryEvent::CopiedSharedSessionLink { source } => Some(json!({ "source": source })),
-            TelemetryEvent::WebSessionOpenedOnDesktop { source } => {
-                Some(json!({ "source": source}))
-            }
             TelemetryEvent::WebCloudObjectOpenedOnDesktop { object_metadata } => Some(json!({
                 "object": object_metadata,
             })),
@@ -3698,7 +3601,6 @@ impl TelemetryEvent {
             } => Some(
                 json!({ "citation": citation, "block_id": block_id, "conversation_id": conversation_id, "server_output_id": server_output_id }),
             ),
-            TelemetryEvent::OpenedSharingDialog(event) => Some(json!(event)),
             TelemetryEvent::ToggleGlobalAI { is_ai_enabled } => {
                 Some(json!({"is_ai_enabled": is_ai_enabled}))
             }
@@ -4050,19 +3952,16 @@ impl TelemetryEvent {
             | TelemetryEvent::CopySecret
             | TelemetryEvent::AutoGenerateMetadataSuccess
             | TelemetryEvent::CommandFileRun
-            | TelemetryEvent::SharerGrantModalDontShowAgain
             | TelemetryEvent::LogOut
             | TelemetryEvent::UpdateBlockFilterQuery
             | TelemetryEvent::BlockFilterToolbeltButtonClicked
             | TelemetryEvent::PaneDragInitiated
             | TelemetryEvent::SharedObjectLimitHitBannerViewPlansButtonClicked
-            | TelemetryEvent::SharedSessionModalUpgradePressed
             | TelemetryEvent::AgentModePotentialAutoDetectionFalsePositive(
                 AgentModeAutoDetectionFalsePositivePayload::ExternalUsers,
             )
             | TelemetryEvent::SettingsImportResetButtonClicked
             | TelemetryEvent::ITermMultipleHotkeys
-            | TelemetryEvent::DriveSharingOnboardingBlockShown
             | TelemetryEvent::SettingsImportInitiated
             | TelemetryEvent::GrepToolSucceeded
             | TelemetryEvent::FileGlobToolSucceeded
@@ -4725,18 +4624,8 @@ impl TelemetryEvent {
             | TelemetryEvent::PtyThroughput { .. }
             | TelemetryEvent::DuplicateObject(_)
             | TelemetryEvent::ExportObject(_)
-            | TelemetryEvent::DriveSharingOnboardingBlockShown
             | TelemetryEvent::CommandFileRun
             | TelemetryEvent::PageUpDownInEditorPressed { .. }
-            | TelemetryEvent::StartedSharingCurrentSession { .. }
-            | TelemetryEvent::StoppedSharingCurrentSession { .. }
-            | TelemetryEvent::JoinedSharedSession { .. }
-            | TelemetryEvent::SharedSessionModalUpgradePressed
-            | TelemetryEvent::SharerCancelledGrantRole { .. }
-            | TelemetryEvent::SharerGrantModalDontShowAgain
-            | TelemetryEvent::JumpToSharedSessionParticipant { .. }
-            | TelemetryEvent::CopiedSharedSessionLink { .. }
-            | TelemetryEvent::WebSessionOpenedOnDesktop { .. }
             | TelemetryEvent::WebCloudObjectOpenedOnDesktop { .. }
             | TelemetryEvent::UnsupportedShell { .. }
             | TelemetryEvent::LogOut
@@ -4796,7 +4685,6 @@ impl TelemetryEvent {
             | TelemetryEvent::AddTabWithShell { .. }
             | TelemetryEvent::AgentModeSurfacedCitations { .. }
             | TelemetryEvent::AgentModeOpenedCitation { .. }
-            | TelemetryEvent::OpenedSharingDialog(_)
             | TelemetryEvent::ToggleLigatureRendering { .. }
             | TelemetryEvent::WorkflowAliasAdded { .. }
             | TelemetryEvent::WorkflowAliasRemoved { .. }
@@ -5047,12 +4935,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             | Self::AnonymousUserHitCloudObjectLimit => EnablementState::Always,
 
             Self::AgentModeChangedInputType => EnablementState::Always,
-            Self::StartedSharingCurrentSession
-            | Self::StoppedSharingCurrentSession
-            | Self::SharedSessionModalUpgradePressed => {
-                EnablementState::Flag(FeatureFlag::CreatingSharedSessions)
-            }
-            Self::JoinedSharedSession => EnablementState::Flag(FeatureFlag::ViewingSharedSessions),
             Self::OpenNotebook | Self::EditNotebook | Self::NotebookAction => {
                 EnablementState::Always
             }
@@ -5275,14 +5157,8 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::PaneDragInitiated => EnablementState::Always,
             Self::PaneDropped => EnablementState::Always,
             Self::TierLimitHit => EnablementState::Always,
-            Self::SharerCancelledGrantRole => EnablementState::Always,
-            Self::SharerGrantModalDontShowAgain => EnablementState::Always,
-            Self::JumpToSharedSessionParticipant => EnablementState::Always,
-            Self::CopiedSharedSessionLink => EnablementState::Always,
-            Self::WebSessionOpenedOnDesktop => EnablementState::Always,
             Self::WebCloudObjectOpenedOnDesktop => EnablementState::Always,
             Self::ToggleShowBlockDividers => EnablementState::Flag(FeatureFlag::MinimalistUI),
-            Self::DriveSharingOnboardingBlockShown => EnablementState::Always,
             Self::SharedObjectLimitHitBannerViewPlansButtonClicked => EnablementState::Always,
             Self::ResourceUsageStats => EnablementState::Always,
             Self::ToggleGlobalAI => EnablementState::Always,
@@ -5350,7 +5226,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::AgentModeSurfacedCitations | Self::AgentModeOpenedCitation => {
                 EnablementState::Always
             }
-            Self::OpenedSharingDialog => EnablementState::Always,
             Self::ToggleLigatureRendering => EnablementState::Flag(FeatureFlag::Ligatures),
             Self::WorkflowAliasAdded
             | Self::WorkflowAliasRemoved
@@ -5741,17 +5616,7 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::ExportObject => "Export Object",
             Self::CommandFileRun => "Command File Run",
             Self::PageUpDownInEditorPressed => "Page Up/Down In Editor Pressed",
-            Self::StartedSharingCurrentSession => "Started Sharing Current Session",
-            Self::StoppedSharingCurrentSession => "Stopped Sharing Current Session",
-            Self::JoinedSharedSession => "Joined Shared Session",
-            Self::SharedSessionModalUpgradePressed => "Shared Session Modal Upgrade Pressed",
-            Self::SharerCancelledGrantRole => "Sharer Cancelled Grant Role",
-            Self::SharerGrantModalDontShowAgain => "Don't Show Sharer Grant Modal Again",
-            Self::JumpToSharedSessionParticipant { .. } => "Jumped to Shared Session Participant",
-            Self::CopiedSharedSessionLink { .. } => "Copied Shared Session Link",
-            Self::WebSessionOpenedOnDesktop { .. } => "Web session opened on desktop",
             Self::WebCloudObjectOpenedOnDesktop { .. } => "Warp Drive object opened on desktop",
-            Self::DriveSharingOnboardingBlockShown => "Warp Drive Sharing onboarding block shown",
             Self::UnsupportedShell => "Unsupported Shell",
             Self::SettingsImportInitiated => "Settings Import Initiated",
             Self::InviteTeammates => "Invited Teammates",
@@ -5841,7 +5706,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::AddTabWithShell => "Add Tab With Shell",
             Self::AgentModeSurfacedCitations => "AgentMode.SurfacedCitations",
             Self::AgentModeOpenedCitation => "AgentMode.OpenedCitation",
-            Self::OpenedSharingDialog => "Opened Sharing Dialog",
             Self::ToggleGlobalAI => "Toggle Global AI Enablement",
             Self::SuperGrokSubscriptionConnectInitiated => "SuperGrok.Connect.Initiated",
             Self::SuperGrokSubscriptionConnectFinished => "SuperGrok.Connect.Finished",
@@ -6450,32 +6314,8 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
             Self::PageUpDownInEditorPressed => {
                 "Pressed `PAGE-UP` or `PAGE-DOWN` within the Input Editor"
             }
-            Self::StartedSharingCurrentSession => "Started sharing the current session",
-            Self::StoppedSharingCurrentSession => "Halted sharing the current session",
-            Self::JoinedSharedSession => {
-                "When you join another instance of Warp using shared sessions"
-            }
-            Self::SharedSessionModalUpgradePressed => {
-                "Pressed upgrade after reaching max session sharing limit"
-            }
-            Self::SharerCancelledGrantRole => {
-                "When you cancel granting a role to a shared session participant"
-            }
-            Self::SharerGrantModalDontShowAgain => {
-                "When you check don't show again on the confirmation modal for granting a role"
-            }
-            Self::JumpToSharedSessionParticipant => {
-                "Clicked on a shared session participant avatar to jump to their location in the session"
-            }
-            Self::CopiedSharedSessionLink => "Copied a shared session link",
-            Self::WebSessionOpenedOnDesktop => {
-                "Shared session viewed on the web was opened on the desktop"
-            }
             Self::WebCloudObjectOpenedOnDesktop => {
                 "Warp Drive object on the web was opened on the desktop"
-            }
-            Self::DriveSharingOnboardingBlockShown => {
-                "Showed onboarding block for Warp Drive sharing"
             }
             Self::UnsupportedShell => "Booted Warp with a shell that isn't supported",
             Self::LogOut => "Logged out of the Warp client",
@@ -6631,9 +6471,6 @@ impl TelemetryEventDesc for TelemetryEventDiscriminants {
                 "Agent mode used and cited external sources that were used in its response"
             }
             Self::AgentModeOpenedCitation => "Opened a citation that was surfaced in agent mode",
-            Self::OpenedSharingDialog => {
-                "Opened the sharing settings dialog for a session or Warp Drive object"
-            }
 			Self::ToggleGlobalAI => "Toggled global AI enablement.",
 			Self::SuperGrokSubscriptionConnectInitiated => "User clicked Connect SuperGrok subscription; OAuth connection attempt initiated.",
             Self::SuperGrokSubscriptionConnectFinished => "SuperGrok subscription OAuth connection flow finished (success or failure).",
