@@ -11,8 +11,10 @@ fn main() -> Result<()> {
     let mut state = ChannelState::new(
         Channel::Oss,
         ChannelConfig {
-            app_id: AppId::new("dev", "uncaged", "WarpOss"),
-            logfile_name: "warp-oss.log".into(),
+            // Up to v0.3.4 this was `dev.uncaged.WarpOss` / `warp-oss.log`; the
+            // first launch moves that identity's data (see identity_migration).
+            app_id: AppId::new("dev", "uncaged", "Uncaged"),
+            logfile_name: "uncaged.log".into(),
             // Fail-closed, not merely gated. Every Warp endpoint points at the
             // RFC 5737 sentinel (192.0.2.0:9), which is guaranteed unroutable,
             // so any egress path we missed — now or after an upstream merge —
@@ -44,9 +46,9 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>CFBundleDisplayName</key>
     <string>Uncaged</string>
     <key>CFBundleExecutable</key>
-    <string>warp-oss</string>
+    <string>uncaged</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.uncaged.WarpOss</string>
+    <string>dev.uncaged.Uncaged</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -62,7 +64,7 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>UIDesignRequiresCompatibility</key>
     <true/>
     <key>CFBundleURLTypes</key>
-    <array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>uncagedoss</string></array></dict></array>
+    <array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>uncagedoss</string><string>uncaged</string></array></dict></array>
     <key>NSHumanReadableCopyright</key>
     <string>© 2026 the Uncaged contributors. Based on Warp © Denver Technologies, Inc.</string>
     </dict>

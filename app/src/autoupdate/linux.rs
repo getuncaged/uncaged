@@ -683,7 +683,9 @@ fn package_name(channel: Channel) -> &'static str {
         Channel::Dev => "warp-terminal-dev",
         Channel::Integration => "warp-terminal-integration",
         Channel::Local => "warp-terminal-local",
-        Channel::Oss => "warp-oss",
+        // The package name predates the binary's rename to `uncaged` and is kept
+        // so a new package upgrades the old one (see script/linux/bundle).
+        Channel::Oss => "warp-terminal-oss",
     }
 }
 

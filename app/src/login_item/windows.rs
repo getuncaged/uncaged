@@ -9,7 +9,7 @@
 use std::path::{Path, PathBuf};
 
 use ::settings::Setting;
-use uncaged_core::channel::ChannelState;
+use uncaged_core::channel::{Channel, ChannelState};
 use uncaged_ui::{AppContext, SingletonEntity};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
 use winreg::RegKey;
@@ -84,8 +84,19 @@ fn current_exe_path() -> Option<PathBuf> {
 /// Using the channel's application name keeps Dogfood / Preview / Stable installs
 /// isolated (`Warp`, `WarpPreview`, `WarpDev`, etc.) so installing multiple
 /// channels doesn't cause one to overwrite another's startup entry.
+///
+/// Uncaged keeps `WarpOss`, its application name up to v0.3.4: renaming the value
+/// would leave the old entry behind, launching the app twice at sign-in. The
+/// installer points an existing `WarpOss` entry at the renamed executable.
 fn login_item_value_name() -> String {
-    ChannelState::app_id().application_name().to_owned()
+    match ChannelState::channel() {
+        Channel::Oss => "WarpOss".to_owned(),
+        Channel::Stable
+        | Channel::Preview
+        | Channel::Dev
+        | Channel::Local
+        | Channel::Integration => ChannelState::app_id().application_name().to_owned(),
+    }
 }
 
 /// Writes the startup registry value pointing at `exe` under `value_name`.

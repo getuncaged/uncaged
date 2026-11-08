@@ -157,21 +157,25 @@ mkdir -p "$OUT_DIR"
 # For the first-party channels, APP_NAME must match the value used in Rust as
 # the application name (see app/src/channel.rs) and BUNDLE_ID is derived as
 # dev.warp.$APP_NAME. The oss (Uncaged) channel is special: its runtime
-# identity is hardcoded in Rust as dev.uncaged.WarpOss and BUNDLE_ID is
-# overridden below to match, so APP_NAME only affects the AppImage filename.
+# identity is its app id, dev.uncaged.Uncaged (app/src/bin/oss.rs), and BUNDLE_ID
+# is overridden below to match, so APP_NAME only affects the AppImage filename.
 #
 # WARP_BIN is the name of the binary produced by cargo;
 # BINARY_NAME is the desired name of the binary in the final package.
 if [[ $RELEASE_CHANNEL = "oss" ]]; then
-  WARP_BIN="warp-oss"
-  BINARY_NAME="warp-oss"
+  WARP_BIN="uncaged"
+  BINARY_NAME="uncaged"
+  # Uncaged: the package keeps the name it had before the binary was renamed
+  # (warp-terminal-oss), so installing a new .deb/.rpm/Arch package upgrades the
+  # old one in place instead of conflicting with it. The other bundle scripts
+  # would otherwise derive the suffix from BINARY_NAME.
+  PACKAGE_CHANNEL_SUFFIX="-oss"
   # Uncaged: the oss channel ships as the app "Uncaged". APP_NAME here only
   # feeds the AppImage filename and (by default) the BUNDLE_ID derivation; the
-  # runtime channel identity (WM_CLASS / Wayland app_id / data domain) is
-  # hardcoded in Rust as dev.uncaged.WarpOss (see
-  # crates/uncaged_core/src/channel/state.rs), independent of this value. We
-  # override BUNDLE_ID below so it matches that Rust identity and the shipped
-  # desktop file app/channels/oss/dev.uncaged.WarpOss.desktop.
+  # runtime channel identity (WM_CLASS / Wayland app_id / data domain) is the
+  # app id set in app/src/bin/oss.rs, independent of this value. We override
+  # BUNDLE_ID below so it matches that identity and the shipped desktop file
+  # app/channels/oss/dev.uncaged.Uncaged.desktop.
   APP_NAME="Uncaged"
   FEATURES="release_bundle"
 else
@@ -182,7 +186,7 @@ fi
 # Artifact-specific binary naming
 if [[ "$ARTIFACT" == "cli" ]]; then
   # For CLI artifacts, use oz instead of warp as the binary name.  The OSS
-  # channel is an exception: its CLI command name is `warp-oss`, matching
+  # channel is an exception: its CLI command name is `uncaged`, matching
   # `Channel::cli_command_name` in the Rust source.
   if [[ $RELEASE_CHANNEL != "oss" ]]; then
     BINARY_NAME="${BINARY_NAME/warp/oz}"
@@ -201,13 +205,13 @@ if [[ -n "$EXTRA_FEATURES" ]]; then
 fi
 
 BUNDLE_ID="dev.warp.$APP_NAME"
-# Uncaged: the oss channel's user-visible bundle id is dev.uncaged.WarpOss, not
+# Uncaged: the oss channel's user-visible bundle id is dev.uncaged.Uncaged, not
 # the dev.warp.* namespace used by the first-party channels. It MUST match both
-# the Rust runtime app_id (crates/uncaged_core/src/channel/state.rs) and the shipped
-# desktop file (app/channels/oss/dev.uncaged.WarpOss.desktop) that bundle_install
-# looks up by "$BUNDLE_ID.desktop".
+# the Rust runtime app_id (app/src/bin/oss.rs) and the shipped desktop file
+# (app/channels/oss/dev.uncaged.Uncaged.desktop) that bundle_install looks up by
+# "$BUNDLE_ID.desktop".
 if [[ $RELEASE_CHANNEL = "oss" ]]; then
-  BUNDLE_ID="dev.uncaged.WarpOss"
+  BUNDLE_ID="dev.uncaged.Uncaged"
 fi
 EXECUTABLE_PATH="$CARGO_TARGET_OUTPUT_DIR/$WARP_BIN"
 DEBUG_EXECUTABLE_PATH="$EXECUTABLE_PATH.debug"
@@ -278,6 +282,7 @@ export \
   BUNDLE_ID \
   EXECUTABLE_PATH \
   BINARY_NAME \
+  PACKAGE_CHANNEL_SUFFIX \
   APPIMAGE_NAME \
   BUILD_ARCH \
   ARTIFACT \

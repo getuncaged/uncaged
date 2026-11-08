@@ -7,7 +7,7 @@
 # This script is invoked by `./script/run`, which handles cross-platform
 # setup (binary name, feature-to-env-var mapping). The following env vars are
 # expected to be set by the caller:
-#   WARP_BIN_NAME  — "warp-oss"
+#   WARP_BIN_NAME  — "uncaged"
 #   WARP_CHANNEL   — "oss"
 #   FEATURES       — comma-separated cargo features (already normalized)
 # Must be called from the root directory of the warp repo.
@@ -34,7 +34,7 @@ if [ "$WARP_CHANNEL" = "local" ]; then
     WARP_SCHEME_NAME="warplocal"
 else
     WARP_APP_PATH="${TARGET_DIR}/debug/bundle/osx/Uncaged.app"
-    WARP_SCHEME_NAME="uncagedoss"
+    WARP_SCHEME_NAME="uncagedoss uncaged"
 fi
 DONT_OPEN=false
 # Launches the binary with "open", meaning the Warp process is
@@ -134,10 +134,10 @@ if [ "$DONT_OPEN" = false ] ; then
         if [ "$WARP_CHANNEL" = "local" ]; then
             LOG_FILE=~/Library/Logs/warp_local.log
         elif [ "$WARP_CHANNEL" = "oss" ]; then
-            LOG_FILE=~/Library/Logs/warp-oss.log
+            LOG_FILE=~/Library/Logs/uncaged.log
         else
             echo "Warning: unrecognized WARP_CHANNEL '$WARP_CHANNEL', defaulting to OSS log path" >&2
-            LOG_FILE=~/Library/Logs/warp-oss.log
+            LOG_FILE=~/Library/Logs/uncaged.log
         fi
         tail -F "$LOG_FILE"
     else

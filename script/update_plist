@@ -48,7 +48,12 @@ if [[ -n "$WARP_SCHEME_NAME" ]]; then
   echo "Updating plist to support a custom url scheme"
   # Update the plist that cargo bundle creates to add support for custom URL schemes. Unfortunately, cargo bundle does not support
   # setting arbitrary plist fields, so we must do this after the fact.
-  plutil -insert CFBundleURLTypes -xml "<array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>$WARP_SCHEME_NAME</string></array></dict></array>" "$WARP_PLIST_PATH"
+  # WARP_SCHEME_NAME may list several space-separated schemes.
+  SCHEMES_XML=""
+  for scheme in $WARP_SCHEME_NAME; do
+    SCHEMES_XML="$SCHEMES_XML<string>$scheme</string>"
+  done
+  plutil -insert CFBundleURLTypes -xml "<array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array>$SCHEMES_XML</array></dict></array>" "$WARP_PLIST_PATH"
 fi
 
 if [[ -z "$WARP_PLIST_NO_FILE_TYPES" ]]; then

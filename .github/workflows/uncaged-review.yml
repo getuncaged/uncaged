@@ -60,4 +60,4 @@ jobs:
           # On pull_request events, drive an automatic review; on @claude
           # comments the action detects intent from the comment itself, so we
           # only pass a prompt for the automatic (non-comment) path.
-          prompt: ${{ github.event_name == 'pull_request' && 'Review this pull request diff for correctness bugs, security issues, and code-quality problems. Focus on real defects over style. Post concise inline comments anchored to the offending lines, and a short summary. This is a large Rust workspace (the Uncaged terminal, a Warp fork); the primary build target is `cargo build --bin warp-oss`.' || '' }}
+          prompt: ${{ github.event_name == 'pull_request' && 'Review this pull request diff for correctness bugs, security issues, and code-quality problems. Focus on real defects over style. Post concise inline comments anchored to the offending lines, and a short summary. This is a large Rust workspace (the Uncaged terminal, a Warp fork); the primary build target is `cargo build --bin uncaged`.' || '' }}

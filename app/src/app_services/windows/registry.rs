@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 
 use uncaged_core::channel::ChannelState;
-use windows_registry::{CURRENT_USER, HSTRING};
+use windows_registry::{Key, CURRENT_USER, HSTRING};
 
 pub(super) fn register_uri_handler() {
     // To change the settings for the user, changes must be made under
@@ -22,7 +22,12 @@ pub(super) fn register_uri_handler() {
     //      open
     //         command
     //            (Default) = "{path_to_executable}" "%0"
-    let uri_scheme = ChannelState::url_scheme();
+    for uri_scheme in ChannelState::url_schemes() {
+        register_uri_scheme(&classes_key, uri_scheme);
+    }
+}
+
+fn register_uri_scheme(classes_key: &Key, uri_scheme: &str) {
     match classes_key.create(uri_scheme) {
         Ok(parent_key) => {
             // The empty string represents the "(Default)" value for a registry key.

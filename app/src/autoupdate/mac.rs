@@ -434,7 +434,7 @@ async fn apply_update(channel: Channel, version_info: &VersionInfo, update_id: &
     async_fs::set_permissions(&staged_bundle.path, bundle_metadata.permissions()).await?;
 
     // Verify that the new version actually exists before proceeding
-    let executable_path_buf = staged_bundle.path.join(executable_path(channel));
+    let executable_path_buf = executable_path_in(channel, &staged_bundle.path);
     if !executable_path_buf.exists() {
         bail!(
             "New executable does not exist at path: {:?}",
@@ -464,7 +464,7 @@ async fn apply_update(channel: Channel, version_info: &VersionInfo, update_id: &
     } else {
         // Compute the location of the old executable (which, after the swap of the app contents,
         // is located in the "new app" directory).
-        let new_app_executable_path = staged_bundle.path.join(executable_path(channel));
+        let new_app_executable_path = executable_path_in(channel, &staged_bundle.path);
 
         log::info!(
             "Moving old executable at path {new_app_executable_path:?} into user application data dir at path {executable_temp_file:?}"
@@ -665,7 +665,7 @@ async fn download_and_extract_binary(
     // Ensure that the new app we just downloaded has both integrity (e.g. no corrupted files)
     // and validity (it was signed by us).
     // Store the executable path in a variable to prevent temporary value issues.
-    let executable_path_buf = target.join(executable_path(channel));
+    let executable_path_buf = executable_path_in(channel, &target);
     let verification_start = Instant::now();
     if !version_info.assets.is_empty() {
         // Uncaged is ad-hoc signed: `codesign -R "certificate leaf[subject.OU] =
@@ -836,7 +836,7 @@ fn update_url(channel: Channel, version: &str) -> String {
     )
 }
 
-fn app_name(channel: Channel) -> String {
+pub(super) fn app_name(channel: Channel) -> String {
     format!("{}.app", app_name_prefix(channel))
 }
 
@@ -865,27 +865,44 @@ fn app_name_prefix(channel: Channel) -> &'static str {
         Channel::Local => "warp",
         Channel::Integration => "integration",
         Channel::Dev => "WarpDev",
-        Channel::Oss => "warp-oss",
+        // The app inside the published DMG and zip, and the installed bundle.
+        Channel::Oss => "Uncaged",
     }
 }
 
-fn executable_name(channel: Channel) -> &'static str {
+/// The executable names a bundle on `channel` may carry, current name first.
+///
+/// Uncaged's executable was `warp-oss` up to v0.3.4, and later bundles keep a
+/// `warp-oss` compat entry, so either name marks a complete bundle and this
+/// updater can install releases from both sides of the rename.
+pub(super) fn executable_names(channel: Channel) -> &'static [&'static str] {
     match channel {
-        Channel::Stable => "stable",
-        Channel::Preview => "preview",
-        Channel::Local => "warp",
-        Channel::Integration => "integration",
-        Channel::Dev => "dev",
-        Channel::Oss => "warp-oss",
+        Channel::Stable => &["stable"],
+        Channel::Preview => &["preview"],
+        Channel::Local => &["warp"],
+        Channel::Integration => &["integration"],
+        Channel::Dev => &["dev"],
+        Channel::Oss => &["uncaged", "warp-oss"],
     }
 }
 
-fn executable_path(channel: Channel) -> String {
+fn executable_path(executable_name: &str) -> String {
     if ChannelState::is_release_bundle() {
-        format!("Contents/MacOS/{}", executable_name(channel))
+        format!("Contents/MacOS/{executable_name}")
     } else {
-        executable_name(channel).to_owned()
+        executable_name.to_owned()
     }
+}
+
+/// The executable inside `bundle`: the first of [`executable_names`] present,
+/// or the current name if none is.
+fn executable_path_in(channel: Channel, bundle: &Path) -> PathBuf {
+    let names = executable_names(channel);
+    names
+        .iter()
+        .map(|name| bundle.join(executable_path(name)))
+        .find(|path| path.exists())
+        .unwrap_or_else(|| bundle.join(executable_path(names[0])))
 }
 
 /// Runs a package manager's own upgrade command and reports whether it worked.

@@ -54,7 +54,7 @@ echo "→ attempting merge (no fast-forward, no auto-commit so you can review)�
 if git merge --no-ff --no-commit "$UPSTREAM_REF"; then
   echo
   echo "✓ merged cleanly (staged, not committed). Review, then:"
-  echo "    cargo build --bin warp-oss && cargo test -p uncaged_engine"
+  echo "    cargo build --bin uncaged && cargo test -p uncaged_engine"
   echo "    git commit"
 else
   echo

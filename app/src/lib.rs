@@ -379,10 +379,6 @@ fn apply_scroll_multiplier(event: &mut Event, app: &AppContext) {
 /// Runs the Uncaged executable as the app or as one of its worker subcommands.
 #[::tracing::instrument(skip_all, fields(tags.cloud_agent = true))]
 pub fn run() -> Result<()> {
-    // Carry the previous app identity's data over before anything (logging,
-    // settings, secure storage, sqlite, workers) computes a data path.
-    identity_migration::run_if_needed();
-
     // Perform any necessary platform-specific initialization.
     platform::init();
 
@@ -391,6 +387,12 @@ pub fn run() -> Result<()> {
 
     // Parse command-line arguments.
     let args = uncaged_cli::Args::from_env();
+
+    // Carry the previous app identity's data over before anything (logging,
+    // settings, secure storage, sqlite) computes a data path. Only the app
+    // itself moves data; a command-line or worker invocation keeps using the
+    // previous identity's data until the app has moved it.
+    identity_migration::run_if_needed(args.command().is_none());
 
     if let Some(command) = args.command() {
         #[cfg(windows)]
@@ -761,15 +763,23 @@ pub(crate) fn initialize_app(
     cfg_if::cfg_if! {
         if #[cfg(feature = "integration_tests")] {
             uncaged_ui_extras::secure_storage::register_noop(&data_domain, ctx);
-        } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            uncaged_ui_extras::secure_storage::register_with_fallback(&data_domain, uncaged_core::paths::state_dir(), ctx)
-        } else if #[cfg(target_os = "windows")] {
-            uncaged_ui_extras::secure_storage::register_with_dir(&data_domain, uncaged_core::paths::state_dir(), ctx)
         } else {
-            // Uncaged: on macOS this is file-backed rather than the login keychain --
-            // see `secure_storage/mac.rs` for why, and for what to restore if Uncaged
-            // ever gets a signing identity.
-            uncaged_ui_extras::secure_storage::register(&data_domain, ctx);
+            // Secrets the previous app identity stored are read through and
+            // copied forward (see `identity_migration`).
+            let legacy_data_domain = identity_migration::legacy_data_domain();
+            let legacy_data_domain = legacy_data_domain.as_deref();
+            cfg_if::cfg_if! {
+                if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
+                    uncaged_ui_extras::secure_storage::register_with_fallback(&data_domain, legacy_data_domain, uncaged_core::paths::state_dir(), ctx)
+                } else if #[cfg(target_os = "windows")] {
+                    uncaged_ui_extras::secure_storage::register_with_dir(&data_domain, legacy_data_domain, uncaged_core::paths::state_dir(), ctx)
+                } else {
+                    // Uncaged: on macOS this is file-backed rather than the login keychain --
+                    // see `secure_storage/mac.rs` for why, and for what to restore if Uncaged
+                    // ever gets a signing identity.
+                    uncaged_ui_extras::secure_storage::register(&data_domain, legacy_data_domain, ctx);
+                }
+            }
         }
     }
     mark_startup_sub_interval("secure_storage");

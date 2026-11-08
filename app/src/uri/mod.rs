@@ -1115,7 +1115,7 @@ fn settings_section_for_simple_subpage(subpage: &str) -> Option<SettingsSection>
 fn validate_custom_uri(url: &Url) -> Result<UriHost> {
     // For now the only scheme we support is `[scheme_name]://[host_str]/...
     // Ignore all other urls that don't match this scheme for security purposes.
-    if url.scheme() != ChannelState::url_scheme() {
+    if !ChannelState::url_schemes().contains(&url.scheme()) {
         return Err(anyhow!(
             "Received url with unexpected scheme: {} ",
             url.scheme()

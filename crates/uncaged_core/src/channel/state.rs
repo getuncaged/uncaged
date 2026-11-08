@@ -38,7 +38,7 @@ pub struct ChannelState {
 impl ChannelState {
     pub fn init() -> Self {
         let channel = Channel::Oss;
-        let app_id = AppId::new("dev", "uncaged", "WarpOss");
+        let app_id = AppId::new("dev", "uncaged", "Uncaged");
         Self {
             channel,
             additional_features: Default::default(),
@@ -281,6 +281,22 @@ impl ChannelState {
             Channel::Integration => "warpintegration",
             Channel::Local => "warplocal",
             Channel::Oss => "uncagedoss",
+        }
+    }
+
+    /// Returns every URL scheme the app handles: [`Self::url_scheme`] first.
+    ///
+    /// Uncaged handles `uncaged://` as well as `uncagedoss://`, which predates the
+    /// rename and stays the primary scheme because MCP OAuth redirect URIs that
+    /// clients already registered use it.
+    pub fn url_schemes() -> &'static [&'static str] {
+        match Self::channel() {
+            Channel::Oss => &["uncagedoss", "uncaged"],
+            Channel::Stable => &["warp"],
+            Channel::Preview => &["warppreview"],
+            Channel::Dev => &["warpdev"],
+            Channel::Integration => &["warpintegration"],
+            Channel::Local => &["warplocal"],
         }
     }
 }

@@ -74,7 +74,7 @@ impl SecureStorage {
 
 /// `~/Library/Application Support/<service>/secrets`, alongside the rest of the app's
 /// state rather than in a location the user would not think to look.
-fn default_storage_dir(service_name: &str) -> PathBuf {
+pub(super) fn default_storage_dir(service_name: &str) -> PathBuf {
     let home = std::env::var_os("HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("/tmp"));

@@ -25,7 +25,7 @@ env:
 
 jobs:
   # --- Primary gating job: macOS ------------------------------------------
-  # The Uncaged GUI (warp-oss) needs Apple's Metal toolchain (shipped with
+  # The Uncaged GUI (uncaged) needs Apple's Metal toolchain (shipped with
   # Xcode) to compile its shaders, so macOS is the reference platform.
   macos:
     name: Build & lint (macOS)
@@ -66,14 +66,14 @@ jobs:
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
-          key: macos-warp-oss
+          key: macos-uncaged
 
       # Cheap checks first so obvious problems fail fast before the long build.
       - name: cargo fmt --check
         run: cargo fmt --all --check
 
-      - name: Build warp-oss (GUI binary)
-        run: cargo build --bin warp-oss
+      - name: Build uncaged (GUI binary)
+        run: cargo build --bin uncaged
 
       # The tree is clippy-clean, so lints gate the job. Two runs, because each
       # feature set compiles code the other doesn't (cloud_environments
@@ -140,15 +140,15 @@ jobs:
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
-          key: linux-warp-oss
+          key: linux-uncaged
 
-      - name: Build warp-oss (GUI binary)
-        run: cargo build --bin warp-oss
+      - name: Build uncaged (GUI binary)
+        run: cargo build --bin uncaged
 
       # Catches code only this platform compiles, which the macOS lint never sees.
-      - name: cargo clippy (warp-oss)
+      - name: cargo clippy (uncaged)
         run: >-
-          cargo clippy -p uncaged --lib --tests --bin warp-oss -- -D warnings
+          cargo clippy -p uncaged --lib --tests --bin uncaged -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
   windows:
@@ -172,13 +172,13 @@ jobs:
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
-          key: windows-warp-oss
+          key: windows-uncaged
 
-      - name: Build warp-oss (GUI binary)
-        run: cargo build --bin warp-oss
+      - name: Build uncaged (GUI binary)
+        run: cargo build --bin uncaged
 
       # Catches code only this platform compiles, which the macOS lint never sees.
-      - name: cargo clippy (warp-oss)
+      - name: cargo clippy (uncaged)
         run: >-
-          cargo clippy -p uncaged --lib --tests --bin warp-oss -- -D warnings
+          cargo clippy -p uncaged --lib --tests --bin uncaged -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion

@@ -21,6 +21,8 @@ if [ "$ARTIFACT" = "cli" ]; then
 else
   CHANNEL_SUFFIX="${BINARY_NAME#warp}"
 fi
+# The oss channel's package name predates its binary name (see script/linux/bundle).
+CHANNEL_SUFFIX="${PACKAGE_CHANNEL_SUFFIX:-$CHANNEL_SUFFIX}"
 
 # On Linux, we keep the `-stable` suffix for stable to avoid package conflicts.
 # The binary name is still `oz`, and the repo name is still `warpdotdev`.

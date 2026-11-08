@@ -86,15 +86,14 @@ $BUNDLE_ID = "dev.warp.$app_name"
 # For the first-party channels, APP_NAME must match the value used in Rust as
 # the application name (see app/src/channel.rs) and BUNDLE_ID is derived as
 # dev.warp.$APP_NAME. The oss (Uncaged) channel is special: its runtime identity
-# (AppUserModelID) is hardcoded in Rust as dev.uncaged.WarpOss (see
-# crates/uncaged_core/src/channel/state.rs), and BUNDLE_ID is overridden below to
-# match. APP_NAME still drives the app's display name and installer filename.
+# (AppUserModelID) is its app id, dev.uncaged.Uncaged (see app/src/bin/oss.rs),
+# and BUNDLE_ID is overridden below to match. APP_NAME still drives the app's display name and installer filename.
 #
 # WARP_BIN is the name of the binary produced by cargo;
 # BINARY_NAME is the desired name of the binary in the final package.
 if ("$CHANNEL" -eq 'oss') {
-    $WARP_BIN = 'warp-oss'
-    $BINARY_NAME = 'warp-oss.exe'
+    $WARP_BIN = 'uncaged'
+    $BINARY_NAME = 'uncaged.exe'
     $APP_NAME = 'Uncaged'
     $FEATURES = 'release_bundle,gui'
 }
@@ -105,10 +104,10 @@ $FEATURES = "$FEATURES,nld_heuristic_v2"
 $BINARY_PATH = "$CARGO_TARGET_OUTPUT_DIR\$BINARY_NAME"
 $BUNDLE_ID = "dev.warp.$APP_NAME"
 # Uncaged: the oss channel's user-visible bundle id / AppUserModelID is
-# dev.uncaged.WarpOss, matching the Rust runtime identity
-# (crates/uncaged_core/src/channel/state.rs) rather than the dev.warp.* namespace.
+# dev.uncaged.Uncaged, matching the Rust runtime identity (app/src/bin/oss.rs)
+# rather than the dev.warp.* namespace.
 if ("$CHANNEL" -eq 'oss') {
-    $BUNDLE_ID = 'dev.uncaged.WarpOss'
+    $BUNDLE_ID = 'dev.uncaged.Uncaged'
 }
 $INSTALLER_OUTPUT_DIR = "$WINDOWS_INSTALLER_DIR\Output"
 $INSTALLER_NAME = "$($APP_NAME)$($FILE_ENDING)"

@@ -117,7 +117,7 @@ mkdir -p "$EXTRAS_DIR"
 # WARP_BIN is the name of the binary produced by cargo.
 # N.B. The bundled outputs will always be warp.js and warp_bg.wasm.
 if [[ $RELEASE_CHANNEL = "oss" ]]; then
-  WARP_BIN="warp-oss"
+  WARP_BIN="uncaged"
 else
   echo "Unsupported channel '$RELEASE_CHANNEL': Uncaged only builds the oss channel." >&2
   exit 1

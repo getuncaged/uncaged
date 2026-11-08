@@ -23,7 +23,7 @@ INSTALL_COMMON_SKILLS=1
 FORCE_COMMON_SKILLS=0
 COMMON_SKILLS_TARGET="${WARP_COMMON_SKILLS_INSTALL_TARGET:-}"
 
-WARP_BIN_NAME="warp-oss"
+WARP_BIN_NAME="uncaged"
 WARP_CHANNEL="oss"
 
 # Shared argument parsing. macOS-specific flags (--dont-open,

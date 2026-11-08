@@ -9,6 +9,7 @@
 #[cfg_attr(any(target_os = "linux", target_os = "freebsd"), path = "linux.rs")]
 #[cfg_attr(target_os = "windows", path = "windows.rs")]
 mod imp;
+mod legacy;
 mod noop;
 mod unavailable;
 
@@ -34,9 +35,9 @@ use windows_only::*;
 /// App::test((), |mut app| async move {
 ///     app.update(|ctx| {
 ///         #[cfg(not(windows))]
-///         secure_storage::register("service_name", ctx);
+///         secure_storage::register("service_name", None, ctx);
 ///         #[cfg(windows)]
-///         secure_storage::register_with_dir("service_name", std::path::PathBuf::from(r"C:\some\path"), ctx);
+///         secure_storage::register_with_dir("service_name", None, std::path::PathBuf::from(r"C:\some\path"), ctx);
 ///
 ///         let _ = secure_storage::Model::handle(ctx).as_ref(ctx).read_value("some_key");
 ///     });
@@ -51,9 +52,37 @@ pub type Model = Box<dyn SecureStorage>;
 /// The service name is used as a namespace for the application's secrets.  It
 /// is recommended that this be a unique identifier for the application; one
 /// common scheme is reverse-DNS notation (e.g.: "dev.warp.Warp").
+///
+/// `legacy_service_name` is the service name a previous identity of the app
+/// stored its secrets under, if any: values missing from `service_name` are read
+/// from it and copied forward (see `legacy.rs`).
 #[cfg(not(target_os = "windows"))]
-pub fn register(service_name: &str, ctx: &mut uncaged_ui_core::AppContext) {
-    ctx.add_singleton_model(|_| -> Model { Box::new(imp::SecureStorage::new(service_name)) });
+pub fn register(
+    service_name: &str,
+    legacy_service_name: Option<&str>,
+    ctx: &mut uncaged_ui_core::AppContext,
+) {
+    ctx.add_singleton_model(|_| -> Model {
+        let current: Model = Box::new(imp::SecureStorage::new(service_name));
+        #[cfg(target_os = "macos")]
+        if let Some(legacy_service_name) = legacy_service_name {
+            // After the identity's directories moved, the previous service's
+            // files sit in the current service's directory.
+            let legacy = imp::SecureStorage::new_with_path(
+                legacy_service_name,
+                imp::default_storage_dir(service_name),
+            );
+            return with_legacy(current, Box::new(legacy));
+        }
+        #[cfg(not(target_os = "macos"))]
+        if let Some(legacy_service_name) = legacy_service_name {
+            return with_legacy(
+                current,
+                Box::new(imp::SecureStorage::new(legacy_service_name)),
+            );
+        }
+        current
+    });
 }
 
 /// Registers a no-op Secure Storage provider with the application.
@@ -71,14 +100,25 @@ pub fn register_unavailable(ctx: &mut uncaged_ui_core::AppContext) {
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 pub fn register_with_fallback(
     service_name: &str,
+    legacy_service_name: Option<&str>,
     fallback_dir: std::path::PathBuf,
     ctx: &mut uncaged_ui_core::AppContext,
 ) {
     ctx.add_singleton_model(|_| -> Model {
-        Box::new(imp::SecureStorage::new_with_fallback(
+        let current: Model = Box::new(imp::SecureStorage::new_with_fallback(
             service_name,
-            fallback_dir,
-        ))
+            fallback_dir.clone(),
+        ));
+        match legacy_service_name {
+            Some(legacy_service_name) => with_legacy(
+                current,
+                Box::new(imp::SecureStorage::new_with_fallback(
+                    legacy_service_name,
+                    fallback_dir,
+                )),
+            ),
+            None => current,
+        }
     });
 }
 
@@ -87,12 +127,30 @@ pub fn register_with_fallback(
 #[cfg(target_os = "windows")]
 pub fn register_with_dir(
     service_name: &str,
+    legacy_service_name: Option<&str>,
     storage_dir: std::path::PathBuf,
     ctx: &mut uncaged_ui_core::AppContext,
 ) {
     ctx.add_singleton_model(|_| -> Model {
-        Box::new(imp::SecureStorage::new_with_path(service_name, storage_dir))
+        let current: Model = Box::new(imp::SecureStorage::new_with_path(
+            service_name,
+            storage_dir.clone(),
+        ));
+        match legacy_service_name {
+            Some(legacy_service_name) => with_legacy(
+                current,
+                Box::new(imp::SecureStorage::new_with_path(
+                    legacy_service_name,
+                    storage_dir,
+                )),
+            ),
+            None => current,
+        }
     });
+}
+
+fn with_legacy(current: Model, legacy: Model) -> Model {
+    Box::new(legacy::WithLegacyService { current, legacy })
 }
 
 /// A trait representing a secure store for key-value pairs.
@@ -176,9 +234,9 @@ impl From<FromUtf8Error> for Error {
 /// App::test((), |mut app| async move {
 ///     app.update(|ctx| {
 ///         #[cfg(not(windows))]
-///         secure_storage::register("service_name", ctx);
+///         secure_storage::register("service_name", None, ctx);
 ///         #[cfg(windows)]
-///         secure_storage::register_with_dir("service_name", std::path::PathBuf::from(r"C:\some\path"), ctx);
+///         secure_storage::register_with_dir("service_name", None, std::path::PathBuf::from(r"C:\some\path"), ctx);
 ///
 ///         use secure_storage::AppContextExt;
 ///         let _ = ctx.secure_storage().read_value("some_key");

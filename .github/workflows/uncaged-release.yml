@@ -163,7 +163,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          # Build/runtime deps for warp-oss, plus the packaging tooling:
+          # Build/runtime deps for uncaged, plus the packaging tooling:
           #   dpkg-dev + fakeroot -> .deb (dpkg-deb)
           #   rpm                 -> .rpm (rpmbuild)
           #   libfuse2 + wget     -> AppImage (linuxdeploy needs FUSE)
@@ -191,7 +191,7 @@ jobs:
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
-          key: linux-release-warp-oss
+          key: linux-release-uncaged
 
       # The bundle scripts generate the third-party license file via
       # script/prepare_bundled_resources -> `cargo about`, which isn't on the runner.
@@ -242,8 +242,8 @@ jobs:
 
           # Keep shipping the plain tarball of the built binary as well.
           mkdir -p stage/Uncaged-linux-x86_64
-          cp target/release-lto/warp-oss stage/Uncaged-linux-x86_64/uncaged 2>/dev/null \
-            || cp target/release/warp-oss stage/Uncaged-linux-x86_64/uncaged
+          cp target/release-lto/uncaged stage/Uncaged-linux-x86_64/uncaged 2>/dev/null \
+            || cp target/release/uncaged stage/Uncaged-linux-x86_64/uncaged
           [ -f README.md ] && cp README.md stage/Uncaged-linux-x86_64/ || true
           [ -f LICENSE ] && cp LICENSE stage/Uncaged-linux-x86_64/ || true
           tar -C stage -czf dist/Uncaged-linux-x86_64.tar.gz Uncaged-linux-x86_64
@@ -309,7 +309,7 @@ jobs:
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
-          key: linux-arm64-release-warp-oss
+          key: linux-arm64-release-uncaged
 
       - name: Install cargo-about
         run: cargo install --locked cargo-about@0.8.4
@@ -347,8 +347,8 @@ jobs:
           APPIMG="$(ls "$OUT"/*aarch64.AppImage 2>/dev/null | head -1 || true)"
           [ -n "$APPIMG" ] && cp "$APPIMG" dist/Uncaged-linux-aarch64.AppImage || echo "no aarch64 AppImage produced"
           mkdir -p stage/Uncaged-linux-aarch64
-          cp target/release-lto/warp-oss stage/Uncaged-linux-aarch64/uncaged 2>/dev/null \
-            || cp target/release/warp-oss stage/Uncaged-linux-aarch64/uncaged
+          cp target/release-lto/uncaged stage/Uncaged-linux-aarch64/uncaged 2>/dev/null \
+            || cp target/release/uncaged stage/Uncaged-linux-aarch64/uncaged
           [ -f README.md ] && cp README.md stage/Uncaged-linux-aarch64/ || true
           [ -f LICENSE ] && cp LICENSE stage/Uncaged-linux-aarch64/ || true
           tar -C stage -czf dist/Uncaged-linux-aarch64.tar.gz Uncaged-linux-aarch64
@@ -393,7 +393,7 @@ jobs:
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
-          key: windows-release-warp-oss
+          key: windows-release-uncaged
 
       # bundle.ps1 builds the binary + Inno Setup installer for the given arch.
       # $env:GIT_RELEASE_TAG is read for the installer version.
@@ -423,7 +423,7 @@ jobs:
           }
 
           # Also keep shipping the plain zip of the built binary.
-          $bin = 'target/x86_64-pc-windows-msvc/rlto/warp-oss.exe'
+          $bin = 'target/x86_64-pc-windows-msvc/rlto/uncaged.exe'
           if (Test-Path $bin) {
             Copy-Item $bin stage/Uncaged-windows-x86_64/uncaged.exe
             if (Test-Path README.md) { Copy-Item README.md stage/Uncaged-windows-x86_64/ }
@@ -470,7 +470,7 @@ jobs:
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
-          key: windows-release-warp-oss-arm64
+          key: windows-release-uncaged-arm64
 
       - name: Install cargo-about
         run: cargo install --locked cargo-about@0.8.4

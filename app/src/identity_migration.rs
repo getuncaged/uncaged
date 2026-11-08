@@ -8,8 +8,9 @@
 //! identity and is left alone.
 //!
 //! The rules, each pinned by `identity_migration_tests.rs`:
-//! - A directory moves only when its new location does not exist. Nothing is
-//!   merged and nothing is overwritten.
+//! - A directory moves only when its new location does not exist (or holds
+//!   nothing but empty directories). Nothing is merged and nothing is
+//!   overwritten.
 //! - A move is a rename: atomic per directory and never a copy.
 //! - Each moved directory leaves a symlink (a junction on Windows) at its old
 //!   path, so downgrading to v0.3.4 still finds its data.
@@ -18,6 +19,8 @@
 //!   data ([`ChannelState::set_data_app_id`]) and the next launch tries again.
 //! - If a rename fails, the renames done by this launch are put back and the
 //!   launch keeps using the old identity's data.
+//! - Only the app's own launch moves data. Command-line and worker invocations
+//!   (`uncaged <subcommand>`) keep using the old identity's data until it has.
 //! - A marker file written before a rename and removed once the old path links
 //!   to the new one lets a later launch finish a move interrupted in between.
 //!
@@ -80,7 +83,8 @@ pub(crate) struct Report {
 
 /// What [`migrate`] needs to know about the rest of the system.
 pub(crate) trait Probe {
-    /// Describes another running Uncaged process, if there is one.
+    /// Describes another running Uncaged process (or another reason this
+    /// process must not move data), if there is one.
     fn other_instance_running(&self) -> Option<String>;
     /// Whether some process has `database` open.
     fn database_in_use(&self, database: &Path) -> bool;
@@ -90,8 +94,10 @@ pub(crate) trait Probe {
 /// uses the renamed identity.
 ///
 /// Must run before anything computes a data path or domain: logging, secure
-/// storage, settings, sqlite.
-pub(crate) fn run_if_needed() {
+/// storage, settings, sqlite. With `may_move` false (a command-line or worker
+/// invocation) nothing moves: if data is still to move, this process uses the
+/// previous identity's data, as a deferred launch does.
+pub(crate) fn run_if_needed(may_move: bool) {
     let current = ChannelState::app_id();
     let legacy = legacy_app_id();
     if ChannelState::channel() != Channel::Oss || current.to_string() == legacy.to_string() {
@@ -110,6 +116,7 @@ pub(crate) fn run_if_needed() {
     // real install, so any other Uncaged process says nothing about whether the
     // profile's own data is in use. Its database check still applies.
     let probe = SystemProbe {
+        may_move,
         check_processes: data_profile.is_none(),
     };
     let mut report = migrate(&old, &new, &probe);
@@ -137,6 +144,20 @@ pub(crate) fn run_if_needed() {
         );
     }
     let _ = REPORT.set(report);
+}
+
+/// The previous identity's data domain, while this launch uses a different
+/// one: secrets stored under it are still read (and copied forward).
+pub(crate) fn legacy_data_domain() -> Option<String> {
+    if ChannelState::channel() != Channel::Oss {
+        return None;
+    }
+    let legacy = legacy_app_id().to_string();
+    let legacy = match ChannelState::data_profile() {
+        Some(profile) => format!("{legacy}-{profile}"),
+        None => legacy,
+    };
+    (legacy != ChannelState::data_domain()).then_some(legacy)
 }
 
 /// Logs what [`run_if_needed`] did. Call once logging is initialized.
@@ -182,7 +203,10 @@ enum Root {
 }
 
 fn classify(from: &Path, to: &Path) -> Root {
-    let new_exists = fs::symlink_metadata(to).is_ok();
+    // Directories without a single file in them are not data: something
+    // (another tool, a test run, the system) can create them before the first
+    // launch, and treating them as a migrated identity would strand the data.
+    let new_exists = fs::symlink_metadata(to).is_ok() && !is_empty_tree(to);
     let old = fs::symlink_metadata(from);
     if new_exists {
         if old.is_err() && to.join(MARKER_FILE_NAME).exists() {
@@ -308,6 +332,10 @@ fn move_root(from: &Path, to: &Path) -> io::Result<()> {
     if let Some(parent) = to.parent() {
         fs::create_dir_all(parent)?;
     }
+    // `classify` only lets an empty directory tree stand at `to`.
+    if fs::symlink_metadata(to).is_ok() {
+        remove_empty_tree(to)?;
+    }
     // Best-effort: without the marker an interrupted move is still safe, a
     // later launch just cannot restore the downgrade link.
     let marker = from.join(MARKER_FILE_NAME);
@@ -319,6 +347,33 @@ fn move_root(from: &Path, to: &Path) -> io::Result<()> {
         return Err(err);
     }
     Ok(())
+}
+
+/// Whether `path` is a directory (not a link) containing nothing but
+/// directories, at any depth.
+fn is_empty_tree(path: &Path) -> bool {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return false;
+    };
+    if !metadata.is_dir() {
+        return false;
+    }
+    let Ok(entries) = fs::read_dir(path) else {
+        return false;
+    };
+    entries
+        .into_iter()
+        .all(|entry| entry.is_ok_and(|entry| is_empty_tree(&entry.path())))
+}
+
+/// Removes a tree [`is_empty_tree`] accepted. `remove_dir` refuses a directory
+/// with anything in it, so a file that appeared meanwhile stops this rather
+/// than being deleted.
+fn remove_empty_tree(path: &Path) -> io::Result<()> {
+    for entry in fs::read_dir(path)? {
+        remove_empty_tree(&entry?.path())?;
+    }
+    fs::remove_dir(path)
 }
 
 /// Undoes [`move_root`] after a later root failed to move. If the rename back
@@ -387,11 +442,15 @@ fn link(_from: &Path, _to: &Path) -> io::Result<()> {
 }
 
 struct SystemProbe {
+    may_move: bool,
     check_processes: bool,
 }
 
 impl Probe for SystemProbe {
     fn other_instance_running(&self) -> Option<String> {
+        if !self.may_move {
+            return Some("this is not the app's own launch".to_owned());
+        }
         if !self.check_processes {
             return None;
         }

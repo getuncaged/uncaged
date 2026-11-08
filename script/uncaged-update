@@ -91,6 +91,9 @@ fi
 
 # The app spawns this and then quits. Overwriting the bundle while its process is
 # still alive is what produces half-updated installs, so wait for it to go.
+# Matching the directory rather than a name waits on every executable the bundle
+# has carried: `uncaged`, and `warp-oss` (v0.3.4 and earlier, and the compat
+# entry that still points at `uncaged`) -- including their worker processes.
 if (( RESTART )); then
   waited=0
   while pgrep -f "$APP_PATH/Contents/MacOS/" >/dev/null 2>&1 && (( waited < 30 )); do

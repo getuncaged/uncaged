@@ -413,6 +413,18 @@ fn test_action_new_agent_conversation_parse() {
     assert!(matches!(action, Action::NewAgentConversation));
 }
 
+/// `uncaged://` is accepted next to the pre-rename `uncagedoss://`.
+#[test]
+fn test_validate_custom_uri_accepts_every_registered_scheme() {
+    assert_eq!(ChannelState::url_schemes(), &["uncagedoss", "uncaged"]);
+    for scheme in ChannelState::url_schemes() {
+        let url = Url::parse(&format!("{scheme}://linear/work")).unwrap();
+        assert!(matches!(validate_custom_uri(&url), Ok(UriHost::Linear)));
+    }
+    let url = Url::parse("warp://linear/work").unwrap();
+    assert!(validate_custom_uri(&url).is_err());
+}
+
 #[test]
 fn test_validate_custom_uri_linear() {
     let url = Url::parse(&format!(

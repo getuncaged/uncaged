@@ -32,6 +32,11 @@ fi
 # Copy files to the desired output locations within the target dir, stripping
 # debugging symbols from the installed binaries.
 install -D "$EXECUTABLE_PATH" "${TARGET_DIR}${OPT_DIR}/$BINARY_NAME"
+# Uncaged: the binary was `warp-oss` up to v0.3.4; keep that name working for
+# anything that points at it. Remove once no supported release predates the rename.
+if [[ "$RELEASE_CHANNEL" == "oss" && "$ARTIFACT" == "app" ]]; then
+  ln -sfn "$BINARY_NAME" "${TARGET_DIR}${OPT_DIR}/warp-oss"
+fi
 # Only install desktop file and icons if the artifact is "app"
 if [[ "$ARTIFACT" == "app" ]]; then
   install -Dm644 "$WORKSPACE_ROOT_DIR/app/channels/$RELEASE_CHANNEL/$BUNDLE_ID.desktop" "${TARGET_DIR}/usr/share/applications/$BUNDLE_ID.desktop"

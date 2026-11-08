@@ -232,6 +232,26 @@ fn never_merges_into_an_existing_new_location() {
 }
 
 #[test]
+fn empty_directories_at_the_new_location_are_not_data() {
+    let layout = layout();
+    seed_old(&layout);
+    // Created before the first launch, e.g. by a test run or another tool.
+    fs::create_dir_all(layout.new.roots[0].join("codebase_index_snapshots/nested")).unwrap();
+
+    let report = migrate(&layout.old, &layout.new, &FakeProbe::default());
+
+    assert_eq!(report.outcome, Outcome::Migrated, "{:?}", report.notes);
+    assert!(is_link_to(&layout.old.roots[0], &layout.new.roots[0]));
+    assert_eq!(
+        fs::read_to_string(layout.new.state_dir.join("warp.sqlite")).unwrap(),
+        "db"
+    );
+    assert!(!layout.new.roots[0]
+        .join("codebase_index_snapshots/nested")
+        .exists());
+}
+
+#[test]
 fn a_dangling_compat_link_is_not_data() {
     let layout = layout();
     // The user deleted the new directory; the old path still links to it.

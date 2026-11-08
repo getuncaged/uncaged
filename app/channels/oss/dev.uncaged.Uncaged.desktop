@@ -4,20 +4,20 @@ Version=1.0
 
 Type=Application
 
-Name=UncagedOss
+Name=Uncaged
 GenericName=TerminalEmulator
 
 Exec=warp-terminal-oss %U
-StartupWMClass=dev.uncaged.WarpOss
+StartupWMClass=dev.uncaged.Uncaged
 
 Keywords=shell;prompt;command;commandline;cmd;
 
-Icon=dev.uncaged.WarpOss
+Icon=dev.uncaged.Uncaged
 
 Categories=System;TerminalEmulator;
 
 # Don't run this application within a terminal.
 Terminal=false
 
-# Register ourselves as the handler for uncagedoss:// URLs.
-MimeType=x-scheme-handler/uncagedoss;
+# Register ourselves as the handler for uncaged:// and (pre-rename) uncagedoss:// URLs.
+MimeType=x-scheme-handler/uncaged;x-scheme-handler/uncagedoss;

@@ -17,9 +17,9 @@
   #define ReleaseChannel "dev"
 #endif
 // The application/AppUserModelID bundle id. For first-party channels this is
-// dev.warp.<AppName>; the oss (Uncaged) channel passes dev.uncaged.WarpOss so the
+// dev.warp.<AppName>; the oss (Uncaged) channel passes dev.uncaged.Uncaged so the
 // taskbar/start-menu shortcut links to the running app, whose AppUserModelID is
-// hardcoded in Rust as dev.uncaged.WarpOss.
+// its app id, dev.uncaged.Uncaged.
 #ifndef BundleId
   #define BundleId "dev.warp." + MyAppName
 #endif
@@ -141,6 +141,14 @@ Root: HKA; Subkey: "Software\Classes\Directory\Background\shell\{#MyAppName}Wind
 [Tasks]
 Name: addToPath; Description: "Add Warp to PATH"
 
+#if ReleaseChannel == "oss"
+[InstallDelete]
+; Uncaged: the executable was warp-oss.exe up to v0.3.4. An upgrade installs
+; uncaged.exe next to it, so remove the stale copy rather than leave a runnable
+; old version behind. bin\warp-oss.cmd is rewritten to start uncaged.exe.
+Type: files; Name: "{app}\warp-oss.exe"
+#endif
+
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\warp\{#MyAppName}"
 Type: filesandordirs; Name: "{localappdata}\warp\{#MyAppName}"
@@ -253,7 +261,7 @@ begin
 #if ReleaseChannel == "stable"
     CmdScriptName := 'oz.cmd'
 #elif ReleaseChannel == "oss"
-    CmdScriptName := 'warp-oss.cmd';
+    CmdScriptName := 'uncaged.cmd';
 #else
     CmdScriptName := 'oz-{#ReleaseChannel}.cmd';
 #endif
@@ -265,6 +273,17 @@ begin
                        '"' + ExpandConstant('{app}\{#MyAppExeName}') + '" %*' + #13#10;
     
     SaveStringToFile(CmdScriptPath, CmdScriptContent, False);
+#if ReleaseChannel == "oss"
+    { Uncaged: keep the pre-rename CLI name (v0.3.4 and earlier) working. }
+    SaveStringToFile(BinDir + '\warp-oss.cmd', CmdScriptContent, False);
+
+    { The app registers its login item under the value name WarpOss (kept across
+      the rename so there is only ever one entry); point an existing one at the
+      new executable, since warp-oss.exe is gone. }
+    if RegValueExists(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'WarpOss') then
+      RegWriteStringValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'WarpOss',
+        '"' + ExpandConstant('{app}\{#MyAppExeName}') + '"');
+#endif
   end;
 end;
 

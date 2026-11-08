@@ -10,9 +10,9 @@ fn test_data_dir_path() {
         if #[cfg(target_os = "macos")] {
             assert_eq!(data_dir(), home_dir.join(".uncaged"));
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(data_dir(), home_dir.join(".local/share/warp-oss"));
+            assert_eq!(data_dir(), home_dir.join(".local/share/uncaged"));
         } else if #[cfg(windows)] {
-            assert_eq!(data_dir(), home_dir.join("AppData\\Roaming\\warp\\WarpOss\\data"));
+            assert_eq!(data_dir(), home_dir.join("AppData\\Roaming\\uncaged\\Uncaged\\data"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -27,9 +27,9 @@ fn test_config_local_dir_path() {
         if #[cfg(target_os = "macos")] {
             assert_eq!(config_local_dir(), home_dir.join(".uncaged"));
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(config_local_dir(), home_dir.join(".config/warp-oss"));
+            assert_eq!(config_local_dir(), home_dir.join(".config/uncaged"));
         } else if #[cfg(windows)] {
-            assert_eq!(config_local_dir(), home_dir.join("AppData\\Local\\warp\\WarpOss\\config"));
+            assert_eq!(config_local_dir(), home_dir.join("AppData\\Local\\uncaged\\Uncaged\\config"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -68,11 +68,11 @@ fn test_cache_dir_path() {
     // ChannelState, by default, is configured for Channel::Oss.
     cfg_if::cfg_if! {
         if #[cfg(target_os = "macos")] {
-            assert_eq!(cache_dir(), home_dir.join("Library/Application Support/dev.uncaged.WarpOss"));
+            assert_eq!(cache_dir(), home_dir.join("Library/Application Support/dev.uncaged.Uncaged"));
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(cache_dir(), home_dir.join(".cache/warp-oss"));
+            assert_eq!(cache_dir(), home_dir.join(".cache/uncaged"));
         } else if #[cfg(windows)] {
-            assert_eq!(cache_dir(), home_dir.join("AppData\\Local\\warp\\WarpOss\\cache"));
+            assert_eq!(cache_dir(), home_dir.join("AppData\\Local\\uncaged\\Uncaged\\cache"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -85,11 +85,11 @@ fn test_state_dir_path() {
     cfg_if::cfg_if! {
         // ChannelState, by default, is configured for Channel::Oss.
         if #[cfg(target_os = "macos")] {
-            assert_eq!(state_dir(), home_dir.join("Library/Application Support/dev.uncaged.WarpOss"));
+            assert_eq!(state_dir(), home_dir.join("Library/Application Support/dev.uncaged.Uncaged"));
         } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
-            assert_eq!(state_dir(), home_dir.join(".local/state/warp-oss"));
+            assert_eq!(state_dir(), home_dir.join(".local/state/uncaged"));
         } else if #[cfg(windows)] {
-            assert_eq!(state_dir(), home_dir.join("AppData\\Local\\warp\\WarpOss\\data"));
+            assert_eq!(state_dir(), home_dir.join("AppData\\Local\\uncaged\\Uncaged\\data"));
         } else {
             unimplemented!("Need to update tests for current platform!");
         }
@@ -130,6 +130,24 @@ fn test_project_path_for_warp_dev_app_id() {
     }
 }
 
+#[test]
+fn test_project_path_for_renamed_oss_app_id() {
+    let project_dirs = project_dirs_for_app_id(AppId::new("dev", "uncaged", "Uncaged"), None)
+        .expect("should be able to compute project dirs");
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "macos")] {
+            assert_eq!(project_dirs.project_path(), "dev.uncaged.Uncaged");
+        } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
+            assert_eq!(project_dirs.project_path(), "uncaged");
+        } else if #[cfg(windows)] {
+            assert_eq!(project_dirs.project_path(), "uncaged\\Uncaged");
+        } else {
+            unimplemented!("Need to update tests for current platform!");
+        }
+    }
+}
+
+/// The identity Uncaged used up to v0.3.4, whose data the first launch moves.
 #[test]
 fn test_project_path_for_oss_app_id() {
     let project_dirs = project_dirs_for_app_id(AppId::new("dev", "uncaged", "WarpOss"), None)
@@ -180,8 +198,8 @@ fn test_identity_dirs_for_oss_app_ids() {
                 legacy.roots,
                 vec![
                     home_dir.join(".local/state/warp-oss"),
-                    home_dir.join(".local/share/warp-oss"),
-                    home_dir.join(".config/warp-oss"),
+                    home_dir.join(".local/share/uncaged"),
+                    home_dir.join(".config/uncaged"),
                     home_dir.join(".cache/warp-oss"),
                 ]
             );

@@ -21,6 +21,8 @@ if [ "$ARTIFACT" = "cli" ]; then
 else
   CHANNEL_SUFFIX="${BINARY_NAME#warp}"
 fi
+# The oss channel's package name predates its binary name (see script/linux/bundle).
+CHANNEL_SUFFIX="${PACKAGE_CHANNEL_SUFFIX:-$CHANNEL_SUFFIX}"
 REPO_NAME="warpdotdev$CHANNEL_SUFFIX"
 
 # On Linux, we keep the `-stable` suffix for stable to avoid package conflicts.
@@ -72,8 +74,8 @@ mkdir -p "$RPMBUILD_DIR"/{SPEC,RPMS}
 # package to the releases.warp.dev yum/zypper repositories.
 VERSION="$GIT_RELEASE_TAG"
 RELEASE="1"
-if [ "$RELEASE_CHANNEL" = "oss" ] && [ -f "$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/warp-oss.spec.template" ]; then
-  SPEC_TEMPLATE="$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/warp-oss.spec.template"
+if [ "$RELEASE_CHANNEL" = "oss" ] && [ -f "$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/uncaged.spec.template" ]; then
+  SPEC_TEMPLATE="$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/uncaged.spec.template"
 else
   SPEC_TEMPLATE="$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/warp.spec.template"
 fi

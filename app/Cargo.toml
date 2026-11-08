@@ -1,6 +1,6 @@
 [package]
 authors = ["The Uncaged contributors"]
-default-run = "warp-oss"
+default-run = "uncaged"
 description = "The account-free, bring-your-own-model terminal."
 edition = "2021"
 autobins = false
@@ -18,7 +18,7 @@ path = "src/lib.rs"
 # flag overrides). Otherwise these binaries are exactly identical to our main binary.
 
 [[bin]]
-name = "warp-oss"
+name = "uncaged"
 path = "src/bin/oss.rs"
 test = false
 
@@ -905,10 +905,10 @@ handoff_cloud_cloud = ["cloud_mode_setup_v2"]
 git_credential_refresh = []
 prompt_cache_expiry_warning = []
 
-[package.metadata.bundle.bin.warp-oss]
+[package.metadata.bundle.bin.uncaged]
 category = "public.app-category.developer-tools"
 copyright = "© 2026 the Uncaged contributors. Based on Warp © Denver Technologies, Inc."
-identifier = "dev.uncaged.WarpOss"
+identifier = "dev.uncaged.Uncaged"
 name = "Uncaged"
 resources = ["assets/onboarding"]
 icon = ["channels/oss/icon/no-padding/512x512.png", "channels/oss/icon/no-padding/icon.ico"]
