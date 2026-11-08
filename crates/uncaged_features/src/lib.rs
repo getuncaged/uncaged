@@ -590,9 +590,6 @@ pub enum FeatureFlag {
     /// Enables loading and returning bundled skills in the SkillManager.
     BundledSkills,
 
-    /// Enables the orchestration launch modal announcing multi-agent orchestration features.
-    OrchestrationLaunchModal,
-
     /// Updated tab styling (background colors, border, close button positioning, margins).
     NewTabStyling,
 

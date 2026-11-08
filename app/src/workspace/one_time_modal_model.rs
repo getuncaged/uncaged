@@ -14,7 +14,6 @@ use crate::settings::AISettings;
 /// a modal is currently being shown and automatically triggers the modal when appropriate
 /// conditions are met (e.g., user becomes onboarded).
 pub struct OneTimeModalModel {
-    is_orchestration_launch_modal_open: bool,
     /// Whether the auto-handoff sleep discoverability modal is currently being shown.
     is_auto_handoff_sleep_modal_open: bool,
     /// Set while the auto-handoff sleep modal is closed and reset while it is
@@ -45,7 +44,6 @@ impl OneTimeModalModel {
         auto_handoff_sleep_modal_closed.set();
 
         Self {
-            is_orchestration_launch_modal_open: false,
             is_auto_handoff_sleep_modal_open: false,
             auto_handoff_sleep_modal_closed,
             is_free_ai_removal_modal_open: false,
@@ -57,14 +55,6 @@ impl OneTimeModalModel {
     /// Returns the window ID where the currently open one-time modal should be displayed.
     pub fn target_window_id(&self) -> Option<WindowId> {
         self.target_window_id
-    }
-
-    pub fn is_orchestration_launch_modal_open(&self) -> bool {
-        self.is_orchestration_launch_modal_open && self.target_window_id.is_some()
-    }
-
-    pub fn mark_orchestration_launch_modal_dismissed(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_orchestration_launch_modal_open(false, ctx);
     }
 
     /// Returns whether the auto-handoff sleep discoverability modal is currently open.
@@ -144,16 +134,10 @@ impl OneTimeModalModel {
 
     /// Returns true if any one-time modal is currently open.
     pub fn is_any_modal_open(&self) -> bool {
-        (self.is_orchestration_launch_modal_open
-            || self.is_auto_handoff_sleep_modal_open
+        (self.is_auto_handoff_sleep_modal_open
             || self.is_free_ai_removal_modal_open
             || self.is_hoa_onboarding_open)
             && self.target_window_id.is_some()
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn force_open_orchestration_launch_modal(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_orchestration_launch_modal_open(true, ctx);
     }
 
     pub fn update_target_window_id(&mut self, window_id: WindowId, ctx: &mut ModelContext<Self>) {
@@ -164,19 +148,6 @@ impl OneTimeModalModel {
                 is_open: self.is_any_modal_open(),
             });
         }
-    }
-
-    fn set_orchestration_launch_modal_open(
-        &mut self,
-        is_open: bool,
-        ctx: &mut ModelContext<Self>,
-    ) -> bool {
-        if self.is_orchestration_launch_modal_open != is_open {
-            self.is_orchestration_launch_modal_open = is_open;
-            ctx.emit(OneTimeModalEvent::VisibilityChanged { is_open });
-            return true;
-        }
-        false
     }
 
     /// Returns whether the free-AI-removal notice modal is currently open.

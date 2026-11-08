@@ -9,7 +9,6 @@ use uncaged_ui::elements::{
 };
 use uncaged_ui::fonts::FamilyId;
 use uncaged_ui::geometry::vector::vec2f;
-use uncaged_ui::scene::DropShadow;
 use uncaged_ui::text_layout::ClipConfig;
 use uncaged_ui::ui_components::button::{ButtonVariant, TextAndIcon, TextAndIconAlignment};
 use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
@@ -113,7 +112,6 @@ pub struct Dropdown<A: DropdownItemAction = ()> {
     menu_header_text_override: Option<MenuHeaderTextFormatter>,
     self_handle: WeakViewHandle<Self>,
     style: DropdownStyle,
-    use_drop_shadow: bool,
     font_color: Option<ColorU>,
     font_size: Option<f32>,
     padding: Option<Coords>,
@@ -288,7 +286,6 @@ where
             style: Default::default(),
             element_anchor: PositionedElementAnchor::BottomLeft,
             child_anchor: ChildAnchor::TopLeft,
-            use_drop_shadow: false,
             font_color: None,
             font_size: None,
             padding: None,
@@ -326,11 +323,6 @@ where
     pub fn set_border_radius(&mut self, border_radius: CornerRadius, ctx: &mut ViewContext<Self>) {
         self.border_radius = Some(border_radius);
         ctx.notify();
-    }
-
-    pub fn with_drop_shadow(mut self) -> Self {
-        self.use_drop_shadow = true;
-        self
     }
 
     pub fn set_font_color(&mut self, color: ColorU, ctx: &mut ViewContext<Self>) {
@@ -703,12 +695,7 @@ where
         let appearance = Appearance::as_ref(app);
         let mut dropdown_stack = Stack::new().with_child(self.render_top_bar(appearance));
         if self.is_expanded {
-            let mut menu = ChildView::new(&self.dropdown).finish();
-            if self.use_drop_shadow {
-                menu = Container::new(menu)
-                    .with_drop_shadow(DropShadow::default())
-                    .finish();
-            }
+            let menu = ChildView::new(&self.dropdown).finish();
             let positioning = OffsetPositioning::offset_from_save_position_element(
                 self.top_bar_label(),
                 vec2f(0., 0.),

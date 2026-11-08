@@ -5,11 +5,6 @@ use uncaged_ui_core::{Entity, ModelContext, SingletonEntity};
 use uncaged_ui_extras::secure_storage::{self, AppContextExt};
 use uuid::Uuid;
 
-pub use crate::geap_credentials::{
-    GeapCredentials, GeapCredentialsState, GeapFederation, GeapMintBinding,
-    LoadGeapCredentialsError, GEAP_REFRESH_LEAD_TIME,
-};
-
 const SECURE_STORAGE_KEY: &str = "AiApiKeys";
 
 /// Secure-storage key for the connected xAI/Grok subscription's OAuth tokens.
@@ -158,8 +153,6 @@ pub struct ApiKeyManager {
     /// (`ApiKeyManager::refresh_grok_tokens_if_needed`) can otherwise race.
     #[cfg(not(target_family = "wasm"))]
     pub(crate) grok_refresh_in_flight: bool,
-    /// In-memory Gemini Enterprise (GEAP) credential state.
-    pub(crate) geap_credentials_state: GeapCredentialsState,
     secure_storage_write_version: u64,
     grok_secure_storage_write_version: u64,
 }
@@ -175,7 +168,6 @@ impl ApiKeyManager {
             grok_refresh_allowed: false,
             #[cfg(not(target_family = "wasm"))]
             grok_refresh_in_flight: false,
-            geap_credentials_state: GeapCredentialsState::Missing,
             secure_storage_write_version: 0,
             grok_secure_storage_write_version: 0,
         }
@@ -316,22 +308,6 @@ impl ApiKeyManager {
         self.keys.custom_endpoints.clear();
         ctx.emit(ApiKeyManagerEvent::KeysUpdated);
         self.write_keys_to_secure_storage(ctx);
-    }
-
-    pub fn set_geap_credentials_state(
-        &mut self,
-        state: GeapCredentialsState,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if self.geap_credentials_state == state {
-            return;
-        }
-        self.geap_credentials_state = state;
-        ctx.emit(ApiKeyManagerEvent::KeysUpdated);
-    }
-
-    pub fn geap_credentials_state(&self) -> &GeapCredentialsState {
-        &self.geap_credentials_state
     }
 
     fn load_keys_from_secure_storage(ctx: &mut ModelContext<Self>) -> ApiKeys {

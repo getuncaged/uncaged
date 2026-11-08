@@ -83,7 +83,6 @@ pub fn init(app: &mut AppContext) {
     crate::tab_configs::remove_confirmation_dialog::init(app);
     hoa_onboarding::init(app);
     tab_configs::session_config_modal::init(app);
-    view::orchestration_launch_modal::init(app);
     view::codex_modal::init(app);
     view::free_ai_removal_modal::init(app);
     view::global_search::view::GlobalSearchView::init(app);
@@ -147,18 +146,6 @@ pub fn init(app: &mut AppContext) {
         #[cfg(debug_assertions)]
         {
             app.register_editable_bindings([
-                EditableBinding::new(
-                    "workspace:open_orchestration_launch_modal",
-                    "[Debug] Open Orchestration Launch Modal",
-                    WorkspaceAction::OpenOrchestrationLaunchModal,
-                )
-                .with_context_predicate(id!("Workspace")),
-                EditableBinding::new(
-                    "workspace:reset_orchestration_launch_modal_state",
-                    "[Debug] Reset Orchestration Launch Modal State",
-                    WorkspaceAction::ResetOrchestrationLaunchModalState,
-                )
-                .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
                     "workspace:open_free_ai_removal_modal",
                     "[Debug] Open Free AI Removal Modal",

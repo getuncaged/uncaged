@@ -14,16 +14,9 @@ fn make_manager_with_grok(keys: ApiKeys, grok_tokens: Option<GrokTokens>) -> Api
         grok_refresh_allowed: false,
         #[cfg(not(target_family = "wasm"))]
         grok_refresh_in_flight: false,
-        geap_credentials_state: GeapCredentialsState::Missing,
         secure_storage_write_version: 0,
         grok_secure_storage_write_version: 0,
     }
-}
-
-fn make_manager_with_geap(geap_credentials_state: GeapCredentialsState) -> ApiKeyManager {
-    let mut manager = make_manager(ApiKeys::default());
-    manager.geap_credentials_state = geap_credentials_state;
-    manager
 }
 
 fn grok_tokens(access_token: &str, expires_in: Option<u64>) -> GrokTokens {
@@ -32,39 +25,6 @@ fn grok_tokens(access_token: &str, expires_in: Option<u64>) -> GrokTokens {
         refresh_token: Some("refresh".into()),
         expires_at: expires_in.map(|secs| SystemTime::now() + Duration::from_secs(secs)),
         connected_at: None,
-    }
-}
-
-fn geap_credentials(access_token: &str, expires_in: Option<u64>) -> GeapCredentials {
-    GeapCredentials::new(
-        access_token.into(),
-        expires_in.map(|secs| SystemTime::now() + Duration::from_secs(secs)),
-    )
-}
-
-fn geap_binding() -> GeapMintBinding {
-    GeapMintBinding {
-        user_uid: "user-1".into(),
-        audience:
-            "//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/q"
-                .into(),
-        federation: GeapFederation::ServiceAccount {
-            email: "sa@proj.iam.gserviceaccount.com".into(),
-        },
-    }
-}
-
-// The expected binding the request build site passes in is the same type as
-// the stored `minted_for`, so the attach check is a plain `==`.
-fn geap_gate() -> GeapMintBinding {
-    geap_binding()
-}
-
-fn geap_loaded(access_token: &str, expires_in: Option<u64>) -> GeapCredentialsState {
-    GeapCredentialsState::Loaded {
-        credentials: geap_credentials(access_token, expires_in),
-        loaded_at: SystemTime::now(),
-        minted_for: geap_binding(),
     }
 }
 
@@ -368,37 +328,4 @@ fn manager_has_any_key_true_for_connected_grok_without_pasted_key() {
 fn manager_has_any_key_false_for_blank_grok_and_no_keys() {
     let mgr = make_manager_with_grok(ApiKeys::default(), Some(grok_tokens("   ", None)));
     assert!(!mgr.has_any_key());
-}
-
-// ── geap credentials ────────────────────────────────────────────
-
-#[test]
-fn geap_access_token_present_without_expiry() {
-    let credentials = GeapCredentials::new("tok".into(), None);
-    assert_eq!(credentials.access_token_for_request(), Some("tok"));
-}
-
-#[test]
-fn geap_access_token_blank_is_none() {
-    let credentials = GeapCredentials::new("   ".into(), None);
-    assert_eq!(credentials.access_token_for_request(), None);
-}
-
-#[test]
-fn geap_access_token_near_expiry_still_sent() {
-    // Expired tokens are still sent; Google is the authority on validity.
-    let credentials = geap_credentials("tok", Some(0));
-    assert_eq!(credentials.access_token_for_request(), Some("tok"));
-}
-
-#[test]
-fn geap_needs_refresh_lead_time_boundaries() {
-    // Within the 5-minute lead window.
-    assert!(geap_credentials("tok", Some(30)).needs_refresh());
-    // Comfortably fresh.
-    assert!(!geap_credentials("tok", Some(3600)).needs_refresh());
-    // Already expired -> still needs a refresh.
-    assert!(geap_credentials("tok", Some(0)).needs_refresh());
-    // Unknown expiry never reports as needing a refresh.
-    assert!(!geap_credentials("tok", None).needs_refresh());
 }
