@@ -1262,7 +1262,7 @@ enum AuthOnboardingTarget {
 /// User preferences key to track whether the user has completed the onboarding slides locally
 /// (before login). This is needed because the server-side `is_onboarded` flag requires
 /// authentication.
-const HAS_COMPLETED_ONBOARDING_KEY: &str = "HasCompletedOnboarding";
+pub const HAS_COMPLETED_ONBOARDING_KEY: &str = "HasCompletedOnboarding";
 
 /// Returns whether the user has completed the onboarding slides locally (before login).
 pub(crate) fn has_completed_local_onboarding(ctx: &AppContext) -> bool {

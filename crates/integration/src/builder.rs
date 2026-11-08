@@ -48,10 +48,20 @@ impl Builder {
             builder = builder.with_real_display();
         }
 
+        // Start every test in the terminal, as a returning user would. A fresh
+        // profile otherwise opens on first-run onboarding. Integration builds
+        // keep private preferences in the same file under the test's HOME, so
+        // a test can opt back into onboarding by overriding this key with
+        // `with_user_defaults`.
+        let user_prefs = HashMap::from([(
+            uncaged::root_view::HAS_COMPLETED_ONBOARDING_KEY.to_owned(),
+            "true".to_owned(),
+        )]);
+
         Self {
             inner: builder,
             setup: None,
-            user_prefs: Default::default(),
+            user_prefs,
         }
     }
 
