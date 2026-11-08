@@ -1,9 +1,7 @@
 pub mod event;
 pub mod listener;
-#[cfg(not(target_family = "wasm"))]
-pub(crate) mod plugin_manager;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use event::{CLIAgentEvent, CLIAgentEventSource, CLIAgentEventType};
 use uncaged_ui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
@@ -111,20 +109,9 @@ pub struct CLIAgentSession {
     /// `None` for non-Codex sessions created by command detection alone.
     /// Dropping this handle cleans up the listener's PTY event subscription.
     pub listener: Option<ModelHandle<CLIAgentSessionListener>>,
-    /// The plugin version reported by structured plugin events.
-    /// `None` if the plugin predates version reporting or Codex is using OSC9 fallback.
-    pub plugin_version: Option<String>,
-    /// `None` when the session is local.
-    /// `Some("user@hostname")` when running over SSH (warpified or legacy).
-    /// Used as a key for per-host plugin install failure tracking.
-    pub remote_host: Option<String>,
     /// Draft text saved from the rich input composer when it was closed.
     /// Restored into the editor when the composer is reopened.
     pub draft_text: Option<String>,
-    /// When the session was detected via a custom toolbar command pattern,
-    /// the first word of the command (the binary/alias the user typed).
-    /// Used to customize plugin instructions and force manual install mode.
-    pub custom_command_prefix: Option<String>,
     /// Set once the session has received any structured OSC 777 (rich)
     /// notification. Codex's OSC 9 fallback never sets it, so this is the
     /// single source of truth for whether the session is plugin-backed.
@@ -132,10 +119,6 @@ pub struct CLIAgentSession {
 }
 
 impl CLIAgentSession {
-    pub fn is_remote(&self) -> bool {
-        self.remote_host.is_some()
-    }
-
     /// Whether the session surfaces trustworthy fine-grained status
     /// (in-progress / blocked / success). True only after receiving a rich OSC
     /// 777 notification. Codex's OSC 9 fallback emits only opaque `Stop`
@@ -216,10 +199,7 @@ impl CLIAgentSession {
             // IdlePrompt means the agent is sitting at its prompt waiting for input.
             // This should not affect status — otherwise it would override Success after a Stop event.
             CLIAgentEventType::IdlePrompt => return None,
-            CLIAgentEventType::SessionStart => {
-                self.plugin_version = event.payload.plugin_version.clone();
-                return None;
-            }
+            CLIAgentEventType::SessionStart => return None,
             CLIAgentEventType::Unknown(_) => return None,
         };
 
@@ -288,9 +268,6 @@ impl CLIAgentSessionsModelEvent {
 /// Singleton model that tracks pane-scoped CLI agent state and plugin-enriched session context.
 pub struct CLIAgentSessionsModel {
     sessions: HashMap<EntityId, CLIAgentSession>,
-    /// Tracks (agent, remote_host) pairs where an auto plugin operation (install or update) has failed.
-    /// Shared across all views so failure in one tab is reflected everywhere.
-    plugin_auto_failures: HashSet<(CLIAgent, Option<String>)>,
 }
 
 impl Entity for CLIAgentSessionsModel {
@@ -303,7 +280,6 @@ impl CLIAgentSessionsModel {
     pub fn new() -> Self {
         Self {
             sessions: HashMap::new(),
-            plugin_auto_failures: HashSet::new(),
         }
     }
 
@@ -326,8 +302,8 @@ impl CLIAgentSessionsModel {
     ///
     /// The optional `cwd` / `project` / `session_id` fields supply initial
     /// context when available (e.g. from a `SessionStart` event). Passing
-    /// `None` for all three is fine — happens when the plugin is installed
-    /// mid-session and there is no start event to extract context from.
+    /// `None` for all three is fine — happens when the listener is created
+    /// without a start event to extract context from (Codex command detection).
     #[allow(clippy::too_many_arguments)]
     pub fn register_listener(
         &mut self,
@@ -336,8 +312,6 @@ impl CLIAgentSessionsModel {
         cwd: Option<String>,
         project: Option<String>,
         session_id: Option<String>,
-        plugin_version: Option<String>,
-        remote_host: Option<String>,
         should_auto_toggle_input: bool,
         listener: ModelHandle<CLIAgentSessionListener>,
         ctx: &mut ModelContext<Self>,
@@ -350,8 +324,6 @@ impl CLIAgentSessionsModel {
             // Upgrade existing session with plugin context.
             session.status = CLIAgentSessionStatus::InProgress;
             session.listener = Some(listener);
-            session.plugin_version = plugin_version;
-            session.remote_host = remote_host;
             session.should_auto_toggle_input = should_auto_toggle_input;
             session.session_context.cwd = cwd.or(session.session_context.cwd.take());
             session.session_context.project = project.or(session.session_context.project.take());
@@ -374,10 +346,7 @@ impl CLIAgentSessionsModel {
                 input_state: CLIAgentInputState::Closed,
                 should_auto_toggle_input,
                 listener: Some(listener),
-                plugin_version,
-                remote_host,
                 draft_text: None,
-                custom_command_prefix: None,
                 received_rich_notification: false,
             },
             ctx,
@@ -522,13 +491,6 @@ impl CLIAgentSessionsModel {
         });
     }
 
-    /// Records that an auto plugin operation (install or update) failed for the given agent/host.
-    /// `remote_host` is `None` for local sessions, `Some("user@hostname")` for remote.
-    #[cfg(not(target_family = "wasm"))]
-    pub fn record_plugin_auto_failure(&mut self, agent: CLIAgent, remote_host: Option<String>) {
-        self.plugin_auto_failures.insert((agent, remote_host));
-    }
-
     /// Saves draft text from the rich input composer for the given terminal.
     /// Stores `None` for empty or whitespace-only text.
     pub fn set_draft(&mut self, terminal_view_id: EntityId, text: String) {
@@ -553,12 +515,6 @@ impl CLIAgentSessionsModel {
         self.sessions
             .get_mut(&terminal_view_id)
             .and_then(|s| s.draft_text.take())
-    }
-
-    /// Whether an auto plugin operation has previously failed for this agent on this host.
-    pub fn has_plugin_auto_failed(&self, agent: CLIAgent, remote_host: &Option<String>) -> bool {
-        self.plugin_auto_failures
-            .contains(&(agent, remote_host.clone()))
     }
 }
 

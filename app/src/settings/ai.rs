@@ -1112,27 +1112,6 @@ define_settings_group!(AISettings, settings: [
         description: "Whether agent notifications are shown.",
     }
 
-    // Per-agent, per-host tracking of whether the user dismissed the plugin install chip.
-    // Keys are "<agent_prefix>" for local sessions or "<agent_prefix>@<host>" for remote.
-    // Local-only so dismissal doesn't sync across devices.
-    plugin_install_chip_dismissed_map: PluginInstallChipDismissedMap {
-        type: HashMap<String, bool>,
-        default: HashMap::default(),
-        supported_platforms: SupportedPlatforms::DESKTOP,
-        private: true,
-    }
-
-    // Per-agent, per-host tracking of the MINIMUM_PLUGIN_VERSION for which the user
-    // dismissed the plugin update chip. Empty/absent means not dismissed.
-    // Keys are "<agent_prefix>" for local sessions or "<agent_prefix>@<host>" for remote.
-    // Local-only so dismissal doesn't sync across devices.
-    plugin_update_chip_dismissed_for_version_map: PluginUpdateChipDismissedForVersionMap {
-        type: HashMap<String, String>,
-        default: HashMap::default(),
-        supported_platforms: SupportedPlatforms::DESKTOP,
-        private: true,
-    }
-
     // Whether Oz should add attribution (co-author line) to commit messages and PRs.
     // This is the user-level preference.
     agent_attribution_enabled: AgentAttributionEnabled {
@@ -1471,45 +1450,6 @@ impl AISettings {
         report_if_error!(self
             .cli_agent_footer_enabled_commands
             .set_value(ToolbarCommandMap::new(map), ctx));
-    }
-
-    /// Whether the plugin install chip was dismissed for the given agent/host.
-    pub fn is_plugin_install_chip_dismissed(&self, key: &str) -> bool {
-        self.plugin_install_chip_dismissed_map
-            .get(key)
-            .copied()
-            .unwrap_or(false)
-    }
-
-    /// Mark the plugin install chip as dismissed for the given agent/host.
-    pub fn dismiss_plugin_install_chip(&mut self, key: &str, ctx: &mut ModelContext<Self>) {
-        let mut map = self.plugin_install_chip_dismissed_map.clone();
-        map.insert(key.to_owned(), true);
-        report_if_error!(self.plugin_install_chip_dismissed_map.set_value(map, ctx));
-    }
-
-    /// Returns the minimum plugin version for which the update chip was dismissed
-    /// for the given agent/host, or an empty string if not dismissed.
-    pub fn plugin_update_chip_dismissed_version(&self, key: &str) -> &str {
-        self.plugin_update_chip_dismissed_for_version_map
-            .get(key)
-            .map(String::as_str)
-            .unwrap_or("")
-    }
-
-    /// Record that the user dismissed the update chip for the given agent/host at
-    /// the specified minimum version.
-    pub fn dismiss_plugin_update_chip(
-        &mut self,
-        key: &str,
-        version: String,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        let mut map = self.plugin_update_chip_dismissed_for_version_map.clone();
-        map.insert(key.to_owned(), version);
-        report_if_error!(self
-            .plugin_update_chip_dismissed_for_version_map
-            .set_value(map, ctx));
     }
 }
 

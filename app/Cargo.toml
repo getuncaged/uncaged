@@ -576,14 +576,12 @@ default = [
     "configurable_toolbar",
     "transfer_control_tool",
     "hoa_notifications",
-    "open_code_notifications",
     "cli_agent_rich_input",
     "vertical_tabs",
     "vertical_tabs_summary_mode",
     "tab_configs",
     "agent_harness",
     "hoa_onboarding_flow",
-    "codex_notifications",
     "codex_plugin",
     "trim_trailing_blank_lines",
     "open_warp_new_settings_modes",
@@ -882,7 +880,6 @@ agent_harness = []
 oz_handoff = []
 handoff_local_cloud = []
 hoa_notifications = []
-open_code_notifications = []
 transfer_control_tool = []
 custom_model_routers = []
 billing_and_usage_page_v2 = []
@@ -891,7 +888,6 @@ configurable_toolbar = []
 warpify_footer = []
 hoa_onboarding_flow = []
 git_operations_in_code_review = []
-codex_notifications = []
 codex_plugin = []
 cloud_mode_setup_v2 = ["cloud_mode"]
 handoff_cloud_cloud = ["cloud_mode_setup_v2"]

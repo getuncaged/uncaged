@@ -316,15 +316,11 @@ impl TerminalView {
     /// if a user has aliased `foo` to `claude`, running `foo` will detect Claude.
     /// Falls back to user-configured toolbar command patterns, returning the
     /// assigned agent (or `CLIAgent::Unknown` for unassigned patterns).
-    ///
-    /// The second tuple element is the custom command prefix (the first word of
-    /// the command), present only when the agent was resolved via a custom
-    /// toolbar command pattern rather than native detection.
     pub(super) fn detect_cli_agent_from_model(
         &self,
         model: &TerminalModel,
         ctx: &AppContext,
-    ) -> Option<(CLIAgent, Option<String>)> {
+    ) -> Option<CLIAgent> {
         let active_block = model.block_list().active_block();
 
         if !active_block.is_active_and_long_running() {
@@ -344,14 +340,7 @@ impl TerminalView {
             })
         });
 
-        if let Some(agent) = detected {
-            return Some((agent, None));
-        }
-
-        CompiledCommandsForCodingAgentToolbar::matched_agent(ctx, &command).map(|agent| {
-            let prefix = command.split_whitespace().next().map(str::to_owned);
-            (agent, prefix)
-        })
+        detected.or_else(|| CompiledCommandsForCodingAgentToolbar::matched_agent(ctx, &command))
     }
 
     /// Updates the UI during a long running command to agent "tagged-in state".

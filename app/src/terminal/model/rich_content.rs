@@ -7,7 +7,6 @@ pub enum RichContentType {
     InlineAgentViewHeader,
     AgentViewZeroState,
     TerminalViewZeroState,
-    PluginInstructionsBlock,
 }
 
 impl RichContentType {
