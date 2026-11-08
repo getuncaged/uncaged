@@ -81,11 +81,11 @@ variants in [`crates/uncaged_core/src/ui/icons.rs`](crates/uncaged_core/src/ui/i
 ```sh
 source "$HOME/.cargo/env"
 touch crates/uncaged_assets/src/lib.rs           # if any bundled asset changed
-CARGO_INCREMENTAL=0 cargo build --bin warp-oss
+CARGO_INCREMENTAL=0 cargo build --bin uncaged
 
 # Deploy into the signed app bundle, then RE-SIGN (required — AMFI kills an
 # unsigned/modified bundle on launch):
-cp target/debug/warp-oss ~/Applications/Uncaged.app/Contents/MacOS/warp-oss
+cp target/debug/uncaged ~/Applications/Uncaged.app/Contents/MacOS/uncaged
 codesign --force --deep --sign - ~/Applications/Uncaged.app
 ```
 

@@ -5,7 +5,7 @@ This file provides guidance when working with code in this repository.
 ## Development Commands
 
 ### Build and Run
-- `cargo run` - Build and run Uncaged locally (the `warp-oss` binary)
+- `cargo run` - Build and run Uncaged locally (the `uncaged` binary)
 - `./script/bundle app --channel oss --selfsign --debug --arch aarch64` - Bundle a local macOS debug app
 
 ### Testing

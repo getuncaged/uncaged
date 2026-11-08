@@ -59,10 +59,10 @@ new *protocol* needs engine code (see MODIFYING.md §3).
 These make the OS treat it as a distinct app (own prefs, own config dir, own URL
 scheme) so it never collides with Warp or with Uncaged:
 
-- `crates/uncaged_core/src/channel/state.rs` — `AppId::new("dev","uncaged","WarpOss")`.
+- `crates/uncaged_core/src/channel/state.rs` — `AppId::new("dev","uncaged","Uncaged")` (and `app/src/bin/oss.rs`; changing it needs a data migration like `app/src/identity_migration.rs`).
 - `crates/uncaged_core/src/paths.rs` — the `.uncaged` home-config dir name.
 - `crates/uncaged_core/src/channel/mod.rs` — CLI command names + URL scheme.
-- `app/Cargo.toml` `[package.metadata.bundle.bin.warp-oss]` + `app/src/bin/oss.rs`
+- `app/Cargo.toml` `[package.metadata.bundle.bin.uncaged]` + `app/src/bin/oss.rs`
   embedded plist — bundle id, display name, scheme, copyright.
 - `crates/uncaged_core/src/channel/config.rs` — `uncaged_sentinel()` (the fail-closed
   Warp URLs); no change needed unless you rename the constructors.

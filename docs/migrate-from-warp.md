@@ -8,13 +8,13 @@ carry over.
 
 ## Why they don't share anything
 
-Uncaged runs as its own macOS app (`dev.uncaged.WarpOss`) on its own release
+Uncaged runs as its own macOS app (`dev.uncaged.Uncaged`; `dev.uncaged.WarpOss` up to v0.3.4) on its own release
 channel, so it uses its own directories:
 
 | | Warp (Stable) | Uncaged |
 |---|---|---|
 | User config (themes, workflows, keybindings, MCP) | `~/.warp/` | `~/.uncaged/` |
-| App state (history DB, caches) | `~/Library/Application Support/dev.warp.Warp-Stable/` | `~/Library/Application Support/dev.uncaged.WarpOss/` |
+| App state (history DB, caches) | `~/Library/Application Support/dev.warp.Warp-Stable/` | `~/Library/Application Support/dev.uncaged.Uncaged/` |
 | Model / engine config | *(server-side, in your Warp account)* | `~/.uncaged/engine.json`, `~/.uncaged/connections.json` |
 
 Because the paths are keyed to the app identity, the two installs can coexist and

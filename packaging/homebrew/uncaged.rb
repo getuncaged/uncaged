@@ -62,13 +62,21 @@ cask "uncaged" do
 
   # Remove Uncaged's user data on `brew uninstall --zap uncaged`. Uncaged stores
   # everything under ~/.uncaged and namespaces app-support/caches/prefs by its
-  # bundle id dev.uncaged.WarpOss.
+  # bundle id dev.uncaged.Uncaged. Releases up to v0.3.4 used dev.uncaged.WarpOss
+  # and logged to warp-oss.log; the first launch of a renamed build moves that
+  # data and leaves symlinks at the old paths, so both sets are listed.
   zap trash: [
     "~/.uncaged",
+    "~/Library/Application Support/dev.uncaged.Uncaged",
+    "~/Library/Caches/dev.uncaged.Uncaged",
+    "~/Library/Preferences/dev.uncaged.Uncaged.plist",
+    "~/Library/Saved Application State/dev.uncaged.Uncaged.savedState",
+    "~/Library/Logs/uncaged.log*",
     "~/Library/Application Support/dev.uncaged.WarpOss",
     "~/Library/Caches/dev.uncaged.WarpOss",
     "~/Library/Preferences/dev.uncaged.WarpOss.plist",
     "~/Library/Saved Application State/dev.uncaged.WarpOss.savedState",
     "~/Library/Logs/dev.uncaged.WarpOss",
+    "~/Library/Logs/warp-oss.log*",
   ]
 end

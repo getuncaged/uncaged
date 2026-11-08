@@ -43,7 +43,7 @@ confidence we'll ever get. They arrived at the same answers on:
 - **Failing the agent seam closed** — hard-return rather than falling back to
   Warp's cloud. (We both do this. It is not overzealous.)
 - **Channel-level isolation** — running our own `Channel::Oss` with a distinct
-  bundle id (`dev.uncaged.WarpOss` vs their `dev.zap.Zap`) and a separate config
+  bundle id (`dev.uncaged.Uncaged` vs their `dev.zap.Zap`) and a separate config
   dir keeps Warp cloud state out.
 - **Not renaming the internal `warp_*` crates** — Zap kept them `warp`-named and
   rebranded only the product/packaging layer. This confirms our leftover `warp`

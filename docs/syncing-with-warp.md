@@ -66,7 +66,7 @@ git merge upstream/main
 #    `if Oss { … }` guard. Never drop a gate to make a conflict go away.
 
 # 4. Build + run the checks — a clean text-merge can still break behavior
-cargo build --bin warp-oss
+cargo build --bin uncaged
 cargo test -p uncaged_engine            # + any live tests you rely on
 
 # 5. Smoke-test the running app (no sign-up modal, Drive move, model connect)

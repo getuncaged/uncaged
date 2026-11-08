@@ -152,9 +152,9 @@
 
             cargoBuildFlags = [
               "-p"
-              "warp"
+              "uncaged"
               "--bin"
-              "warp-oss"
+              "uncaged"
               "--bin"
               "generate_settings_schema"
             ];
@@ -165,7 +165,7 @@
             doCheck = false;
 
             env = {
-              APPIMAGE_NAME = "WarpOss-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
+              APPIMAGE_NAME = "Uncaged-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
               LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
               PROTOC = "${pkgs.protobuf}/bin/protoc";
               PROTOC_INCLUDE = "${pkgs.protobuf}/include";
@@ -180,8 +180,8 @@
                 executablePath = lib.makeBinPath (with pkgs; [ xdg-utils ]);
               in
               ''
-                install -Dm755 "$out/bin/warp-oss" "${installDir}/warp-oss"
-                rm -f "$out/bin/warp-oss"
+                install -Dm755 "$out/bin/uncaged" "${installDir}/uncaged"
+                rm -f "$out/bin/uncaged"
 
                 patchShebangs ./script/prepare_bundled_resources
 
@@ -202,30 +202,32 @@
                 install -Dm644 LICENSE-AGPL "$out/share/licenses/warp-terminal-experimental/LICENSE-AGPL"
                 install -Dm644 LICENSE-MIT "$out/share/licenses/warp-terminal-experimental/LICENSE-MIT"
 
-                install -Dm644 app/channels/oss/dev.uncaged.WarpOss.desktop \
-                  "$out/share/applications/dev.uncaged.WarpOss.desktop"
-                substituteInPlace "$out/share/applications/dev.uncaged.WarpOss.desktop" \
+                install -Dm644 app/channels/oss/dev.uncaged.Uncaged.desktop \
+                  "$out/share/applications/dev.uncaged.Uncaged.desktop"
+                substituteInPlace "$out/share/applications/dev.uncaged.Uncaged.desktop" \
                   --replace-fail "Exec=warp-terminal-oss %U" "Exec=warp-terminal-experimental %U"
 
                 for size in 16x16 32x32 64x64 128x128 256x256 512x512; do
                   icon="app/channels/oss/icon/no-padding/$size.png"
                   if [ -f "$icon" ]; then
                     install -Dm644 "$icon" \
-                      "$out/share/icons/hicolor/$size/apps/dev.uncaged.WarpOss.png"
+                      "$out/share/icons/hicolor/$size/apps/dev.uncaged.Uncaged.png"
                   fi
                 done
 
-                wrapProgram "${installDir}/warp-oss" \
+                wrapProgram "${installDir}/uncaged" \
                   --prefix LD_LIBRARY_PATH : "${libraryPath}" \
                   --prefix PATH : "${executablePath}"
 
                 mkdir -p "$out/bin"
-                ln -s "${installDir}/warp-oss" "$out/bin/warp-oss"
-                ln -s "${installDir}/warp-oss" "$out/bin/warp-terminal-experimental"
+                ln -s "${installDir}/uncaged" "$out/bin/uncaged"
+                # Pre-rename name (v0.3.4 and earlier), kept for existing scripts.
+                ln -s "${installDir}/uncaged" "$out/bin/warp-oss"
+                ln -s "${installDir}/uncaged" "$out/bin/warp-terminal-experimental"
               '';
 
             postFixup = lib.optionalString pkgs.stdenv.isLinux ''
-              wrapped="/opt/warpdotdev/warp-terminal-experimental/.warp-oss-wrapped"
+              wrapped="/opt/warpdotdev/warp-terminal-experimental/.uncaged-wrapped"
               if [ -e "$out$wrapped" ] && ! patchelf --print-needed "$out$wrapped" | grep -q '^libfontconfig\.so\.1$'; then
                 patchelf --add-needed libfontconfig.so.1 "$out$wrapped"
               fi
@@ -301,7 +303,7 @@
         {
           default = pkgs.mkShell {
             inherit nativeBuildInputs buildInputs;
-            APPIMAGE_NAME = "WarpOss-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
+            APPIMAGE_NAME = "Uncaged-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
             PROTOC = "${pkgs.protobuf}/bin/protoc";
             PROTOC_INCLUDE = "${pkgs.protobuf}/include";

@@ -6,14 +6,14 @@ are intentionally separate from the upstream Warp workflows (`ci.yml`,
 `create_release.yml`, etc.), which target Warp's private, self-hosted
 infrastructure and secrets and are **not** used here.
 
-Uncaged builds the GUI binary with `cargo build --bin warp-oss` (channel `oss`,
-bundle id `dev.uncaged.WarpOss`). See `RELEASING.md` for the full release story.
+Uncaged builds the GUI binary with `cargo build --bin uncaged` (channel `oss`,
+bundle id `dev.uncaged.Uncaged`). See `RELEASING.md` for the full release story.
 
 ## Workflows
 
 | File | Trigger | What it does |
 |------|---------|--------------|
-| `uncaged-ci.yml` | push / PR to `master` or `main` | Builds `warp-oss` on macOS (gating) plus best-effort Linux/Windows builds; runs `cargo fmt --check`, and best-effort `clippy` + `test`. |
+| `uncaged-ci.yml` | push / PR to `master` or `main` | Builds `uncaged` on macOS (gating) plus best-effort Linux/Windows builds; runs `cargo fmt --check`, and best-effort `clippy` + `test`. |
 | `uncaged-review.yml` | PRs, and `@claude` comments | Runs Anthropic's `claude-code-action@v1.0.179` to review the diff for bugs and quality. |
 | `uncaged-release.yml` | pushed tag `v*` | Builds per-OS packages and attaches them to a GitHub Release. |
 

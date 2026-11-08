@@ -37,8 +37,10 @@ Current version: **0.3.4**.
 
 ## 2. Build the app + DMG
 
-The channel that produces Uncaged is **`oss`**. It builds the `warp-oss` binary
-as the app named **Uncaged** (bundle id `dev.uncaged.WarpOss`). There is **no
+The channel that produces Uncaged is **`oss`**. It builds the `uncaged` binary
+as the app named **Uncaged** (bundle id `dev.uncaged.Uncaged`; up to v0.3.4 the
+binary was `warp-oss` and the bundle id `dev.uncaged.WarpOss`, see
+[The identity rename](#the-identity-rename-v034--next)). There is **no
 crash reporting / Sentry** in the codebase.
 
 Single-architecture (Apple Silicon), ad-hoc signed — the common local release:
@@ -170,14 +172,18 @@ the Warp-only pieces stripped for the `oss` channel:
 - **No apt/rpm repo wiring.** `script/linux/bundle_deb` skips appending the
   `releases.warp.dev` apt source + GPG key (`postinst.repo.template` /
   `postrm.repo.template`) for `oss`. The `.rpm` uses a dedicated
-  `resources/linux/rpm/app/warp-oss.spec.template` whose `%post` only refreshes
+  `resources/linux/rpm/app/uncaged.spec.template` whose `%post` only refreshes
   the desktop database — no GPG key install, no yum/zypper repo.
 - **No PGP signing.** `script/linux/bundle_rpm` skips the `rpmsign` step for
   `oss` (Uncaged has no private signing key; packages are distributed unsigned
   via GitHub Releases).
-- **Bundle id.** `script/linux/bundle` sets `BUNDLE_ID=dev.uncaged.WarpOss` for
+- **Bundle id.** `script/linux/bundle` sets `BUNDLE_ID=dev.uncaged.Uncaged` for
   `oss`, matching the Rust runtime identity and the shipped desktop file
-  `app/channels/oss/dev.uncaged.WarpOss.desktop`.
+  `app/channels/oss/dev.uncaged.Uncaged.desktop`.
+- **Package name.** The binary is `uncaged`, but the package stays
+  `warp-terminal-oss` (`PACKAGE_CHANNEL_SUFFIX=-oss`) so a new package upgrades
+  an old install in place; `/opt/warpdotdev/warp-terminal-oss/warp-oss` is a
+  compat symlink to `uncaged`.
 
 Runner tooling installed by the workflow: `dpkg-dev`+`fakeroot` (deb), `rpm`
 (rpm), `libfuse2`+`linuxdeploy` (AppImage), and the graphics/X11 dev
@@ -193,10 +199,13 @@ targeted arm64.)
 ### Windows packaging — what the fork changed
 
 `script/windows/bundle.ps1 -Channel oss` builds the Inno Setup installer. For
-`oss` it sets `APP_NAME=Uncaged` and `BUNDLE_ID=dev.uncaged.WarpOss`, and passes
-the bundle id into `windows-installer.iss` as `/DBundleId=…` so the Start-menu /
-desktop shortcut's `AppUserModelID` matches the running app (whose id is
-hardcoded in Rust as `dev.uncaged.WarpOss`). The runner installs Inno Setup with
+`oss` it sets `APP_NAME=Uncaged`, `BINARY_NAME=uncaged.exe` and
+`BUNDLE_ID=dev.uncaged.Uncaged`, and passes the bundle id into
+`windows-installer.iss` as `/DBundleId=…` so the Start-menu / desktop shortcut's
+`AppUserModelID` matches the running app (whose id is `dev.uncaged.Uncaged`,
+set in `app/src/bin/oss.rs`). The Inno `AppId` (`warp-terminal-oss`) is
+deliberately unchanged: it is what makes a new installer upgrade the existing
+install instead of installing beside it. The runner installs Inno Setup with
 `choco install innosetup`. aarch64 cross-compiles fine but is kept best-effort
 until validated on ARM hardware.
 
@@ -246,6 +255,96 @@ winget install Uncaged.Uncaged
 PR to [`microsoft/winget-pkgs`](https://github.com/microsoft/winget-pkgs) under
 `manifests/u/Uncaged/Uncaged/<version>/`. The `wingetcreate` tool can automate
 the version bump and PR.
+
+## The identity rename (v0.3.4 → next)
+
+The release after v0.3.4 renames the app's identity: binary `warp-oss` →
+`uncaged`, bundle id / data domain `dev.uncaged.WarpOss` → `dev.uncaged.Uncaged`,
+log `warp-oss.log` → `uncaged.log`. Everything below exists so v0.3.4 can still
+update to it and so existing data comes along.
+
+### How v0.3.4 updates to the renamed build
+
+- **macOS.** v0.3.4 never swaps the bundle itself: it runs the *old* bundle's
+  `Contents/Resources/bin/uncaged-update --restart` and quits. That script waits
+  for every process under `/Applications/Uncaged.app/Contents/MacOS/`, then runs
+  `brew upgrade --cask uncaged` (Homebrew installs) or
+  `curl -fsSL https://getuncaged.dev/install.sh | bash`, which downloads
+  `Uncaged-macos-<arch>.zip`, expects `Uncaged.app` at its top, moves it to
+  `/Applications/Uncaged.app` and opens it. None of that names the executable or
+  the bundle id, so the published names it relies on are: the asset names
+  `Uncaged-macos-{aarch64,x86_64}.{zip,dmg}` (they also carry v0.3.4's in-app
+  asset fragments `macos-aarch64` / `macos-x86_64`), the app name `Uncaged.app`
+  in the zip and DMG, and `Contents/Resources/bin/uncaged-update` in the new
+  bundle (for the *next* update). `app/src/autoupdate/release_names_tests.rs`
+  pins all of them against the workflow and bundle scripts.
+- **Linux.** v0.3.4 does not self-update on Linux; it reports the new version
+  and the user updates the way they installed. The package name stays
+  `warp-terminal-oss` so `apt`/`dnf`/`pacman` upgrade in place; the tarball's
+  binary was already named `uncaged`.
+- **Windows.** v0.3.4's in-app updater cannot download anything on this
+  channel (its installer URL has no base for `oss`), so it never updates itself;
+  users run the new `Uncaged-windows-<arch>-setup.exe` (or winget). The Inno
+  `AppId` is unchanged so that upgrades in place.
+
+### First launch: the data migration
+
+`app/src/identity_migration.rs` runs first thing in `uncaged::run()` (right
+after argument parsing), before logging, settings, secure storage or sqlite.
+Only the GUI launch moves anything; a CLI or worker invocation that finds data
+still to move uses the old identity's data for that process.
+
+- It moves (renames) each directory the old identity owns to the new name —
+  macOS `~/Library/{Application Support,Caches}/dev.uncaged.WarpOss` and
+  `~/Library/Saved Application State/dev.uncaged.WarpOss.savedState`; Linux
+  `~/.local/state`, `~/.local/share`, `~/.config`, `~/.cache` `warp-oss` →
+  `uncaged`; Windows `%LOCALAPPDATA%` and `%APPDATA%` `uncaged\WarpOss` →
+  `uncaged\Uncaged` — only if the new location does not exist or holds nothing
+  but empty directories (never merges),
+  then leaves a symlink (Windows: junction) at the old path so a downgrade to
+  v0.3.4 finds the same data. `~/.uncaged` is not touched.
+- If another `uncaged`/`warp-oss` process is running or the old `warp.sqlite`
+  is open, nothing moves: that launch keeps using the old identity's data and
+  the next launch retries. A failed rename puts the earlier ones back.
+- NSUserDefaults (`dev.uncaged.WarpOss` → `dev.uncaged.Uncaged`) and the
+  Windows registry preferences (`HKCU\Software\Warp.dev\WarpOss` → `…\Uncaged`)
+  are copied once, keeping the old ones.
+- Secrets stored under the old service name are read through and copied to the
+  new one on first use; the old copies stay (`secure_storage/legacy.rs`).
+- The outcome is logged at startup (`Identity migration: …` in `uncaged.log`).
+
+### Compat shims and when to remove them
+
+| Shim | Why | Remove when |
+| --- | --- | --- |
+| `Contents/MacOS/warp-oss` → `uncaged` symlink (macOS bundle) | Login items, scripts and the v0.3.4 updater's executable check point at the old path | No supported release predates the rename and the in-app staged-bundle check no longer accepts `warp-oss` |
+| `Contents/Resources/bin/warp-oss` → `uncaged` (macOS CLI) | Users symlinked the old CLI onto `PATH` | Same, with a release note telling users to relink `bin/uncaged` |
+| `/opt/warpdotdev/warp-terminal-oss/warp-oss` → `uncaged` (Linux packages, flake) | Scripts calling the old binary | Same |
+| `bin\warp-oss.cmd` (Windows) and rewriting the `WarpOss` login-item `Run` value | Old CLI name; the startup entry pointed at the deleted `warp-oss.exe` | Same; the `Run` value name stays `WarpOss` until a migration renames it |
+| Package name `warp-terminal-oss`, Inno `AppId=warp-terminal-oss` | In-place upgrades | Never (renaming them breaks upgrades) |
+| `uncagedoss://` URL scheme (still the primary one; `uncaged://` added) | Existing links and MCP OAuth redirect URIs | When no registered OAuth client uses the old redirect URI |
+| Identity migration, legacy secure-storage read-through, `WarpOss` → `Warp-Oss` Linux mapping in `paths.rs` | Existing installs' data | Once no supported release predates the rename; the old-path symlinks can then be left to users |
+| `app_name`/executable checks accepting both `uncaged` and `warp-oss` in `autoupdate/mac.rs` | The new updater can install a bundle from either side of the rename | With the `Contents/MacOS/warp-oss` shim |
+
+### Release-notes draft (user-visible consequences)
+
+> **Uncaged is now `dev.uncaged.Uncaged`.** The app's internal identity changed
+> from `dev.uncaged.WarpOss` / `warp-oss`. Your settings, history, Drive objects
+> and secrets move over automatically the first time the new version starts
+> (quit any other Uncaged windows first; if one is still open the move waits for
+> the next launch). Downgrading still works: the old locations point at the new
+> ones.
+>
+> Because macOS treats it as a new app, you may need to:
+> - re-grant **Full Disk Access**, **Accessibility**, **Automation** and other
+>   privacy permissions in System Settings → Privacy & Security;
+> - set Uncaged as the default terminal / "Open With" handler again;
+> - re-add it as a login item and re-pin it in the Dock;
+> - on Windows, re-pin the taskbar shortcut (its AppUserModelID changed).
+>
+> The command-line name is now `uncaged`; `warp-oss` still works for now. The
+> log file is `~/Library/Logs/uncaged.log` (macOS) — older logs stay in
+> `warp-oss.log`.
 
 ## Notes
 

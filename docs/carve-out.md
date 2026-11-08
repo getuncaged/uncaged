@@ -27,7 +27,7 @@ Two things stay:
 
 Startup breakdown for the last release: settings 134 ms, SQLite 99 ms, singletons
 56 ms, window creation 99 ms, first frame 147 ms (`Startup timing:` in
-`~/Library/Logs/warp-oss.log`).
+`~/Library/Logs/uncaged.log`; `warp-oss.log` before the rename).
 
 What still ties us to Warp, by size (files in `app/src` that use it):
 
@@ -101,6 +101,7 @@ frame. Target: under 250 ms to first frame.
   `warp-oss.log` → `uncaged.log`.
 - Bundle id `dev.uncaged.WarpOss` → `dev.uncaged.Uncaged`, with a one-time move of
   the application-support, cache and preferences folders so nobody loses settings.
+  Done: see "The identity rename" in RELEASING.md.
 - Sweep remaining Warp names out of UI strings, docs and code comments.
 
 ## Decided defaults

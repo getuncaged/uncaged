@@ -155,12 +155,13 @@ known edit — **do not scatter literals**, always reach for these:
    `script/compile_icon` path) — macOS caches icons aggressively, so a dock
    refresh may need `killall Dock Finder`.
 4. **App identity** (only when you also want a new bundle): `channel/state.rs`
-   `AppId::new("dev","uncaged","WarpOss")`, `channel/mod.rs` cli command names,
-   `channel/state.rs` url scheme, and the `[package.metadata.bundle.bin.warp-oss]`
+   `AppId::new("dev","uncaged","Uncaged")` (plus a data migration like
+   `app/src/identity_migration.rs`), `channel/mod.rs` cli command names,
+   `channel/state.rs` url scheme, and the `[package.metadata.bundle.bin.uncaged]`
    block + `app/src/bin/oss.rs` plist in `app/Cargo.toml`.
 
-The workspace crates are named `uncaged_*` (the app package is `uncaged`); the
-`warp-oss` binary name and the identifiers inside the crates (`WarpDrive`,
+The workspace crates are named `uncaged_*` (the app package and binary are
+`uncaged`, bundle id `dev.uncaged.Uncaged`); the identifiers inside the crates (`WarpDrive`,
 `FeatureFlag` names, setting keys) are unchanged, since some of them are persisted.
 The product/identity layer and the code layer are intentionally separate.
 
@@ -213,7 +214,7 @@ anything behind `on_user_fetched`/auth can't fire** — the risk is only
 # --- dev loop (debug) ---
 source "$HOME/.cargo/env"
 cargo run                                   # build + launch Uncaged
-CARGO_INCREMENTAL=0 cargo build --bin warp-oss   # compile-check only
+CARGO_INCREMENTAL=0 cargo build --bin uncaged    # compile-check only
 
 # --- point it at a model ---
 ./script/uncaged-setup                      # menu; or Settings → AI Models; or edit ~/.uncaged/engine.json
@@ -228,8 +229,8 @@ CARGO_INCREMENTAL=0 cargo build --bin warp-oss   # compile-check only
 - No Apple Developer ID → ad-hoc signed → users run
   `xattr -dr com.apple.quarantine /Applications/Uncaged.app` once. Full details +
   the cross-platform-CI plan are in RELEASING.md and DIRECTION.md.
-- Local deploy of a fresh debug build: `pkill -9 -f "Uncaged.app/.../warp-oss"`,
-  copy `target/debug/warp-oss` into the bundle's `Contents/MacOS/`,
+- Local deploy of a fresh debug build: `pkill -9 -f "Uncaged.app/.../uncaged"`,
+  copy `target/debug/uncaged` into the bundle's `Contents/MacOS/`,
   `codesign --force --deep --sign - ~/Applications/Uncaged.app`, relaunch.
 
 ---
