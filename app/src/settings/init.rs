@@ -113,16 +113,17 @@ pub fn init(
     register_all_settings(ctx);
     mark_startup_sub_interval("settings_register");
 
-    // Uncaged: one-time reset of input autodetection, run on every launch. See the function's
-    // own docs.
-    super::initializer::apply_uncaged_autodetection_reset(ctx);
-
     // One-time migration: copy public settings from the platform-native store
     // into the TOML file so existing users don't lose their customizations
     // when the settings file feature is first enabled.
     if needs_settings_file_migration(ctx) {
         migrate_native_settings_to_settings_file(ctx);
     }
+
+    // Uncaged: one-time reset of input autodetection, run on every launch. See the function's
+    // own docs. It must follow the settings file migration: it writes a public setting, which
+    // creates settings.toml, and the migration only runs while that file does not exist yet.
+    super::initializer::apply_uncaged_autodetection_reset(ctx);
 
     let use_thin_strokes = *FontSettings::as_ref(ctx).use_thin_strokes;
 
