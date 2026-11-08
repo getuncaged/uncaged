@@ -19,8 +19,8 @@ pub(crate) fn run() -> anyhow::Result<()> {
 
     #[cfg(target_os = "linux")]
     println!(
-        "Package type: {:?}",
-        crate::autoupdate::linux::UpdateMethod::detect()
+        "Package type: {}",
+        crate::autoupdate::linux::detect_install_method()
     );
 
     #[cfg_attr(windows, expect(unused_mut))]

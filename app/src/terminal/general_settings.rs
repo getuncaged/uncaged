@@ -106,15 +106,6 @@ define_settings_group!(GeneralSettings, settings: [
         supported_platforms: SupportedPlatforms::ALL,
         private: true,
     },
-    // One-time flag tracking whether the OpenWarp launch modal has already been
-    // shown to the user. Not user-visible; modeled as a setting so it's only
-    // shown once per user regardless of the number of devices they use.
-    did_check_to_trigger_openwarp_launch_modal: DidShowOpenWarpLaunchModal {
-        type: bool,
-        default: false,
-        supported_platforms: SupportedPlatforms::ALL,
-        private: true,
-    },
     auto_open_code_review_pane_on_first_agent_change: AutoOpenCodeReviewPaneOnFirstAgentChange {
         type: bool,
         default: false,

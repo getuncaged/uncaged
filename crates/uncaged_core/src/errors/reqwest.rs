@@ -30,18 +30,6 @@ impl ErrorExt for reqwest::Error {
             return false;
         }
 
-        // If we're making a request to the staging server and get back
-        // a 403 Forbidden, the user is probably not whitelisted to talk
-        // to staging from their current IP address, so downgrade to a
-        // warning.
-        if let (Some(url), Some(status)) = (self.url(), self.status()) {
-            if let Some(domain) = url.domain() {
-                if domain == "staging.warp.dev" && status == StatusCode::FORBIDDEN {
-                    return false;
-                }
-            }
-        }
-
         true
     }
 }

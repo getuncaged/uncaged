@@ -21,13 +21,12 @@ use uncaged_ui::platform::TerminationMode;
 use uncaged_ui::r#async::Timer;
 use uncaged_ui::windowing::state::ApplicationStage;
 use uncaged_ui::windowing::{self, WindowManager};
-use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity, ViewContext};
+use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::channel::Channel;
 use crate::features::FeatureFlag;
 use crate::server::shared_http_client::SharedHttpClient;
 use crate::settings::UpdateSettings;
-use crate::workspace::Workspace;
 use crate::{report_if_error, ChannelState};
 
 /// A successfully downloaded and unpacked target update.
@@ -712,7 +711,8 @@ pub enum UpdateReady {
 }
 
 /// Set of results from downloading an update.
-#[cfg_attr(target_family = "wasm", allow(dead_code))]
+// Linux never downloads an update (see `linux.rs`), so only the other platforms build `Yes`.
+#[cfg_attr(any(target_family = "wasm", target_os = "linux"), allow(dead_code))]
 pub enum DownloadReady {
     /// The update was downloaded successfully.
     Yes,
@@ -724,22 +724,6 @@ pub enum DownloadReady {
     #[cfg_attr(windows, allow(dead_code))]
     NeedsAuthorization,
     /// A newer version could not be downloaded.
-    No,
-}
-
-/// Whether or not we're ready to relaunch the app after the user requests that
-/// we apply an update.
-///
-/// This exists for Linux, when the app is installed via a package manager.
-/// Instead of immediately applying the update, we open a new tab and populate
-/// the input field with the command the user needs to run to install the
-/// update via their package manager.  After the update completes, we send
-/// ourselves a signal (via a DCS hook) that the update has completed and we're
-/// ready to relaunch.
-#[cfg_attr(target_family = "wasm", allow(dead_code))]
-pub enum ReadyForRelaunch {
-    Yes,
-    #[cfg_attr(any(target_os = "macos", windows), allow(dead_code))]
     No,
 }
 
@@ -836,8 +820,12 @@ async fn fetch_version(channel: &Channel) -> Result<VersionInfo> {
     }
 }
 
-// This method is unimplemented on wasm, so we allow unused variables.
-#[cfg_attr(target_family = "wasm", allow(unused_variables))]
+// This method is unimplemented on wasm and Linux doesn't self-update, so we allow unused
+// variables there.
+#[cfg_attr(
+    any(target_family = "wasm", target_os = "linux"),
+    allow(unused_variables)
+)]
 async fn download_update(
     version_info: VersionInfo,
     update_id: String,
@@ -854,7 +842,7 @@ async fn download_update(
         if #[cfg(target_os = "macos")] {
             mac::download_update_and_cleanup(&version_info, &update_id, last_successful_update_id.as_deref(), &http_client).await
         } else if #[cfg(target_os = "linux")] {
-            linux::download_update_and_cleanup(&version_info, &update_id, &http_client).await
+            linux::download_update_and_cleanup()
         } else if #[cfg(windows)] {
             windows::download_update_and_cleanup(&version_info, &update_id, &http_client).await
         } else {
@@ -863,32 +851,23 @@ async fn download_update(
     }
 }
 
-/// Apply a downloaded update. If this returns `Ok(ReadyForRelaunch::Yes)`, then the app should be
-/// relaunched to complete the update. If this returns `Ok(ReadyForRelaunch::No)`, then more user
-/// action is needed to apply the update, and the app shouldn't relaunch automatically.
+/// Apply a downloaded update. If this returns `Ok(())`, the app should be relaunched to complete
+/// the update.
 ///
 /// The timing of how updates are applied is very platform-specific:
-/// * On macOS, updates are applied asynchronously, _immediately_ before relaunching. This always
-///   returns [`ReadyForRelaunch::Yes`].
+/// * On macOS, updates are applied asynchronously, _immediately_ before relaunching.
 /// * On Windows, updates are applied by a separate installer process, which is spawned
 ///   [just before the app terminates](spawn_child_if_necessary).
-/// * On Linux, if using a package manager, we ask the user to install the update via their package
-///   manager, and do not relaunch until that's complete. This returns [`ReadyForRelaunch::No`].
-pub fn apply_update(
-    _initiating_workspace: &mut Workspace,
-    _ctx: &mut ViewContext<Workspace>,
-) -> Result<ReadyForRelaunch> {
+/// * On Linux, Uncaged does not self-update (users update the way they installed), so this
+///   returns an error.
+pub fn apply_update() -> Result<()> {
     cfg_if::cfg_if! {
         if #[cfg(any(target_os = "macos", windows))] {
             // macOS applies the update during the download step. Windows does it during
             // `spawn_child_if_necessary`. In either case, simply continue relaunching the app.
-            Ok(ReadyForRelaunch::Yes)
+            Ok(())
         } else if #[cfg(target_os = "linux")] {
-            let AutoupdateStage::UpdateReady { update_id, .. } = &AutoupdateState::handle(_ctx).as_ref(_ctx).stage else {
-                anyhow::bail!("Trying to apply an update without AutoupdateState being UpdateReady!");
-            };
-            let update_id = update_id.clone();
-            linux::apply_update(_initiating_workspace, &update_id, _ctx)
+            linux::apply_update()
         } else {
             anyhow::bail!("Not implemented")
         }
@@ -1182,6 +1161,7 @@ pub fn uncaged_updates_consented(ctx: &AppContext) -> bool {
 
 /// Returns the base URL that contains release assets for the given version
 /// of this app bundle.
+#[cfg(any(target_os = "macos", windows))]
 fn release_assets_directory_url(channel: Channel, version: &str) -> String {
     let releases_base_url = ChannelState::releases_base_url();
     match channel {
