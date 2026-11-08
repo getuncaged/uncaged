@@ -22,8 +22,7 @@ use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
 use crate::ai::ambient_agents::{
-    AgentSource, AmbientAgentLiveSessionState, AmbientAgentTask, AmbientAgentTaskId,
-    AmbientAgentTaskState,
+    AgentSource, AmbientAgentTask, AmbientAgentTaskId, AmbientAgentTaskState,
 };
 use crate::ai::artifacts::Artifact;
 use crate::ai::blocklist::{
@@ -668,25 +667,6 @@ impl AgentConversationsModel {
         let active_views_model = ActiveAgentViewsModel::as_ref(app);
 
         if let Some(task_id) = entry.identity.ambient_agent_task_id {
-            match self
-                .tasks
-                .get(&task_id)
-                .map(AmbientAgentTask::active_live_session_state)
-            {
-                Some(AmbientAgentLiveSessionState::ActiveUnattachable) => {
-                    return active_views_model
-                        .get_terminal_view_id_for_ambient_task(task_id)
-                        .map(
-                            |terminal_view_id| WorkspaceAction::FocusTerminalViewInWorkspace {
-                                terminal_view_id,
-                            },
-                        );
-                }
-                Some(AmbientAgentLiveSessionState::Attachable { .. })
-                | Some(AmbientAgentLiveSessionState::Inactive)
-                | None => {}
-            }
-
             if let Some(terminal_view_id) =
                 active_views_model.get_terminal_view_id_for_ambient_task(task_id)
             {

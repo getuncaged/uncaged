@@ -413,10 +413,6 @@ fn test_display_status_uses_active_execution_over_previous_conversation_status()
 
         app.update(|ctx| {
             assert!(task.has_active_execution());
-            assert_eq!(
-                task.active_execution_session_id(),
-                Some(session_id.as_str())
-            );
             let display_status = AgentRunDisplayStatus::from_task(&task, ctx);
             assert_eq!(display_status, AgentRunDisplayStatus::TaskInProgress);
             assert_eq!(display_status.status_filter(), StatusFilter::Working);
@@ -1034,71 +1030,6 @@ fn test_resolve_open_action_prefers_active_ambient_terminal() {
                 Some(WorkspaceAction::FocusTerminalViewInWorkspace { terminal_view_id: id })
                     if id == terminal_view_id
             ));
-        });
-    });
-}
-
-#[test]
-fn test_resolve_open_action_returns_none_for_active_unattachable_session() {
-    App::test((), |mut app| async move {
-        add_entry_projection_test_models(&mut app);
-
-        let now = Utc::now();
-        let conversation_id = AIConversationId::new();
-        let task_id = make_uuid(8203);
-        let conversation = create_restored_conversation(
-            conversation_id,
-            "root-task",
-            AgentConversationData {
-                server_conversation_token: None,
-                conversation_usage_metadata: None,
-                reverted_action_ids: None,
-                forked_from_server_conversation_token: None,
-                artifacts_json: None,
-                parent_agent_id: None,
-                agent_name: None,
-                orchestration_harness_type: None,
-                parent_conversation_id: None,
-                is_remote_child: false,
-                root_task_is_optimistic: None,
-                run_id: Some(task_id.clone()),
-                autoexecute_override: None,
-                last_event_sequence: None,
-                pinned: false,
-            },
-        );
-
-        BlocklistAIHistoryModel::handle(&app).update(&mut app, |model, ctx| {
-            model.restore_conversations(EntityId::new(), vec![conversation], ctx);
-        });
-
-        let mut task = create_test_task(&task_id, "user-a", now);
-        task.state = AmbientAgentTaskState::InProgress;
-        task.session_id = Some("not-a-session-id".to_string());
-        task.session_link = Some("https://example.com/session".to_string());
-        task.is_sandbox_running = true;
-        let task_id = task.task_id;
-
-        app.add_singleton_model(|_| {
-            let mut model = create_test_model();
-            model.tasks.insert(task_id, task);
-            model.conversations.insert(
-                conversation_id,
-                create_test_conversation_metadata(conversation_id, "Conversation"),
-            );
-            model
-        });
-
-        app.update(|ctx| {
-            let action = AgentConversationsModel::resolve_open_action(
-                AgentConversationNavigationSubject::Entry(AgentConversationEntryId::AmbientRun(
-                    task_id,
-                )),
-                None,
-                ctx,
-            );
-
-            assert!(action.is_none());
         });
     });
 }

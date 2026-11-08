@@ -4,33 +4,15 @@ use anyhow::anyhow;
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use iso8601_duration::Duration as Iso8601Duration;
 use serde::{Deserialize, Serialize};
-use session_sharing_protocol::common::SessionId;
 use uncaged_core::report_error;
 use uncaged_core::ui::theme::WarpTheme;
 use uncaged_ui::color::ColorU;
-use url::Url;
 
 pub use super::agent_config::AgentConfigSnapshot;
 use super::AmbientAgentTaskId;
 use crate::ai::artifacts::{deserialize_artifacts, Artifact};
 use crate::ui_components::icons::Icon;
 
-fn parse_session_id_from_link(session_link: &str) -> Option<SessionId> {
-    Url::parse(session_link).ok().and_then(|url| {
-        url.path_segments()
-            .into_iter()
-            .flatten()
-            .last()
-            .and_then(|segment| segment.parse().ok())
-    })
-}
-
-fn parse_execution_session_id(execution: RunExecution<'_>) -> Option<SessionId> {
-    execution
-        .session_id
-        .and_then(|id| id.parse().ok())
-        .or_else(|| execution.session_link.and_then(parse_session_id_from_link))
-}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentSource {
     Linear,
@@ -187,17 +169,6 @@ pub struct RunExecution<'a> {
     pub is_sandbox_running: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AmbientAgentLiveSessionState {
-    /// The task does not currently have a running execution with a joinable session signal.
-    Inactive,
-    /// The task has a running execution, but this client does not have a parsed
-    /// shared-session id it can attach to.
-    ActiveUnattachable,
-    /// The task has a running execution and this client can attach to its shared session.
-    Attachable { session_id: SessionId },
-}
-
 impl RunExecution<'_> {
     pub fn has_joinable_session(&self) -> bool {
         self.session_id.is_some() || self.session_link.is_some()
@@ -250,32 +221,6 @@ impl AmbientAgentTask {
             session_link: self.session_link.as_deref().filter(|link| !link.is_empty()),
             request_usage: self.request_usage.as_ref(),
             is_sandbox_running: self.is_sandbox_running,
-        }
-    }
-
-    pub fn active_execution_session_id(&self) -> Option<&str> {
-        let execution = self.active_run_execution();
-        if self.state == AmbientAgentTaskState::InProgress && execution.is_active() {
-            execution.session_id
-        } else {
-            None
-        }
-    }
-
-    /// Returns the canonical live-session state for this task from the client's perspective.
-    ///
-    /// This separates task liveness from attachability: an in-progress task can have an active
-    /// execution without a usable shared-session id, and callers should not treat that as a
-    /// completed transcript/follow-up state.
-    pub fn active_live_session_state(&self) -> AmbientAgentLiveSessionState {
-        let execution = self.active_run_execution();
-        if self.state != AmbientAgentTaskState::InProgress || !execution.is_active() {
-            return AmbientAgentLiveSessionState::Inactive;
-        }
-
-        match parse_execution_session_id(execution) {
-            Some(session_id) => AmbientAgentLiveSessionState::Attachable { session_id },
-            None => AmbientAgentLiveSessionState::ActiveUnattachable,
         }
     }
 

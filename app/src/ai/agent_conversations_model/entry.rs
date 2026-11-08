@@ -1,6 +1,5 @@
 use chrono::{DateTime, Utc};
 use cloud_objects::UserUid;
-use session_sharing_protocol::common::SessionId;
 use uncaged_cli::agent::Harness;
 use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{AppContext, SingletonEntity};
@@ -82,7 +81,6 @@ pub struct AgentConversationIdentity {
     pub local_conversation_id: Option<AIConversationId>,
     pub ambient_agent_task_id: Option<AmbientAgentTaskId>,
     pub server_conversation_token: Option<ServerConversationToken>,
-    pub session_id: Option<SessionId>,
 }
 
 /// Display-only fields for rendering a conversation entry without consulting source models.
@@ -299,10 +297,6 @@ pub(super) fn task_creator_uid(task: &AmbientAgentTask) -> Option<String> {
     task.creator.as_ref().map(|creator| creator.uid.clone())
 }
 
-fn task_session_id(task: &AmbientAgentTask) -> Option<SessionId> {
-    task.session_id.as_deref().and_then(parse_session_id)
-}
-
 fn task_session_status(task: &AmbientAgentTask) -> SessionStatus {
     if FeatureFlag::CloudConversations.is_enabled() {
         return if task.active_run_execution().session_link.is_some() {
@@ -443,15 +437,10 @@ pub(super) fn entry_for_task(
             })
         });
     let status = AgentRunDisplayStatus::from_task(task, app);
-    let has_active_session_id = task
-        .active_execution_session_id()
-        .and_then(parse_session_id)
-        .is_some();
     let has_open_ambient_session = ActiveAgentViewsModel::as_ref(app)
         .get_terminal_view_id_for_ambient_task(task.task_id)
         .is_some();
     let can_open = has_open_ambient_session
-        || has_active_session_id
         || local_conversation_id.is_some()
         || server_conversation_token.is_some();
     let can_copy_link = task.has_active_execution()
@@ -464,7 +453,6 @@ pub(super) fn entry_for_task(
             local_conversation_id,
             ambient_agent_task_id: Some(task.task_id),
             server_conversation_token,
-            session_id: task_session_id(task),
         },
         provenance: AgentConversationProvenance::AmbientRun,
         display: AgentConversationDisplayData {
@@ -582,7 +570,6 @@ fn entry_for_conversation_parts(
                 Some(&metadata.nav_data),
                 history_model,
             ),
-            session_id: None,
         },
         provenance,
         display: AgentConversationDisplayData {
@@ -646,14 +633,4 @@ fn server_conversation_token_for_conversation(
                 .and_then(|metadata| metadata.server_conversation_token.clone())
         })
         .or_else(|| nav_data.and_then(|nav_data| nav_data.server_conversation_token.clone()))
-}
-
-pub(super) fn parse_session_id(session_id: &str) -> Option<SessionId> {
-    match session_id.parse::<SessionId>() {
-        Ok(session_id) => Some(session_id),
-        Err(e) => {
-            log::warn!("Failed to parse shared session ID: {e}");
-            None
-        }
-    }
 }

@@ -392,7 +392,6 @@ fn non_ambient_entry_uses_display_harness() {
             local_conversation_id: Some(conversation_id),
             ambient_agent_task_id: None,
             server_conversation_token: None,
-            session_id: None,
         },
         provenance: AgentConversationProvenance::CloudSyncedConversation,
         display: AgentConversationDisplayData {

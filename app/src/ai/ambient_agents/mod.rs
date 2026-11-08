@@ -12,9 +12,7 @@ use crate::ai::agent::{
 pub(crate) mod agent_config;
 pub mod task;
 
-pub use task::{
-    AgentSource, AmbientAgentLiveSessionState, AmbientAgentTask, AmbientAgentTaskState,
-};
+pub use task::{AgentSource, AmbientAgentTask, AmbientAgentTaskState};
 
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid task ID: {0}")]
