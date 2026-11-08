@@ -3220,7 +3220,8 @@ impl TerminalView {
             Banner::<TerminalAction>::new_with_buttons(
                 BannerTextContent::formatted_text(vec![
                     FormattedTextFragment::plain_text(
-                        "Seems like your shell is taking a while to start...  ",
+                        "Your shell is taking a while to start. It may be waiting for input, \
+                         like an update prompt: show the initialization block to answer it.  ",
                     ),
                     FormattedTextFragment::hyperlink("More info", KNOWN_ISSUES_URL),
                 ]),
