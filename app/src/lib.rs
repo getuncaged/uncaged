@@ -34,6 +34,7 @@ mod external_secrets;
 mod gist_sync;
 mod global_resource_handles;
 mod gpu_state;
+mod identity_migration;
 mod input_classifier;
 mod interval_timer;
 /// Bridge to the local Uncaged engine (see `uncaged.rs`).
@@ -378,6 +379,10 @@ fn apply_scroll_multiplier(event: &mut Event, app: &AppContext) {
 /// Runs the Uncaged executable as the app or as one of its worker subcommands.
 #[::tracing::instrument(skip_all, fields(tags.cloud_agent = true))]
 pub fn run() -> Result<()> {
+    // Carry the previous app identity's data over before anything (logging,
+    // settings, secure storage, sqlite, workers) computes a data path.
+    identity_migration::run_if_needed();
+
     // Perform any necessary platform-specific initialization.
     platform::init();
 
@@ -504,6 +509,7 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
     }
 
     timer.mark_interval_end("LOG_FILE_SETUP_COMPLETE");
+    identity_migration::log_report();
 
     #[cfg(windows)]
     platform::windows::check_redirection_guard();

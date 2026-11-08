@@ -29,6 +29,10 @@ pub struct ChannelState {
     additional_features: HashSet<FeatureFlag>,
 
     config: ChannelConfig,
+
+    /// The app ID persisted data is namespaced under, when it differs from
+    /// `config.app_id` for this run (see [`Self::set_data_app_id`]).
+    data_app_id: Option<AppId>,
 }
 
 impl ChannelState {
@@ -49,6 +53,7 @@ impl ChannelState {
                 autoupdate_config: None,
                 mcp_static_config: None,
             },
+            data_app_id: None,
         }
     }
 
@@ -67,6 +72,7 @@ impl ChannelState {
             channel,
             additional_features: Default::default(),
             config,
+            data_app_id: None,
         }
     }
 
@@ -95,6 +101,26 @@ impl ChannelState {
         CHANNEL_STATE.lock().config.app_id.clone()
     }
 
+    /// Returns the app ID that persisted data is namespaced under.
+    ///
+    /// This is [`Self::app_id`] unless this run has to keep using the data of a
+    /// previous identity, because moving it to the current one was not safe yet
+    /// (see `identity_migration` in the app crate).
+    pub fn data_app_id() -> AppId {
+        let state = CHANNEL_STATE.lock();
+        state
+            .data_app_id
+            .clone()
+            .unwrap_or_else(|| state.config.app_id.clone())
+    }
+
+    /// Namespaces persisted data under `app_id` for the rest of this process.
+    ///
+    /// Must be called before anything computes a data path or domain.
+    pub fn set_data_app_id(app_id: AppId) {
+        CHANNEL_STATE.lock().data_app_id = Some(app_id);
+    }
+
     /// Returns a profile name for isolating user data. This should be used to
     /// sandbox how user data is stored.
     ///
@@ -110,19 +136,21 @@ impl ChannelState {
 
     /// Returns a value that should be used for namespacing persisted data.
     ///
-    /// In release builds, this is identical to the app ID; in debug builds,
-    /// it optionally includes a suffix derived from the `WARP_DATA_PROFILE`
-    /// environment variable.
+    /// In release builds, this is identical to the data app ID (normally the
+    /// app ID); in debug builds, it optionally includes a suffix derived from
+    /// the `WARP_DATA_PROFILE` environment variable.
     pub fn data_domain() -> String {
         match Self::data_profile() {
-            Some(profile) => format!("{}-{profile}", Self::app_id()),
-            None => Self::app_id().to_string(),
+            Some(profile) => format!("{}-{profile}", Self::data_app_id()),
+            None => Self::data_app_id().to_string(),
         }
     }
 
-    /// Returns the data domain if overridden from the default, otherwise None.
+    /// Returns the data domain if it differs from the app ID (a data profile is
+    /// set, or this run keeps a previous identity's data), otherwise None.
     pub fn data_domain_if_not_default() -> Option<String> {
-        Self::data_profile().map(|_| Self::data_domain())
+        let data_domain = Self::data_domain();
+        (data_domain != Self::app_id().to_string()).then_some(data_domain)
     }
 
     pub fn additional_features() -> HashSet<FeatureFlag> {

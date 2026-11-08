@@ -146,3 +146,61 @@ fn test_project_path_for_oss_app_id() {
         }
     }
 }
+
+#[test]
+fn test_identity_dirs_for_oss_app_ids() {
+    let home_dir = home_dir().expect("Should be able to compute home directory");
+    let legacy = identity_dirs(AppId::new("dev", "uncaged", "WarpOss"), None)
+        .expect("should be able to compute identity dirs");
+    let renamed = identity_dirs(AppId::new("dev", "uncaged", "Uncaged"), Some("renametest"))
+        .expect("should be able to compute identity dirs");
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "macos")] {
+            let library = home_dir.join("Library");
+            assert_eq!(legacy.state_dir, library.join("Application Support/dev.uncaged.WarpOss"));
+            assert_eq!(
+                legacy.roots,
+                vec![
+                    library.join("Application Support/dev.uncaged.WarpOss"),
+                    library.join("Caches/dev.uncaged.WarpOss"),
+                    library.join("Saved Application State/dev.uncaged.WarpOss.savedState"),
+                ]
+            );
+            assert_eq!(
+                renamed.roots,
+                vec![
+                    library.join("Application Support/dev.uncaged.Uncaged-renametest"),
+                    library.join("Caches/dev.uncaged.Uncaged-renametest"),
+                    library.join("Saved Application State/dev.uncaged.Uncaged-renametest.savedState"),
+                ]
+            );
+        } else if #[cfg(any(target_os = "linux", target_os = "freebsd"))] {
+            assert_eq!(legacy.state_dir, home_dir.join(".local/state/warp-oss"));
+            assert_eq!(
+                legacy.roots,
+                vec![
+                    home_dir.join(".local/state/warp-oss"),
+                    home_dir.join(".local/share/warp-oss"),
+                    home_dir.join(".config/warp-oss"),
+                    home_dir.join(".cache/warp-oss"),
+                ]
+            );
+            assert_eq!(renamed.state_dir, home_dir.join(".local/state/uncaged-renametest"));
+            assert_eq!(renamed.roots[3], home_dir.join(".cache/uncaged-renametest"));
+        } else if #[cfg(windows)] {
+            assert_eq!(legacy.state_dir, home_dir.join("AppData\\Local\\uncaged\\WarpOss\\data"));
+            assert_eq!(
+                legacy.roots,
+                vec![
+                    home_dir.join("AppData\\Local\\uncaged\\WarpOss"),
+                    home_dir.join("AppData\\Roaming\\uncaged\\WarpOss"),
+                ]
+            );
+            assert_eq!(renamed.roots[0], home_dir.join("AppData\\Local\\uncaged\\Uncaged-renametest"));
+        } else {
+            unimplemented!("Need to update tests for current platform!");
+        }
+    }
+    // The database lives under the first root, which is moved first.
+    assert!(legacy.state_dir.starts_with(&legacy.roots[0]));
+}

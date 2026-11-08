@@ -251,10 +251,13 @@ objc2-app-kit = { workspace = true, features = [
 objc2-core-foundation.workspace = true
 objc2-foundation = { workspace = true, features = [
     "NSBundle",
+    "NSDictionary",
     "NSLocale",
+    "NSObject",
     "NSPathUtilities",
     "NSString",
     "NSURL",
+    "NSUserDefaults",
 ] }
 permissions = "0.4.1"
 pprof = { workspace = true, optional = true, features = ["frame-pointer"] }

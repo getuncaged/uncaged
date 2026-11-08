@@ -31,6 +31,35 @@ impl RegistryBackedPreferences {
     }
 }
 
+/// Copies the values of `from_app`'s preferences key into `to_app`'s key, once.
+///
+/// Values `to_app` already has are kept. Afterwards `to_app`'s key records
+/// `from_app` under `marker_value_name`, and later calls return `Ok(false)`
+/// without copying again; so do calls when `from_app` has no key. Returns
+/// whether anything was copied.
+pub fn copy_app_values_once(
+    from_app: &str,
+    to_app: &str,
+    marker_value_name: &str,
+) -> windows_result::Result<bool> {
+    let to_key = CURRENT_USER.create(WARP_REGISTRY_BASE_PATH.to_owned() + to_app)?;
+    if to_key.get_value(marker_value_name).is_ok() {
+        return Ok(false);
+    }
+    let from_key = match CURRENT_USER.open(WARP_REGISTRY_BASE_PATH.to_owned() + from_app) {
+        Ok(key) => key,
+        Err(err) if err.code() == KEY_NOT_FOUND_ERR => return Ok(false),
+        Err(err) => return Err(err),
+    };
+    for (name, value) in from_key.values()? {
+        if to_key.get_value(&name).is_err() {
+            to_key.set_value(&name, &value)?;
+        }
+    }
+    to_key.set_string(marker_value_name, from_app)?;
+    Ok(true)
+}
+
 impl UserPreferences for RegistryBackedPreferences {
     fn read_value(&self, name: &str) -> Result<Option<String>, super::Error> {
         Ok(self.get_warp_registry()?.get_string(name).ok())

@@ -215,15 +215,74 @@ pub fn home_relative_path(path: &Path) -> String {
     path.display().to_string()
 }
 
-/// Returns a [`directories::ProjectDirs`] configured based on the current app ID
-/// and the current data profile, if one is set.
+/// Returns a [`directories::ProjectDirs`] configured based on the current data
+/// app ID and the current data profile, if one is set.
 ///
 /// This returns [`None`] if the user's home directory could not be determined.
 fn project_dirs() -> Option<directories::ProjectDirs> {
     project_dirs_for_app_id(
-        ChannelState::app_id(),
+        ChannelState::data_app_id(),
         ChannelState::data_profile().as_deref(),
     )
+}
+
+/// The on-disk footprint of one app identity, used to move a previous
+/// identity's data to the current one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IdentityDirs {
+    /// The directory holding the sqlite database ([`state_dir`]).
+    pub state_dir: PathBuf,
+    /// Every top-level directory the identity owns, the one containing
+    /// `state_dir` first. Moving these moves all of the identity's data.
+    pub roots: Vec<PathBuf>,
+}
+
+/// Returns the directories `app_id` (with `data_profile`) owns on this platform.
+///
+/// This returns [`None`] if the user's home directory could not be determined.
+pub fn identity_dirs(app_id: AppId, data_profile: Option<&str>) -> Option<IdentityDirs> {
+    let project_dirs = project_dirs_for_app_id(app_id, data_profile)?;
+    cfg_if! {
+        if #[cfg(target_os = "macos")] {
+            // Application Support holds the database, secrets and caches we
+            // write; Caches and Saved Application State are written by the
+            // system on the app's behalf.
+            let saved_state = dirs::home_dir()?
+                .join("Library/Saved Application State")
+                .join(format!("{}.savedState", project_dirs.project_path().display()));
+            Some(IdentityDirs {
+                state_dir: project_dirs.data_local_dir().to_owned(),
+                roots: vec![
+                    project_dirs.data_dir().to_owned(),
+                    project_dirs.cache_dir().to_owned(),
+                    saved_state,
+                ],
+            })
+        } else if #[cfg(windows)] {
+            // `<Local AppData>\<org>\<app>` holds data (the database) and
+            // config; `<Roaming AppData>\<org>\<app>` holds portable data.
+            let local_root = project_dirs.data_local_dir().parent()?.to_owned();
+            let roaming_root = project_dirs.data_dir().parent()?.to_owned();
+            Some(IdentityDirs {
+                state_dir: project_dirs.data_local_dir().to_owned(),
+                roots: vec![local_root, roaming_root],
+            })
+        } else {
+            let state_dir = project_dirs
+                .state_dir()
+                .unwrap_or_else(|| project_dirs.data_local_dir())
+                .to_owned();
+            Some(IdentityDirs {
+                roots: vec![
+                    state_dir.clone(),
+                    project_dirs.data_dir().to_owned(),
+                    project_dirs.config_dir().to_owned(),
+                    project_dirs.cache_dir().to_owned(),
+                ],
+                state_dir,
+            })
+        }
+    }
 }
 
 /// Returns a [`directories::ProjectDirs`] configured based on the given app ID

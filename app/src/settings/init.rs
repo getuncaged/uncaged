@@ -272,7 +272,7 @@ fn init_platform_native_preferences() -> user_preferences::Model {
                 }
             }
         } else if #[cfg(target_os = "windows")] {
-            let app_id = uncaged_core::channel::ChannelState::app_id();
+            let app_id = uncaged_core::channel::ChannelState::data_app_id();
             Box::new(user_preferences::registry_backed::RegistryBackedPreferences::new(app_id.application_name()))
         } else if #[cfg(target_os = "macos")] {
             Box::new(user_preferences::user_defaults::UserDefaultsPreferencesStorage::new(
