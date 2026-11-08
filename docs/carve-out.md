@@ -44,6 +44,36 @@ What still ties us to Warp, by size (files in `app/src` that use it):
 | AWS SDK (Bedrock credentials) | 2 | credentials only ever went to Warp's server |
 | Sentry, OpenTelemetry | 20 + 3 | crash and trace reporting to Warp |
 
+## Where we ended (2026-11-08, branch `uncaged-carve-phase1` at 88cbc18, not released)
+
+| Measure | Start (v0.3.4) | Now | Target |
+| --- | --- | --- | --- |
+| Workspace crates | 78 | 59 | about 45 |
+| Crates compiled for the app (macOS) | 943 | 787 | under 600 |
+| Packages in `Cargo.lock` | 1,465 | 1,354 | |
+| Rust in `app/src` | 1.06M lines | 769k lines | under 700k |
+| Launch to first frame (debug bundle, real data, idle) | ~700 ms | ~430-490 ms | |
+| macOS arm64 DMG, release launch time | 136 MB, 549 ms | not measured yet (needs a release build) | under 90 MB, under 250 ms |
+
+63 commits since v0.3.4: 3,304 files changed, 378,981 lines deleted, 32,442 added.
+
+Gone: AWS/Sentry/OpenTelemetry, telemetry, accounts and Firebase, teams and workspaces,
+settings sync, shared sessions, the SSH remote server, Oz/cloud agents, the AI server
+client, server experiments, ServerApi and the whole GraphQL stack (cynic, schema codegen,
+websocket/graphql-ws), the IAP and Warp client headers, `remote_tty`, voice input, and the
+git dependency on Warp's protobuf repo (now `crates/uncaged_agent_api`, checked-in
+generated code, no protoc for normal builds). Drive is a local store (Trash, restore and
+delete work and persist). Crates are `uncaged_*`; the app is `uncaged` / `dev.uncaged.Uncaged`
+with a one-time data migration and compat names so v0.3.4 can still update (see RELEASING.md,
+"The identity rename").
+
+Still open: Oz launch/setup modals that link to oz.warp.dev, the wasm-only "get Warp" link,
+the Linux updater's Warp pacman repo text (dead: Linux doesn't self-update on this channel),
+the changelog-only resource center, the ~5 SSH integration tests that need Warp's GCP VMs,
+~89 dead-code warnings, and the items in the cleanup backlog the agents listed. The Linux
+secure-storage key seed string that names `releases.warp.dev` must stay (changing it would
+make stored secrets unreadable).
+
 ## Rules for every phase
 
 - Each phase lands on `uncaged-0.3` green: `cargo fmt`, both clippy runs from
