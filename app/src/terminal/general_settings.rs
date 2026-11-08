@@ -31,23 +31,10 @@ define_settings_group!(GeneralSettings, settings: [
         toml_path: "general.restore_session",
         description: "Whether to restore the previous session when Uncaged starts up.",
     },
-    add_app_as_login_item: LoginItem {
-        type: bool,
-        default: true,
-        supported_platforms: SupportedPlatforms::OR(
-            Box::new(SupportedPlatforms::MAC),
-            Box::new(SupportedPlatforms::WINDOWS),
-        ),
-        private: false,
-        toml_path: "general.login_item",
-        description: "Whether to launch Uncaged automatically when you log in.",
-    },
-    // Records whether the app has been added as a login item.
-    // If it has, we don't try to add it again unless the user explicitly
-    // retoggles the setting. This is to allow a user to remove the login item
-    // directly from their OS's startup UI and not have it re-added when they
-    // next start Uncaged.
-    app_added_as_login_item: AppAddedAsLoginItem {
+    // Uncaged never launches itself at login. Earlier builds registered the app as a
+    // login item by default; this records that the one-time removal of that entry
+    // (see `login_item`) has run, so it isn't repeated on every launch.
+    legacy_login_item_removed: LegacyLoginItemRemoved {
         type: bool,
         default: false,
         supported_platforms: SupportedPlatforms::OR(

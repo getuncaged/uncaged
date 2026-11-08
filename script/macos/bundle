@@ -423,9 +423,6 @@ if [[ "$ARTIFACT" == "app" ]]; then
   # Add LSBackgroundOnly key and set it to false since we need a UI app
   plutil -insert LSBackgroundOnly -bool false "$BUNDLE_DIR"/$WARP_APP_NAME.app/Contents/Info.plist
 
-  # Add SMAuthorizedClients for macOS 13+ (Ventura) to support login item functionality
-  plutil -insert SMAuthorizedClients -xml "<array><string>$BUNDLE_ID</string></array>" "$BUNDLE_DIR"/$WARP_APP_NAME.app/Contents/Info.plist
-
   if [[ $UNIVERSAL_BINARY = true ]]; then
       if [[ $BUILD_BINARY = true ]]; then
           echo "Building $ADDITIONAL_TARGET to include in universal binary"

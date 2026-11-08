@@ -320,7 +320,7 @@ still to move uses the old identity's data for that process.
 | `Contents/MacOS/warp-oss` → `uncaged` symlink (macOS bundle) | Login items, scripts and the v0.3.4 updater's executable check point at the old path | No supported release predates the rename and the in-app staged-bundle check no longer accepts `warp-oss` |
 | `Contents/Resources/bin/warp-oss` → `uncaged` (macOS CLI) | Users symlinked the old CLI onto `PATH` | Same, with a release note telling users to relink `bin/uncaged` |
 | `/opt/warpdotdev/warp-terminal-oss/warp-oss` → `uncaged` (Linux packages, flake) | Scripts calling the old binary | Same |
-| `bin\warp-oss.cmd` (Windows) and rewriting the `WarpOss` login-item `Run` value | Old CLI name; the startup entry pointed at the deleted `warp-oss.exe` | Same; the `Run` value name stays `WarpOss` until a migration renames it |
+| `bin\warp-oss.cmd` (Windows) | Old CLI name | Same |
 | Package name `warp-terminal-oss`, Inno `AppId=warp-terminal-oss` | In-place upgrades | Never (renaming them breaks upgrades) |
 | `uncagedoss://` URL scheme (still the primary one; `uncaged://` added) | Existing links and MCP OAuth redirect URIs | When no registered OAuth client uses the old redirect URI |
 | Identity migration, legacy secure-storage read-through, `WarpOss` → `Warp-Oss` Linux mapping in `paths.rs` | Existing installs' data | Once no supported release predates the rename; the old-path symlinks can then be left to users |
@@ -339,12 +339,17 @@ still to move uses the old identity's data for that process.
 > - re-grant **Full Disk Access**, **Accessibility**, **Automation** and other
 >   privacy permissions in System Settings → Privacy & Security;
 > - set Uncaged as the default terminal / "Open With" handler again;
-> - re-add it as a login item and re-pin it in the Dock;
+> - re-pin it in the Dock;
 > - on Windows, re-pin the taskbar shortcut (its AppUserModelID changed).
 >
 > The command-line name is now `uncaged`; `warp-oss` still works for now. The
 > log file is `~/Library/Logs/uncaged.log` (macOS) — older logs stay in
 > `warp-oss.log`.
+>
+> **Uncaged no longer starts at login.** The "Start Uncaged at login" setting is
+> gone, and the first launch removes the login item earlier versions registered.
+> If an entry is still listed (System Settings → General → Login Items on macOS,
+> Startup apps on Windows), remove it there.
 
 ## Notes
 

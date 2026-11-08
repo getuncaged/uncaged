@@ -1717,18 +1717,9 @@ fn launch(ctx: &mut uncaged_ui::AppContext, app_state: Option<AppState>, launch_
     });
 
     // TODO(ben): We should skip this for LaunchMode::Test.
+    // Note that we put this here because it depends on settings already having been initialized.
     #[cfg(any(target_os = "macos", target_os = "windows"))]
-    {
-        use crate::login_item::maybe_register_app_as_login_item;
-        use crate::terminal::general_settings::GeneralSettingsChangedEvent;
-        // Note that we put this here because it depends on settings already having been initialized.
-        ctx.subscribe_to_model(&GeneralSettings::handle(ctx), |_, event, ctx| {
-            if matches!(event, GeneralSettingsChangedEvent::LoginItem { .. }) {
-                maybe_register_app_as_login_item(ctx);
-            }
-        });
-        maybe_register_app_as_login_item(ctx);
-    }
+    login_item::remove_legacy_login_item(ctx);
 }
 
 /// Initializes the logger before running tests.

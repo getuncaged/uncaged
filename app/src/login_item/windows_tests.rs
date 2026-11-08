@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
 
 use super::*;
@@ -28,6 +26,14 @@ impl ScratchSubkey {
         Self { path }
     }
 
+    fn write(&self, value_name: &str, data: &str) {
+        let (key, _) = RegKey::predef(HKEY_CURRENT_USER)
+            .create_subkey(&self.path)
+            .expect("open scratch subkey");
+        key.set_value(value_name, &data.to_owned())
+            .expect("write scratch value");
+    }
+
     fn read(&self, value_name: &str) -> Option<String> {
         let key = RegKey::predef(HKEY_CURRENT_USER)
             .open_subkey_with_flags(&self.path, KEY_READ)
@@ -43,10 +49,39 @@ impl Drop for ScratchSubkey {
 }
 
 #[test]
-fn register_writes_quoted_path() {
-    let scratch = ScratchSubkey::new("register_writes_quoted_path");
-    let exe = PathBuf::from(r"C:\Program Files\Warp\warp.exe");
-    register_in(HKEY_CURRENT_USER, &scratch.path, "Warp", &exe).unwrap();
+fn oss_removes_only_its_own_value() {
+    assert_eq!(legacy_value_names(Channel::Oss), &["WarpOss"]);
+    for channel in [
+        Channel::Stable,
+        Channel::Preview,
+        Channel::Dev,
+        Channel::Local,
+        Channel::Integration,
+    ] {
+        assert!(legacy_value_names(channel).is_empty(), "{channel:?}");
+    }
+}
+
+#[test]
+fn remove_is_idempotent() {
+    let scratch = ScratchSubkey::new("remove_is_idempotent");
+    // Never registered: nothing to remove.
+    assert!(!remove_value_in(HKEY_CURRENT_USER, &scratch.path, "WarpOss").unwrap());
+    scratch.write("WarpOss", r#""C:\Uncaged\uncaged.exe""#);
+    assert!(remove_value_in(HKEY_CURRENT_USER, &scratch.path, "WarpOss").unwrap());
+    assert!(!remove_value_in(HKEY_CURRENT_USER, &scratch.path, "WarpOss").unwrap());
+    assert!(scratch.read("WarpOss").is_none());
+}
+
+#[test]
+fn remove_leaves_other_values_alone() {
+    let scratch = ScratchSubkey::new("remove_leaves_other_values_alone");
+    scratch.write("WarpOss", r#""C:\Uncaged\uncaged.exe""#);
+    scratch.write("Warp", r#""C:\Program Files\Warp\warp.exe""#);
+
+    assert!(remove_value_in(HKEY_CURRENT_USER, &scratch.path, "WarpOss").unwrap());
+
+    assert!(scratch.read("WarpOss").is_none());
     assert_eq!(
         scratch.read("Warp").as_deref(),
         Some(r#""C:\Program Files\Warp\warp.exe""#)
@@ -54,79 +89,11 @@ fn register_writes_quoted_path() {
 }
 
 #[test]
-fn register_overwrites_previous_path() {
-    let scratch = ScratchSubkey::new("register_overwrites_previous_path");
-    register_in(
-        HKEY_CURRENT_USER,
-        &scratch.path,
-        "Warp",
-        &PathBuf::from(r"C:\old\warp.exe"),
-    )
-    .unwrap();
-    register_in(
-        HKEY_CURRENT_USER,
-        &scratch.path,
-        "Warp",
-        &PathBuf::from(r"C:\new\warp.exe"),
-    )
-    .unwrap();
-    assert_eq!(
-        scratch.read("Warp").as_deref(),
-        Some(r#""C:\new\warp.exe""#)
-    );
-}
-
-#[test]
-fn unregister_is_idempotent() {
-    let scratch = ScratchSubkey::new("unregister_is_idempotent");
-    // Never registered: unregister should be Ok.
-    unregister_in(HKEY_CURRENT_USER, &scratch.path, "Warp").unwrap();
-    // Register, then unregister twice.
-    register_in(
-        HKEY_CURRENT_USER,
-        &scratch.path,
-        "Warp",
-        &PathBuf::from(r"C:\warp.exe"),
-    )
-    .unwrap();
-    unregister_in(HKEY_CURRENT_USER, &scratch.path, "Warp").unwrap();
-    unregister_in(HKEY_CURRENT_USER, &scratch.path, "Warp").unwrap();
-    assert!(scratch.read("Warp").is_none());
-}
-
-#[test]
-fn unregister_leaves_other_values_alone() {
-    let scratch = ScratchSubkey::new("unregister_leaves_other_values_alone");
-    register_in(
-        HKEY_CURRENT_USER,
-        &scratch.path,
-        "Warp",
-        &PathBuf::from(r"C:\warp.exe"),
-    )
-    .unwrap();
-    register_in(
-        HKEY_CURRENT_USER,
-        &scratch.path,
-        "WarpPreview",
-        &PathBuf::from(r"C:\warp-preview.exe"),
-    )
-    .unwrap();
-
-    unregister_in(HKEY_CURRENT_USER, &scratch.path, "Warp").unwrap();
-
-    assert!(scratch.read("Warp").is_none());
-    assert_eq!(
-        scratch.read("WarpPreview").as_deref(),
-        Some(r#""C:\warp-preview.exe""#)
-    );
-}
-
-#[test]
-fn unregister_missing_subkey_is_ok() {
-    unregister_in(
+fn remove_missing_subkey_is_ok() {
+    assert!(!remove_value_in(
         HKEY_CURRENT_USER,
         r"Software\Warp\LoginItemTests\does-not-exist",
-        "Warp",
+        "WarpOss",
     )
-    .unwrap();
+    .unwrap());
 }

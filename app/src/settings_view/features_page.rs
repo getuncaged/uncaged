@@ -751,7 +751,6 @@ pub enum FeaturesPageAction {
     ToggleNotificationSound,
     SetNotificationToastDuration,
     ToggleShowWarningBeforeQuitting,
-    ToggleLoginItem,
     ToggleQuitOnLastWindowClosed,
     ToggleSmartSelection,
     SetWordCharAllowlist,
@@ -1529,9 +1528,6 @@ impl TypedActionView for FeaturesPageView {
                         .toggle_and_save_value(ctx));
                 })
             }
-            ToggleLoginItem => GeneralSettings::handle(ctx).update(ctx, |settings, ctx| {
-                report_if_error!(settings.add_app_as_login_item.toggle_and_save_value(ctx));
-            }),
             ToggleAtContextMenuInTerminalMode => {
                 InputSettings::handle(ctx).update(ctx, |input_settings, ctx| {
                     report_if_error!(input_settings
@@ -2193,13 +2189,6 @@ impl FeaturesPageView {
             .is_supported_on_current_platform()
         {
             general_widgets.push(Box::new(QuitWhenAllWindowsClosedWidget::default()));
-        }
-
-        if general_settings
-            .add_app_as_login_item
-            .is_supported_on_current_platform()
-        {
-            general_widgets.push(Box::new(LoginItemWidget::default()));
         }
 
         // Uncaged: no "Show changelog toast after updates" -- Uncaged has no changelog feed for
@@ -4214,48 +4203,6 @@ impl SettingsWidget for QuitWarningModalWidget {
                 .build()
                 .on_click(move |ctx, _, _| {
                     ctx.dispatch_typed_action(FeaturesPageAction::ToggleShowWarningBeforeQuitting);
-                })
-                .finish(),
-            None,
-        )
-    }
-}
-
-#[derive(Default)]
-struct LoginItemWidget {
-    switch_state: SwitchStateHandle,
-}
-
-impl SettingsWidget for LoginItemWidget {
-    type View = FeaturesPageView;
-
-    fn search_terms(&self) -> &str {
-        "login item startup start mac windows app restart automatic"
-    }
-
-    fn render(
-        &self,
-        _view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let general_settings = GeneralSettings::as_ref(app);
-        let ui_builder = appearance.ui_builder();
-        #[cfg(target_os = "macos")]
-        let label = "Start Uncaged at login (requires macOS 13+)";
-        #[cfg(not(target_os = "macos"))]
-        let label = "Start Uncaged at login";
-        render_body_item::<FeaturesPageAction>(
-            label.into(),
-            None,
-            ToggleState::Enabled,
-            appearance,
-            ui_builder
-                .switch(self.switch_state.clone())
-                .check(*general_settings.add_app_as_login_item)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(FeaturesPageAction::ToggleLoginItem);
                 })
                 .finish(),
             None,

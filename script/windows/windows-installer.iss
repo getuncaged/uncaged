@@ -277,12 +277,11 @@ begin
     { Uncaged: keep the pre-rename CLI name (v0.3.4 and earlier) working. }
     SaveStringToFile(BinDir + '\warp-oss.cmd', CmdScriptContent, False);
 
-    { The app registers its login item under the value name WarpOss (kept across
-      the rename so there is only ever one entry); point an existing one at the
-      new executable, since warp-oss.exe is gone. }
+    { Uncaged no longer launches at login. Earlier builds registered a startup
+      entry under the value name WarpOss; remove it (the app also does this once
+      on its first launch). }
     if RegValueExists(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'WarpOss') then
-      RegWriteStringValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'WarpOss',
-        '"' + ExpandConstant('{app}\{#MyAppExeName}') + '"');
+      RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', 'WarpOss');
 #endif
   end;
 end;
