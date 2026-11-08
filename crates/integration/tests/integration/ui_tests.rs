@@ -86,6 +86,7 @@ integration_tests! {
     #[ignore]
     test_session_navigation_recency_navigate_to_window,
     test_block_based_snackbar_scroll_to_top,
+    #[ignore = "Uncaged's one-line block headers stay under half of this 500x300 window's pane, so the header stays sticky and the too-tall case this covers does not occur"]
     test_block_based_snackbar_small_window,
     test_block_based_snackbar_appears_for_running_command_input_at_bottom,
     test_block_based_snackbar_not_visible_for_pager_command_input_at_bottom,

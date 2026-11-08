@@ -92,7 +92,11 @@ pub fn enter_notebook_edit_mode_and_set_markdown(
     TestStep::new("Enter notebook edit mode and set Markdown").with_action(
         move |app, window_id, _| {
             let notebook = notebook_view(app, window_id, tab_index, pane_index);
-            notebook.update(app, |notebook, ctx| notebook.toggle_mode(ctx));
+            // Opening a local notebook already enters edit mode, so ask for edit access rather
+            // than toggling, which would switch an editing notebook back to view mode.
+            notebook.update(app, |notebook, ctx| {
+                notebook.grab_edit_access_or_display_access_dialog(ctx)
+            });
             let editor = notebook_editor(app, window_id, tab_index, pane_index);
             editor.update(app, |editor, ctx| {
                 editor.reset_with_markdown(&markdown, ctx);

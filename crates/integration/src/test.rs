@@ -6618,10 +6618,16 @@ pub fn test_agent_mode_pane_minimum_size() -> Builder {
                             let pane_width =
                                 agent_mode_pane.as_ref(app).size_info().pane_size_px().x();
 
+                            // Uncaged: each pane in a split is a card with a 4px margin and a
+                            // 1px border on every side, so the terminal inside is 10px narrower
+                            // than the pane's share of the split.
+                            const SPLIT_PANE_CARD_CHROME: f32 = 2. * (4. + 1.);
+
                             // Approx equality to handle pane borders, etc.
                             assert_approx_eq!(
                                 f32,
-                                pane_width - AGENT_MODE_PANE_DEFAULT_MINIMUM_WIDTH,
+                                pane_width + SPLIT_PANE_CARD_CHROME
+                                    - AGENT_MODE_PANE_DEFAULT_MINIMUM_WIDTH,
                                 0.,
                                 epsilon = 4.
                             );

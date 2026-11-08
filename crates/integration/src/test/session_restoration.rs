@@ -1,6 +1,7 @@
 use uncaged::features::FeatureFlag;
 use uncaged::integration_testing::notebook::{
-    assert_no_cloud_objects_loaded, assert_notebook_contents, assert_notebook_metadata_revision,
+    assert_notebook_contents, assert_notebook_metadata_revision,
+    assert_preference_rows_skipped_on_load,
 };
 use uncaged::integration_testing::step::{
     new_step_with_default_assertions, new_step_with_default_assertions_for_pane,
@@ -386,7 +387,8 @@ pub fn test_restore_snapshot_with_workflows() -> Builder {
 }
 
 /// Tests restoring a snapshot that includes a settings-sync preference json object (the "HonorPS1"
-/// preference). Uncaged skips preference rows on load, so the database loads with no objects.
+/// preference). Uncaged skips preference rows on load; the snapshot's notebooks, workflows and
+/// folders still load.
 pub fn test_restore_snapshot_with_test_json_object() -> Builder {
     new_builder()
         .with_setup(|_utils| {
@@ -400,7 +402,7 @@ pub fn test_restore_snapshot_with_test_json_object() -> Builder {
         })
         .with_step(
             TestStep::new("Verify the preference row is skipped")
-                .add_assertion(assert_no_cloud_objects_loaded()),
+                .add_assertion(assert_preference_rows_skipped_on_load()),
         )
 }
 

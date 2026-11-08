@@ -5,6 +5,7 @@ use uncaged_ui::integration::{AssertionCallback, AssertionOutcome, AssertionWith
 use uncaged_ui::{async_assert, async_assert_eq, App, ViewHandle};
 
 use crate::cloud_object::model::persistence::CloudModel;
+use crate::cloud_object::ObjectType;
 use crate::integration_testing::cloud_object::assert_metadata_revision;
 use crate::integration_testing::terminal::util::ExpectedOutput;
 use crate::integration_testing::view_getters::{notebook_view, terminal_view};
@@ -30,14 +31,29 @@ pub fn assert_notebook_contents(
     })
 }
 
-/// Asserts that no Warp Drive objects were loaded. Used for databases whose only objects are
-/// types Uncaged skips on load (such as settings-sync preferences).
-pub fn assert_no_cloud_objects_loaded() -> AssertionCallback {
+/// Asserts that a database's settings-sync preference rows were skipped on load while the rest of
+/// its Warp Drive objects still loaded. Uncaged has no Drive object type for preferences, and the
+/// generic string objects in such a database are all preferences.
+pub fn assert_preference_rows_skipped_on_load() -> AssertionCallback {
     Box::new(move |app, _window_id| {
-        let has_objects = app
-            .get_singleton_model_handle::<CloudModel>()
-            .read(app, |cloud_model, _| cloud_model.has_non_welcome_objects());
-        async_assert!(!has_objects, "Expected no Warp Drive objects to be loaded")
+        let (generic_string_objects, other_objects) =
+            app.get_singleton_model_handle::<CloudModel>()
+                .read(app, |cloud_model, _| {
+                    cloud_model.cloud_objects().fold(
+                        (0, 0),
+                        |(generic, other), object| match object.object_type() {
+                            ObjectType::GenericStringObject(_) => (generic + 1, other),
+                            ObjectType::Notebook | ObjectType::Workflow | ObjectType::Folder => {
+                                (generic, other + 1)
+                            }
+                        },
+                    )
+                });
+        async_assert!(
+            generic_string_objects == 0 && other_objects > 0,
+            "Expected the preference rows to be skipped and the other Drive objects to load, \
+             but got {generic_string_objects} generic string objects and {other_objects} others"
+        )
     })
 }
 
