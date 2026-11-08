@@ -1,6 +1,6 @@
 use std::io;
 
-use windows_registry::{Key, CURRENT_USER};
+use windows_registry::{Key, Value, CURRENT_USER};
 use windows_result::HRESULT;
 
 /// Store user preferences in the Windows Registry.
@@ -53,7 +53,19 @@ pub fn copy_app_values_once(
     };
     for (name, value) in from_key.values()? {
         if to_key.get_value(&name).is_err() {
-            to_key.set_value(&name, &value)?;
+            match value {
+                Value::U32(number) => to_key.set_u32(name.as_str(), number)?,
+                Value::U64(number) => to_key.set_u64(name.as_str(), number)?,
+                Value::String(text) => to_key.set_string(name.as_str(), text.as_str())?,
+                Value::Bytes(bytes) => to_key.set_bytes(name.as_str(), &bytes)?,
+                Value::MultiString(texts) => {
+                    let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
+                    to_key.set_multi_string(name.as_str(), &texts)?
+                }
+                // A registry type the crate can't represent: there is no public way to
+                // write it back, so it is left behind in the old identity's key.
+                Value::Unknown(_) => {}
+            }
         }
     }
     to_key.set_string(marker_value_name, from_app)?;

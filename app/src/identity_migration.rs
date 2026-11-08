@@ -119,6 +119,7 @@ pub(crate) fn run_if_needed(may_move: bool) {
         may_move,
         check_processes: data_profile.is_none(),
     };
+    #[cfg_attr(not(any(target_os = "macos", windows)), expect(unused_mut))]
     let mut report = migrate(&old, &new, &probe);
 
     if report.outcome == Outcome::Deferred {
