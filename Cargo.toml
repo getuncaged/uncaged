@@ -396,7 +396,6 @@ pprof.opt-level = 3
 # Ensure jemalloc is optimized for performance.
 tikv-jemallocator.opt-level = 3
 tikv-jemalloc-sys.opt-level = 3
-pprof_util.opt-level = 3
 # Vastly improve runtime performance of some font and text layout logic
 # at the cost of a small increase in compile time for this crate.
 ttf-parser.opt-level = 3
@@ -482,10 +481,6 @@ core-text = { git = "https://github.com/servo/core-foundation-rs", rev = "6f844c
 objc = { git = "https://github.com/warpdotdev/rust-objc.git", rev = "5b656827fa9f863ef0eb22e444a3fedac009e78a" }
 pathfinder_simd = { git = "https://github.com/warpdotdev/pathfinder.git", rev = "34128a129ca6aee168fbc5060a4f21b4f7e486a9" }
 yaml-rust = { git = "https://github.com/warpdotdev/yaml-rust.git", rev = "51684719d0102ca85ff4b21cec39877a0c669e19" }
-
-tink-core = { git = "https://github.com/warpdotdev/tink-rust", rev = "54b9ac9af93b0c08b446a7bc0582836c9403a71b" }
-tink-proto = { git = "https://github.com/warpdotdev/tink-rust", rev = "54b9ac9af93b0c08b446a7bc0582836c9403a71b" }
-tink-hybrid = { git = "https://github.com/warpdotdev/tink-rust", rev = "54b9ac9af93b0c08b446a7bc0582836c9403a71b" }
 
 tikv-jemallocator = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
 tikv-jemalloc-sys = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
