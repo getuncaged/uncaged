@@ -67,12 +67,29 @@ delete work and persist). Crates are `uncaged_*`; the app is `uncaged` / `dev.un
 with a one-time data migration and compat names so v0.3.4 can still update (see RELEASING.md,
 "The identity rename").
 
-Still open: Oz launch/setup modals that link to oz.warp.dev, the wasm-only "get Warp" link,
-the Linux updater's Warp pacman repo text (dead: Linux doesn't self-update on this channel),
-the changelog-only resource center, the ~5 SSH integration tests that need Warp's GCP VMs,
-~89 dead-code warnings, and the items in the cleanup backlog the agents listed. The Linux
-secure-storage key seed string that names `releases.warp.dev` must stay (changing it would
-make stored secrets unreadable).
+Since then (2026-11-08, cleanup pass; app crates 786, dead-code warnings 89 → 86): the `session-sharing-protocol` git dependency, the Oz,
+OpenWarp and orchestration launch modals, the agents view's Oz cloud setup guide, the wasm
+"Download Warp Desktop" dialog, the Linux updater's Warp pacman/apt commands, Warp's internal
+opencode-plugin debug actions, GEAP credential state in `crates/ai`, and the integration tests
+that needed Warp's GCP SSH VMs are gone.
+
+Still open:
+- About 86 dead-code warnings (`cargo check -p uncaged --bin uncaged` without `-A dead_code`).
+  Almost all are items only unit tests still reach: the cloud ambient-task model
+  (`ai/ambient_agents`, the task map in `AgentConversationsModel`, which is empty outside
+  tests), orchestration lifecycle-event helpers, the Oz platform-plugin checks in
+  `cli_agent_sessions/plugin_manager`, `llms.rs` server model updates, and small UI builder
+  leftovers. Each needs its tests deleted with it, so they were left for a deliberate pass.
+- The free-AI-removal notice modal and the HOA onboarding flow (never opened; the modal's view
+  also backs the live prompt-suggestions-unavailable modal), the changelog-only resource
+  center, and server-sentinel links (`ServerConversationToken::conversation_link`/`debug_link`).
+- Cleanup-backlog leftovers: harness auth-secret UI, enterprise secrets in the terminal model,
+  web-intent parsing (wasm only), and `RequestParams.api_keys`/`custom_model_providers`
+  always `None`.
+- The CLI-agent plugin installers still point at Warp's public `claude-code-warp`,
+  `codex-warp` and `gemini-cli-warp` repos; Uncaged has no plugins of its own yet.
+- The Linux secure-storage key seed string that names `releases.warp.dev` must stay (changing
+  it would make stored secrets unreadable).
 
 ## Rules for every phase
 
