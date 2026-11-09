@@ -116,6 +116,7 @@ bounded-vec-deque = "0.1"
 bytemuck = { version = "1.13.1" }
 bytes = { version = "1.11.1", features = ["serde"] }
 command-corrections = { path = "third_party/command-corrections" }
+cosmic-text = { path = "third_party/cosmic-text" }
 core-foundation = "0.10.1"
 concat-idents = "1.1.4"
 cfg_aliases = "0.2.1"
@@ -130,11 +131,12 @@ derive_more = "0.99.17"
 diesel = { version = "2.3.8", default-features = false }
 directories = "6.0"
 dunce = "1.0.1"
+dwrote = { path = "third_party/dwrote", default-features = false }
 enum-iterator = "1.1.3"
 env_logger = "0.10.0"
 event-listener = "5.4.0"
 float-cmp = "0.9.0"
-font-kit = { git = "https://github.com/warpdotdev/font-kit", rev = "a04b225ecb639bb850f21d05212cfdc7465000f3", default-features = false, features = [
+font-kit = { path = "third_party/font-kit", default-features = false, features = [
   "source",
 ] }
 futures = { version = "0.3", features = ["executor", "thread-pool"] }
@@ -335,7 +337,7 @@ rayon = "1.10.0"
 sha2 = "0.10"
 shellexpand = "3.1.1"
 warp-command-signatures = { path = "third_party/command-signatures/command-signatures", default-features = false }
-winit = { git = "https://github.com/warpdotdev/winit.git", rev = "a4e0ecb5f9626ccac9445a73dc28354b52423abc" }
+winit = { path = "third_party/winit" }
 x11rb = "0.13.0"
 mockito = "1.7.0"
 sysinfo = { version = "0.37.0", default-features = false, features = [

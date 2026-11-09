@@ -43,4 +43,5 @@ workarounds = [
 #   - warp-workflows-types (Apache-2.0)
 # Their LICENSE files are appended instead through ADDITIONAL_LICENSES in
 # script/prepare_bundled_resources (and its Windows twin). mermaid_to_svg (MIT)
-# and its dagre_rust (Apache-2.0) are publishable, so cargo-about includes them.
+# and its dagre_rust (Apache-2.0) are publishable, so cargo-about includes them,
+# as it does the Warp forks of upstream crates vendored next to them.

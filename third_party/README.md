@@ -1,7 +1,7 @@
 # third_party
 
-Crates vendored from Warp's repositories so the build no longer fetches from
-`github.com/warpdotdev`. They are path dependencies from the root
+Crates vendored from Warp's repositories, and from Warp's forks of upstream
+crates, so the build no longer fetches from `github.com/warpdotdev`. They are path dependencies from the root
 `[workspace.dependencies]`, and `third_party` is in `[workspace] exclude`, so
 workspace-wide clippy and nextest skip them. `third_party/Cargo.toml` is their own
 workspace root, so Cargo stops looking for one in parent directories, and
@@ -18,6 +18,15 @@ dotfiles; LICENSE and notice files are kept.
 | `mermaid_to_svg`, `dagre_rust` | [warpdotdev/mermaid-to-svg](https://github.com/warpdotdev/mermaid-to-svg) @ `8d3f789c2eb49335d7bf247a06bb649f59b6d4ed` | MIT (`mermaid_to_svg/LICENSE`, `THIRD_PARTY_NOTICES`); `dagre_rust` Apache-2.0 (`crates/dagre_rust/LICENCE`) | Dropped `samples/`, `docs/`, `scripts/`, `examples/`, the `render_mermaid` bin and `[dev-dependencies]`, so the test modules no longer build here. `dagre_rust` lost its cargo-generated manifest header, `Cargo.toml.orig`, `.cargo_vcs_info.json` and `.cargo-ok`. |
 | `warp-command-signatures`, `warp-completion-metadata` | [warpdotdev/command-signatures](https://github.com/warpdotdev/command-signatures) @ `a937ae35dfe20eaed030664ad52b36657390b162` | MIT (`command-signatures/LICENSE.md`; specs adapted from withfig/autocomplete) | Literal `authors`/`license`/`publish` instead of workspace inheritance. Dropped `json/overrides/` and `src/bin/` (offline PowerShell spec generator only), plus repo tooling (`.agents/`, `script/`, `package*.json`, prettier config, `AGENTS.md`). `json/` is embedded by rust-embed. |
 | `warp-workflows`, `warp-workflows-types` | [warpdotdev/workflows](https://github.com/warpdotdev/workflows) @ `793a98ddda6ef19682aed66364faebd2829f0e01` | Apache-2.0 (`workflows/LICENSE`) | `build.rs` writes one `generated_workflows.rs` into `$OUT_DIR`, which `src/lib.rs` `include!`s, instead of a gitignored `src/generated_workflows/` tree, and no longer runs `cargo fmt`. Uses crates.io `uneval` 0.2.4 instead of the warpdotdev/uneval fork (`df4d9fa`). The generated `workflows()` serializes to byte-identical JSON. Literal manifest metadata. Dropped `build_ts/`, `script/`, `FORMAT.md`. |
+| `winit`, `dpi` | [warpdotdev/winit](https://github.com/warpdotdev/winit) @ `a4e0ecb5f9626ccac9445a73dc28354b52423abc` (upstream rust-windowing/winit v0.30.13 plus Warp's Windows 11 DPI-change fix, X11 exit-on-lost-connection, and two web fixes) | Apache-2.0 (`winit/LICENSE`, `winit/dpi/LICENSE`) | Literal `rust-version`/`repository`/`license`/`edition` and `serde`/`mint` versions instead of workspace inheritance; dropped upstream's `[workspace]`, `include`, `[dev-dependencies]` and `[[example]]`. Dropped `docs/`, `examples/`, `tests/`, `.cargo/` (only set `unreleased_changelogs` for in-repo docs builds) and the changelog/meta files; `src/` is complete, every platform backend included. |
+| `font-kit` | [warpdotdev/font-kit](https://github.com/warpdotdev/font-kit) @ `a04b225ecb639bb850f21d05212cfdc7465000f3` (servo/font-kit 0.12.0 plus Warp's `Font::from_ct_font`, colour-glyph rendering, thin strokes, `pub mod matching` and fallible DirectWrite calls) | MIT OR Apache-2.0 (`font-kit/LICENSE-MIT`, `font-kit/LICENSE-APACHE`) | `dwrote` points at `../dwrote` instead of warpdotdev/dwrote-rs (same rev). Dropped `[dev-dependencies]`, `tests/`, `examples/`, `resources/` and `c/`. |
+| `dwrote` | [warpdotdev/dwrote-rs](https://github.com/warpdotdev/dwrote-rs) @ `a71ce6c0136f7d0954a9a8b181b5b2d8ace5eb9c` (servo/dwrote-rs 0.11.5 plus fallible `Font` methods, servo/dwrote-rs#64) | MPL-2.0 (per-file headers; `dwrote/LICENSE` added) | Added the MPL-2.0 text as `LICENSE` (upstream has none). |
+| `cosmic-text` | [warpdotdev/cosmic-text](https://github.com/warpdotdev/cosmic-text) @ `15198beba692162201c0ea8b15222cf5643ea068` (pop-os/cosmic-text 0.12.0 plus first-line indent, fontdb 0.23 / rustybuzz 0.20 bumps and the PasswordCircle fallback exclusion) | MIT OR Apache-2.0 (`cosmic-text/LICENSE-MIT`, `cosmic-text/LICENSE-APACHE`) | Dropped `[workspace]`, `[[bench]]`, `[dev-dependencies]`, `[profile.test]`, and `fonts/`, `sample/`, `screenshots/`, `examples/`, `benches/`, `tests/` and the shell scripts. |
+
+The Warp forks of upstream crates (the rows from `winit` down) also set
+`[lints.rust] warnings = "allow"`, which keeps their upstream warnings out of
+Uncaged builds as `--cap-lints` did while they were git dependencies. They are
+publishable crates, so cargo-about picks up their licenses itself.
 
 The crates marked `publish = false` are skipped by cargo-about, so their
 license files are appended through `ADDITIONAL_LICENSES` in

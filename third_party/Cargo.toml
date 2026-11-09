@@ -7,8 +7,13 @@ members = [
   "command-corrections",
   "command-signatures/command-signatures",
   "command-signatures/completion-metadata",
+  "cosmic-text",
+  "dwrote",
+  "font-kit",
   "mermaid_to_svg",
   "mermaid_to_svg/crates/dagre_rust",
+  "winit",
+  "winit/dpi",
   "workflows/workflow-types",
   "workflows/workflows",
 ]

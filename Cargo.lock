@@ -2499,7 +2499,6 @@ dependencies = [
 [[package]]
 name = "cosmic-text"
 version = "0.12.0"
-source = "git+https://github.com/warpdotdev/cosmic-text.git?rev=15198beba692162201c0ea8b15222cf5643ea068#15198beba692162201c0ea8b15222cf5643ea068"
 dependencies = [
  "bitflags 2.13.0",
  "fontdb",
@@ -3310,7 +3309,6 @@ checksum = "117240f60069e65410b3ae1bb213295bd828f707b5bec6596a1afc8793ce0cbc"
 [[package]]
 name = "dpi"
 version = "0.1.1"
-source = "git+https://github.com/warpdotdev/winit.git?rev=a4e0ecb5f9626ccac9445a73dc28354b52423abc#a4e0ecb5f9626ccac9445a73dc28354b52423abc"
 
 [[package]]
 name = "dsl_auto_type"
@@ -3335,7 +3333,6 @@ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 [[package]]
 name = "dwrote"
 version = "0.11.5"
-source = "git+https://github.com/warpdotdev/dwrote-rs?rev=a71ce6c0136f7d0954a9a8b181b5b2d8ace5eb9c#a71ce6c0136f7d0954a9a8b181b5b2d8ace5eb9c"
 dependencies = [
  "lazy_static",
  "libc",
@@ -3852,7 +3849,6 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 [[package]]
 name = "font-kit"
 version = "0.12.0"
-source = "git+https://github.com/warpdotdev/font-kit?rev=a04b225ecb639bb850f21d05212cfdc7465000f3#a04b225ecb639bb850f21d05212cfdc7465000f3"
 dependencies = [
  "bitflags 2.13.0",
  "byteorder",
@@ -14343,7 +14339,6 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 [[package]]
 name = "winit"
 version = "0.30.13"
-source = "git+https://github.com/warpdotdev/winit.git?rev=a4e0ecb5f9626ccac9445a73dc28354b52423abc#a4e0ecb5f9626ccac9445a73dc28354b52423abc"
 dependencies = [
  "ahash 0.8.11",
  "android-activity",
