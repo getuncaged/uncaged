@@ -84,7 +84,7 @@ pub fn init(app: &mut AppContext) {
     hoa_onboarding::init(app);
     tab_configs::session_config_modal::init(app);
     view::codex_modal::init(app);
-    view::free_ai_removal_modal::init(app);
+    view::prompt_suggestions_unavailable_modal::init(app);
     view::global_search::view::GlobalSearchView::init(app);
     view::right_panel::RightPanelView::init(app);
     header_toolbar_editor::init(app);
@@ -146,18 +146,6 @@ pub fn init(app: &mut AppContext) {
         #[cfg(debug_assertions)]
         {
             app.register_editable_bindings([
-                EditableBinding::new(
-                    "workspace:open_free_ai_removal_modal",
-                    "[Debug] Open Free AI Removal Modal",
-                    WorkspaceAction::OpenFreeAiRemovalModal,
-                )
-                .with_context_predicate(id!("Workspace")),
-                EditableBinding::new(
-                    "workspace:reset_free_ai_removal_modal_state",
-                    "[Debug] Reset Free AI Removal Modal State",
-                    WorkspaceAction::ResetFreeAiRemovalModalState,
-                )
-                .with_context_predicate(id!("Workspace")),
                 EditableBinding::new(
                     "workspace:open_session_config_modal",
                     "[Debug] Open Session Config Modal",

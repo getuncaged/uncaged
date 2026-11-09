@@ -16,6 +16,7 @@ use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
+use crate::brand;
 use crate::settings_view::SettingsSection;
 use crate::ui_components::blended_colors;
 use crate::workspace::WorkspaceAction;
@@ -25,51 +26,17 @@ const CORNER_RADIUS: f32 = 12.;
 const PANEL_PADDING: f32 = 24.;
 const CLOSE_BUTTON_DIAMETER: f32 = 20.;
 
-const NOTICE_TITLE_TEXT: &str = "Warp is no longer providing inference on the free plan.";
-const NOTICE_BODY_TEXT: &str = "To keep using Warp's AI features, please upgrade to a paid plan, \
-     bring your own API key or endpoint, or log in with your Grok subscription.";
-const NOTICE_BONUS_CREDITS_TEXT: &str = "If you have any unused bonus credits, AI will keep \
-     working until these run out.";
-
-const PROMPT_SUGGESTIONS_TITLE_TEXT: &str = "How to use AI features in Warp";
-const PROMPT_SUGGESTIONS_BODY_TEXT: &str = "To use AI features in Warp, subscribe to a paid plan, \
-     add an API key (OpenAI, Anthropic, or Google), add a custom inference endpoint (OpenRouter, \
-     LiteLLM), or log in using your SuperGrok subscription.";
-
-/// Which surface opened the modal. Selects the copy; the layout and CTAs are identical across
-/// variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FreeAiRemovalModalVariant {
-    /// One-time notice shown to Free users when Warp-provided AI is removed from their plan.
-    Notice,
-    /// Shown on demand when a Free user activates Prompt Suggestions while out of credits.
-    PromptSuggestions,
+fn title() -> String {
+    format!("How to use AI features in {}", brand::NAME)
 }
 
-impl FreeAiRemovalModalVariant {
-    fn title(self) -> &'static str {
-        match self {
-            Self::Notice => NOTICE_TITLE_TEXT,
-            Self::PromptSuggestions => PROMPT_SUGGESTIONS_TITLE_TEXT,
-        }
-    }
-
-    fn body(self) -> &'static str {
-        match self {
-            Self::Notice => NOTICE_BODY_TEXT,
-            Self::PromptSuggestions => PROMPT_SUGGESTIONS_BODY_TEXT,
-        }
-    }
-
-    /// Secondary note rendered under the body. The on-demand Prompt Suggestions
-    /// variant only fires once the user is already out of credits, so the
-    /// bonus-credits note doesn't apply there.
-    fn secondary(self) -> Option<&'static str> {
-        match self {
-            Self::Notice => Some(NOTICE_BONUS_CREDITS_TEXT),
-            Self::PromptSuggestions => None,
-        }
-    }
+fn body() -> String {
+    format!(
+        "To use AI features in {}, connect a model: add an API key (OpenAI, Anthropic, or \
+         Google), add a custom inference endpoint (OpenRouter, LiteLLM), or log in using your \
+         SuperGrok subscription.",
+        brand::NAME
+    )
 }
 
 pub fn init(app: &mut AppContext) {
@@ -77,19 +44,19 @@ pub fn init(app: &mut AppContext) {
 
     app.register_fixed_bindings([FixedBinding::new(
         "escape",
-        FreeAiRemovalModalAction::Close,
-        id!("FreeAiRemovalModal"),
+        PromptSuggestionsUnavailableModalAction::Close,
+        id!("PromptSuggestionsUnavailableModal"),
     )]);
 }
 
 #[derive(Clone, Debug)]
-pub enum FreeAiRemovalModalAction {
+pub enum PromptSuggestionsUnavailableModalAction {
     Close,
     SetUpByok,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum FreeAiRemovalModalEvent {
+pub enum PromptSuggestionsUnavailableModalEvent {
     Close,
 }
 
@@ -99,22 +66,14 @@ struct StateHandles {
     byok_button: MouseStateHandle,
 }
 
-/// Notice shown to Free-plan users about the removal of Warp-provided AI. The
-/// `variant` selects the copy: a one-time rollout notice, or an on-demand prompt
-/// when a Free user activates a gated feature (e.g. Prompt Suggestions).
-pub struct FreeAiRemovalModal {
-    variant: FreeAiRemovalModalVariant,
+/// Explains how to connect a model, shown when the user activates Prompt Suggestions while no
+/// model is available. Its button opens the AI settings page.
+#[derive(Default)]
+pub struct PromptSuggestionsUnavailableModal {
     state_handles: StateHandles,
 }
 
-impl FreeAiRemovalModal {
-    pub fn new(variant: FreeAiRemovalModalVariant, _ctx: &mut ViewContext<Self>) -> Self {
-        Self {
-            variant,
-            state_handles: Default::default(),
-        }
-    }
-
+impl PromptSuggestionsUnavailableModal {
     fn render_buttons(&self, appearance: &Appearance) -> Box<dyn Element> {
         let byok_button = appearance
             .ui_builder()
@@ -131,7 +90,7 @@ impl FreeAiRemovalModal {
             .build()
             .with_cursor(Cursor::PointingHand)
             .on_click(|ctx, _, _| {
-                ctx.dispatch_typed_action(FreeAiRemovalModalAction::SetUpByok);
+                ctx.dispatch_typed_action(PromptSuggestionsUnavailableModalAction::SetUpByok);
             })
             .finish();
 
@@ -152,18 +111,20 @@ impl FreeAiRemovalModal {
                 self.state_handles.close_button.clone(),
             )
             .build()
-            .on_click(|ctx, _, _| ctx.dispatch_typed_action(FreeAiRemovalModalAction::Close))
+            .on_click(|ctx, _, _| {
+                ctx.dispatch_typed_action(PromptSuggestionsUnavailableModalAction::Close)
+            })
             .finish()
     }
 }
 
-impl Entity for FreeAiRemovalModal {
-    type Event = FreeAiRemovalModalEvent;
+impl Entity for PromptSuggestionsUnavailableModal {
+    type Event = PromptSuggestionsUnavailableModalEvent;
 }
 
-impl View for FreeAiRemovalModal {
+impl View for PromptSuggestionsUnavailableModal {
     fn ui_name() -> &'static str {
-        "FreeAiRemovalModal"
+        "PromptSuggestionsUnavailableModal"
     }
 
     fn render(&self, app: &AppContext) -> Box<dyn Element> {
@@ -172,39 +133,19 @@ impl View for FreeAiRemovalModal {
         let bg = blended_colors::neutral_1(theme);
         let font_family = appearance.ui_font_family();
 
-        let title = FormattedTextElement::from_str(self.variant.title(), font_family, 18.)
+        let title = FormattedTextElement::from_str(title(), font_family, 18.)
             .with_color(blended_colors::text_main(theme, bg))
             .with_weight(Weight::Bold)
             .finish();
 
-        let body_color = blended_colors::text_sub(theme, bg);
-        let body = FormattedTextElement::from_str(self.variant.body(), font_family, 14.)
-            .with_color(body_color)
+        let body = FormattedTextElement::from_str(body(), font_family, 14.)
+            .with_color(blended_colors::text_sub(theme, bg))
             .finish();
 
-        let mut content = Flex::column()
+        let content = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(Container::new(title).with_margin_bottom(12.).finish());
-
-        // Tighten the gap below the body when a secondary note follows; otherwise
-        // keep the full gap above the buttons.
-        let body_margin_bottom = if self.variant.secondary().is_some() {
-            8.
-        } else {
-            20.
-        };
-        content.add_child(
-            Container::new(body)
-                .with_margin_bottom(body_margin_bottom)
-                .finish(),
-        );
-
-        if let Some(secondary_text) = self.variant.secondary() {
-            let secondary = FormattedTextElement::from_str(secondary_text, font_family, 14.)
-                .with_color(body_color)
-                .finish();
-            content.add_child(Container::new(secondary).with_margin_bottom(20.).finish());
-        }
+            .with_child(Container::new(title).with_margin_bottom(12.).finish())
+            .with_child(Container::new(body).with_margin_bottom(20.).finish());
 
         let content = content.with_child(self.render_buttons(appearance)).finish();
 
@@ -249,22 +190,22 @@ impl View for FreeAiRemovalModal {
     }
 }
 
-impl TypedActionView for FreeAiRemovalModal {
-    type Action = FreeAiRemovalModalAction;
+impl TypedActionView for PromptSuggestionsUnavailableModal {
+    type Action = PromptSuggestionsUnavailableModalAction;
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         match action {
-            FreeAiRemovalModalAction::Close => {
-                ctx.emit(FreeAiRemovalModalEvent::Close);
+            PromptSuggestionsUnavailableModalAction::Close => {
+                ctx.emit(PromptSuggestionsUnavailableModalEvent::Close);
             }
-            FreeAiRemovalModalAction::SetUpByok => {
+            PromptSuggestionsUnavailableModalAction::SetUpByok => {
                 // Deferred so the close-driven refocus below doesn't steal focus from
                 // the settings page this opens.
                 ctx.dispatch_typed_action_deferred(WorkspaceAction::ShowSettingsPageWithSearch {
                     search_query: "api".to_string(),
                     section: Some(SettingsSection::WarpAgent),
                 });
-                ctx.emit(FreeAiRemovalModalEvent::Close);
+                ctx.emit(PromptSuggestionsUnavailableModalEvent::Close);
             }
         }
     }

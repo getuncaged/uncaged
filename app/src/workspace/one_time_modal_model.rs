@@ -21,8 +21,6 @@ pub struct OneTimeModalModel {
     /// modal to close. Mirrors the `Condition` pattern used by
     /// `NetworkStatus::pending_reconnect`.
     auto_handoff_sleep_modal_closed: Condition,
-    /// Whether the free-AI-removal notice modal is currently being shown.
-    is_free_ai_removal_modal_open: bool,
     /// Whether the HOA onboarding flow is currently being shown.
     is_hoa_onboarding_open: bool,
     /// The window ID where the currently open one-time modal should be displayed.
@@ -46,7 +44,6 @@ impl OneTimeModalModel {
         Self {
             is_auto_handoff_sleep_modal_open: false,
             auto_handoff_sleep_modal_closed,
-            is_free_ai_removal_modal_open: false,
             is_hoa_onboarding_open: false,
             target_window_id: None,
         }
@@ -134,9 +131,7 @@ impl OneTimeModalModel {
 
     /// Returns true if any one-time modal is currently open.
     pub fn is_any_modal_open(&self) -> bool {
-        (self.is_auto_handoff_sleep_modal_open
-            || self.is_free_ai_removal_modal_open
-            || self.is_hoa_onboarding_open)
+        (self.is_auto_handoff_sleep_modal_open || self.is_hoa_onboarding_open)
             && self.target_window_id.is_some()
     }
 
@@ -150,33 +145,6 @@ impl OneTimeModalModel {
         }
     }
 
-    /// Returns whether the free-AI-removal notice modal is currently open.
-    pub fn is_free_ai_removal_modal_open(&self) -> bool {
-        self.is_free_ai_removal_modal_open && self.target_window_id.is_some()
-    }
-
-    pub fn mark_free_ai_removal_modal_dismissed(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_free_ai_removal_modal_open(false, ctx);
-    }
-
-    #[cfg(debug_assertions)]
-    pub fn force_open_free_ai_removal_modal(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_free_ai_removal_modal_open(true, ctx);
-    }
-
-    fn set_free_ai_removal_modal_open(
-        &mut self,
-        is_open: bool,
-        ctx: &mut ModelContext<Self>,
-    ) -> bool {
-        if self.is_free_ai_removal_modal_open != is_open {
-            self.is_free_ai_removal_modal_open = is_open;
-            ctx.emit(OneTimeModalEvent::VisibilityChanged { is_open });
-            return true;
-        }
-        false
-    }
-
     fn set_hoa_onboarding_open(&mut self, is_open: bool, ctx: &mut ModelContext<Self>) -> bool {
         if self.is_hoa_onboarding_open != is_open {
             self.is_hoa_onboarding_open = is_open;
@@ -187,7 +155,6 @@ impl OneTimeModalModel {
     }
 }
 
-/// The outcome of evaluating the free-AI-removal notice conditions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OneTimeModalEvent {
     VisibilityChanged { is_open: bool },

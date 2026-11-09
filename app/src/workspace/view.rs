@@ -3,10 +3,10 @@ pub(crate) mod config_panel;
 pub mod conversation_list;
 #[cfg(enable_crash_recovery)]
 mod crash_recovery;
-pub(crate) mod free_ai_removal_modal;
 pub mod global_search;
 pub(crate) mod left_panel;
 pub(crate) mod onboarding;
+pub(crate) mod prompt_suggestions_unavailable_modal;
 pub(crate) mod right_panel;
 pub(crate) mod skills_panel;
 pub(crate) mod ssh_panel;
@@ -389,12 +389,12 @@ use crate::workspace::toast_stack::{
     ToastStack, ToastStack as WorkspaceToastStack, ToastStackEvent as WorkspaceToastStackEvent,
 };
 use crate::workspace::view::codex_modal::{CodexModal, CodexModalEvent};
-use crate::workspace::view::free_ai_removal_modal::{
-    FreeAiRemovalModal, FreeAiRemovalModalEvent, FreeAiRemovalModalVariant,
-};
 use crate::workspace::view::global_search::view::GlobalSearchEntryFocus;
 use crate::workspace::view::left_panel::{
     LeftPanelAction, LeftPanelEvent, LeftPanelView, ToolPanelView,
+};
+use crate::workspace::view::prompt_suggestions_unavailable_modal::{
+    PromptSuggestionsUnavailableModal, PromptSuggestionsUnavailableModalEvent,
 };
 use crate::workspace::view::right_panel::{RightPanelEvent, RightPanelView};
 use crate::workspace::{ForkFromExchange, ForkedConversationDestination};
@@ -913,10 +913,8 @@ pub struct Workspace {
     suggested_agent_mode_workflow_modal: ViewHandle<SuggestedAgentModeWorkflowModal>,
     suggested_rule_modal: ViewHandle<SuggestedRuleModal>,
     codex_modal: ViewHandle<CodexModal>,
-    free_ai_removal_modal: ViewHandle<FreeAiRemovalModal>,
-    /// Second instance of the free-AI-removal modal, opened on demand when a
-    /// Free user activates Prompt Suggestions while out of credits.
-    prompt_suggestions_unavailable_modal: ViewHandle<FreeAiRemovalModal>,
+    /// Opened on demand when the user activates Prompt Suggestions without a usable model.
+    prompt_suggestions_unavailable_modal: ViewHandle<PromptSuggestionsUnavailableModal>,
     toast_stack: ViewHandle<DismissibleToastStack<WorkspaceAction>>,
     agent_toast_stack: ViewHandle<AgentToastStack>,
     update_toast_stack: ViewHandle<DismissibleToastStack<WorkspaceAction>>,
@@ -2434,16 +2432,8 @@ impl Workspace {
             me.handle_codex_modal_event(event, ctx);
         });
 
-        let free_ai_removal_modal = ctx.add_typed_action_view(|ctx| {
-            FreeAiRemovalModal::new(FreeAiRemovalModalVariant::Notice, ctx)
-        });
-        ctx.subscribe_to_view(&free_ai_removal_modal, |me, _, event, ctx| {
-            me.handle_free_ai_removal_modal_event(event, ctx);
-        });
-
-        let prompt_suggestions_unavailable_modal = ctx.add_typed_action_view(|ctx| {
-            FreeAiRemovalModal::new(FreeAiRemovalModalVariant::PromptSuggestions, ctx)
-        });
+        let prompt_suggestions_unavailable_modal =
+            ctx.add_typed_action_view(|_| PromptSuggestionsUnavailableModal::default());
         ctx.subscribe_to_view(
             &prompt_suggestions_unavailable_modal,
             |me, _, event, ctx| {
@@ -2714,12 +2704,10 @@ impl Workspace {
                 // Only trigger modal actions if this is the target window.
                 // The model has already determined which window should show the modal.
                 let model_ref = model.as_ref(ctx);
-                if model_ref.target_window_id() == Some(ctx.window_id()) {
-                    if model_ref.is_free_ai_removal_modal_open() {
-                        me.focus_free_ai_removal_modal(ctx);
-                    } else if model_ref.is_hoa_onboarding_open() {
-                        me.show_hoa_onboarding_flow(ctx);
-                    }
+                if model_ref.target_window_id() == Some(ctx.window_id())
+                    && model_ref.is_hoa_onboarding_open()
+                {
+                    me.show_hoa_onboarding_flow(ctx);
                 }
             }
             ctx.notify();
@@ -2814,7 +2802,6 @@ impl Workspace {
             notification_mailbox_view,
             notification_toast_stack,
             codex_modal,
-            free_ai_removal_modal,
             prompt_suggestions_unavailable_modal,
             lightbox_view: None,
             hoa_onboarding_flow: None,
@@ -15207,29 +15194,13 @@ impl Workspace {
         };
     }
 
-    fn handle_free_ai_removal_modal_event(
-        &mut self,
-        event: &FreeAiRemovalModalEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        match event {
-            FreeAiRemovalModalEvent::Close => {
-                OneTimeModalModel::handle(ctx).update(ctx, |model, ctx| {
-                    model.mark_free_ai_removal_modal_dismissed(ctx);
-                });
-                self.focus_active_tab(ctx);
-                ctx.notify();
-            }
-        }
-    }
-
     fn handle_prompt_suggestions_unavailable_modal_event(
         &mut self,
-        event: &FreeAiRemovalModalEvent,
+        event: &PromptSuggestionsUnavailableModalEvent,
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            FreeAiRemovalModalEvent::Close => {
+            PromptSuggestionsUnavailableModalEvent::Close => {
                 self.current_workspace_state
                     .is_prompt_suggestions_unavailable_modal_open = false;
                 self.focus_active_tab(ctx);
@@ -18967,10 +18938,6 @@ impl Workspace {
         self.tab_views().map(|tab| tab.id())
     }
 
-    fn focus_free_ai_removal_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        ctx.focus(&self.free_ai_removal_modal);
-    }
-
     fn open_left_panel_view(&mut self, action: &LeftPanelAction, ctx: &mut ViewContext<Self>) {
         if !self.active_tab_pane_group().as_ref(ctx).left_panel_open {
             self.toggle_left_panel(ctx);
@@ -20471,25 +20438,6 @@ impl TypedActionView for Workspace {
             FileDeleted { path } => {
                 self.close_tabs_with_file_path(path, ctx);
             }
-            #[cfg(debug_assertions)]
-            OpenFreeAiRemovalModal => {
-                OneTimeModalModel::handle(ctx).update(ctx, |model, ctx| {
-                    model.force_open_free_ai_removal_modal(ctx);
-                });
-                ctx.notify();
-            }
-            #[cfg(debug_assertions)]
-            ResetFreeAiRemovalModalState => {
-                AISettings::handle(ctx).update(ctx, |ai_settings, ctx| {
-                    if let Err(e) = ai_settings
-                        .did_check_to_trigger_free_ai_removal_modal
-                        .set_value(false, ctx)
-                    {
-                        log::warn!("Failed to reset free AI removal modal seen setting: {e}");
-                    }
-                });
-                log::info!("Free AI removal modal seen state has been reset");
-            }
             #[cfg(target_os = "macos")]
             SampleProcess => {
                 let pid = process::id();
@@ -21738,18 +21686,6 @@ impl View for Workspace {
 
         if self.current_workspace_state.is_suggested_rule_modal_open {
             stack.add_child(ChildView::new(&self.suggested_rule_modal).finish());
-        }
-
-        let one_time_modal_model = OneTimeModalModel::as_ref(app);
-        // Uncaged: suppress Warp's one-time launch / announcement modals — the Oz
-        // cloud tour, "Warp is now open-source", orchestration, cloud-handoff, and
-        // free-AI-removal. They're cloud/billing announcements that don't apply to
-        // a free, local, account-free fork.
-        // (Upstream: shown in the modal's target window.)
-        let should_show_modal = false;
-
-        if should_show_modal && one_time_modal_model.is_free_ai_removal_modal_open() {
-            stack.add_child(ChildView::new(&self.free_ai_removal_modal).finish());
         }
 
         if self
