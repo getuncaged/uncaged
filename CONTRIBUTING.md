@@ -51,7 +51,7 @@ Larger changes are easier to review when a spec lands before the code. A spec co
 
 To open a spec PR:
 
-1. Add `specs/GH<issue-number>/product.md` and `specs/GH<issue-number>/tech.md`. Browse [`specs/`](specs/) for examples of well-structured specs.
+1. Add `specs/GH<issue-number>/product.md` and `specs/GH<issue-number>/tech.md`.
 2. Use the PR as the home for product and technical discussion.
 3. Once the specs are approved, implementation generally continues on the same PR. In rarer cases — for example, if a large spec is merged on its own so the implementation can be broken up — it can move to a linked follow-up PR.
 

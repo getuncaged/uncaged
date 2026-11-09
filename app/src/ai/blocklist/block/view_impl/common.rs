@@ -2274,11 +2274,10 @@ fn render_visual_markdown_block<A: Action>(
         VisualMarkdownAlignment::Center => Align::new(content).finish(),
     };
 
-    // Wrap the rendered image in the standard Warp tooltip when the source
-    // carried a CommonMark `title`. Branching on `Some(non_empty)` here means
-    // untitled images remain un-wrapped, matching `specs/GH849/product.md`
-    // invariant 6 (no tooltip for empty or absent titles). The tooltip's
-    // `Hoverable` needs a
+    // Wrap the rendered image in the standard tooltip when the source carried
+    // a CommonMark `title`. Branching on `Some(non_empty)` here means untitled
+    // images remain un-wrapped (no tooltip for empty or absent titles). The
+    // tooltip's `Hoverable` needs a
     // `MouseStateHandle` that survives across frames (so `is_hovered()` can
     // latch); prefer the caller's pre-allocated handle from
     // `AIBlockStateHandles.image_section_tooltip_handles`. Fall back to a

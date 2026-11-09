@@ -6,8 +6,6 @@
 //! symlinks each top-level entry from `~/.warp` into `~/.warp-preview` on
 //! first launch, so existing configuration (keybindings, themes, workflows,
 //! etc.) remains available to Preview.
-//!
-//! See `specs/QUALITY-408/` for full context.
 
 use std::path::Path;
 

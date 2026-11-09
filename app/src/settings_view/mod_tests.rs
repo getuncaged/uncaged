@@ -202,7 +202,7 @@ fn subpage_from_str_parses_display_names() {
     // Both the legacy "Oz" name and the new "Warp Agent" display name must
     // resolve to SettingsSection::WarpAgent so existing deep links, persisted
     // telemetry strings, and external callers continue to work after the
-    // user-facing rename (see specs/GH1063/product.md, Behavior #8).
+    // user-facing rename.
     assert_eq!(
         SettingsSection::from_str("Oz"),
         Ok(SettingsSection::WarpAgent)
