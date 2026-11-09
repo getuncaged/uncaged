@@ -181,7 +181,7 @@ mermaid_to_svg = { path = "third_party/mermaid_to_svg" }
 mime_guess = "2.0"
 minimp4 = "0.1.2"
 nix = { version = "0.26.4", default-features = false, features = ["signal"] }
-notify-debouncer-full = { git = "https://github.com/warpdotdev/notify", rev = "91b719849bc04ef251bcb2cc61076b099204e970" }
+notify-debouncer-full = { path = "third_party/notify/notify-debouncer-full" }
 nom = "7.1.1"
 num-traits = "0.2"
 oauth2 = { version = "5.0.0", default-features = false }
@@ -291,7 +291,7 @@ unicode-width = "0.1.12"
 uuid = { version = "1.1.2", features = ["v4", "v5", "serde", "js"] }
 vec1 = { version = "1.8.0", features = ["serde"] }
 version-compare = "0.1"
-vte = { git = "https://github.com/warpdotdev/vte.git", rev = "4b399c87b63ba88f45709edaa6383fc519f6c900", default-features = false }
+vte = { path = "third_party/vte", default-features = false }
 walkdir = "2"
 warp-workflows = { path = "third_party/workflows/workflows" }
 wasm-bindgen = "0.2.89"
@@ -484,7 +484,9 @@ core-graphics = { git = "https://github.com/servo/core-foundation-rs", rev = "6f
 core-text = { git = "https://github.com/servo/core-foundation-rs", rev = "6f844cf1a1a18e25b70fcdf1bcdc458555bd2eff" }
 objc = { git = "https://github.com/warpdotdev/rust-objc.git", rev = "5b656827fa9f863ef0eb22e444a3fedac009e78a" }
 pathfinder_simd = { git = "https://github.com/warpdotdev/pathfinder.git", rev = "34128a129ca6aee168fbc5060a4f21b4f7e486a9" }
-yaml-rust = { git = "https://github.com/warpdotdev/yaml-rust.git", rev = "51684719d0102ca85ff4b21cec39877a0c669e19" }
+# Vendored from Warp's fork: block scalars may contain a tab right after their
+# indentation, which upstream 0.4.5 rejects. See third_party/README.md.
+yaml-rust = { path = "third_party/yaml-rust" }
 
 tikv-jemallocator = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
 tikv-jemalloc-sys = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }

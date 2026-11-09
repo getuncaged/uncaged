@@ -12,9 +12,13 @@ members = [
   "font-kit",
   "mermaid_to_svg",
   "mermaid_to_svg/crates/dagre_rust",
+  "notify/notify",
+  "notify/notify-debouncer-full",
+  "vte",
   "winit",
   "winit/dpi",
   "workflows/workflow-types",
   "workflows/workflows",
+  "yaml-rust",
 ]
 resolver = "2"
