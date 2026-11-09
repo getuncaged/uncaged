@@ -86,11 +86,6 @@ jobs:
           --all-targets --tests -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
-      # command-signatures-v2 (pulled in by --all-features) builds its JS with
-      # the Yarn version package.json pins, which Corepack provides.
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: cargo clippy (all features)
         timeout-minutes: 40
         run: >-

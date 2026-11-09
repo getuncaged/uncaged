@@ -20,17 +20,6 @@ pub(super) enum BuiltInPluginType {
 }
 
 impl BuiltInPluginType {
-    #[cfg(feature = "completions_v2")]
-    pub(super) fn plugin_bytes(&self) -> Option<Vec<u8>> {
-        match self {
-            BuiltInPluginType::Completions => {
-                command_signatures_v2::CommandSignaturesJs::get("main.js")
-                    .map(|bytes| bytes.data.into())
-            }
-        }
-    }
-
-    #[cfg(not(feature = "completions_v2"))]
     pub(super) fn plugin_bytes(&self) -> Option<Vec<u8>> {
         None
     }

@@ -2281,15 +2281,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "command-signatures-v2"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "command",
- "rust-embed 8.7.2",
-]
-
-[[package]]
 name = "compact_str"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11998,7 +11989,6 @@ dependencies = [
  "cocoa 0.26.0",
  "command",
  "command-corrections",
- "command-signatures-v2",
  "concat-idents",
  "console_error_panic_hook",
  "content_inspector",
@@ -12252,7 +12242,6 @@ dependencies = [
  "async-recursion",
  "async-trait",
  "bincode",
- "cfg-if",
  "clap",
  "command",
  "derive-new",
@@ -12266,7 +12255,6 @@ dependencies = [
  "log",
  "memo-map",
  "regex",
- "rquickjs",
  "serde",
  "shellexpand",
  "smol_str",
@@ -12276,7 +12264,6 @@ dependencies = [
  "uncaged_cli",
  "uncaged_completer",
  "uncaged_core",
- "uncaged_js",
  "uncaged_ui_core",
  "uncaged_util",
  "warp-command-signatures",

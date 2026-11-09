@@ -13,8 +13,6 @@ pub use context::{
     CommandExitStatus, CommandOutput, CompletionContext, GeneratorContext, PathCompletionContext,
     PathSeparators,
 };
-#[cfg(feature = "v2")]
-pub use context::{JsExecutionContext, JsExecutionError};
 pub use describe::{describe, describe_given_token, Description, TopLevelCommandCaseSensitivity};
 pub use engine::{EngineDirEntry, EngineFileType, LocationType};
 pub use matchers::{Match, MatchStrategy, MatchType};

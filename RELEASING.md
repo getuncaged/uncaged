@@ -127,15 +127,14 @@ gh release edit vX.Y.Z --notes-file docs/releases/vX.Y.Z.md
   same version.
 - `cargo fmt --all --check` is clean.
 - Clippy is clean with both feature sets, the same two runs `uncaged-ci.yml` gates on
-  (each set compiles code the other doesn't; `--all-features` needs `corepack enable`
-  for the command-signatures JS build):
+  (each set compiles code the other doesn't):
   ```bash
   cargo clippy -p uncaged -p uncaged_engine --all-targets --tests -- -D warnings -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
   cargo clippy -p uncaged -p uncaged_engine --all-targets --all-features --tests -- -D warnings -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
   ```
 - The latest Uncaged CI run on `uncaged-0.3` is green, including the Linux and Windows
   jobs (best-effort, so they don't block, but a red one there is a platform-only break).
-- `cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2`:
+- `cargo nextest run --no-fail-fast --workspace`:
   unit tests all pass. Integration tests that need SSH targets / containers or
   your own shell setup (`test_ssh_*`, `test_preferred_shell`, PS1 checks) fail
   locally; compare against the previous release before treating one as new.

@@ -48,11 +48,6 @@ pub fn run() -> Result<()> {
         let mut plugin_runners =
             PluginRunners::new(plugin_request_rx, client.clone(), executor.clone());
 
-        #[cfg(feature = "completions_v2")]
-        plugin_runners.run_plugin(PluginRef::BuiltIn(
-            plugin_ref::BuiltInPluginType::Completions,
-        ));
-
         for plugin_path in plugin_paths() {
             plugin_runners.run_plugin(PluginRef::Path(plugin_path));
         }

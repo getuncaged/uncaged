@@ -12,7 +12,6 @@ async-recursion.workspace = true
 async-trait.workspace = true
 anyhow.workspace = true
 bincode.workspace = true
-cfg-if.workspace = true
 clap.workspace = true
 derive-new = "0.5.8"
 dirs.workspace = true
@@ -32,7 +31,6 @@ string-offset.workspace = true
 thiserror.workspace = true
 uncaged_cli.workspace = true
 uncaged_core.workspace = true
-uncaged_js = { workspace = true, optional = true }
 uncaged_ui_core.workspace = true
 uncaged_util.workspace = true
 typed-path.workspace = true
@@ -43,7 +41,6 @@ warp-command-signatures = {workspace = true}
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 command = { path = "../command" }
-rquickjs = { workspace = true, optional = true }
 warp-command-signatures = {workspace = true, features = ["embed-signatures"]}
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
@@ -55,8 +52,5 @@ anyhow.workspace = true
 uncaged_completer = { path = ".", features = ["test-util"] }
 
 [features]
-# Enables the completions-on-js implementation of the completion engine.
-# Note that this feature is only compatible with non-wasm targets.
-v2 = ["dep:uncaged_js", "dep:rquickjs"]
 # Enables utilities for testing.
-test-util = ["uncaged_js?/test-util"]
+test-util = []

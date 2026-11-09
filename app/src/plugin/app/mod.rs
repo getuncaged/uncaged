@@ -68,12 +68,6 @@ impl PluginHost {
             .with_service(plugin_host_bootstrap_service)
             .with_service(LogServiceImpl::new());
 
-        #[cfg(feature = "completions_v2")]
-        let server_builder =
-            server_builder.with_service(service_impl::RegisterCommandSignatureServiceImpl::new(
-                uncaged_completer::signatures::CommandRegistry::global_instance(),
-            ));
-
         let (server, plugin_host_process) =
             match server_builder.build_and_run(ctx.background_executor()) {
                 Ok((server, connection_address)) => {

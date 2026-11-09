@@ -6,16 +6,6 @@ use anyhow::anyhow;
 use rquickjs::Context;
 use uncaged_js::{JsFunctionId, JsFunctionRegistry, SerializedJsValue};
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "completions_v2")] {
-        use uncaged_completer::signatures::CommandSignature;
-
-        use crate::plugin::service::{
-            RegisterCommandSignatureRequest, RegisterCommandSignatureService,
-        };
-    }
-}
-
 /// A handle on a single JS plugin.
 ///
 /// We use a `Rc<RefCell<_>>` to make it possible for the plugin "API" (JS functions implemented in
@@ -42,20 +32,11 @@ impl PluginHandle {
 }
 
 /// Container struct for holding ipc `ServiceCaller` dependencies of `Plugin`.
-pub(super) struct AppServiceCallers {
-    #[cfg(feature = "completions_v2")]
-    register_command_signatures_caller:
-        Box<dyn ipc::ServiceCaller<RegisterCommandSignatureService>>,
-}
+pub(super) struct AppServiceCallers {}
 
 impl AppServiceCallers {
     pub fn new(#[allow(unused_variables)] app_client: Arc<ipc::Client>) -> Self {
-        Self {
-            #[cfg(feature = "completions_v2")]
-            register_command_signatures_caller: ipc::service_caller::<
-                RegisterCommandSignatureService,
-            >(app_client),
-        }
+        Self {}
     }
 }
 
@@ -88,18 +69,6 @@ impl Plugin {
                 .map(|serialized_value| PluginResponse::CallJsFunctionResult {
                     output: serialized_value,
                 }),
-        }
-    }
-
-    /// Registers the given command signatures.
-    #[cfg(feature = "completions_v2")]
-    pub(super) fn register_command_signatures(&mut self, signatures: Vec<CommandSignature>) {
-        if let Err(e) = uncaged_ui::r#async::block_on(
-            self.app_services
-                .register_command_signatures_caller
-                .call(RegisterCommandSignatureRequest { signatures }),
-        ) {
-            log::warn!("Failed to register command signature: {e:?}");
         }
     }
 

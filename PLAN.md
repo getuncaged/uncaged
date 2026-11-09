@@ -352,7 +352,7 @@ GetStartedView removal rides this area's next slice with a restore fallback.
 - "34 tree-sitter grammars, 44–51 MB": the lockfile has **one** tree-sitter package. Wrong.
 - "42 MB onboarding PNGs in the binary": `Contents/Resources` is 3.3 MB; the PNGs are not embedded. Wrong.
 - "`get_all_restored_blocks` loads everything": true in code, irrelevant in practice — this DB is 79 rows / 0.2 MB.
-- "29.3 MB command-signature JSON in the binary": `completions_v2` is not in `default`; repo weight only.
+- "29.3 MB command-signature JSON in the binary": `completions_v2` was never in `default`; it and `crates/command-signatures-v2` are now gone.
 - `ps` RSS overstates real memory by ~2×: use `vmmap` physical footprint (fair comparison: Terminal.app 32.5 MB).
 
 ## Where the remaining memory actually is (malloc_history + vmmap, measured)
