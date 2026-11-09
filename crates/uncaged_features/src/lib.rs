@@ -711,10 +711,6 @@ pub enum FeatureFlag {
     /// Enables conversation retrieval via the CLI (oz run conversation get, oz run get --conversation).
     ConversationApi,
 
-    /// Guided onboarding flow for existing users introducing HOA features
-    /// (vertical tabs, agent inbox, tab configs).
-    HOAOnboardingFlow,
-
     /// Enables commit, push, and create-PR actions in the code review panel.
     GitOperationsInCodeReview,
 

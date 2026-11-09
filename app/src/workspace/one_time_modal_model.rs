@@ -21,8 +21,6 @@ pub struct OneTimeModalModel {
     /// modal to close. Mirrors the `Condition` pattern used by
     /// `NetworkStatus::pending_reconnect`.
     auto_handoff_sleep_modal_closed: Condition,
-    /// Whether the HOA onboarding flow is currently being shown.
-    is_hoa_onboarding_open: bool,
     /// The window ID where the currently open one-time modal should be displayed.
     /// This is captured when a modal is first opened and ensures the modal stays on that window.
     target_window_id: Option<WindowId>,
@@ -44,7 +42,6 @@ impl OneTimeModalModel {
         Self {
             is_auto_handoff_sleep_modal_open: false,
             auto_handoff_sleep_modal_closed,
-            is_hoa_onboarding_open: false,
             target_window_id: None,
         }
     }
@@ -120,19 +117,9 @@ impl OneTimeModalModel {
         self.auto_handoff_sleep_modal_closed.wait()
     }
 
-    /// Returns whether the HOA onboarding flow is currently open.
-    pub fn is_hoa_onboarding_open(&self) -> bool {
-        self.is_hoa_onboarding_open && self.target_window_id.is_some()
-    }
-
-    pub fn mark_hoa_onboarding_dismissed(&mut self, ctx: &mut ModelContext<Self>) {
-        self.set_hoa_onboarding_open(false, ctx);
-    }
-
     /// Returns true if any one-time modal is currently open.
     pub fn is_any_modal_open(&self) -> bool {
-        (self.is_auto_handoff_sleep_modal_open || self.is_hoa_onboarding_open)
-            && self.target_window_id.is_some()
+        self.is_auto_handoff_sleep_modal_open && self.target_window_id.is_some()
     }
 
     pub fn update_target_window_id(&mut self, window_id: WindowId, ctx: &mut ModelContext<Self>) {
@@ -143,15 +130,6 @@ impl OneTimeModalModel {
                 is_open: self.is_any_modal_open(),
             });
         }
-    }
-
-    fn set_hoa_onboarding_open(&mut self, is_open: bool, ctx: &mut ModelContext<Self>) -> bool {
-        if self.is_hoa_onboarding_open != is_open {
-            self.is_hoa_onboarding_open = is_open;
-            ctx.emit(OneTimeModalEvent::VisibilityChanged { is_open });
-            return true;
-        }
-        false
     }
 }
 

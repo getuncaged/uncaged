@@ -571,7 +571,6 @@ default = [
     "vertical_tabs_summary_mode",
     "tab_configs",
     "agent_harness",
-    "hoa_onboarding_flow",
     "codex_plugin",
     "trim_trailing_blank_lines",
     "open_warp_new_settings_modes",
@@ -875,7 +874,6 @@ billing_and_usage_page_v2 = []
 gpt_configurable_context_window = []
 configurable_toolbar = []
 warpify_footer = []
-hoa_onboarding_flow = []
 git_operations_in_code_review = []
 codex_plugin = []
 cloud_mode_setup_v2 = ["cloud_mode"]
