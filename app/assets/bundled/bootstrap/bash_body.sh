@@ -924,42 +924,6 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
         fi
     }
 
-    function warp_finish_update {
-      local update_id="$1"
-      if [ "$WARP_IN_MSYS2" = true ]; then
-        warp_send_hook_via_kv_pairs_start "FinishUpdate"
-        warp_send_hook_kv_pair "update_id" "$update_id"
-        warp_send_hook_kv_pair "session_id" "$WARP_SESSION_ID"
-        warp_send_hook_via_kv_pairs_end
-      else
-        warp_send_json_message "{ \"hook\": \"FinishUpdate\", \"value\": { \"update_id\": \"$update_id\", \"session_id\": $WARP_SESSION_ID} }"
-      fi
-    }
-
-    # Check if the warp apt source file has been renamed to `warpdotdev.list.distUpgrade` due to an ubuntu version update.
-    # If this occurred, we want to rename the source file back to `warpdotdev.list` to ensure updates can proceed.
-    # We purposefully skip this if either the `warpdotdev.list` file already exists (indicating that the user has already
-    # done this themselves) _or_ if a `warpdotdev.sources` file exists (which is the new Deb822 format for source files).
-    # The `.sources` file could only exist if a user manually created it; Ubuntu doesn't create one automatically for the
-    # warp source file due to a bug in its update flow where it considers our source file to be "invalid" because it
-    # contains a `signed-by` key.
-    function warp_handle_dist_upgrade {
-      local source_file_name="$1"
-
-      eval "$(command apt-config shell APT_SOURCESDIR 'Dir::Etc::sourceparts/d')"
-
-      if [[ ! -e $APT_SOURCESDIR$source_file_name.list && \
-          ! -e $APT_SOURCESDIR$source_file_name.sources && \
-           -e $APT_SOURCESDIR$source_file_name.list.distUpgrade ]]; then
-        # DO NOT DO THIS. We should never run a command for user with `sudo`. The only reason this is safe here is because
-        # we insert this function into the input for the user to determine if they want to execute (we never run it on
-        # their behalf without their permission).  To be transparent about what is being executed with sudo, we echo out the
-        # command we're about to run.
-        echo "Executing: sudo cp \"$APT_SOURCESDIR$source_file_name.list.distUpgrade\" \"$APT_SOURCESDIR$source_file_name.list\""
-        sudo cp "$APT_SOURCESDIR$source_file_name.list.distUpgrade" "$APT_SOURCESDIR$source_file_name.list"
-      fi
-    }
-
     # The SSH logic only applies to local sessions, because we don't yet have support for bootstrapping
     # recursive SSH sessions.
     if [[ $WARP_IS_LOCAL_SHELL_SESSION == "1" ]]; then
