@@ -1,0 +1,24 @@
+[package]
+edition = "2021"
+name = "dagre_rust"
+version = "0.0.5"
+authors = ["Ameer Hamza <r3alst@gmail.com>"]
+description = "Dagre implementation in Rust"
+readme = "README.md"
+keywords = [
+    "dagre",
+    "graph",
+    "dag",
+]
+categories = [
+    "graph",
+    "dagre",
+]
+license = "Apache-2.0"
+repository = "https://github.com/r3alst/dagre-rust"
+
+[dependencies.graphlib_rust]
+version = "0.0.2"
+
+[dependencies.ordered_hashmap]
+version = "0.0.3"

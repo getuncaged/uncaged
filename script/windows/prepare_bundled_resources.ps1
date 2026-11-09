@@ -79,7 +79,11 @@ $AdditionalLicenses = @(
     @{ Name = 'bash-preexec'; License = 'MIT'; Path = 'app\assets\bundled\bootstrap\bash-preexec-LICENSE.md' },
     @{ Name = 'Claude API Skill'; License = 'Apache-2.0'; Path = 'resources\bundled\skills\claude-api\LICENSE.txt' },
     @{ Name = 'Windows Terminal'; License = 'MIT'; Path = 'app\assets\windows\LICENSE-WINDOWS-TERMINAL' },
-    @{ Name = 'GitHub Desktop'; License = 'MIT'; Path = 'app\src\code_review\GITHUB-DESKTOP-LICENSE' }
+    @{ Name = 'GitHub Desktop'; License = 'MIT'; Path = 'app\src\code_review\GITHUB-DESKTOP-LICENSE' },
+    # Vendored crates that cargo-about skips (publish = false); see third_party/README.md.
+    @{ Name = 'command-corrections'; License = 'MIT'; Path = 'third_party\command-corrections\LICENSE.md' },
+    @{ Name = 'warp-command-signatures / warp-completion-metadata'; License = 'MIT'; Path = 'third_party\command-signatures\LICENSE.md' },
+    @{ Name = 'warp-workflows / warp-workflows-types'; License = 'Apache-2.0'; Path = 'third_party\workflows\LICENSE' }
 )
 # Windows-only components:
 $AdditionalLicenses += @(

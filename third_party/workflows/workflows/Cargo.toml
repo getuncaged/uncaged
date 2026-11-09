@@ -1,0 +1,19 @@
+[package]
+name = "warp-workflows"
+version = "0.1.0"
+edition = "2021"
+authors = ["Warp Team <dev@warp.dev>"]
+publish = false
+license = "Apache-2.0"
+
+[dependencies]
+warp-workflows-types = {path = "../workflow-types" }
+
+[build-dependencies]
+anyhow = "1.0"
+convert_case = "0.4.0"
+memmap = "0.7.0"
+serde_yaml = "0.8"
+uneval = "0.2.4"
+walkdir = "2.3.2"
+warp-workflows-types = {path = "../workflow-types" }

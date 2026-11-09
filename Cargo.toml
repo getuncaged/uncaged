@@ -3,6 +3,9 @@ members = [
   "crates/*",
   "app",
 ]
+# Vendored third-party crates are path dependencies, not members: keep them out of
+# workspace-wide clippy, tests and formatting. See third_party/README.md.
+exclude = ["third_party"]
 resolver = "2"
 
 # Include all members except integration (since it is only used for testing).
@@ -112,7 +115,7 @@ blocking = "1.6.2"
 bounded-vec-deque = "0.1"
 bytemuck = { version = "1.13.1" }
 bytes = { version = "1.11.1", features = ["serde"] }
-command-corrections = { git = "https://github.com/warpdotdev/command-corrections.git", rev = "eae08c8c51d9bc9741fcb17eef2c21f696aebbeb" }
+command-corrections = { path = "third_party/command-corrections" }
 core-foundation = "0.10.1"
 concat-idents = "1.1.4"
 cfg_aliases = "0.2.1"
@@ -172,7 +175,7 @@ lazy_static = "1.4.0"
 libc = "0.2.81"
 line-ending = "1.4.0"
 log = { version = "0.4", features = ["serde", "std"] }
-mermaid_to_svg = { git = "https://github.com/warpdotdev/mermaid-to-svg.git", rev = "8d3f789c2eb49335d7bf247a06bb649f59b6d4ed" }
+mermaid_to_svg = { path = "third_party/mermaid_to_svg" }
 mime_guess = "2.0"
 minimp4 = "0.1.2"
 nix = { version = "0.26.4", default-features = false, features = ["signal"] }
@@ -288,7 +291,7 @@ vec1 = { version = "1.8.0", features = ["serde"] }
 version-compare = "0.1"
 vte = { git = "https://github.com/warpdotdev/vte.git", rev = "4b399c87b63ba88f45709edaa6383fc519f6c900", default-features = false }
 walkdir = "2"
-warp-workflows = { git = "https://github.com/warpdotdev/workflows", rev = "793a98ddda6ef19682aed66364faebd2829f0e01" }
+warp-workflows = { path = "third_party/workflows/workflows" }
 wasm-bindgen = "0.2.89"
 wasm-bindgen-futures = "0.4.42"
 web-sys = { version = "0.3.69", features = [
@@ -331,7 +334,7 @@ dirs = "6.0.0"
 rayon = "1.10.0"
 sha2 = "0.10"
 shellexpand = "3.1.1"
-warp-command-signatures = { git = "https://github.com/warpdotdev/command-signatures.git", rev = "a937ae35dfe20eaed030664ad52b36657390b162", default-features = false }
+warp-command-signatures = { path = "third_party/command-signatures/command-signatures", default-features = false }
 winit = { git = "https://github.com/warpdotdev/winit.git", rev = "a4e0ecb5f9626ccac9445a73dc28354b52423abc" }
 x11rb = "0.13.0"
 mockito = "1.7.0"

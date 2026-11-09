@@ -1,0 +1,15 @@
+# Workspace root for the vendored crates (see README.md). The Uncaged workspace
+# excludes third_party/, and without a root here Cargo keeps searching parent
+# directories for one when a tool such as `cargo fmt --all` loads these crates.
+# Uncaged builds them as path dependencies and never builds this workspace.
+[workspace]
+members = [
+  "command-corrections",
+  "command-signatures/command-signatures",
+  "command-signatures/completion-metadata",
+  "mermaid_to_svg",
+  "mermaid_to_svg/crates/dagre_rust",
+  "workflows/workflow-types",
+  "workflows/workflows",
+]
+resolver = "2"

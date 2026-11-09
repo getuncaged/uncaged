@@ -85,6 +85,10 @@ ADDITIONAL_LICENSES=(
     "Claude API Skill|Apache-2.0|resources/bundled/skills/claude-api/LICENSE.txt"
     "Windows Terminal|MIT|app/assets/windows/LICENSE-WINDOWS-TERMINAL"
     "GitHub Desktop|MIT|app/src/code_review/GITHUB-DESKTOP-LICENSE"
+    # Vendored crates that cargo-about skips (publish = false); see third_party/README.md.
+    "command-corrections|MIT|third_party/command-corrections/LICENSE.md"
+    "warp-command-signatures / warp-completion-metadata|MIT|third_party/command-signatures/LICENSE.md"
+    "warp-workflows / warp-workflows-types|Apache-2.0|third_party/workflows/LICENSE"
 )
 
 # Build the third-party licenses file unless the NO_LICENSES envvar is set.

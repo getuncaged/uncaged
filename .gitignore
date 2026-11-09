@@ -4,6 +4,9 @@ app/frameworks/dev/Carthage
 app/frameworks/**/*.xcframework
 /target
 /app/target
+# Only if someone runs cargo inside the vendored workspace (see third_party/README.md).
+/third_party/target
+/third_party/Cargo.lock
 /warp.xcworkspace
 .idea/
 .DS_Store

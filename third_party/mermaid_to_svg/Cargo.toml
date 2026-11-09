@@ -1,0 +1,18 @@
+[package]
+name = "mermaid_to_svg"
+version = "0.1.0"
+edition = "2021"
+authors = ["Warp Team <dev@warp.dev>"]
+description = "Convert Mermaid diagram syntax to SVG"
+license = "MIT"
+# Vendored without upstream's samples/, docs/, scripts/, render_mermaid bin and
+# dev-dependencies; the test modules need those and are not built here.
+
+[dependencies]
+regex = "1"
+thiserror = "1.0"
+dagre_rust = { path = "crates/dagre_rust" }  # vendored from 0.0.5 with fixes
+graphlib_rust = "0.0.2"
+petgraph = "0.8.3"
+unicode-segmentation = "1.11"
+serde_yaml = "0.9.34"

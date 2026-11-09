@@ -2271,7 +2271,6 @@ dependencies = [
 [[package]]
 name = "command-corrections"
 version = "0.0.0"
-source = "git+https://github.com/warpdotdev/command-corrections.git?rev=eae08c8c51d9bc9741fcb17eef2c21f696aebbeb#eae08c8c51d9bc9741fcb17eef2c21f696aebbeb"
 dependencies = [
  "difflib 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.10.5",
@@ -2774,7 +2773,6 @@ dependencies = [
 [[package]]
 name = "dagre_rust"
 version = "0.0.5"
-source = "git+https://github.com/warpdotdev/mermaid-to-svg.git?rev=8d3f789c2eb49335d7bf247a06bb649f59b6d4ed#8d3f789c2eb49335d7bf247a06bb649f59b6d4ed"
 dependencies = [
  "graphlib_rust",
  "ordered_hashmap",
@@ -6626,7 +6624,6 @@ dependencies = [
 [[package]]
 name = "mermaid_to_svg"
 version = "0.1.0"
-source = "git+https://github.com/warpdotdev/mermaid-to-svg.git?rev=8d3f789c2eb49335d7bf247a06bb649f59b6d4ed#8d3f789c2eb49335d7bf247a06bb649f59b6d4ed"
 dependencies = [
  "dagre_rust",
  "graphlib_rust",
@@ -12830,8 +12827,9 @@ dependencies = [
 
 [[package]]
 name = "uneval"
-version = "0.2.3"
-source = "git+https://github.com/warpdotdev/uneval?rev=df4d9fad372aedc447e6f93ca0f930fabaf9dd1a#df4d9fad372aedc447e6f93ca0f930fabaf9dd1a"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63cc5d2fd8648d7e2be86098f60c9ece7045cc710b3c1e226910e2f37d11dc73"
 dependencies = [
  "serde",
  "thiserror 1.0.63",
@@ -13293,7 +13291,6 @@ dependencies = [
 [[package]]
 name = "warp-command-signatures"
 version = "0.0.0"
-source = "git+https://github.com/warpdotdev/command-signatures.git?rev=a937ae35dfe20eaed030664ad52b36657390b162#a937ae35dfe20eaed030664ad52b36657390b162"
 dependencies = [
  "cfg-if",
  "itertools 0.10.5",
@@ -13311,7 +13308,6 @@ dependencies = [
 [[package]]
 name = "warp-completion-metadata"
 version = "0.0.0"
-source = "git+https://github.com/warpdotdev/command-signatures.git?rev=a937ae35dfe20eaed030664ad52b36657390b162#a937ae35dfe20eaed030664ad52b36657390b162"
 dependencies = [
  "html-escape",
  "itertools 0.10.5",
@@ -13324,7 +13320,6 @@ dependencies = [
 [[package]]
 name = "warp-workflows"
 version = "0.1.0"
-source = "git+https://github.com/warpdotdev/workflows?rev=793a98ddda6ef19682aed66364faebd2829f0e01#793a98ddda6ef19682aed66364faebd2829f0e01"
 dependencies = [
  "anyhow",
  "convert_case 0.4.0",
@@ -13338,7 +13333,6 @@ dependencies = [
 [[package]]
 name = "warp-workflows-types"
 version = "0.1.0"
-source = "git+https://github.com/warpdotdev/workflows?rev=793a98ddda6ef19682aed66364faebd2829f0e01#793a98ddda6ef19682aed66364faebd2829f0e01"
 dependencies = [
  "serde",
 ]

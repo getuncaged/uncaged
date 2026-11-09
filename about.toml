@@ -33,16 +33,14 @@ workarounds = [
     "rustls",
 ]
 
-# These are Warp's own private crates, sourced via git from the warpdotdev
-# organization. They are not part of this workspace and do not have explicit
-# licenses yet (they will be open-sourced soon). cargo-about will skip them
-# during generation. Once they are open-sourced and have license fields, they
-# will be included automatically and we can add --fail back to the generate
-# invocation.
-#
-# Excluded crates (same as deny.toml exceptions):
-#   - command-corrections
-#   - warp-command-signatures
-#   - warp-completion-metadata
-#   - warp-workflows
-#   - warp-workflows-types
+# Warp's crates vendored under third_party/ (see third_party/README.md) keep
+# their upstream `publish = false`, so `private.ignore` above skips them during
+# generation, as it did when they were git dependencies:
+#   - command-corrections (MIT)
+#   - warp-command-signatures (MIT)
+#   - warp-completion-metadata (MIT)
+#   - warp-workflows (Apache-2.0)
+#   - warp-workflows-types (Apache-2.0)
+# Their LICENSE files are appended instead through ADDITIONAL_LICENSES in
+# script/prepare_bundled_resources (and its Windows twin). mermaid_to_svg (MIT)
+# and its dagre_rust (Apache-2.0) are publishable, so cargo-about includes them.

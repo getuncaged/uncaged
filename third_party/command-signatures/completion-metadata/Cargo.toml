@@ -1,0 +1,15 @@
+[package]
+name = "warp-completion-metadata"
+version = "0.0.0"
+edition = "2021"
+authors = ["Warp Team <dev@warp.dev>"]
+publish = false
+license = "MIT"
+
+[dependencies]
+itertools = "0.10.0"
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
+serde_with = "2.0.1"
+log = "0.4"
+html-escape = "0.2.13"
