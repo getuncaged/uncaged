@@ -2,8 +2,6 @@ mod docker;
 
 #[cfg(target_family = "wasm")]
 pub mod browser_url_handler;
-#[cfg(target_family = "wasm")]
-pub mod web_intent_parser;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

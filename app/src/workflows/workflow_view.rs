@@ -73,8 +73,6 @@ use crate::ui_components::breadcrumb::{render_breadcrumbs, BreadcrumbState};
 use crate::ui_components::buttons::{accent_icon_button, icon_button};
 use crate::ui_components::dialog::{dialog_styles, Dialog};
 use crate::ui_components::icons::Icon;
-#[cfg(target_family = "wasm")]
-use crate::uri::web_intent_parser::open_url_on_desktop;
 use crate::util::bindings::CustomAction;
 use crate::view_components::{DismissibleToast, ToastType};
 use crate::workflows::workflow::{Argument, Workflow};
@@ -2692,14 +2690,8 @@ impl TypedActionView for WorkflowView {
             WorkflowAction::RunWorkflow => self.copy_to_command_line(ctx),
             WorkflowAction::CopyContent => self.copy_content(ctx),
             WorkflowAction::Duplicate => self.duplicate_object(ctx),
-            #[cfg(target_family = "wasm")]
-            WorkflowAction::OpenLinkOnDesktop(url) => {
-                open_url_on_desktop(url);
-            }
-            #[cfg(not(target_family = "wasm"))]
-            WorkflowAction::OpenLinkOnDesktop(_) => {
-                // No-op when not on wasm
-            }
+            // Uncaged has no web app to hand a link over from, so this does nothing.
+            WorkflowAction::OpenLinkOnDesktop(_) => {}
             WorkflowAction::Trash => self.trash_object(ctx),
             WorkflowAction::Untrash => self.untrash_object(ctx),
             WorkflowAction::CloseEnumDialog => self.hide_enum_creation_dialog(ctx),

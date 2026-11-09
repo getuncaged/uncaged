@@ -65,8 +65,6 @@ use crate::ui_components::blended_colors;
 use crate::ui_components::buttons::{highlight, icon_button};
 use crate::ui_components::icons::{Icon, ICON_DIMENSIONS};
 use crate::ui_components::menu_button::{icon_button_with_context_menu, MenuDirection};
-#[cfg(target_family = "wasm")]
-use crate::uri::web_intent_parser::open_url_on_desktop;
 use crate::util::color::coloru_with_opacity;
 use crate::workflows::{CloudWorkflow, WorkflowViewMode};
 use crate::workspace::active_terminal_in_window;
@@ -3968,14 +3966,8 @@ impl TypedActionView for DriveIndex {
                     }
                 }
             }
-            #[cfg(target_family = "wasm")]
-            DriveIndexAction::OpenObjectLinkOnDesktop(url) => {
-                open_url_on_desktop(url);
-            }
-            #[cfg(not(target_family = "wasm"))]
-            DriveIndexAction::OpenObjectLinkOnDesktop(_) => {
-                // No-op when not on wasm
-            }
+            // Uncaged has no web app to hand a link over from, so this does nothing.
+            DriveIndexAction::OpenObjectLinkOnDesktop(_) => {}
             DriveIndexAction::InvokeEnvVarCollectionInSubshell(id) => {
                 ctx.emit(DriveIndexEvent::InvokeEnvVarCollectionInSubshell(*id))
             }

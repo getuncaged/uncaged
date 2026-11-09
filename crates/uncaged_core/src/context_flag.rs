@@ -34,10 +34,6 @@ pub enum ContextFlag {
 static FLAG_STATES: [AtomicBool; cardinality::<ContextFlag>()] =
     [const { AtomicBool::new(true) }; { cardinality::<ContextFlag>() }];
 
-fn disable_flag(flag: ContextFlag) {
-    FLAG_STATES[flag as usize].store(false, Ordering::Relaxed);
-}
-
 impl ContextFlag {
     pub fn is_enabled(&self) -> bool {
         FLAG_STATES[*self as usize].load(Ordering::Relaxed)
@@ -52,59 +48,6 @@ impl ContextFlag {
         }
 
         FLAG_STATES[*self as usize].store(value, Ordering::Relaxed);
-    }
-
-    pub fn set_warp_home_link_only() {
-        disable_flag(Self::ForceSidePanelOpen);
-        disable_flag(Self::HideOpenOnDesktopButton);
-        disable_flag(Self::RunWorkflow);
-        disable_flag(Self::CreateNewSession);
-        disable_flag(Self::CloseWindow);
-        disable_flag(Self::PromptForVersionUpdates);
-        disable_flag(Self::WarpEssentials);
-        disable_flag(Self::NetworkLogConsole);
-        disable_flag(Self::ShowMCPServers);
-    }
-
-    pub fn set_settings_link_only() {
-        disable_flag(Self::ForceSidePanelOpen);
-        disable_flag(Self::HideOpenOnDesktopButton);
-        disable_flag(Self::RunWorkflow);
-        disable_flag(Self::CreateNewSession);
-        disable_flag(Self::CloseWindow);
-        disable_flag(Self::PromptForVersionUpdates);
-        disable_flag(Self::WarpEssentials);
-        disable_flag(Self::NetworkLogConsole);
-        disable_flag(Self::AllowSettingsModalToClose);
-        disable_flag(Self::ShowSlowShellStartupBanner);
-        disable_flag(Self::DynamicBrowserUrl);
-        disable_flag(Self::ShowMCPServers);
-    }
-
-    pub fn set_warp_drive_link_only() {
-        disable_flag(Self::ForceSidePanelOpen);
-        disable_flag(Self::HideOpenOnDesktopButton);
-        disable_flag(Self::RunWorkflow);
-        disable_flag(Self::CreateNewSession);
-        disable_flag(Self::CloseWindow);
-        disable_flag(Self::PromptForVersionUpdates);
-        disable_flag(Self::WarpEssentials);
-        disable_flag(Self::NetworkLogConsole);
-        disable_flag(Self::ShowMCPServers);
-    }
-
-    // ContextFlag flag sets:
-    pub fn set_conversation_only() {
-        disable_flag(Self::CreateNewSession);
-        disable_flag(Self::CloseWindow);
-        disable_flag(Self::ForceSidePanelOpen);
-        disable_flag(Self::HideOpenOnDesktopButton);
-        disable_flag(Self::PromptForVersionUpdates);
-        disable_flag(Self::NetworkLogConsole);
-        disable_flag(Self::LaunchConfigurations);
-        disable_flag(Self::WarpEssentials);
-        disable_flag(Self::ShowMCPServers);
-        disable_flag(Self::RunWorkflow);
     }
 }
 

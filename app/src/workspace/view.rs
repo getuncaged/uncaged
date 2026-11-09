@@ -18783,9 +18783,10 @@ impl Workspace {
         });
     }
 
-    /// Opens a given URL in the desktop Warp app if installed, or redirects to download page.
+    /// Redirects to the download page when the desktop app isn't detected. There is no web app
+    /// to hand the link over from, so an installed app is left alone.
     #[cfg(target_family = "wasm")]
-    fn open_link_on_desktop(&mut self, url: &Url, ctx: &mut ViewContext<Self>) {
+    fn open_link_on_desktop(&mut self, ctx: &mut ViewContext<Self>) {
         use crate::settings::app_installation_detection::{
             UserAppInstallDetectionSettings, UserAppInstallStatus,
         };
@@ -18812,11 +18813,7 @@ impl Workspace {
             self.toast_stack.update(ctx, |toast_stack, ctx| {
                 toast_stack.add_persistent_toast(DismissibleToast::default(toast_message), ctx)
             });
-            // Still try to open the url on desktop below
         }
-
-        // Open the URL on desktop. This does nothing if the app isn't installed.
-        crate::uri::web_intent_parser::open_url_on_desktop(url);
     }
 }
 
@@ -19372,7 +19369,7 @@ impl TypedActionView for Workspace {
             }
             OpenLink(link) => ctx.open_url(link),
             #[cfg(target_family = "wasm")]
-            OpenLinkOnDesktop(url) => self.open_link_on_desktop(url, ctx),
+            OpenLinkOnDesktop(_) => self.open_link_on_desktop(ctx),
             DumpDebugInfo => self.dump_debug_info(ctx),
             LogReviewCommentSendStatusForActiveTab => {
                 self.right_panel_view.update(ctx, |right_panel_view, ctx| {

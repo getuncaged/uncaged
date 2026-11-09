@@ -73,8 +73,6 @@ use crate::settings::{
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
 use crate::throttle::throttle;
 use crate::ui_components::icons;
-#[cfg(target_family = "wasm")]
-use crate::uri::web_intent_parser::open_url_on_desktop;
 use crate::util::bindings::{self, CustomAction};
 use crate::view_components::{DismissibleToast, ToastType};
 use crate::workflows::{WorkflowSource, WorkflowType};
@@ -1735,14 +1733,8 @@ impl TypedActionView for NotebookView {
                 cloud_object_type_and_id,
                 new_space,
             } => self.move_to_team_owner(*cloud_object_type_and_id, *new_space, ctx),
-            #[cfg(target_family = "wasm")]
-            NotebookAction::OpenLinkOnDesktop(url) => {
-                open_url_on_desktop(url);
-            }
-            #[cfg(not(target_family = "wasm"))]
-            NotebookAction::OpenLinkOnDesktop(_) => {
-                // No-op when not on wasm
-            }
+            // Uncaged has no web app to hand a link over from, so this does nothing.
+            NotebookAction::OpenLinkOnDesktop(_) => {}
             NotebookAction::Export => self.export(ctx),
             NotebookAction::AttachPlanAsContext(id) => {
                 ctx.emit(NotebookEvent::AttachPlanAsContext(*id))
