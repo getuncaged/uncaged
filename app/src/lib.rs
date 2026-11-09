@@ -50,8 +50,6 @@ mod notification;
 mod palette;
 mod persistence;
 mod platform;
-#[cfg(feature = "plugin_host")]
-mod plugin;
 mod prefix;
 #[cfg(target_os = "macos")]
 mod preview_config_migration;
@@ -177,8 +175,6 @@ use interval_timer::{mark_startup_sub_interval, IntervalTimer};
 use itertools::Itertools;
 #[cfg(feature = "integration_tests")]
 pub use persistence::testing as sqlite_testing;
-#[cfg(feature = "plugin_host")]
-pub use plugin::{run_plugin_host, PLUGIN_HOST_FLAG};
 use server::network_logging::NetworkLogModel;
 use server::shared_http_client::SharedHttpClient;
 use settings::{ExtraMetaKeys, PrivacySettings};
@@ -409,10 +405,6 @@ pub fn run() -> Result<()> {
                 crate::terminal::local_tty::server::run_terminal_server(args);
                 return Ok(());
             }
-            #[cfg(feature = "plugin_host")]
-            uncaged_cli::Command::Worker(uncaged_cli::WorkerCommand::PluginHost { .. }) => {
-                return crate::run_plugin_host();
-            }
             #[cfg(not(target_family = "wasm"))]
             uncaged_cli::Command::Worker(uncaged_cli::WorkerCommand::RipgrepSearch {
                 parent,
@@ -431,11 +423,7 @@ pub fn run() -> Result<()> {
                 .map_err(|err| anyhow!(err.to_string()))?;
                 return Ok(());
             }
-            #[cfg(not(any(
-                feature = "local_tty",
-                feature = "plugin_host",
-                not(target_family = "wasm")
-            )))]
+            #[cfg(not(any(feature = "local_tty", not(target_family = "wasm"))))]
             uncaged_cli::Command::Worker(worker) => {
                 // Need this case to handle platforms where there are no enum variants in
                 // uncaged_cli::WorkerCommand, as we still need to check Command::Worker.
@@ -730,10 +718,6 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         #[cfg(enable_crash_recovery)]
         ctx.add_singleton_model(move |_ctx| crash_recovery);
 
-        #[cfg(feature = "plugin_host")]
-        ctx.add_singleton_model(move |ctx| {
-            plugin::PluginHost::new(ctx).expect("Could not instantiate PluginHost")
-        });
         mark_startup_sub_interval("early_singletons");
         let app_state = initialize_app(timer, startup_toml_parse_error, ctx);
 

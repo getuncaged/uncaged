@@ -203,7 +203,6 @@ uncaged_assets.workspace = true
 uncaged_completer.workspace = true
 uncaged_core.workspace = true
 uncaged_editor.workspace = true
-uncaged_js = { workspace = true, optional = true }
 uncaged_search_core.workspace = true
 uncaged_util.workspace = true
 uncaged_ui = { workspace = true, features = ["schema_gen", "settings_value"] }
@@ -280,7 +279,6 @@ tokio.workspace = true
 tokio-util.workspace = true
 
 notify-debouncer-full.workspace = true
-rquickjs = { workspace = true, optional = true }
 rustls.workspace = true
 syntect = "5.0"
 sysinfo.workspace = true
@@ -699,7 +697,6 @@ read_image_files = []
 # This feature enables plugin support in Warp. Note that its typically checked
 # directly, rather than via the `FeatureFlag` enum, because its value is
 # required early in the app lifecycle prior to `FeatureFlag` initialization.
-plugin_host = ["dep:rquickjs", "dep:uncaged_js", "uncaged_cli/plugin_host"]
 # Enable this feature to automatically perform CPU profiling via pprof.  The
 # generated profile will be written to profile.pb in the current directory.
 # NOTE: This may slow down program execution.

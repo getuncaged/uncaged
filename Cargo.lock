@@ -9512,33 +9512,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rquickjs"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db7788c2818f4546daabe9ae2d1ee2f4db61ab1998d4b483494c4193cc38dab"
-dependencies = [
- "rquickjs-core",
-]
-
-[[package]]
-name = "rquickjs-core"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b12cf8646fe0af5bcff2822ccd162990f0679a1f9287c7257f4f4193a9d31ea9"
-dependencies = [
- "rquickjs-sys",
-]
-
-[[package]]
-name = "rquickjs-sys"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b747058afd4d988d056e4972ec8516a5a86fdfc103c1c1485bfee8966a0743ae"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "rstar"
 version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12101,7 +12074,6 @@ dependencies = [
  "repo_metadata",
  "reqwest",
  "rmcp",
- "rquickjs",
  "rust-embed 8.7.2",
  "rustls",
  "schemars",
@@ -12159,7 +12131,6 @@ dependencies = [
  "uncaged_engine",
  "uncaged_files",
  "uncaged_isolation_platform",
- "uncaged_js",
  "uncaged_logging",
  "uncaged_ripgrep",
  "uncaged_search_core",
@@ -12431,18 +12402,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.17",
  "uncaged_core",
-]
-
-[[package]]
-name = "uncaged_js"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "cfg-if",
- "rquickjs",
- "serde",
- "thiserror 2.0.17",
- "uuid",
 ]
 
 [[package]]
