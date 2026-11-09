@@ -1,14 +1,12 @@
 name: Feature Request
-description: "Have a great new idea? Please search through our existing feature requests, and upvote it if it's already exists."
+description: "Have an idea? Search the existing feature requests first, and upvote it if it is already there."
 labels: ["enhancement"]
 body:
   - type: checkboxes
     attributes:
       label: "Pre-submit Checks"
       options:
-        - label: "I have [searched Warp feature requests](https://github.com/warpdotdev/warp/issues?q=is%3Aissue+label%3Aenhancement) and there are no duplicates"
-          required: true
-        - label: "I have [searched Warp docs](https://docs.warp.dev) and my feature is not there"
+        - label: "I have [searched Uncaged feature requests](https://github.com/getuncaged/uncaged/issues?q=is%3Aissue+label%3Aenhancement) and there are no duplicates"
           required: true
   - type: textarea
     id: "describe-solution"
@@ -58,12 +56,3 @@ body:
         - "5 (Can't work without it!)"
     validations:
       required: true
-  - type: dropdown
-    id: "linear-label-feature"
-    attributes:
-      label: "Warp Internal (ignore) - linear-label:39cc6478-1249-4ee7-950b-c428edfeecd1"
-      multiple: false
-      options:
-        - Ignore
-    validations:
-      required: false

@@ -123,7 +123,7 @@ cargo run                                         # builds & launches Uncaged
 ```
 
 Requires the toolchain pinned in `rust-toolchain.toml` (1.92.0). You do **not**
-need `./script/bootstrap` (it installs Docker/gcloud/PowerShell you won't need).
+need `./script/bootstrap` (it installs Docker/PowerShell you won't need).
 
 ## Licensing, trademark & attribution
 
