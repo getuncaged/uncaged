@@ -75,6 +75,18 @@ that needed Warp's GCP SSH VMs are gone. The CLI-agent plugin installer (the too
 "Enable notifications" / setup-instructions / update chips, which installed Warp's
 `claude-code-warp`, `codex-warp` and `gemini-cli-warp` plugins, plus the Oz platform-plugin
 checks) is gone too; sessions still pick up OSC 777 events from any plugin the user installs.
+Launch-at-login is gone, and a one-time cleanup removes the login item older builds added.
+
+Warp's GitHub (2026-11-09): the build no longer fetches anything from `github.com/warpdotdev`.
+Crates where Warp's patches matter are vendored at their pinned revs under `third_party/`
+(excluded from the workspace; origins and local changes in `third_party/README.md`): Warp's own
+command-corrections, command-signatures, workflows (codegen now writes to `OUT_DIR`, crates.io
+`uneval`) and mermaid_to_svg, plus the winit, font-kit, dwrote, cosmic-text, vte, notify and
+yaml-rust forks. jemallocator, difflib, pathfinder_simd and objc are back on crates.io, and the
+unused email_address is gone. The dev scripts no longer download and run Warp's common-skills
+installer or ask for a gcloud login, the issue templates point at Uncaged's own issues, and the
+shell bootstrap lost Warp's apt-repo repair helper. The only git dependency left is servo's
+core-foundation-rs (an upstream fix not yet released).
 
 Still open:
 - About 86 dead-code warnings (`cargo check -p uncaged --bin uncaged` without `-A dead_code`).
