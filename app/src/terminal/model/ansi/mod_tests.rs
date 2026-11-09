@@ -694,6 +694,42 @@ fn parse_dcs_command_finished() {
     };
 }
 
+/// Shells bootstrapped by older builds could still send Warp's `FinishUpdate` hook. It is no
+/// longer a known hook, so it must be dropped without dispatching anything, and the hooks that
+/// follow it must still parse.
+#[test]
+fn parse_dcs_retired_finish_update_hook_is_ignored() {
+    let bytes = [
+        hex_encoded_dcs_string(
+            r#"{
+                "hook": "FinishUpdate",
+                "value": {
+                    "update_id": "update-id",
+                    "session_id": 167303092612201
+                }
+            }"#,
+        ),
+        hex_encoded_dcs_string(
+            r#"{
+                "hook": "CommandFinished",
+                "value": {
+                    "exit_code": 0,
+                    "next_block_id": "block_id",
+                    "session_id": 167303092612201
+                }
+            }"#,
+        ),
+    ]
+    .concat();
+    let (_, handler) = parse_bytes(&bytes);
+
+    assert_eq!(handler.d_proto_hooks.len(), 1);
+    assert!(matches!(
+        handler.d_proto_hooks.first(),
+        Some(DProtoHook::CommandFinished { .. })
+    ));
+}
+
 #[test]
 fn parse_dcs_bootstrapped() {
     let bytes = hex_encoded_dcs_string(
