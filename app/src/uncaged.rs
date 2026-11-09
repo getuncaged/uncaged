@@ -21,8 +21,6 @@ pub struct PresetView {
     pub wire: String,
     pub needs_key: bool,
     pub local: bool,
-    pub key_url: String,
-    pub note: Option<String>,
 }
 
 /// A gallery section grouping presets that connect the same way.
@@ -30,8 +28,6 @@ pub struct PresetView {
 pub struct CatalogSection {
     pub title: String,
     pub subtitle: String,
-    /// The badge shown on every card in this section ("Your login" / …).
-    pub pill: String,
     pub presets: Vec<PresetView>,
 }
 
@@ -60,16 +56,12 @@ pub struct ConnectionView {
     /// The effort levels this connection's wire accepts, as `(value, label)`. Empty for a CLI
     /// agent, which picks its own.
     pub effort_levels: Vec<(String, String)>,
-    /// Whether a key is stored (never the key itself).
-    pub has_key: bool,
     pub needs_key: bool,
     pub local: bool,
     /// "Ready" | "Needs key" | "Incomplete".
     pub status: String,
     pub usable: bool,
     pub is_active: bool,
-    pub note: Option<String>,
-    pub key_url: String,
 }
 
 // ── provider branding ───────────────────────────────────────────────────────
@@ -190,8 +182,6 @@ mod imp {
             wire: wire_str(p.wire).to_string(),
             needs_key: p.needs_key,
             local: p.local,
-            key_url: p.key_url.to_string(),
-            note: p.note.map(str::to_string),
         }
     }
 
@@ -202,7 +192,6 @@ mod imp {
             .map(|g| CatalogSection {
                 title: g.title().to_string(),
                 subtitle: g.subtitle().to_string(),
-                pill: g.pill().to_string(),
                 presets: uncaged_engine::presets_in(*g).map(preset_view).collect(),
             })
             .collect()
@@ -268,18 +257,11 @@ mod imp {
                 .iter()
                 .map(|&effort| (effort_value(effort), effort.label().to_string()))
                 .collect(),
-            has_key: c
-                .api_key
-                .as_deref()
-                .map(|k| !k.trim().is_empty())
-                .unwrap_or(false),
             needs_key: c.needs_key,
             local: c.local,
             status: c.status().to_string(),
             usable: c.usable(),
             is_active: active_id == Some(c.id.as_str()),
-            note: preset.note.map(str::to_string),
-            key_url: preset.key_url.to_string(),
         }
     }
 

@@ -164,159 +164,6 @@ fn get_skills_for_working_directory_scopes_subdirectory_skills() {
 }
 
 #[test]
-fn remote_home_provider_variants_are_available_for_provider_selection() {
-    let host_id = HostId::new("remote-host".to_string());
-    let agents_skill = make_remote_home_skill(&host_id, "deploy", "shared content");
-    let claude_skill = ParsedSkill {
-        path: remote_test_path(&host_id, "/home/user/.claude/skills/deploy/SKILL.md"),
-        provider: SkillProvider::Claude,
-        ..agents_skill.clone()
-    };
-
-    App::test((), |mut app| async move {
-        app.add_singleton_model(DirectoryWatcher::new);
-        app.add_singleton_model(AISettings::new_with_defaults);
-        app.add_singleton_model(|_| DetectedRepositories::default());
-        app.add_singleton_model(RepoMetadataModel::new);
-        app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
-        let handle = app.add_singleton_model(SkillManager::new);
-
-        handle.update(&mut app, |manager, _| {
-            manager.set_remote_home_skills(
-                host_id.clone(),
-                remote_test_path(&host_id, "/home/user"),
-                vec![agents_skill, claude_skill],
-            );
-        });
-        let descriptor = handle
-            .read(&app, |manager, ctx| {
-                manager.get_skills_for_working_directory_with_origin(
-                    None,
-                    &SkillPathOrigin::Remote {
-                        host_id: host_id.clone(),
-                    },
-                    ctx,
-                )
-            })
-            .into_iter()
-            .find(|skill| skill.name == "deploy")
-            .unwrap();
-
-        assert_eq!(descriptor.provider, SkillProvider::Agents);
-        assert!(handle.read(&app, |manager, _| manager
-            .skill_exists_for_any_provider(&descriptor, &[SkillProvider::Claude])));
-        assert_eq!(
-            handle.read(&app, |manager, _| manager
-                .best_supported_provider(&descriptor, &[SkillProvider::Claude])),
-            SkillProvider::Claude
-        );
-    });
-}
-
-#[test]
-fn remote_home_provider_variants_are_scoped_to_the_descriptor_host() {
-    let first_host = HostId::new("first-host".to_string());
-    let second_host = HostId::new("second-host".to_string());
-    let first_skill = make_remote_home_skill(&first_host, "deploy", "shared content");
-    let second_skill = ParsedSkill {
-        path: remote_test_path(&second_host, "/home/user/.claude/skills/deploy/SKILL.md"),
-        provider: SkillProvider::Claude,
-        ..make_remote_home_skill(&second_host, "deploy", "shared content")
-    };
-
-    App::test((), |mut app| async move {
-        app.add_singleton_model(DirectoryWatcher::new);
-        app.add_singleton_model(AISettings::new_with_defaults);
-        app.add_singleton_model(|_| DetectedRepositories::default());
-        app.add_singleton_model(RepoMetadataModel::new);
-        app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
-        let handle = app.add_singleton_model(SkillManager::new);
-
-        handle.update(&mut app, |manager, _| {
-            manager.set_remote_home_skills(
-                first_host.clone(),
-                remote_test_path(&first_host, "/home/user"),
-                vec![first_skill],
-            );
-            manager.set_remote_home_skills(
-                second_host.clone(),
-                remote_test_path(&second_host, "/home/user"),
-                vec![second_skill],
-            );
-        });
-        let descriptor = handle
-            .read(&app, |manager, ctx| {
-                manager.get_skills_for_working_directory_with_origin(
-                    None,
-                    &SkillPathOrigin::Remote {
-                        host_id: first_host,
-                    },
-                    ctx,
-                )
-            })
-            .into_iter()
-            .find(|skill| skill.name == "deploy")
-            .unwrap();
-
-        assert!(!handle.read(&app, |manager, _| manager
-            .skill_exists_for_any_provider(&descriptor, &[SkillProvider::Claude])));
-        assert_eq!(
-            handle.read(&app, |manager, _| manager
-                .best_supported_provider(&descriptor, &[SkillProvider::Claude])),
-            SkillProvider::Agents
-        );
-    });
-}
-
-#[test]
-fn remote_home_skill_replaces_an_overlapping_index_entry() {
-    let host_id = HostId::new("remote-host".to_string());
-    let home_dir = remote_test_path(&host_id, "/home/user");
-    let working_directory = home_dir.join("repo");
-    let home_skill = make_remote_home_skill(&host_id, "deploy", "shared content");
-    let project_skill = ParsedSkill {
-        scope: SkillScope::Project,
-        ..home_skill.clone()
-    };
-
-    App::test((), |mut app| async move {
-        app.add_singleton_model(DirectoryWatcher::new);
-        app.add_singleton_model(AISettings::new_with_defaults);
-        app.add_singleton_model(|_| DetectedRepositories::default());
-        app.add_singleton_model(RepoMetadataModel::new);
-        app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
-        let handle = app.add_singleton_model(SkillManager::new);
-
-        handle.update(&mut app, |manager, _| {
-            manager
-                .directory_skills
-                .entry(home_dir.clone())
-                .or_default()
-                .insert(project_skill.path.clone());
-            manager
-                .skills_by_path
-                .insert(project_skill.path.clone(), project_skill);
-            manager.set_remote_home_skills(host_id, home_dir, vec![home_skill]);
-        });
-
-        let descriptors = handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory(Some(&working_directory), ctx)
-        });
-        assert_eq!(
-            descriptors
-                .iter()
-                .filter(|skill| skill.name == "deploy")
-                .count(),
-            1,
-            "the indexed remote home skill should be listed once"
-        );
-    });
-}
-
-#[test]
 fn get_skills_for_working_directory_name_collision_returns_both() {
     // When the same skill name exists at root and subdirectory, both should be returned.
     // The caller (agent) is responsible for precedence based on path proximity.
@@ -417,113 +264,6 @@ fn get_skills_for_working_directory_name_collision_returns_both() {
             "Only root deploy should be visible from repo root"
         );
         assert_eq!(deploy_skills[0].description, "Root deploy");
-    });
-}
-
-#[test]
-fn cloud_environment_skills_always_included() {
-    // In a cloud environment, all skills should be in scope regardless of
-    // the working directory—even when cwd is inside a different repo or
-    // when working_directory is None.
-
-    let temp = TempDir::new().unwrap();
-    let base = dunce::canonicalize(temp.path()).unwrap();
-    let repo_a = base.join("repo-a");
-    let repo_b = base.join("repo-b");
-    fs::create_dir_all(&repo_a).unwrap();
-    fs::create_dir_all(&repo_b).unwrap();
-
-    let skill_a_path = LocalOrRemotePath::Local(repo_a.join(".agents/skills/build/SKILL.md"));
-    let skill_b_path = LocalOrRemotePath::Local(repo_b.join(".agents/skills/deploy/SKILL.md"));
-
-    let skill_a = ParsedSkill {
-        name: "build".to_string(),
-        description: "Repo A skill".to_string(),
-        path: skill_a_path.clone(),
-        content: "# Build".to_string(),
-        line_range: None,
-        provider: SkillProvider::Agents,
-        scope: SkillScope::Project,
-    };
-
-    let skill_b = ParsedSkill {
-        name: "deploy".to_string(),
-        description: "Repo B skill".to_string(),
-        path: skill_b_path.clone(),
-        content: "# Deploy".to_string(),
-        line_range: None,
-        provider: SkillProvider::Agents,
-        scope: SkillScope::Project,
-    };
-
-    let mut directory_skills: HashMap<LocalOrRemotePath, HashSet<LocalOrRemotePath>> =
-        HashMap::new();
-    directory_skills
-        .entry(LocalOrRemotePath::Local(repo_a.clone()))
-        .or_default()
-        .insert(skill_a_path.clone());
-    directory_skills
-        .entry(LocalOrRemotePath::Local(repo_b.clone()))
-        .or_default()
-        .insert(skill_b_path.clone());
-
-    let mut skills_by_path: HashMap<LocalOrRemotePath, ParsedSkill> = HashMap::new();
-    skills_by_path.insert(skill_a_path.clone(), skill_a);
-    skills_by_path.insert(skill_b_path.clone(), skill_b);
-
-    App::test((), |mut app| async move {
-        app.add_singleton_model(DirectoryWatcher::new);
-        app.add_singleton_model(AISettings::new_with_defaults);
-        let repo_handle = app.add_singleton_model(|_| DetectedRepositories::default());
-        app.add_singleton_model(RepoMetadataModel::new);
-        app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
-        let skill_manager_handle = app.add_singleton_model(SkillManager::new);
-
-        let canonical_repo_a =
-            uncaged_util::standardized_path::StandardizedPath::from_local_canonicalized(&repo_a)
-                .unwrap();
-        repo_handle.update(&mut app, |repos, _ctx| {
-            repos.insert_test_repo_root(canonical_repo_a);
-        });
-
-        skill_manager_handle.update(&mut app, |manager, _ctx| {
-            manager.directory_skills = directory_skills;
-            manager.skills_by_path = skills_by_path;
-            manager.is_cloud_environment = true;
-        });
-
-        // From inside repo_a, both repo_a and repo_b skills are visible
-        // because is_cloud_environment skips the ancestor filter.
-        let skills = skill_manager_handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory(
-                Some(&LocalOrRemotePath::Local(repo_a.clone())),
-                ctx,
-            )
-        });
-        let names: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
-        assert!(
-            names.contains(&"build"),
-            "Repo A skill should be visible from repo A"
-        );
-        assert!(
-            names.contains(&"deploy"),
-            "Repo B skill should be visible from repo A in cloud environment"
-        );
-
-        // With no working directory, all skills are still included.
-        let skills_none = skill_manager_handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory(None, ctx)
-        });
-        let names_none: Vec<&str> = skills_none.iter().map(|s| s.name.as_str()).collect();
-        assert!(
-            names_none.contains(&"build"),
-            "Repo A skill should be visible even without a working directory"
-        );
-        assert!(
-            names_none.contains(&"deploy"),
-            "Repo B skill should be visible even without a working directory"
-        );
     });
 }
 
@@ -745,28 +485,6 @@ fn bundled_test_skill(id: &str, description: &str) -> ParsedSkill {
     }
 }
 
-fn remote_test_path(host_id: &HostId, path: &str) -> LocalOrRemotePath {
-    LocalOrRemotePath::Remote(RemotePath::new(
-        host_id.clone(),
-        StandardizedPath::try_new(path).unwrap(),
-    ))
-}
-
-fn make_remote_home_skill(host_id: &HostId, name: &str, content: &str) -> ParsedSkill {
-    ParsedSkill {
-        name: name.to_string(),
-        description: format!("{name} remote home skill"),
-        path: remote_test_path(
-            host_id,
-            format!("/home/user/.agents/skills/{name}/SKILL.md").as_str(),
-        ),
-        content: content.to_string(),
-        line_range: None,
-        provider: SkillProvider::Agents,
-        scope: SkillScope::Home,
-    }
-}
-
 fn make_remote_skill(host_id: &HostId, name: &str) -> ParsedSkill {
     ParsedSkill {
         name: name.to_string(),
@@ -781,236 +499,6 @@ fn make_remote_skill(host_id: &HostId, name: &str) -> ParsedSkill {
         provider: SkillProvider::Agents,
         scope: SkillScope::Project,
     }
-}
-
-#[test]
-fn get_skills_for_working_directory_respects_location() {
-    let same_host_id = HostId::new("same-host".to_string());
-    let other_host_id = HostId::new("other-host".to_string());
-    let home_dir = LocalOrRemotePath::Local(dirs::home_dir().unwrap());
-    let local_project_dir =
-        LocalOrRemotePath::Local(std::env::temp_dir().join("skill-path-scope-project"));
-    let same_host_dir = LocalOrRemotePath::Remote(RemotePath::new(
-        same_host_id.clone(),
-        StandardizedPath::try_new("/repo").unwrap(),
-    ));
-    let other_host_dir = LocalOrRemotePath::Remote(RemotePath::new(
-        other_host_id.clone(),
-        StandardizedPath::try_new("/repo").unwrap(),
-    ));
-
-    let local_home_skill = ParsedSkill {
-        name: "local-home".to_string(),
-        description: "local home skill".to_string(),
-        path: home_dir.join(".agents/skills/local-home/SKILL.md"),
-        content: "# local-home".to_string(),
-        line_range: None,
-        provider: SkillProvider::Agents,
-        scope: SkillScope::Home,
-    };
-    let local_project_skill = ParsedSkill {
-        name: "local-project".to_string(),
-        description: "local project skill".to_string(),
-        path: local_project_dir.join(".agents/skills/local-project/SKILL.md"),
-        content: "# local-project".to_string(),
-        line_range: None,
-        provider: SkillProvider::Agents,
-        scope: SkillScope::Project,
-    };
-    let same_host_skill = make_remote_skill(&same_host_id, "same-host-project");
-    let other_host_skill = make_remote_skill(&other_host_id, "other-host-project");
-    let bundled_skill = bundled_test_skill("bundled", "bundled skill");
-    // A bundled skill from the remote host's daemon-pushed catalog.
-    let remote_bundled_skill = ParsedSkill {
-        name: "remote-bundled".to_string(),
-        description: "remote bundled skill".to_string(),
-        path: LocalOrRemotePath::Remote(RemotePath::new(
-            same_host_id.clone(),
-            StandardizedPath::try_new(
-                "/home/user/.warp/remote-server/bundled_resources/bundled/skills/remote-bundled/SKILL.md",
-            )
-            .unwrap(),
-        )),
-        content: "# remote-bundled".to_string(),
-        line_range: None,
-        provider: SkillProvider::Warp,
-        scope: SkillScope::Bundled,
-    };
-
-    let remote_bundled_path = remote_bundled_skill.path.clone();
-
-    let mut directory_skills = HashMap::new();
-    let mut skills_by_path = HashMap::new();
-    for (dir, skill) in [
-        (home_dir, local_home_skill),
-        (local_project_dir.clone(), local_project_skill),
-        (same_host_dir.clone(), same_host_skill),
-        (other_host_dir.clone(), other_host_skill),
-    ] {
-        directory_skills
-            .entry(dir)
-            .or_insert_with(HashSet::new)
-            .insert(skill.path.clone());
-        skills_by_path.insert(skill.path.clone(), skill);
-    }
-
-    App::test((), |mut app| async move {
-        app.add_singleton_model(DirectoryWatcher::new);
-        app.add_singleton_model(AISettings::new_with_defaults);
-        app.add_singleton_model(|_| DetectedRepositories::default());
-        app.add_singleton_model(RepoMetadataModel::new);
-        app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
-        let handle = app.add_singleton_model(SkillManager::new);
-        let _bundled_skills = FeatureFlag::BundledSkills.override_enabled(true);
-
-        handle.update(&mut app, |manager, _| {
-            manager.directory_skills = directory_skills;
-            manager.skills_by_path = skills_by_path;
-            manager.add_bundled_skill_for_testing(
-                "bundled",
-                bundled_skill,
-                BundledSkillActivation::Always,
-            );
-            manager.set_remote_bundled_skill(
-                same_host_id.clone(),
-                BundledSkill::from_definitions([(
-                    "remote-bundled".to_string(),
-                    remote_bundled_skill,
-                    BundledSkillActivation::Always,
-                )]),
-            );
-        });
-
-        // A remote working directory sees the remote host's bundled catalog,
-        // never the local client's.
-        let remote_skills = handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory(Some(&same_host_dir), ctx)
-        });
-        let remote_names: HashSet<_> = remote_skills
-            .iter()
-            .map(|skill| skill.name.as_str())
-            .collect();
-        assert!(remote_names.contains("same-host-project"));
-        assert!(remote_names.contains("remote-bundled"));
-        assert!(!remote_names.contains("bundled"));
-        assert!(!remote_names.contains("local-home"));
-        assert!(!remote_names.contains("local-project"));
-        assert!(!remote_names.contains("other-host-project"));
-        let other_remote_skills = handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory(Some(&other_host_dir), ctx)
-        });
-        let other_remote_names: HashSet<_> = other_remote_skills
-            .iter()
-            .map(|skill| skill.name.as_str())
-            .collect();
-        assert!(other_remote_names.contains("other-host-project"));
-        assert!(!other_remote_names.contains("bundled"));
-
-        // Remote catalog descriptors are path-referenced, and that reference
-        // resolves back to the remote host's catalog entry. A
-        // `BundledSkillId` reference would resolve against the local catalog
-        // and serve the wrong content.
-        let remote_bundled_descriptor = remote_skills
-            .iter()
-            .find(|skill| skill.name == "remote-bundled")
-            .unwrap();
-        assert_eq!(
-            remote_bundled_descriptor.reference,
-            SkillReference::Path(remote_bundled_path.clone())
-        );
-        // Path-referenced remote bundled descriptors keep their bundled scope:
-        // filters that hide non-invokable bundled skills (e.g. the `/open-skill`
-        // selector) key off the scope, not the reference variant.
-        assert_eq!(remote_bundled_descriptor.scope, SkillScope::Bundled);
-        let resolved_content = handle.read(&app, |manager, ctx| {
-            manager
-                .active_skill_by_reference_with_origin(
-                    &remote_bundled_descriptor.reference,
-                    &SkillPathOrigin::Remote {
-                        host_id: same_host_id.clone(),
-                    },
-                    ctx,
-                )
-                .map(|skill| skill.content.clone())
-        });
-        assert_eq!(resolved_content, Ok("# remote-bundled".to_string()));
-        let wrong_origin_content = handle.read(&app, |manager, ctx| {
-            manager
-                .active_skill_by_reference_with_origin(
-                    &remote_bundled_descriptor.reference,
-                    &SkillPathOrigin::Local,
-                    ctx,
-                )
-                .map(|skill| skill.content.clone())
-        });
-        assert!(matches!(
-            wrong_origin_content,
-            Err(ActiveSkillLookupError::NotFound { .. })
-        ));
-
-        let local_skills_without_cwd = handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory(None, ctx)
-        });
-        let local_names_without_cwd: HashSet<_> = local_skills_without_cwd
-            .iter()
-            .map(|skill| skill.name.as_str())
-            .collect();
-        assert_eq!(
-            local_names_without_cwd,
-            HashSet::from(["local-home", "bundled"])
-        );
-        let unavailable_remote_skills = handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory_with_origin(
-                None,
-                &SkillPathOrigin::Unavailable,
-                ctx,
-            )
-        });
-        assert!(
-            unavailable_remote_skills.is_empty(),
-            "Unavailable remote sessions must not fall back to client-global bundles"
-        );
-
-        let local_skills = handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory(Some(&local_project_dir), ctx)
-        });
-        let local_names: HashSet<_> = local_skills
-            .iter()
-            .map(|skill| skill.name.as_str())
-            .collect();
-        assert!(local_names.contains("local-home"));
-        assert!(local_names.contains("local-project"));
-        assert!(local_names.contains("bundled"));
-        assert!(!local_names.contains("remote-bundled"));
-        assert!(!local_names.contains("same-host-project"));
-        assert!(!local_names.contains("other-host-project"));
-
-        // Local catalog descriptors keep their ID-based references.
-        let local_bundled_descriptor = local_skills
-            .iter()
-            .find(|skill| skill.name == "bundled")
-            .unwrap();
-        assert_eq!(
-            local_bundled_descriptor.reference,
-            SkillReference::BundledSkillId("bundled".to_string())
-        );
-
-        handle.update(&mut app, |manager, _| {
-            manager.is_cloud_environment = true;
-        });
-        let cloud_skills = handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory(None, ctx)
-        });
-        let cloud_names: HashSet<_> = cloud_skills
-            .iter()
-            .map(|skill| skill.name.as_str())
-            .collect();
-        assert_eq!(
-            cloud_names,
-            HashSet::from(["local-home", "local-project", "bundled"])
-        );
-    });
 }
 
 #[test]
@@ -1111,13 +599,15 @@ fn warp_control_direct_read_respects_warp_control_feature() {
             .skill_by_reference(&reference)
             .is_some()));
         assert!(handle.read(&app, |manager, ctx| manager
-            .active_skill_by_reference(&reference, ctx)
+            .active_skill_by_reference_with_origin(&reference, &SkillPathOrigin::Local, ctx)
+            .ok()
             .is_none()));
 
         drop(warp_control_cli);
         let warp_control_cli_enabled = FeatureFlag::WarpControlCli.override_enabled(true);
         assert!(handle.read(&app, |manager, ctx| manager
-            .active_skill_by_reference(&reference, ctx)
+            .active_skill_by_reference_with_origin(&reference, &SkillPathOrigin::Local, ctx)
+            .ok()
             .is_some()));
         drop(warp_control_cli_enabled);
     });
@@ -1142,7 +632,8 @@ fn active_skill_by_reference_resolves_exact_remote_identity() {
 
         let resolved = handle.read(&app, |manager, ctx| {
             manager
-                .active_skill_by_reference(&reference, ctx)
+                .active_skill_by_reference_with_origin(&reference, &SkillPathOrigin::Local, ctx)
+                .ok()
                 .map(|skill| skill.path.clone())
         });
 
@@ -1176,10 +667,20 @@ fn active_skill_by_reference_distinguishes_remote_hosts_with_the_same_display_pa
         let resolved = handle.read(&app, |manager, ctx| {
             (
                 manager
-                    .active_skill_by_reference(&first_reference, ctx)
+                    .active_skill_by_reference_with_origin(
+                        &first_reference,
+                        &SkillPathOrigin::Local,
+                        ctx,
+                    )
+                    .ok()
                     .map(|skill| skill.path.clone()),
                 manager
-                    .active_skill_by_reference(&second_reference, ctx)
+                    .active_skill_by_reference_with_origin(
+                        &second_reference,
+                        &SkillPathOrigin::Local,
+                        ctx,
+                    )
+                    .ok()
                     .map(|skill| skill.path.clone()),
             )
         });
@@ -1226,190 +727,6 @@ fn active_skill_by_reference_with_origin_returns_typed_lookup_errors() {
     });
 }
 
-// Remote home snapshots use the shared skill indexes and must remain host scoped.
-#[test]
-fn remote_home_skills_are_host_scoped_replaceable_and_path_invokable() {
-    let first_host = HostId::new("first-host".to_string());
-    let second_host = HostId::new("second-host".to_string());
-    let first_skill = make_remote_home_skill(&first_host, "deploy", "first host content");
-    let second_skill = make_remote_home_skill(&second_host, "deploy", "second host content");
-    let first_skill_path = first_skill.path.clone();
-    let second_skill_path = second_skill.path.clone();
-    let first_reference = SkillReference::Path(first_skill.path.clone());
-    let second_reference = SkillReference::Path(second_skill.path.clone());
-    let first_cwd = remote_test_path(&first_host, "/work/repo");
-    let second_cwd = remote_test_path(&second_host, "/other/repo");
-
-    App::test((), |mut app| async move {
-        app.add_singleton_model(DirectoryWatcher::new);
-        app.add_singleton_model(AISettings::new_with_defaults);
-        app.add_singleton_model(|_| DetectedRepositories::default());
-        app.add_singleton_model(RepoMetadataModel::new);
-        app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
-        let handle = app.add_singleton_model(SkillManager::new);
-
-        handle.update(&mut app, |manager, _| {
-            manager.set_remote_home_skills(
-                first_host.clone(),
-                remote_test_path(&first_host, "/home/user"),
-                vec![first_skill],
-            );
-            manager.set_remote_home_skills(
-                second_host.clone(),
-                remote_test_path(&second_host, "/home/user"),
-                vec![second_skill],
-            );
-        });
-        assert_eq!(
-            handle
-                .read(&app, |manager, _| manager.skill_paths_by_name("deploy"))
-                .into_iter()
-                .collect::<HashSet<_>>(),
-            HashSet::from([first_skill_path.clone(), second_skill_path.clone()])
-        );
-
-        for (cwd, host_id, expected_content, reference) in [
-            (
-                &first_cwd,
-                &first_host,
-                "first host content",
-                &first_reference,
-            ),
-            (
-                &second_cwd,
-                &second_host,
-                "second host content",
-                &second_reference,
-            ),
-        ] {
-            let descriptors = handle.read(&app, |manager, ctx| {
-                manager.get_skills_for_working_directory(Some(cwd), ctx)
-            });
-            assert_eq!(
-                descriptors
-                    .iter()
-                    .filter(|skill| skill.name == "deploy")
-                    .count(),
-                1
-            );
-            assert_eq!(
-                handle.read(&app, |manager, ctx| {
-                    manager
-                        .active_skill_by_reference_with_origin(
-                            reference,
-                            &SkillPathOrigin::Remote {
-                                host_id: host_id.clone(),
-                            },
-                            ctx,
-                        )
-                        .ok()
-                        .map(|skill| skill.content.clone())
-                }),
-                Some(expected_content.to_string())
-            );
-        }
-
-        let first_host_without_cwd = handle.read(&app, |manager, ctx| {
-            manager.get_skills_for_working_directory_with_origin(
-                None,
-                &SkillPathOrigin::Remote {
-                    host_id: first_host.clone(),
-                },
-                ctx,
-            )
-        });
-        assert_eq!(
-            first_host_without_cwd
-                .iter()
-                .filter(|skill| skill.name == "deploy")
-                .count(),
-            1
-        );
-        assert_eq!(
-            first_host_without_cwd
-                .iter()
-                .find(|skill| skill.name == "deploy")
-                .map(|skill| &skill.reference),
-            Some(&first_reference)
-        );
-        assert!(handle
-            .read(&app, |manager, ctx| manager
-                .get_skills_for_working_directory(None, ctx))
-            .iter()
-            .all(|skill| skill.name != "deploy"));
-
-        handle.update(&mut app, |manager, _| {
-            manager.set_remote_home_skills(
-                first_host.clone(),
-                remote_test_path(&first_host, "/home/user"),
-                Vec::new(),
-            );
-        });
-        assert!(handle.read(&app, |manager, ctx| manager
-            .active_skill_by_reference_with_origin(
-                &first_reference,
-                &SkillPathOrigin::Remote {
-                    host_id: first_host.clone(),
-                },
-                ctx,
-            )
-            .is_err()));
-        assert!(handle.read(&app, |manager, ctx| manager
-            .active_skill_by_reference_with_origin(
-                &second_reference,
-                &SkillPathOrigin::Remote {
-                    host_id: second_host.clone(),
-                },
-                ctx,
-            )
-            .is_ok()));
-        assert_eq!(
-            handle.read(&app, |manager, _| manager.skill_paths_by_name("deploy")),
-            vec![second_skill_path]
-        );
-    });
-}
-
-#[test]
-fn removing_remote_home_skills_preserves_project_skills_below_home() {
-    let host_id = HostId::new("remote-host".to_string());
-    let home_dir = remote_test_path(&host_id, "/home/user");
-    let home_skill = make_remote_home_skill(&host_id, "home", "home content");
-    let home_skill_path = home_skill.path.clone();
-    let project_dir = remote_test_path(&host_id, "/home/user/repo");
-    let project_skill = ParsedSkill {
-        path: project_dir.join(".agents/skills/project/SKILL.md"),
-        ..make_remote_skill(&host_id, "project")
-    };
-    let project_skill_path = project_skill.path.clone();
-
-    App::test((), |mut app| async move {
-        app.add_singleton_model(DirectoryWatcher::new);
-        app.add_singleton_model(AISettings::new_with_defaults);
-        app.add_singleton_model(|_| DetectedRepositories::default());
-        app.add_singleton_model(RepoMetadataModel::new);
-        app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
-        app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
-        let handle = app.add_singleton_model(SkillManager::new);
-
-        handle.update(&mut app, |manager, _| {
-            manager.handle_skills_added(vec![project_skill]);
-            manager.set_remote_home_skills(host_id.clone(), home_dir, vec![home_skill]);
-            manager.remove_remote_home_skills(&host_id);
-        });
-
-        handle.read(&app, |manager, _| {
-            assert!(manager.skill_by_path(&home_skill_path).is_none());
-            assert!(manager.skill_by_path(&project_skill_path).is_some());
-            assert!(manager.skill_paths_by_name("home").is_empty());
-            assert_eq!(
-                manager.skill_paths_by_name("project"),
-                vec![project_skill_path]
-            );
-        });
-    });
-}
 // ============================================================================
 // Tests for best_supported_provider
 // ============================================================================

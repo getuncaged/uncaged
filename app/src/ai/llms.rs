@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
 use ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent, CustomEndpoint, CustomEndpointModel};
 pub use ai::LLMId;
-use parking_lot::FairMutex;
 use serde::{de, Deserialize, Serialize};
 use uncaged_agent_api as api;
 use uncaged_core::features::FeatureFlag;
@@ -238,20 +237,6 @@ impl<'de> Deserialize<'de> for LLMInfo {
     }
 }
 
-/// Deduplicates a list of LLMInfo choices by base_model_name and returns an alphabetically sorted
-/// list of display names.
-pub fn dedupe_model_display_names<'a>(
-    choices: impl IntoIterator<Item = &'a LLMInfo>,
-) -> Vec<String> {
-    let names: HashSet<String> = choices
-        .into_iter()
-        .map(|choice| choice.base_model_name.clone())
-        .collect();
-    let mut sorted: Vec<String> = names.into_iter().collect();
-    sorted.sort();
-    sorted
-}
-
 impl LLMInfo {
     /// Returns the display name for the LLM, to be used in the LLM selector menu.
     pub fn menu_display_name(&self) -> String {
@@ -287,28 +272,6 @@ impl LLMInfo {
     pub fn reasoning_level(&self) -> Option<String> {
         self.reasoning_level.clone()
     }
-
-    #[cfg(feature = "integration_tests")]
-    fn new_for_test(llm_name: &str) -> Self {
-        Self {
-            display_name: llm_name.to_string(),
-            base_model_name: llm_name.to_string(),
-            id: llm_name.into(),
-            reasoning_level: None,
-            usage_metadata: LLMUsageMetadata {
-                request_multiplier: 1,
-                credit_multiplier: None,
-            },
-            description: None,
-            disable_reason: None,
-            vision_supported: false, // Default to false for tests
-            spec: None,
-            provider: LLMProvider::Unknown,
-            host_configs: HashMap::new(),
-            discount_percentage: None,
-            context_window: LLMContextWindow::default(),
-        }
-    }
 }
 
 /// The set of LLMs available for a feature.
@@ -329,6 +292,7 @@ impl AvailableLLMs {
     ///
     /// If default_id is not a valid ID present in `choices`, takes the first choice in `choices
     /// and uses it as the default.
+    #[cfg(test)]
     pub fn new<T: Into<LLMInfo>>(
         mut default_id: LLMId,
         choices: impl IntoIterator<Item = T>,
@@ -375,15 +339,6 @@ impl AvailableLLMs {
     fn default_llm_info(&self) -> &LLMInfo {
         self.info_for_id(&self.default_id)
             .expect("Default LLM ID must be present in choices")
-    }
-
-    #[cfg(feature = "integration_tests")]
-    pub fn new_for_test(llm_name: &str) -> Self {
-        Self {
-            default_id: llm_name.into(),
-            choices: vec![LLMInfo::new_for_test(llm_name)],
-            preferred_codex_model_id: None,
-        }
     }
 }
 
@@ -522,22 +477,10 @@ impl Default for ModelsByFeature {
     }
 }
 
-enum UpdatePopupVisibilityState {
-    WaitingToBeShown,
-    Visible(EntityId),
-    Hidden,
-}
-
-struct AvailableLLMsUpdate {
-    new_choices: Vec<LLMInfo>,
-    popup_visibility_state: Arc<FairMutex<UpdatePopupVisibilityState>>,
-}
-
 /// Singleton model holding user/workspace LLM preferences, including the set of LLMs available for
 /// use as well as the user's preferred LLM for Agent Mode.
 pub struct LLMPreferences {
     models_by_feature: ModelsByFeature,
-    last_update: Option<AvailableLLMsUpdate>,
     // Stores temporary model overrides for a given terminal view.
     // NOTE: We only store an override if the model selected by the user is different
     // from the base LLM for the active profile. This means that if the user selects the
@@ -588,7 +531,6 @@ impl LLMPreferences {
 
         let mut me = Self {
             models_by_feature,
-            last_update: None,
             base_llm_for_terminal_view,
             custom_llms,
             custom_model_routers: Vec::new(),
@@ -1096,108 +1038,9 @@ impl LLMPreferences {
         }
     }
 
-    pub fn new_choices_since_last_update(&self) -> Option<Vec<LLMInfo>> {
-        self.last_update.as_ref().map(|update| {
-            // We don't want to display new choices if they are warp branded.
-            let filter_choices: Vec<LLMInfo> = update
-                .new_choices
-                .clone()
-                .into_iter()
-                .filter(|choice| !choice.display_name.starts_with("lite"))
-                .collect();
-
-            filter_choices
-        })
-    }
-
-    pub fn should_show_new_choices_popup(&self, view_id: EntityId) -> bool {
-        self.last_update.as_ref().is_some_and(|update| {
-            let popup_state = &*update.popup_visibility_state.lock();
-            matches!(popup_state, UpdatePopupVisibilityState::WaitingToBeShown)
-                || matches!(
-                popup_state,
-                UpdatePopupVisibilityState::Visible(id) if *id == view_id)
-        })
-    }
-
-    pub fn mark_new_choices_popup_as_shown(&self, view_id: EntityId) {
-        if let Some(update) = self.last_update.as_ref() {
-            if matches!(
-                &*update.popup_visibility_state.lock(),
-                UpdatePopupVisibilityState::WaitingToBeShown
-            ) {
-                *update.popup_visibility_state.lock() =
-                    UpdatePopupVisibilityState::Visible(view_id);
-            }
-        }
-    }
-
-    pub fn hide_llm_popup(&self, view_id: EntityId) {
-        if !self.should_show_new_choices_popup(view_id) {
-            return;
-        }
-        let Some(last_update) = self.last_update.as_ref() else {
-            return;
-        };
-        *last_update.popup_visibility_state.lock() = UpdatePopupVisibilityState::Hidden;
-    }
-
-    pub fn update_feature_model_choices(
-        &mut self,
-        choices_result: Result<ModelsByFeature, anyhow::Error>,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if let Ok(choices) = choices_result {
-            self.on_server_update(choices, ctx);
-        }
-    }
-
-    fn on_server_update(&mut self, update: ModelsByFeature, ctx: &mut ModelContext<Self>) {
-        let has_existing_persisted_config = get_cached_models(ctx).is_some();
-
-        let old = std::mem::replace(&mut self.models_by_feature, update);
-
-        match serde_json::to_string(&self.models_by_feature) {
-            Ok(serialized_update) => {
-                if let Err(e) = ctx
-                    .private_user_preferences()
-                    .write_value(MODELS_BY_FEATURE_CACHE_KEY, serialized_update)
-                {
-                    log::error!("Failed to cache LLMs: {e}");
-                }
-            }
-            Err(e) => {
-                log::error!("Failed to serialize LLMs for cache: {e}");
-            }
-        }
-
-        self.reconcile_disabled_model_preferences(ctx);
-
-        // Re-evaluate custom model routers now that the server catalog is fresh.
-        // A router that was excluded at startup (because its target wasn't in the
-        // cached catalog) is reconsidered here with the authoritative model list.
-        if FeatureFlag::CustomModelRouters.is_enabled() {
-            self.rebuild_custom_model_routers(ctx);
-            self.reconcile_stale_custom_router_selection(ctx);
-        }
-
-        let new_choices =
-            get_new_agent_mode_choices(&old.agent_mode, &self.models_by_feature.agent_mode);
-        if !new_choices.is_empty() {
-            self.last_update = Some(AvailableLLMsUpdate {
-                new_choices,
-                // We shouldn't show the update for the initial LLM config creation.
-                popup_visibility_state: Arc::new(FairMutex::new(
-                    if has_existing_persisted_config {
-                        UpdatePopupVisibilityState::WaitingToBeShown
-                    } else {
-                        UpdatePopupVisibilityState::Hidden
-                    },
-                )),
-            });
-        }
-
-        ctx.emit(LLMPreferencesEvent::UpdatedAvailableLLMs);
+    #[cfg(test)]
+    pub(crate) fn set_models_by_feature_for_test(&mut self, models_by_feature: ModelsByFeature) {
+        self.models_by_feature = models_by_feature;
     }
 
     /// Clear any model selections where the model is no longer supported
@@ -1311,19 +1154,6 @@ impl Entity for LLMPreferences {
 }
 
 impl SingletonEntity for LLMPreferences {}
-
-fn get_new_agent_mode_choices(
-    old_config: &AvailableLLMs,
-    new_config: &AvailableLLMs,
-) -> Vec<LLMInfo> {
-    let old_ids: HashSet<_> = old_config.choices.iter().map(|info| &info.id).collect();
-    new_config
-        .choices
-        .iter()
-        .filter(|info| !old_ids.contains(&info.id))
-        .cloned()
-        .collect()
-}
 
 /// Builds synthetic [`LLMInfo`]s from the user's persisted custom endpoints.
 ///

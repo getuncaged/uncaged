@@ -157,10 +157,6 @@ impl EnvVarCollectionManager {
             _ => log::warn!("Can only reload existing environment variable collection"),
         }
     }
-
-    pub fn reset(&mut self) {
-        self.panes_by_hashed_id.clear();
-    }
 }
 
 struct EnvVarCollectionPaneData {

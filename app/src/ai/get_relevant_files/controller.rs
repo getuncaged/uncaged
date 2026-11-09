@@ -10,7 +10,6 @@ use ai::index::lexical::{self, Document, Query, Vocab};
 use ai::index::locations::CodeContextLocation;
 use ai::index::FileSymbols;
 use anyhow::anyhow;
-use futures_util::stream::AbortHandle;
 use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
@@ -57,36 +56,25 @@ pub enum GetRelevantFilesError {
     Missing,
 }
 
-/// This enum allows us to use both the existing structure for outline-based indexing
-/// and the new full source code indexing manager/model.
-enum RequestHandle {
-    /// Used with outline-based indexing.
-    AbortHandle(AbortHandle),
-
-    /// Used with full source code indexing.
-    RetrievalID {
-        repo_path: PathBuf,
-        retrieval_id: RetrievalID,
-    },
+/// An in-flight full source code retrieval request.
+struct RequestHandle {
+    repo_path: PathBuf,
+    retrieval_id: RetrievalID,
 }
 
 impl RequestHandle {
     fn abort(&mut self, ctx: &mut AppContext) {
-        match self {
-            RequestHandle::AbortHandle(abort_handle) => abort_handle.abort(),
-            RequestHandle::RetrievalID {
-                repo_path,
-                retrieval_id,
-            } => {
-                CodebaseIndexManager::handle(ctx).update(ctx, |index_manager, ctx| {
-                    if let Err(err) =
-                        index_manager.abort_retrieval_request(repo_path, retrieval_id.clone(), ctx)
-                    {
-                        log::error!("Failed to abort file retrieval request: {err:?}");
-                    }
-                });
+        let Self {
+            repo_path,
+            retrieval_id,
+        } = self;
+        CodebaseIndexManager::handle(ctx).update(ctx, |index_manager, ctx| {
+            if let Err(err) =
+                index_manager.abort_retrieval_request(repo_path, retrieval_id.clone(), ctx)
+            {
+                log::error!("Failed to abort file retrieval request: {err:?}");
             }
-        }
+        });
     }
 }
 
@@ -114,14 +102,8 @@ impl GetRelevantFilesController {
         // the agent action that initiated the request before emitting results.
         self.pending_requests
             .iter()
-            .find_map(|(action_id, request_handle)| match request_handle {
-                RequestHandle::AbortHandle(_) => None,
-                RequestHandle::RetrievalID { retrieval_id, .. }
-                    if retrieval_id == pending_retrieval_id =>
-                {
-                    Some(action_id)
-                }
-                RequestHandle::RetrievalID { .. } => None,
+            .find_map(|(action_id, request_handle)| {
+                (&request_handle.retrieval_id == pending_retrieval_id).then_some(action_id)
             })
     }
 
@@ -203,7 +185,7 @@ impl GetRelevantFilesController {
                         log::info!("Using full source code embedding for search");
                         self.pending_requests.insert(
                             action_id,
-                            RequestHandle::RetrievalID {
+                            RequestHandle {
                                 repo_path: base_path.clone(),
                                 retrieval_id: retrieval_request_id,
                             },

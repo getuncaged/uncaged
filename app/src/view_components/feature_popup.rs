@@ -10,25 +10,10 @@ use uncaged_ui::{
 use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
 
-pub enum NewFeaturePopupLabel {
-    /// A static label.
-    FromString(String),
-    /// A label that is computed on demand.
-    FromCallable(Box<dyn Fn(&AppContext) -> String>),
-}
-
-pub enum FeaturePopupBadge {
-    // Displays "NEW" badge prior to the label
-    New,
-    // Displays an alert icon prior to the label
-    AlertIcon,
-}
-
 /// A dismissable popup that displays a label indicating that a new feature is available.
 pub struct FeaturePopup {
     dismiss_mouse_state: MouseStateHandle,
-    label: NewFeaturePopupLabel,
-    badge: FeaturePopupBadge,
+    label: String,
 }
 
 #[derive(Debug, Clone)]
@@ -37,57 +22,34 @@ pub enum NewFeaturePopupAction {
 }
 
 impl FeaturePopup {
-    pub fn new_feature(label: NewFeaturePopupLabel) -> Self {
+    pub fn new_feature(label: String) -> Self {
         Self {
             dismiss_mouse_state: Default::default(),
             label,
-            badge: FeaturePopupBadge::New,
         }
     }
 
-    pub fn alert_icon(label: NewFeaturePopupLabel) -> Self {
-        Self {
-            dismiss_mouse_state: Default::default(),
-            label,
-            badge: FeaturePopupBadge::AlertIcon,
-        }
-    }
-
+    /// The "NEW" badge shown before the label.
     fn render_badge(&self, appearance: &Appearance) -> Box<dyn Element> {
         let background = appearance.theme().background();
-        match self.badge {
-            FeaturePopupBadge::New => Container::new(
-                Text::new(
-                    "NEW",
-                    appearance.ui_font_family(),
-                    appearance.ui_font_size(),
-                )
-                .with_color(appearance.theme().main_text_color(background).into())
-                .finish(),
+        Container::new(
+            Text::new(
+                "NEW",
+                appearance.ui_font_family(),
+                appearance.ui_font_size(),
             )
-            .with_vertical_padding(2.)
-            .with_horizontal_padding(4.)
-            .with_background_color(
-                appearance
-                    .theme()
-                    .ansi_bg(appearance.theme().terminal_colors().normal.green),
-            )
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(2.)))
+            .with_color(appearance.theme().main_text_color(background).into())
             .finish(),
-            FeaturePopupBadge::AlertIcon => Container::new(
-                ConstrainedBox::new(
-                    Icon::AlertCircle
-                        .to_warpui_icon(appearance.theme().main_text_color(
-                            appearance.theme().terminal_colors().normal.green.into(),
-                        ))
-                        .finish(),
-                )
-                .with_height(16.)
-                .with_width(16.)
-                .finish(),
-            )
-            .finish(),
-        }
+        )
+        .with_vertical_padding(2.)
+        .with_horizontal_padding(4.)
+        .with_background_color(
+            appearance
+                .theme()
+                .ansi_bg(appearance.theme().terminal_colors().normal.green),
+        )
+        .with_corner_radius(CornerRadius::with_all(Radius::Pixels(2.)))
+        .finish()
     }
 }
 
@@ -101,10 +63,7 @@ impl View for FeaturePopup {
         let background = appearance.theme().background();
         let new_badge = self.render_badge(appearance);
 
-        let label = match &self.label {
-            NewFeaturePopupLabel::FromString(label) => label.clone(),
-            NewFeaturePopupLabel::FromCallable(callable) => callable(app),
-        };
+        let label = self.label.clone();
         ConstrainedBox::new(
             Container::new(
                 Flex::row()

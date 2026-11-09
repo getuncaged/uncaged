@@ -47,13 +47,6 @@ impl SkillManager {
         None
     }
 
-    pub fn active_skill_by_reference(
-        &self,
-        _reference: &SkillReference,
-        _ctx: &AppContext,
-    ) -> Option<&ParsedSkill> {
-        None
-    }
     pub fn active_skill_by_reference_with_origin(
         &self,
         reference: &SkillReference,

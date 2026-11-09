@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use ai::api_keys::{ApiKeyManager, ApiKeyManagerEvent};
 use indexmap::IndexMap;
-use instant::{Duration, Instant};
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
@@ -40,9 +39,7 @@ use crate::ai::execution_profiles::model_menu_items::{
 use crate::ai::execution_profiles::profiles::{
     AIExecutionProfilesModel, AIExecutionProfilesModelEvent, ClientProfileId,
 };
-use crate::ai::llms::{
-    dedupe_model_display_names, LLMId, LLMInfo, LLMPreferences, LLMPreferencesEvent, LLMSpec,
-};
+use crate::ai::llms::{LLMId, LLMInfo, LLMPreferences, LLMPreferencesEvent, LLMSpec};
 use crate::appearance::Appearance;
 use crate::cloud_object::model::generic_string_model::StringModel;
 use crate::context_chips::display_chip::{udi_font_size, udi_icon_size};
@@ -53,13 +50,11 @@ use crate::terminal::input::{MenuPositioning, MenuPositioningProvider};
 use crate::terminal::TerminalModel;
 use crate::ui_components::icons::Icon;
 use crate::view_components::action_button::{ActionButton, ActionButtonTheme, ButtonSize};
-use crate::view_components::{FeaturePopup, NewFeaturePopupEvent, NewFeaturePopupLabel};
 
 const MENU_WIDTH: f32 = 280.;
 /// Uncaged: the effort menu only lists a handful of short levels.
 const EFFORT_MENU_WIDTH: f32 = 160.;
 const EFFORT_BUTTON_POSITION_ID: &str = "profile_model_selector_effort_button";
-const NEW_MODEL_CHOICES_POPUP_DELAY: Duration = Duration::from_millis(500);
 const BLURRED_OPACITY: Opacity = 50;
 const SEPARATOR_WIDTH: f32 = 1.0;
 const CORNER_RADIUS: f32 = 4.0;
@@ -161,8 +156,6 @@ pub struct ProfileModelSelector {
     effort_mouse_state: MouseStateHandle,
     menu_positioning_provider: Arc<dyn MenuPositioningProvider>,
     is_blurred: bool,
-    new_model_popup: ViewHandle<FeaturePopup>,
-    input_model: ModelHandle<BlocklistAIInputModel>,
     render_compact: bool,
     hovered_llm_info: Option<LLMInfo>,
     terminal_model: Arc<FairMutex<TerminalModel>>,
@@ -614,37 +607,6 @@ impl ProfileModelSelector {
             }
         });
 
-        let new_model_popup = ctx.add_typed_action_view(|_ctx| {
-            FeaturePopup::new_feature(NewFeaturePopupLabel::FromCallable(Box::new(|ctx| {
-                let llm_preferences = LLMPreferences::as_ref(ctx);
-                let new_choices = llm_preferences.new_choices_since_last_update();
-                if let Some(new_choices) = new_choices {
-                    let deduped_names = dedupe_model_display_names(new_choices.iter());
-                    let max_display = 5;
-                    let has_overflow = deduped_names.len() > max_display;
-                    let display_names = &deduped_names[..deduped_names.len().min(max_display)];
-
-                    let mut label = display_names
-                        .iter()
-                        .map(|name| {
-                            if *name == "auto" {
-                                "auto-select the best model for the task"
-                            } else {
-                                name
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    if has_overflow {
-                        label += ", ...";
-                    }
-                    label
-                } else {
-                    "New models available".to_string()
-                }
-            })))
-        });
-
         ctx.subscribe_to_view(&profile_dropdown, |me, _, event, ctx| {
             if let MenuEvent::Close { .. } = event {
                 me.set_profile_menu_visibility(false, ctx);
@@ -703,29 +665,9 @@ impl ProfileModelSelector {
             }
         });
 
-        ctx.subscribe_to_view(&new_model_popup, move |_me, _, event, ctx| {
-            if matches!(event, NewFeaturePopupEvent::Dismissed) {
-                LLMPreferences::handle(ctx).update(ctx, |preferences, _| {
-                    preferences.hide_llm_popup(terminal_view_id)
-                });
-                ctx.notify();
-            }
-        });
-
         ctx.subscribe_to_model(&input_model, move |_me, _, event, ctx| match event {
-            BlocklistAIInputEvent::InputTypeChanged { config }
-            | BlocklistAIInputEvent::LockChanged { config } => {
-                if config.is_locked && !config.input_type.is_ai() {
-                    let llm_preferences = LLMPreferences::as_ref(ctx);
-                    llm_preferences.hide_llm_popup(terminal_view_id);
-                } else if config.input_type.is_ai() {
-                    ctx.spawn(
-                        uncaged_ui::r#async::Timer::after(NEW_MODEL_CHOICES_POPUP_DELAY),
-                        |_, _, ctx| {
-                            ctx.notify();
-                        },
-                    );
-                }
+            BlocklistAIInputEvent::InputTypeChanged { .. }
+            | BlocklistAIInputEvent::LockChanged { .. } => {
                 ctx.notify();
             }
         });
@@ -733,18 +675,9 @@ impl ProfileModelSelector {
         ctx.subscribe_to_model(
             &LLMPreferences::handle(ctx),
             |me, _, event, ctx| match event {
-                LLMPreferencesEvent::UpdatedAvailableLLMs => {
+                LLMPreferencesEvent::UpdatedAvailableLLMs
+                | LLMPreferencesEvent::UpdatedActiveAgentModeLLM => {
                     me.refresh_state(ctx);
-                    me.new_model_popup.update(ctx, |_popup, ctx| {
-                        ctx.notify();
-                    });
-                    ctx.notify();
-                }
-                LLMPreferencesEvent::UpdatedActiveAgentModeLLM => {
-                    me.refresh_state(ctx);
-                    me.new_model_popup.update(ctx, |_popup, ctx| {
-                        ctx.notify();
-                    });
                     ctx.notify();
                 }
                 _ => (),
@@ -752,10 +685,8 @@ impl ProfileModelSelector {
         );
 
         if let Some(controller) = &controller {
-            ctx.subscribe_to_model(controller, |me, _, event, ctx| {
+            ctx.subscribe_to_model(controller, |_, _, event, ctx| {
                 if let BlocklistAIControllerEvent::SentRequest { .. } = event {
-                    let llm_preferences = LLMPreferences::as_ref(ctx);
-                    llm_preferences.hide_llm_popup(me.terminal_view_id);
                     ctx.notify();
                 }
             });
@@ -815,8 +746,6 @@ impl ProfileModelSelector {
             effort_mouse_state: Default::default(),
             menu_positioning_provider,
             is_blurred: false,
-            new_model_popup,
-            input_model,
             render_compact: false,
             hovered_llm_info: None,
             terminal_model,
@@ -849,10 +778,6 @@ impl ProfileModelSelector {
         self.is_profile_menu_open = false;
         self.is_effort_menu_open = false;
         if is_open {
-            LLMPreferences::handle(ctx).update(ctx, |preferences, _| {
-                preferences.hide_llm_popup(self.terminal_view_id)
-            });
-
             // Initialize hovered_llm_info to the currently selected model
             let selected_index = self
                 .model_dropdown
@@ -2373,44 +2298,6 @@ impl View for ProfileModelSelector {
                         ),
                     );
                 }
-            }
-        }
-
-        let is_udi_enabled =
-            crate::settings::InputSettings::as_ref(app).is_universal_developer_input_enabled(app);
-
-        // The popup overflows the viewport on wasm mobile.
-        let is_wasm_mobile = uncaged_ui::platform::is_mobile_device();
-
-        if !is_wasm_mobile
-            && (is_udi_enabled
-                || self
-                    .input_model
-                    .as_ref(app)
-                    .last_ai_autodetection_ts()
-                    .is_none_or(|ts| {
-                        Instant::now().duration_since(ts) > NEW_MODEL_CHOICES_POPUP_DELAY
-                    }))
-        {
-            let llm_preferences = LLMPreferences::as_ref(app);
-            match (
-                llm_preferences.should_show_new_choices_popup(self.terminal_view_id),
-                llm_preferences.new_choices_since_last_update(),
-            ) {
-                (true, Some(new_choices)) if !new_choices.is_empty() => {
-                    llm_preferences.mark_new_choices_popup_as_shown(self.terminal_view_id);
-                    stack.add_positioned_overlay_child(
-                        ChildView::new(&self.new_model_popup).finish(),
-                        // Render the popup above the chip, centered horizontally.
-                        OffsetPositioning::offset_from_parent(
-                            vec2f(0., -6.),
-                            ParentOffsetBounds::WindowByPosition,
-                            ParentAnchor::TopMiddle,
-                            ChildAnchor::BottomMiddle,
-                        ),
-                    );
-                }
-                _ => (),
             }
         }
 

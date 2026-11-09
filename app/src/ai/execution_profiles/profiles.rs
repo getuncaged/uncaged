@@ -1073,7 +1073,7 @@ impl AIExecutionProfilesModel {
                 self.remove_deleted_mcp_servers(ctx);
             }
             TemplatableMCPServerManagerEvent::LegacyServerConverted
-            | TemplatableMCPServerManagerEvent::StateChanged { uuid: _, state: _ }
+            | TemplatableMCPServerManagerEvent::StateChanged { uuid: _ }
             | TemplatableMCPServerManagerEvent::ServerInstallationAdded(_)
             | TemplatableMCPServerManagerEvent::ServerInstallationDeleted(_) => {}
         }

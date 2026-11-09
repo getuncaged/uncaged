@@ -10,7 +10,6 @@ use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
 use crate::palette::PaletteMode;
-use crate::settings::AISettings;
 use crate::terminal::input::SET_INPUT_MODE_AGENT_ACTION_NAME;
 use crate::terminal::view::init::{
     CANCEL_COMMAND_KEYBINDING, SELECT_PREVIOUS_BLOCK_ACTION_NAME,
@@ -28,9 +27,6 @@ use crate::workspace::WorkspaceAction;
 pub trait AITip: Clone {
     /// Returns the keystroke for this tip, if applicable.
     fn keystroke(&self, app: &AppContext) -> Option<Keystroke>;
-
-    /// Returns the documentation link for this tip, if available.
-    fn link(&self) -> Option<String>;
 
     /// Returns the raw description text for this tip.
     fn description(&self) -> &str;
@@ -71,7 +67,6 @@ pub trait AITip: Clone {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AgentTipKind {
     CodebaseContext,
-    WarpDrive,
     General,
     Mcp,
     SlashCommands,
@@ -79,8 +74,6 @@ pub enum AgentTipKind {
     Context,
     /// Tips about code editors, file trees, and code review panes
     Code,
-    /// Tips about local-to-cloud handoff
-    Handoff,
 }
 
 static DEFAULT_TIPS: LazyLock<Vec<AgentTip>> = LazyLock::new(|| {
@@ -326,10 +319,6 @@ impl AITip for AgentTip {
         None
     }
 
-    fn link(&self) -> Option<String> {
-        self.link.clone()
-    }
-
     fn description(&self) -> &str {
         &self.description
     }
@@ -373,10 +362,6 @@ impl AITip for AgentTip {
                 .get_codebase_index_status_for_path(root, app)
                 .is_none();
         }
-        // Handoff tips only apply when the feature is available and enabled.
-        if matches!(self.kind, AgentTipKind::Handoff) {
-            return AISettings::as_ref(app).is_cloud_handoff_enabled(app);
-        }
         // Tips whose description references a keybinding placeholder should only be shown
         // when the keybinding is actually configured, so we never display the raw
         // "<keybinding>" string to users.
@@ -410,25 +395,6 @@ pub struct AITipModel<T: AITip> {
 }
 
 impl<T: AITip + 'static> AITipModel<T> {
-    /// Creates a new AITipModel with the given tips.
-    /// Selects a random initial tip from the provided tips.
-    ///
-    /// # Panics
-    /// Panics if the tips vector is empty.
-    pub fn new(tips: Vec<T>) -> Self {
-        use rand::seq::SliceRandom;
-        debug_assert!(!tips.is_empty(), "AITipModel must have at least one tip");
-
-        let mut rng = rand::thread_rng();
-        let current_tip = tips.choose(&mut rng).cloned();
-
-        Self {
-            tips,
-            current_tip,
-            cooldown_handle: None,
-        }
-    }
-
     /// Returns the current tip, if one has been selected.
     pub fn current_tip(&self) -> Option<&T> {
         self.current_tip.as_ref()

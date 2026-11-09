@@ -67,12 +67,6 @@ impl ThemeCreatorPageView {
         }
     }
 
-    /// Seeds the editor with a fresh copy of the current palette every time the
-    /// page is shown, so it never displays a previous session's half-finished edits.
-    pub fn on_shown(&mut self, ctx: &mut ViewContext<Self>) {
-        self.body.update(ctx, |body, ctx| body.on_shown(ctx));
-    }
-
     fn handle_body_event(&mut self, event: &ThemeCreatorBodyEvent, ctx: &mut ViewContext<Self>) {
         match event {
             // Saving writes the .yaml into the themes dir; reload the on-disk theme

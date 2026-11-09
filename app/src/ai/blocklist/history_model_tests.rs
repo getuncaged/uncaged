@@ -22,9 +22,7 @@ use crate::ai::agent::{
     AIAgentExchange, AIAgentExchangeId, AIAgentInput, AIAgentOutputStatus, FinishedAIAgentOutput,
     RenderableAIError, Shared, TransientNetworkErrorKind, UserQueryMode,
 };
-use crate::ai::ambient_agents::{
-    conversation_output_status_from_conversation, AmbientAgentTaskId, AmbientConversationStatus,
-};
+use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::blocklist::controller::RequestInput;
 use crate::ai::blocklist::ResponseStreamId;
 use crate::ai::llms::LLMId;
@@ -2505,36 +2503,6 @@ fn test_find_by_token_returns_none_after_remove_conversation() {
 }
 
 #[test]
-fn test_find_by_token_returns_none_after_reset() {
-    App::test((), |mut app| async move {
-        let history_model = app.add_singleton_model(|_| BlocklistAIHistoryModel::new(vec![], &[]));
-
-        history_model.update(&mut app, |model, _| {
-            model.merge_cloud_conversation_metadata(vec![create_server_metadata(
-                "Cloud conversation",
-                "reset-token",
-                1.0,
-                None,
-            )]);
-        });
-
-        let token = ServerConversationToken::new("reset-token".to_string());
-
-        history_model.read(&app, |model, _| {
-            assert!(model.find_conversation_id_by_server_token(&token).is_some());
-        });
-
-        history_model.update(&mut app, |model, _| {
-            model.reset();
-        });
-
-        history_model.read(&app, |model, _| {
-            assert_eq!(model.find_conversation_id_by_server_token(&token), None);
-        });
-    });
-}
-
-#[test]
 fn test_find_by_token_after_initialize_output_for_response_stream() {
     App::test((), |mut app| async move {
         initialize_history_persistence_for_tests(&mut app);
@@ -3570,29 +3538,19 @@ fn hydrate_remote_child_placeholder_with_cloud_transcript_preserves_placeholder_
     });
 }
 
-// --- conversation_output_status_from_conversation ---
+// --- conversation status after a stream error ---
 
 /// Builds a conversation with one in-flight exchange, completes it with the
 /// given error (mirroring what the controller does when a response stream
-/// fails), and returns the resulting [`ConversationStatus`] plus the derived
-/// [`AmbientConversationStatus`].
-fn statuses_after_stream_error(
+/// fails), and returns the resulting [`ConversationStatus`].
+fn status_after_stream_error(
     error: RenderableAIError,
     recovery_pending: bool,
-) -> (
-    Option<ConversationStatus>,
-    Option<AmbientConversationStatus>,
-) {
-    type Captured = (
-        Option<ConversationStatus>,
-        Option<AmbientConversationStatus>,
-    );
-    let derived: Arc<Mutex<Captured>> = Arc::new(Mutex::new((None, None)));
+) -> Option<ConversationStatus> {
+    let derived: Arc<Mutex<Option<ConversationStatus>>> = Arc::new(Mutex::new(None));
     let derived_for_test = Arc::clone(&derived);
     App::test((), |mut app| async move {
         initialize_history_persistence_for_tests(&mut app);
-        // Completing a request with an error emits telemetry, which requires
-        // the telemetry context provider (and the auth state it reads).
         let terminal_view_id = EntityId::new();
         let history_model = app.add_singleton_model(|_| BlocklistAIHistoryModel::new_for_test());
 
@@ -3641,24 +3599,25 @@ fn statuses_after_stream_error(
         });
 
         *derived_for_test.lock().unwrap() = history_model.read(&app, |model, _| {
-            let conversation = model.conversation(&conversation_id).unwrap();
-            (
-                Some(conversation.status().clone()),
-                conversation_output_status_from_conversation(conversation),
+            Some(
+                model
+                    .conversation(&conversation_id)
+                    .unwrap()
+                    .status()
+                    .clone(),
             )
         });
     });
     // Two steps: a tail-expression `lock()` temporary would outlive `derived` (E0597).
-    let result = std::mem::take(&mut *derived.lock().unwrap());
+    let result = derived.lock().unwrap().take();
     result
 }
 
 /// A failure with a recovery scheduled moves the conversation to the
-/// non-terminal `TransientError` status, and the driver-facing conversion must
-/// not report a terminal outcome for it.
+/// non-terminal `TransientError` status.
 #[test]
 fn recovery_pending_error_sets_transient_error_status() {
-    let (status, derived) = statuses_after_stream_error(
+    let status = status_after_stream_error(
         RenderableAIError::transient_network_error(
             true,
             false,
@@ -3668,18 +3627,12 @@ fn recovery_pending_error_sets_transient_error_status() {
     );
 
     assert_eq!(status, Some(ConversationStatus::TransientError));
-    assert!(
-        derived.is_none(),
-        "a pending recovery must not derive a terminal outcome, got {derived:?}"
-    );
 }
 
-/// The structured exchange error (and its rendering hints) must survive the
-/// conversion to `AmbientConversationStatus`; the conversation-level
-/// `status_error_message` is a plain string and would otherwise drop them.
+/// A resumable error with no recovery scheduled is terminal.
 #[test]
-fn structured_exchange_error_is_preserved_in_output_status() {
-    let (status, derived) = statuses_after_stream_error(
+fn resumable_error_without_recovery_sets_error_status() {
+    let status = status_after_stream_error(
         RenderableAIError::transient_network_error(
             true,
             false,
@@ -3689,19 +3642,12 @@ fn structured_exchange_error_is_preserved_in_output_status() {
     );
 
     assert_eq!(status, Some(ConversationStatus::Error));
-    let Some(AmbientConversationStatus::Error { error }) = derived else {
-        panic!("expected an error status, got {derived:?}");
-    };
-    assert!(
-        error.will_attempt_resume(),
-        "the structured exchange error must be preserved, got {error:?}"
-    );
 }
 
 /// A stream error without a pending recovery stays terminal.
 #[test]
-fn non_resumable_stream_error_stays_terminal_in_output_status() {
-    let (status, derived) = statuses_after_stream_error(
+fn non_resumable_stream_error_sets_error_status() {
+    let status = status_after_stream_error(
         RenderableAIError::transient_network_error(
             false,
             false,
@@ -3711,11 +3657,4 @@ fn non_resumable_stream_error_stays_terminal_in_output_status() {
     );
 
     assert_eq!(status, Some(ConversationStatus::Error));
-    let Some(AmbientConversationStatus::Error { error }) = derived else {
-        panic!("expected an error status, got {derived:?}");
-    };
-    assert!(
-        !error.will_attempt_resume(),
-        "will_attempt_resume must be false for a non-recoverable error, got {error:?}"
-    );
 }

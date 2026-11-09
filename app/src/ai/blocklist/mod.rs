@@ -6,7 +6,6 @@ pub mod code_block;
 mod context_model;
 mod controller;
 
-pub(crate) mod orchestration_events;
 pub(crate) mod orchestration_topology;
 mod passive_suggestions;
 pub(crate) mod queued_query;

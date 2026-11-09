@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 use uncaged_cli::agent::Harness;
 use uncaged_core::features::FeatureFlag;
@@ -38,32 +36,15 @@ fn default_harnesses() -> Vec<HarnessAvailability> {
     }]
 }
 
-#[derive(Debug, Clone)]
-pub enum AuthSecretFetchState {
-    NotFetched,
-    Loading,
-    Loaded(Vec<AuthSecretEntry>),
-    Failed(#[allow(dead_code)] String),
-}
-
-#[derive(Debug, Clone)]
-pub struct AuthSecretEntry {
-    pub name: String,
-}
-
 pub struct HarnessAvailabilityModel {
     harnesses: Vec<HarnessAvailability>,
-    auth_secrets: HashMap<Harness, AuthSecretFetchState>,
 }
 
 impl HarnessAvailabilityModel {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
         let harnesses = get_cached(ctx).unwrap_or_else(default_harnesses);
 
-        Self {
-            harnesses,
-            auth_secrets: HashMap::new(),
-        }
+        Self { harnesses }
     }
 
     pub fn available_harnesses(&self) -> &[HarnessAvailability] {
@@ -89,12 +70,6 @@ impl HarnessAvailabilityModel {
             .find(|h| h.harness == harness)
             .map(|h| h.available_models.as_slice())
             .filter(|m| !m.is_empty())
-    }
-
-    pub fn auth_secrets_for(&self, harness: Harness) -> &AuthSecretFetchState {
-        self.auth_secrets
-            .get(&harness)
-            .unwrap_or(&AuthSecretFetchState::NotFetched)
     }
 }
 

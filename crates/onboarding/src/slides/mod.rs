@@ -11,7 +11,6 @@ mod progress_dots;
 mod project_slide;
 pub mod slide_content;
 mod theme_picker_slide;
-mod third_party_slide;
 mod toggle_card;
 mod two_line_button;
 
@@ -28,4 +27,3 @@ pub use intro_slide::IntroSlide;
 pub use onboarding_slide::OnboardingSlide;
 pub use project_slide::{ProjectOnboardingSettings, ProjectSlide};
 pub use theme_picker_slide::{ThemePickerSlide, ThemePickerSlideEvent};
-pub use third_party_slide::ThirdPartySlide;

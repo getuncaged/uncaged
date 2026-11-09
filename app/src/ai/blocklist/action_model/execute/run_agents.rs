@@ -26,7 +26,7 @@ use crate::ai::agent::{
     AIAgentAction, AIAgentActionId, AIAgentActionResultType, AIAgentActionType, AIAgentInput,
     StartAgentExecutionMode,
 };
-use crate::ai::auth_secret_types::auth_secret_types_for_harness;
+use crate::ai::auth_secret_types::harness_has_auth_secret_types;
 use crate::ai::blocklist::inline_action::orchestration_controls::OrchestrationEditState;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, BlocklistAIPermissions};
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
@@ -617,7 +617,7 @@ fn requires_default_auth_secret_for_execution(request: &RunAgentsRequest) -> boo
     let Some(harness) = Harness::parse_orchestration_harness(&request.harness_type) else {
         return false;
     };
-    harness != Harness::Oz && !auth_secret_types_for_harness(harness).is_empty()
+    harness != Harness::Oz && harness_has_auth_secret_types(harness)
 }
 
 fn can_execute_with_auth_secret(

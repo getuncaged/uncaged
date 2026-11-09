@@ -89,11 +89,12 @@ shell bootstrap lost Warp's apt-repo repair helper. The only git dependency left
 core-foundation-rs (an upstream fix not yet released).
 
 Still open:
-- About 86 dead-code warnings (`cargo check -p uncaged --bin uncaged` without `-A dead_code`).
-  Almost all are items only unit tests still reach: the cloud ambient-task model
-  (`ai/ambient_agents`, the task map in `AgentConversationsModel`, which is empty outside
-  tests), orchestration lifecycle-event helpers, `llms.rs` server model updates, and small UI
-  builder leftovers. Each needs its tests deleted with it, so they were left for a deliberate pass.
+- Dead-code warnings are at zero (`cargo check -p uncaged --bin uncaged`, with and without
+  `--all-features`). Still compiler-live but never populated: the ambient-task map in
+  `AgentConversationsModel` (nothing inserts into it, not even tests) and everything that reads
+  it (`entry_for_task`, the `Task*` display statuses, the agent management view's task paths),
+  and the remote-host catalog in `BundledSkills`. Removing them is behaviour-neutral but a larger
+  refactor.
 - The free-AI-removal notice modal and the HOA onboarding flow (never opened; the modal's view
   also backs the live prompt-suggestions-unavailable modal), the changelog-only resource
   center, and server-sentinel links (`ServerConversationToken::conversation_link`/`debug_link`).

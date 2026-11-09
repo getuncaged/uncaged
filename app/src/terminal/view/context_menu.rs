@@ -196,29 +196,6 @@ impl TerminalView {
         );
     }
 
-    fn conversation_server_token(
-        &self,
-        conversation_id: AIConversationId,
-        ctx: &AppContext,
-    ) -> Option<ServerConversationToken> {
-        let history_model = BlocklistAIHistoryModel::as_ref(ctx);
-        // Prefer loaded conversation data when available.
-        history_model
-            .conversation(&conversation_id)
-            .and_then(|conversation| {
-                conversation
-                    .server_conversation_token()
-                    .or_else(|| conversation.forked_from_server_conversation_token())
-                    .cloned()
-            })
-            .or_else(|| {
-                // Restored entries may only have server metadata loaded.
-                history_model
-                    .get_server_conversation_metadata(&conversation_id)
-                    .map(|metadata| metadata.server_conversation_token.clone())
-            })
-    }
-
     fn copy_debugging_menu_items(
         &self,
         conversation_token: ServerConversationToken,

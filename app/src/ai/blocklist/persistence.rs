@@ -481,6 +481,7 @@ impl SerializedBlockListItem {
 
     /// Uncaged one-history: the item's durable identity (the block id, which
     /// doubles as its turn id).
+    #[cfg(test)]
     pub(crate) fn id(&self) -> String {
         match self {
             Self::Command { block } => block.id.to_string(),

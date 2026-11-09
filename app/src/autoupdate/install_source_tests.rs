@@ -27,7 +27,6 @@ fn a_plain_download_may_self_update() {
     let source = detect_with(no_env, std::iter::once(dir.path()), cask_bundle());
     assert_eq!(source, InstallSource::SelfManaged);
     assert!(source.may_self_update());
-    assert_eq!(source.upgrade_hint(), None);
 }
 
 #[test]
@@ -40,7 +39,6 @@ fn a_homebrew_install_must_not_self_update() {
         !source.may_self_update(),
         "replacing a brew-managed bundle desyncs brew's records"
     );
-    assert_eq!(source.upgrade_hint(), Some("brew upgrade --cask uncaged"));
 }
 
 /// Apple Silicon and Intel put Homebrew in different places; finding it in

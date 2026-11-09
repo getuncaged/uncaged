@@ -19,6 +19,28 @@ fn custom_theme_from_file_value_path(path: &str) -> CustomTheme {
     CustomTheme::from_file_value(&custom_theme_json(path)).unwrap()
 }
 
+fn path_is_absolute_or_foreign_absolute(path: &Path) -> bool {
+    path.has_root() || path_looks_like_foreign_windows_absolute(path)
+}
+
+fn path_looks_like_foreign_windows_absolute(path: &Path) -> bool {
+    if path.has_root() {
+        return false;
+    }
+
+    let Some(path) = path.as_os_str().to_str() else {
+        return false;
+    };
+
+    let bytes = path.as_bytes();
+    let starts_with_drive_root = bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && matches!(bytes[2], b'\\' | b'/');
+
+    starts_with_drive_root || path.starts_with(r"\\")
+}
+
 fn custom_theme_path_for_storage(path: &Path, theme_root: &Path) -> PathBuf {
     if path_is_absolute_or_foreign_absolute(path) {
         return portable_custom_theme_storage_string(path, theme_root)
@@ -75,23 +97,12 @@ fn custom_theme_relative_parent_dir_path_is_preserved() {
 }
 
 #[test]
-fn custom_theme_relative_parent_dir_path_is_not_portable() {
-    let root = PathBuf::from("/Users/example/.warp/themes");
-
-    assert!(!custom_theme_path_is_portable(
-        &PathBuf::from("../outside.yml"),
-        &root
-    ));
-}
-
-#[test]
 fn custom_theme_absolute_parent_dir_path_under_theme_root_storage_helper_preserves_path_and_rejects_portability(
 ) {
     let root = PathBuf::from("/Users/example/.warp/themes");
     let path = root.join("../outside.yml");
 
     assert_eq!(custom_theme_path_from_storage(&path, &root), path);
-    assert!(!custom_theme_path_is_portable(&path, &root));
     assert_eq!(custom_theme_path_for_storage(&path, &root), path);
 }
 
@@ -154,14 +165,6 @@ fn custom_theme_windows_absolute_path_string_is_preserved() {
 }
 
 #[test]
-fn custom_theme_windows_absolute_path_string_is_not_portable() {
-    let root = PathBuf::from("/Users/example/.warp/themes");
-    let stored = PathBuf::from(r"C:\Users\example\AppData\Roaming\warp\Warp\data\themes\mocha.yml");
-
-    assert!(!custom_theme_path_is_portable(&stored, &root));
-}
-
-#[test]
 fn custom_theme_windows_absolute_path_string_storage_helper_preserves_path() {
     let root = PathBuf::from("/Users/example/.warp/themes");
     let stored = PathBuf::from(r"C:\Users\example\AppData\Roaming\warp\Warp\data\themes\mocha.yml");
@@ -184,15 +187,6 @@ fn custom_theme_relative_backslash_path_is_preserved() {
     let stored = PathBuf::from(r"catppuccin\mocha.yml");
 
     assert_eq!(custom_theme_path_from_storage(&stored, &root), stored);
-}
-
-#[test]
-#[cfg(not(windows))]
-fn custom_theme_relative_backslash_path_is_not_portable() {
-    let root = PathBuf::from("/Users/example/.warp/themes");
-    let stored = PathBuf::from(r"catppuccin\mocha.yml");
-
-    assert!(!custom_theme_path_is_portable(&stored, &root));
 }
 
 #[test]
@@ -341,14 +335,6 @@ mod windows_custom_theme_path_tests {
     }
 
     #[test]
-    fn custom_theme_windows_theme_root_path_is_portable() {
-        let root = windows_theme_root();
-        let path = root.join("catppuccin").join("mocha.yml");
-
-        assert!(custom_theme_path_is_portable(&path, &root));
-    }
-
-    #[test]
     fn custom_theme_windows_raw_unportable_stored_paths_are_preserved() {
         let root = windows_theme_root();
 
@@ -361,22 +347,6 @@ mod windows_custom_theme_path_tests {
                 portable_custom_theme_path_from_stored_raw(raw_path, &root),
                 PathBuf::from(raw_path)
             );
-        }
-    }
-
-    #[test]
-    fn custom_theme_windows_raw_unportable_paths_are_not_portable() {
-        let root = windows_theme_root();
-
-        for raw_path in [
-            r"catppuccin\mocha.yml",
-            "C:/Users/example/AppData/Roaming/warp/Warp/data/themes/mocha.yml",
-            "C:themes/mocha.yml",
-        ] {
-            assert!(!custom_theme_path_is_portable(
-                &PathBuf::from(raw_path),
-                &root
-            ));
         }
     }
 

@@ -221,28 +221,6 @@ pub struct ConversationDetailsData {
 }
 
 impl ConversationDetailsData {
-    fn directory_for_task(task: &AmbientAgentTask, app: &AppContext) -> Option<String> {
-        let history_model = BlocklistAIHistoryModel::as_ref(app);
-        let conversation_id = history_model
-            .conversation_id_for_agent_id(&task.run_id().to_string())
-            .or_else(|| {
-                task.conversation_id().and_then(|conversation_id| {
-                    history_model.find_conversation_id_by_server_token(
-                        &ServerConversationToken::new(conversation_id.to_string()),
-                    )
-                })
-            })?;
-
-        history_model
-            .conversation(&conversation_id)
-            .and_then(|conversation| conversation.initial_working_directory())
-            .or_else(|| {
-                history_model
-                    .get_conversation_metadata(&conversation_id)
-                    .and_then(|metadata| metadata.initial_working_directory.clone())
-            })
-    }
-
     /// Build details data from an in-memory `AIConversation`. Used both by the WASM
     /// transcript/shared-session details panel and by the native pane-level details panel
     /// when the active conversation is a local (non-cloud) Warp Agent run.
@@ -328,63 +306,6 @@ impl ConversationDetailsData {
             source_prompt: conversation.initial_query(),
             copy_link_url,
             skill_spec: None,
-            harness,
-        }
-    }
-
-    pub fn from_task(
-        task: &AmbientAgentTask,
-        open_action: Option<WorkspaceAction>,
-        copy_link_url: Option<String>,
-        app: &AppContext,
-    ) -> Self {
-        let error_message = if task.state.is_failure_like() {
-            task.status_message.as_ref().map(|m| m.message.clone())
-        } else {
-            None
-        };
-
-        let credits = task.credits_used();
-
-        let skill_spec = task
-            .agent_config_snapshot
-            .as_ref()
-            .and_then(|config| config.skill_spec.as_ref())
-            .and_then(|spec_str| SkillSpec::from_str(spec_str).ok());
-
-        let harness = task.agent_config_snapshot.as_ref().and_then(|config| {
-            config
-                .harness
-                .as_ref()
-                .map(|h| h.harness_type)
-                .or(Some(Harness::Oz))
-        });
-
-        ConversationDetailsData {
-            mode: PanelMode::Task {
-                task_id: Some(task.run_id()),
-                directory: Self::directory_for_task(task, app),
-                display_status: Some(AgentRunDisplayStatus::from_task(task, app)),
-                error_message,
-                conversation_id: task.conversation_id().map(str::to_string),
-            },
-            // Intentionally uses task.title; revisit when product decides
-            // whether to also show the short orchestrator label here.
-            title: task.title.clone(),
-            created_at: Some(task.created_at.with_timezone(&Local)),
-            artifacts: task.artifacts.clone(),
-            credits,
-            run_time: task.run_time(),
-            open_action,
-            creator: task
-                .creator
-                .as_ref()
-                .filter(|c| c.display_name.is_some())
-                .map(PrincipalInfo::from),
-            executor: task.executor.as_ref().map(PrincipalInfo::from),
-            source_prompt: Some(task.prompt.clone()),
-            copy_link_url,
-            skill_spec,
             harness,
         }
     }

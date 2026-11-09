@@ -113,7 +113,6 @@ pub(crate) enum OnboardingStep {
     Customize,
     Agent,
     AiAccess,
-    ThirdParty,
     Project,
     ThemePicker,
 }
@@ -380,30 +379,6 @@ impl OnboardingStateModel {
         ctx.notify();
     }
 
-    pub(crate) fn set_cli_agent_toolbar_enabled(
-        &mut self,
-        value: bool,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if self.agent_settings.cli_agent_toolbar_enabled == value {
-            return;
-        }
-        self.agent_settings.cli_agent_toolbar_enabled = value;
-        ctx.notify();
-    }
-
-    pub(crate) fn set_show_agent_notifications(
-        &mut self,
-        value: bool,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if self.agent_settings.show_agent_notifications == value {
-            return;
-        }
-        self.agent_settings.show_agent_notifications = value;
-        ctx.notify();
-    }
-
     pub(crate) fn set_show_code_review_button(
         &mut self,
         value: bool,
@@ -478,10 +453,7 @@ impl OnboardingStateModel {
         // When the new settings modes flag is on, ThemePicker comes after the agent slides
         // so it must also be guarded.
         let is_past_agent_slide = if FeatureFlag::OpenWarpNewSettingsModes.is_enabled() {
-            matches!(
-                self.step,
-                OnboardingStep::ThirdParty | OnboardingStep::ThemePicker
-            )
+            matches!(self.step, OnboardingStep::ThemePicker)
         } else {
             matches!(self.step, OnboardingStep::Project)
         };
@@ -552,7 +524,6 @@ impl OnboardingStateModel {
                 OnboardingStep::Intention
                 | OnboardingStep::AiSetup
                 | OnboardingStep::Agent
-                | OnboardingStep::ThirdParty
                 | OnboardingStep::Project => None,
             }
         } else {
@@ -564,7 +535,6 @@ impl OnboardingStateModel {
                 OnboardingStep::AiSetup => None,
                 OnboardingStep::AiAccess => None,
                 OnboardingStep::Customize => None,
-                OnboardingStep::ThirdParty => None,
                 OnboardingStep::Agent => Some(OnboardingStep::Intention),
                 OnboardingStep::Project => Some(OnboardingStep::Agent),
             }
@@ -591,7 +561,6 @@ impl OnboardingStateModel {
                 OnboardingStep::Intention
                 | OnboardingStep::AiSetup
                 | OnboardingStep::Agent
-                | OnboardingStep::ThirdParty
                 | OnboardingStep::Project => self.set_step(OnboardingStep::AiAccess, ctx),
             }
         } else {
@@ -603,7 +572,6 @@ impl OnboardingStateModel {
                 OnboardingStep::AiSetup => {}
                 OnboardingStep::AiAccess => {}
                 OnboardingStep::Customize => {}
-                OnboardingStep::ThirdParty => {}
                 OnboardingStep::Agent => self.set_step(OnboardingStep::Project, ctx),
                 OnboardingStep::Project => {}
             }
@@ -633,9 +601,7 @@ impl OnboardingStateModel {
                 OnboardingStep::Intention | OnboardingStep::AiSetup | OnboardingStep::Customize => {
                     (1, 4)
                 }
-                OnboardingStep::Agent | OnboardingStep::ThirdParty | OnboardingStep::AiAccess => {
-                    (2, 4)
-                }
+                OnboardingStep::Agent | OnboardingStep::AiAccess => (2, 4),
                 OnboardingStep::Project => (3, 4),
             };
         }
@@ -651,7 +617,6 @@ impl OnboardingStateModel {
             OnboardingStep::Intention
             | OnboardingStep::AiSetup
             | OnboardingStep::Agent
-            | OnboardingStep::ThirdParty
             | OnboardingStep::Project => 0,
         };
         (step_index, step_count)

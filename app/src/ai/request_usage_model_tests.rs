@@ -31,7 +31,6 @@ fn test_request_limit_info() {
                 embedding_generation_batch_size: 100,
             };
             assert_eq!(200, request_usage_model.request_limit());
-            assert_eq!(39, request_usage_model.requests_used());
             assert_eq!(161, request_usage_model.requests_remaining());
         })
     });
@@ -57,7 +56,6 @@ fn test_request_limit_info_with_limit() {
                 embedding_generation_batch_size: 100,
             };
             assert_eq!(999999999, request_usage_model.request_limit());
-            assert_eq!(39, request_usage_model.requests_used());
             assert_eq!(999999960, request_usage_model.requests_remaining());
         })
     });
@@ -83,7 +81,6 @@ fn test_request_limit_info_past_refresh_time() {
                 embedding_generation_batch_size: 100,
             };
             assert_eq!(200, request_usage_model.request_limit());
-            assert_eq!(0, request_usage_model.requests_used());
             assert_eq!(200, request_usage_model.requests_remaining());
         })
     });
@@ -109,7 +106,6 @@ fn test_request_limit_info_is_unlimited_true() {
                 embedding_generation_batch_size: 100,
             };
             assert_eq!(999999999, request_usage_model.request_limit());
-            assert_eq!(39, request_usage_model.requests_used());
             assert_eq!(999999999, request_usage_model.requests_remaining());
         })
     });

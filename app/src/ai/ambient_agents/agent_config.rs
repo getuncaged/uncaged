@@ -72,34 +72,6 @@ pub struct HarnessConfig {
     pub reasoning_level: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct HarnessModelConfig {
-    pub model_id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reasoning_level: Option<String>,
-}
-
-impl HarnessConfig {
-    /// Builds a harness config from just the harness type.
-    pub fn from_harness_type(harness_type: Harness) -> Self {
-        Self {
-            harness_type,
-            model_id: None,
-            reasoning_level: None,
-        }
-    }
-
-    pub fn model_config(&self) -> Option<HarnessModelConfig> {
-        self.model_id
-            .as_ref()
-            .filter(|id| !id.is_empty())
-            .map(|model_id| HarnessModelConfig {
-                model_id: model_id.clone(),
-                reasoning_level: self.reasoning_level.clone(),
-            })
-    }
-}
-
 fn serialize_harness<S: Serializer>(harness: &Harness, serializer: S) -> Result<S::Ok, S::Error> {
     serializer.serialize_str(harness.config_name())
 }
@@ -120,37 +92,4 @@ pub struct HarnessAuthSecretsConfig {
     /// Name of a managed secret for Codex harness authentication.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codex_auth_secret_name: Option<String>,
-}
-
-impl AgentConfigSnapshot {
-    /// Returns true if this config is empty (no options are set).
-    pub fn is_empty(&self) -> bool {
-        let Self {
-            name,
-            environment_id,
-            runner_id,
-            model_id,
-            base_prompt,
-            mcp_servers,
-            profile_id,
-            worker_host,
-            skill_spec,
-            computer_use_enabled,
-            harness,
-            harness_auth_secrets,
-        } = self;
-
-        name.is_none()
-            && environment_id.is_none()
-            && runner_id.is_none()
-            && model_id.is_none()
-            && base_prompt.is_none()
-            && mcp_servers.is_none()
-            && profile_id.is_none()
-            && worker_host.is_none()
-            && skill_spec.is_none()
-            && computer_use_enabled.is_none()
-            && harness.is_none()
-            && harness_auth_secrets.is_none()
-    }
 }

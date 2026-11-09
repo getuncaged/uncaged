@@ -109,7 +109,6 @@ pub struct StartAgentRequest {
 }
 
 struct PendingStartAgent {
-    parent_conversation_id: AIConversationId,
     /// Set once the child conversation is synchronously created.
     child_conversation_id: Option<AIConversationId>,
     sender: async_channel::Sender<StartAgentOutcome>,
@@ -483,7 +482,6 @@ impl StartAgentExecutor {
         self.pending.insert(
             request_id,
             PendingStartAgent {
-                parent_conversation_id,
                 child_conversation_id: None,
                 sender,
             },
@@ -539,7 +537,6 @@ impl StartAgentExecutor {
         self.pending.insert(
             request_id,
             PendingStartAgent {
-                parent_conversation_id,
                 child_conversation_id: None,
                 sender,
             },

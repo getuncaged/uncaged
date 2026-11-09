@@ -1,9 +1,7 @@
 use anyhow::{anyhow, Result};
-#[cfg(target_family = "wasm")]
 use uncaged_core::context_flag::ContextFlag;
 use url::Url;
 
-#[cfg(target_family = "wasm")]
 use crate::uri::browser_url_handler::parse_current_url;
 use crate::ChannelState;
 
@@ -125,7 +123,6 @@ impl WebIntent {
 }
 
 /// On WASM warp, fires an event to try and open the given link on the desktop app.
-#[cfg(target_family = "wasm")]
 pub fn open_url_on_desktop(url: &Url) {
     match WebIntent::try_from_url(url) {
         Ok(WebIntent::ConversationView(intent))
@@ -141,7 +138,6 @@ pub fn open_url_on_desktop(url: &Url) {
     };
 }
 
-#[cfg(target_family = "wasm")]
 fn set_context_flags_from_url(url: Url) {
     match WebIntent::try_from_url(&url) {
         Ok(WebIntent::ConversationView(_)) => ContextFlag::set_conversation_only(),
@@ -168,7 +164,6 @@ fn set_context_flags_from_url(url: Url) {
 }
 
 /// Looks at the current URL and converts it into an app intent.
-#[cfg(target_family = "wasm")]
 pub fn current_web_intent() -> Option<WebIntent> {
     let Some(current_url) = parse_current_url() else {
         log::warn!("Unable to parse the current url");
@@ -179,13 +174,10 @@ pub fn current_web_intent() -> Option<WebIntent> {
 }
 
 // Looks at the current url and converts it into an app intent.
-// NOTE: This is only intended for use with target_family = "wasm"
-#[cfg(target_family = "wasm")]
 pub fn parse_web_intent_from_current_url() -> Option<Url> {
     current_web_intent().map(WebIntent::into_intent_url)
 }
 
-#[cfg(target_family = "wasm")]
 pub fn set_context_flags_from_current_url() {
     let Some(current_url) = parse_current_url() else {
         log::warn!("Unable to parse the current url");

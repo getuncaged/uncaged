@@ -31,7 +31,7 @@ use crate::pane_group::{BackingView, Direction, PaneDragDropLocation, PaneId, Ta
 use crate::settings::CodeSettings;
 use crate::tab::tab_position_id;
 use crate::terminal::view::TerminalAction;
-use crate::view_components::{FeaturePopup, NewFeaturePopupEvent, NewFeaturePopupLabel};
+use crate::view_components::{FeaturePopup, NewFeaturePopupEvent};
 use crate::workspace::{TabBarDropTargetData, TabBarLocation, VerticalTabsPaneDropTargetData};
 
 pub(crate) mod components;
@@ -136,9 +136,7 @@ impl<P: BackingView> PaneHeader<P> {
         });
 
         let toolbelt_feature_popup = ctx.add_view(|_| {
-            FeaturePopup::new_feature(NewFeaturePopupLabel::FromString(
-                "Open files and review code diffs".to_string(),
-            ))
+            FeaturePopup::new_feature("Open files and review code diffs".to_string())
         });
         ctx.subscribe_to_view(&toolbelt_feature_popup, move |me, _, event, ctx| {
             me.handle_toolbelt_feature_popup_event(event, ctx);

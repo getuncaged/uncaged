@@ -534,11 +534,6 @@ impl AgentConversationsModel {
         self.tasks.values()
     }
 
-    #[cfg(test)]
-    pub(crate) fn insert_task_for_test(&mut self, task: AmbientAgentTask) {
-        self.tasks.insert(task.task_id, task);
-    }
-
     /// Returns normalized, owned entries for agent management/navigation surfaces.
     pub fn get_entries(
         &self,

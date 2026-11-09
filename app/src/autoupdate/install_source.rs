@@ -42,14 +42,6 @@ impl InstallSource {
         matches!(self, InstallSource::SelfManaged)
     }
 
-    /// What to tell the user to run instead, if anything.
-    pub fn upgrade_hint(self) -> Option<&'static str> {
-        match self {
-            InstallSource::Homebrew => Some("brew upgrade --cask uncaged"),
-            InstallSource::SelfManaged | InstallSource::DisabledByUser => None,
-        }
-    }
-
     /// The command that upgrades this install, for us to run on the user's behalf.
     ///
     /// Uncaged: a managed install is still a one-click update -- the click asks the manager

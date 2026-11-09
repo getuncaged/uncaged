@@ -179,14 +179,6 @@ impl SettingsPage {
 #[derive(PartialEq, Eq)]
 pub enum SettingsPageEvent {
     FocusModal,
-    Pane(PaneEventWrapper),
-}
-
-/// Wrapper for pane events to avoid circular dependency with pane module.
-/// The actual handling converts this to the real PaneEvent.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PaneEventWrapper {
-    Close,
 }
 
 /// Adds padding to the sub header

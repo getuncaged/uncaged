@@ -1,3 +1,4 @@
+use ai::skills::parse_skill;
 use repo_metadata::entry::{DirectoryEntry, Entry, FileMetadata};
 use repo_metadata::file_tree_store::FileTreeState;
 use repo_metadata::file_tree_update::{
@@ -17,7 +18,7 @@ use virtual_fs::{Stub, VirtualFS};
 
 use super::{
     extract_skill_parent_directory, find_project_skill_files_in_tree, is_home_provider_path,
-    is_home_skill_directory, is_skill_file, read_skills_from_files,
+    is_home_skill_directory, is_skill_file,
 };
 fn project_standing_results(
     skill_paths: impl IntoIterator<Item = StandardizedPath>,
@@ -584,7 +585,10 @@ fn find_skill_files_in_tree_finds_root_skills() {
                     .into_iter()
                     .filter_map(|path| path.to_local_path().map(|path| path.to_path_buf()))
                     .collect::<Vec<_>>();
-                let skills = read_skills_from_files(local_skill_files);
+                let skills = local_skill_files
+                    .iter()
+                    .filter_map(|path| parse_skill(path).ok())
+                    .collect::<Vec<_>>();
                 assert_eq!(skills.len(), 2);
                 let names: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
                 assert!(names.contains(&"root-skill-1"));
@@ -755,7 +759,10 @@ fn find_skill_files_in_tree_finds_subdirectory_skills() {
                     .into_iter()
                     .filter_map(|path| path.to_local_path().map(|path| path.to_path_buf()))
                     .collect::<Vec<_>>();
-                let skills = read_skills_from_files(local_skill_files);
+                let skills = local_skill_files
+                    .iter()
+                    .filter_map(|path| parse_skill(path).ok())
+                    .collect::<Vec<_>>();
                 assert_eq!(skills.len(), 2);
                 let names: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
                 assert!(names.contains(&"root-skill"));

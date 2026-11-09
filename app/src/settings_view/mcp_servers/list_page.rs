@@ -118,7 +118,6 @@ impl MCPServersListPageView {
                         // Refresh cards when servers are spawned or removed.
                         me.refresh_file_based_server_cards(ctx);
                     }
-                    _ => {}
                 });
 
                 // Refresh cards when MCP config files are parsed or removed.
@@ -128,7 +127,6 @@ impl MCPServersListPageView {
                     | FileMCPWatcherEvent::ConfigRemoved { .. } => {
                         me.refresh_file_based_server_cards(ctx);
                     }
-                    _ => {}
                 });
             }
         );
@@ -794,7 +792,7 @@ impl MCPServersListPageView {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            TemplatableMCPServerManagerEvent::StateChanged { uuid: _, state: _ }
+            TemplatableMCPServerManagerEvent::StateChanged { uuid: _ }
             | TemplatableMCPServerManagerEvent::ServerInstallationAdded(_)
             | TemplatableMCPServerManagerEvent::ServerInstallationDeleted(_)
             | TemplatableMCPServerManagerEvent::TemplatableMCPServersUpdated

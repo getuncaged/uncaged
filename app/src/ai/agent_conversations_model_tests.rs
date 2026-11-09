@@ -1667,7 +1667,10 @@ fn task_with_harness(
 ) -> AmbientAgentTask {
     let mut task = create_test_task(&make_uuid(index), creator_uid, Utc::now());
     task.agent_config_snapshot = harness.map(|harness| AgentConfigSnapshot {
-        harness: harness.map(HarnessConfig::from_harness_type),
+        harness: harness.map(|harness_type| HarnessConfig {
+            harness_type,
+            ..Default::default()
+        }),
         ..Default::default()
     });
     task

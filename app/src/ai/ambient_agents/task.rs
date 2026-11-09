@@ -5,13 +5,10 @@ use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use iso8601_duration::Duration as Iso8601Duration;
 use serde::{Deserialize, Serialize};
 use uncaged_core::report_error;
-use uncaged_core::ui::theme::WarpTheme;
-use uncaged_ui::color::ColorU;
 
 pub use super::agent_config::AgentConfigSnapshot;
 use super::AmbientAgentTaskId;
 use crate::ai::artifacts::{deserialize_artifacts, Artifact};
-use crate::ui_components::icons::Icon;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentSource {
@@ -53,21 +50,6 @@ impl AgentSource {
             AgentSource::Interactive | AgentSource::CloudMode => "Warp App",
             AgentSource::WebApp => "Oz Web",
             AgentSource::GitHubAction => "GitHub Action",
-        }
-    }
-
-    /// Returns true when tasks from this source must not accept user-triggered cloud follow-ups.
-    pub fn blocks_cloud_followups(&self) -> bool {
-        match self {
-            AgentSource::GitHubAction => true,
-            AgentSource::Linear
-            | AgentSource::AgentWebhook
-            | AgentSource::Slack
-            | AgentSource::Cli
-            | AgentSource::ScheduledAgent
-            | AgentSource::Interactive
-            | AgentSource::WebApp
-            | AgentSource::CloudMode => false,
         }
     }
 
@@ -184,35 +166,8 @@ impl AmbientAgentTask {
         self.task_id
     }
 
-    /// Returns the short label for this task: trimmed `agent_config_snapshot.name`,
-    /// trimmed `title`, or `"Agent"`.
-    pub fn display_name(&self) -> &str {
-        if let Some(name) = self
-            .agent_config_snapshot
-            .as_ref()
-            .and_then(|c| c.name.as_deref())
-        {
-            let trimmed = name.trim();
-            if !trimmed.is_empty() {
-                return trimmed;
-            }
-        }
-        let trimmed_title = self.title.trim();
-        if !trimmed_title.is_empty() {
-            return trimmed_title;
-        }
-        "Agent"
-    }
-
     pub fn conversation_id(&self) -> Option<&str> {
         self.conversation_id.as_deref()
-    }
-
-    /// Returns true when this task's source must not accept user-triggered cloud follow-ups.
-    pub fn blocks_cloud_followups(&self) -> bool {
-        self.source
-            .as_ref()
-            .is_some_and(AgentSource::blocks_cloud_followups)
     }
 
     pub fn active_run_execution(&self) -> RunExecution<'_> {
@@ -224,24 +179,8 @@ impl AmbientAgentTask {
         }
     }
 
-    pub fn active_execution_conversation_id(&self) -> Option<&str> {
-        if self.has_active_execution() {
-            self.conversation_id()
-        } else {
-            None
-        }
-    }
-
     pub fn has_active_execution(&self) -> bool {
         self.state == AmbientAgentTaskState::InProgress && self.active_run_execution().is_active()
-    }
-
-    pub fn is_terminal_run_state(&self) -> bool {
-        self.state.is_terminal()
-    }
-
-    pub fn can_submit_cloud_followup(&self) -> bool {
-        self.is_terminal_run_state() && !self.has_active_execution()
     }
 
     /// Total credits used (inference + compute + platform).
@@ -261,16 +200,6 @@ impl AmbientAgentTask {
     /// Creator's display name, if available.
     pub fn creator_display_name(&self) -> Option<String> {
         self.creator.as_ref().and_then(|c| c.display_name.clone())
-    }
-
-    /// Principal the run executed as, formatted for user-facing surfaces.
-    pub fn executor_display_name(&self) -> Option<String> {
-        self.executor.as_ref().and_then(|e| e.display_name.clone())
-    }
-
-    /// Returns true if the underlying session for the ambient agent is no longer running.
-    pub fn is_no_longer_running(&self) -> bool {
-        !self.active_run_execution().is_sandbox_running && !self.state.is_working()
     }
 }
 
@@ -292,25 +221,6 @@ pub enum AmbientAgentTaskState {
 }
 
 impl AmbientAgentTaskState {
-    pub fn is_working(&self) -> bool {
-        match self {
-            AmbientAgentTaskState::Queued
-            | AmbientAgentTaskState::Pending
-            | AmbientAgentTaskState::Claimed
-            | AmbientAgentTaskState::InProgress => true,
-            AmbientAgentTaskState::Succeeded
-            | AmbientAgentTaskState::Failed
-            | AmbientAgentTaskState::Error
-            | AmbientAgentTaskState::Blocked
-            | AmbientAgentTaskState::Cancelled
-            | AmbientAgentTaskState::Unknown => false,
-        }
-    }
-
-    pub fn is_cancellable(&self) -> bool {
-        self.is_working()
-    }
-
     pub fn is_failure_like(&self) -> bool {
         match self {
             AmbientAgentTaskState::Failed
@@ -323,39 +233,6 @@ impl AmbientAgentTaskState {
             | AmbientAgentTaskState::InProgress
             | AmbientAgentTaskState::Succeeded
             | AmbientAgentTaskState::Cancelled => false,
-        }
-    }
-
-    pub fn is_terminal(&self) -> bool {
-        match self {
-            AmbientAgentTaskState::Succeeded
-            | AmbientAgentTaskState::Failed
-            | AmbientAgentTaskState::Error
-            | AmbientAgentTaskState::Blocked
-            | AmbientAgentTaskState::Cancelled
-            | AmbientAgentTaskState::Unknown => true,
-            AmbientAgentTaskState::Queued
-            | AmbientAgentTaskState::Pending
-            | AmbientAgentTaskState::Claimed
-            | AmbientAgentTaskState::InProgress => false,
-        }
-    }
-
-    pub fn status_icon_and_color(&self, theme: &WarpTheme) -> (Icon, ColorU) {
-        match self {
-            AmbientAgentTaskState::Queued
-            | AmbientAgentTaskState::Pending
-            | AmbientAgentTaskState::Claimed
-            | AmbientAgentTaskState::InProgress => (Icon::ClockLoader, theme.ansi_fg_magenta()),
-            AmbientAgentTaskState::Succeeded => (Icon::Check, theme.ansi_fg_green()),
-            AmbientAgentTaskState::Failed
-            | AmbientAgentTaskState::Error
-            | AmbientAgentTaskState::Unknown => (Icon::Triangle, theme.ansi_fg_red()),
-            AmbientAgentTaskState::Blocked => (Icon::StopFilled, theme.ansi_fg_yellow()),
-            AmbientAgentTaskState::Cancelled => (
-                Icon::Cancelled,
-                theme.disabled_text_color(theme.background()).into_solid(),
-            ),
         }
     }
 }
@@ -399,20 +276,6 @@ pub enum TaskStatusErrorCode {
     EnvironmentSetupFailed,
     #[serde(other)]
     Unknown,
-}
-
-impl TaskStatusErrorCode {
-    pub fn is_environment_setup_failure(&self) -> bool {
-        matches!(self, TaskStatusErrorCode::EnvironmentSetupFailed)
-    }
-}
-
-impl TaskStatusMessage {
-    pub fn is_environment_setup_failure(&self) -> bool {
-        self.error_code
-            .as_ref()
-            .is_some_and(TaskStatusErrorCode::is_environment_setup_failure)
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]

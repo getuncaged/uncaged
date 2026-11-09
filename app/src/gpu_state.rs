@@ -18,12 +18,8 @@ impl GPUState {
     }
 }
 
-pub enum GPUStateEvent {
-    LowPowerGPUAvailable,
-}
-
 impl SingletonEntity for GPUState {}
 
 impl Entity for GPUState {
-    type Event = GPUStateEvent;
+    type Event = ();
 }

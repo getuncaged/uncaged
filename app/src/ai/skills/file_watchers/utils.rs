@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use ai::skills::{
-    home_skills_path, parse_skill, provider_parent_directory_for_skills_root, read_skills,
-    ParsedSkill, SkillProvider, SKILL_PROVIDER_DEFINITIONS,
+    home_skills_path, provider_parent_directory_for_skills_root, read_skills, ParsedSkill,
+    SkillProvider, SKILL_PROVIDER_DEFINITIONS,
 };
 use anyhow::Error;
 use repo_metadata::{RepoMetadataModel, RepositoryIdentifier};
@@ -113,13 +113,6 @@ pub fn read_skills_from_directories(
     skill_dirs
         .into_iter()
         .flat_map(|dir| read_skills(&dir))
-        .collect()
-}
-/// Reads all skills from the given concrete skill files.
-pub fn read_skills_from_files(skill_files: impl IntoIterator<Item = PathBuf>) -> Vec<ParsedSkill> {
-    skill_files
-        .into_iter()
-        .filter_map(|path| parse_skill(&path).ok())
         .collect()
 }
 

@@ -29,11 +29,11 @@ use uncaged_ui::{
     SingletonEntity, SizeConstraint, View, ViewContext, ViewHandle,
 };
 
-use crate::ai::auth_secret_types::auth_secret_types_for_harness;
+use crate::ai::auth_secret_types::harness_has_auth_secret_types;
 use crate::ai::blocklist::inline_action::host_picker::HostPicker;
 use crate::ai::cloud_agent_settings::CloudAgentSettings;
 use crate::ai::execution_profiles::model_menu_items::available_model_menu_items;
-use crate::ai::harness_availability::{AuthSecretFetchState, HarnessAvailabilityModel};
+use crate::ai::harness_availability::HarnessAvailabilityModel;
 use crate::ai::harness_display;
 use crate::ai::llms::LLMInfo;
 use crate::ai::local_harness_setup::{
@@ -864,13 +864,11 @@ pub fn should_show_auth_secret_picker(state: &OrchestrationEditState) -> bool {
     if harness == Harness::Oz {
         return false;
     }
-    !auth_secret_types_for_harness(harness).is_empty()
+    harness_has_auth_secret_types(harness)
 }
 
 /// Returns the persisted last-selected secret name for this harness, or
-/// `None`. Only promotes a persisted name; never auto-picks the first
-/// loaded secret. Validates against the loaded secrets list when present,
-/// returning `None` if the persisted name has been deleted server-side.
+/// `None`. Only promotes a persisted name; never auto-picks a secret.
 pub fn resolve_default_auth_secret_for_harness(
     harness_type: &str,
     ctx: &AppContext,
@@ -879,23 +877,12 @@ pub fn resolve_default_auth_secret_for_harness(
     if harness == Harness::Oz {
         return None;
     }
-    let persisted = CloudAgentSettings::as_ref(ctx)
+    CloudAgentSettings::as_ref(ctx)
         .last_selected_auth_secret
         .value()
         .get(harness.config_name())
         .cloned()
-        .filter(|name| !name.trim().is_empty());
-
-    let availability = HarnessAvailabilityModel::as_ref(ctx);
-    match availability.auth_secrets_for(harness) {
-        AuthSecretFetchState::Loaded(secrets) => {
-            // Drop the persisted name if the secret was deleted server-side.
-            persisted.filter(|name| secrets.iter().any(|s| s.name == *name))
-        }
-        // Pre-fetch: optimistically show the persisted name; the
-        // `AuthSecretsLoaded` subscription will re-resolve.
-        _ => persisted,
-    }
+        .filter(|name| !name.trim().is_empty())
 }
 
 /// Returns the full persisted selection (Named / Inherit / Unset) for
@@ -942,7 +929,7 @@ pub fn auth_secret_selection_required(state: &OrchestrationEditState, _ctx: &App
     let Some(harness) = Harness::parse_orchestration_harness(&state.harness_type) else {
         return false;
     };
-    if harness == Harness::Oz || auth_secret_types_for_harness(harness).is_empty() {
+    if harness == Harness::Oz || !harness_has_auth_secret_types(harness) {
         return false;
     }
     true
@@ -976,9 +963,8 @@ pub fn accept_disabled_reason_with_auth(
     None
 }
 
-/// Populates the auth secret picker: Inherit, then the loaded managed secrets. Also
-/// kicks off a lazy fetch so subsequent paints replace "Loading…" with
-/// real entries.
+/// Populates the auth secret picker: Inherit, then a disabled "Loading…" row (there is no
+/// managed-secrets source to list).
 pub fn populate_auth_secret_picker_for_harness<A: OrchestrationControlAction, V: View>(
     dropdown: &ViewHandle<Dropdown<A>>,
     selection: &AuthSecretSelection,
@@ -991,49 +977,16 @@ pub fn populate_auth_secret_picker_for_harness<A: OrchestrationControlAction, V:
     if harness == Harness::Oz {
         return;
     }
-    let initial = match selection {
-        AuthSecretSelection::Named(name) => Some(name.clone()),
-        _ => None,
-    };
     let selection = selection.clone();
     dropdown.update(ctx, |dropdown, ctx_dropdown| {
-        let availability = HarnessAvailabilityModel::as_ref(ctx_dropdown);
-        let mut items: Vec<MenuItem<DropdownAction>> = Vec::new();
-
-        items.push(MenuItem::Item(
-            MenuItemFields::new(AUTH_SECRET_INHERIT_LABEL).with_on_select_action(
-                DropdownAction::select_action_and_close(A::auth_secret_changed(None)),
+        let items: Vec<MenuItem<DropdownAction>> = vec![
+            MenuItem::Item(
+                MenuItemFields::new(AUTH_SECRET_INHERIT_LABEL).with_on_select_action(
+                    DropdownAction::select_action_and_close(A::auth_secret_changed(None)),
+                ),
             ),
-        ));
-
-        let mut selected_display_name: Option<String> = None;
-        match availability.auth_secrets_for(harness) {
-            AuthSecretFetchState::Loaded(secrets) => {
-                for secret in secrets {
-                    let name = secret.name.clone();
-                    if Some(&name) == initial.as_ref() {
-                        selected_display_name = Some(name.clone());
-                    }
-                    items.push(MenuItem::Item(
-                        MenuItemFields::new(&name).with_on_select_action(
-                            DropdownAction::select_action_and_close(A::auth_secret_changed(Some(
-                                name.clone(),
-                            ))),
-                        ),
-                    ));
-                }
-            }
-            AuthSecretFetchState::NotFetched | AuthSecretFetchState::Loading => {
-                items.push(MenuItem::Item(
-                    MenuItemFields::new("Loading…").with_disabled(true),
-                ));
-            }
-            AuthSecretFetchState::Failed(_) => {
-                items.push(MenuItem::Item(
-                    MenuItemFields::new("Unable to load secrets").with_disabled(true),
-                ));
-            }
-        }
+            MenuItem::Item(MenuItemFields::new("Loading…").with_disabled(true)),
+        ];
 
         // Trigger label derives directly from the selection rather than
         // auto-picking the first loaded key.
@@ -1043,8 +996,6 @@ pub fn populate_auth_secret_picker_for_harness<A: OrchestrationControlAction, V:
                 AUTH_SECRET_INHERIT_LABEL.to_string()
             }
         };
-        let _ = selected_display_name;
-        let _ = &availability;
 
         dropdown.set_rich_items(items, ctx_dropdown);
         dropdown.set_selected_by_name(&final_selection, ctx_dropdown);
@@ -1255,20 +1206,6 @@ pub fn repopulate_all_pickers<A: OrchestrationControlAction, V: View>(
             is_local,
             ctx,
         );
-    }
-    // Drop any `Named(_)` selection whose secret no longer exists.
-    if let Some(harness) = Harness::parse_orchestration_harness(&state.harness_type) {
-        if harness != Harness::Oz {
-            if let AuthSecretFetchState::Loaded(secrets) =
-                HarnessAvailabilityModel::as_ref(ctx).auth_secrets_for(harness)
-            {
-                if let AuthSecretSelection::Named(name) = &state.auth_secret_selection {
-                    if !secrets.iter().any(|s| s.name == *name) {
-                        state.auth_secret_selection = AuthSecretSelection::Unset;
-                    }
-                }
-            }
-        }
     }
     // Re-seed `Unset` from persisted settings. Leaves `Inherit` alone.
     // Uses the full selection resolver so a prior explicit Inherit is

@@ -149,6 +149,7 @@ pub(crate) fn run_if_needed(may_move: bool) {
 
 /// The previous identity's data domain, while this launch uses a different
 /// one: secrets stored under it are still read (and copied forward).
+#[cfg(not(feature = "integration_tests"))]
 pub(crate) fn legacy_data_domain() -> Option<String> {
     if ChannelState::channel() != Channel::Oss {
         return None;

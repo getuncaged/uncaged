@@ -80,7 +80,6 @@ struct FocusedTerminalState {
 pub struct ActiveAgentViewsModel {
     /// Per-window focused terminal state, keyed by WindowId.
     focused_terminal_states: HashMap<WindowId, FocusedTerminalState>,
-    last_focused_terminal_state: Option<FocusedTerminalState>,
     /// Map from terminal_view_id to agent view handles (for interactive conversations).
     agent_view_handles: HashMap<EntityId, ActiveAgentViewHandles>,
     /// Map from terminal_view_id to ambient task ID (for open ambient sessions).
@@ -99,7 +98,6 @@ impl ActiveAgentViewsModel {
     pub fn new() -> Self {
         Self {
             focused_terminal_states: HashMap::new(),
-            last_focused_terminal_state: None,
             agent_view_handles: HashMap::new(),
             ambient_sessions: HashMap::new(),
             last_opened_times: HashMap::new(),
@@ -119,17 +117,6 @@ impl ActiveAgentViewsModel {
                 )
             {
                 focused_terminal_state.active_conversation_id = conversation_id;
-            }
-        }
-
-        if let Some(last_focused_terminal_state) = &mut self.last_focused_terminal_state {
-            if last_focused_terminal_state.focused_terminal_id == terminal_view_id
-                && !matches!(
-                    last_focused_terminal_state.active_conversation_id,
-                    Some(ConversationOrTaskId::TaskId(_))
-                )
-            {
-                last_focused_terminal_state.active_conversation_id = conversation_id;
             }
         }
     }
@@ -218,13 +205,6 @@ impl ActiveAgentViewsModel {
             // If the focused terminal is the one being unregistered, clear the focused state.
             self.focused_terminal_states
                 .retain(|_, state| state.focused_terminal_id != terminal_pane_id);
-            if self
-                .last_focused_terminal_state
-                .as_ref()
-                .is_some_and(|state| state.focused_terminal_id == terminal_pane_id)
-            {
-                self.last_focused_terminal_state = None;
-            }
 
             if let Some(conversation_id) = closed_conversation_id {
                 ctx.emit(ActiveAgentViewsEvent::ConversationClosed { conversation_id });
@@ -262,7 +242,6 @@ impl ActiveAgentViewsModel {
                 focused_terminal_id: terminal_view_id,
                 active_conversation_id,
             };
-            self.last_focused_terminal_state = Some(new_state.clone());
             self.focused_terminal_states.insert(window_id, new_state);
         } else {
             self.focused_terminal_states.remove(&window_id);
@@ -285,21 +264,6 @@ impl ActiveAgentViewsModel {
         self.focused_terminal_states
             .get(&window_id)
             .map(|state| state.focused_terminal_id)
-    }
-
-    /// Get the last focused terminal view id (persisted across non-terminal focus changes).
-    pub fn get_last_focused_terminal_id(&self) -> Option<EntityId> {
-        self.last_focused_terminal_state
-            .as_ref()
-            .map(|state| state.focused_terminal_id)
-    }
-
-    /// Get the most recent focused conversation or ambient task ID, persisted
-    /// across non-terminal focus changes.
-    pub fn get_last_focused_conversation(&self) -> Option<ConversationOrTaskId> {
-        self.last_focused_terminal_state
-            .as_ref()
-            .and_then(|state| state.active_conversation_id)
     }
 
     /// Returns the focused conversation ID if it's a new/empty conversation view.

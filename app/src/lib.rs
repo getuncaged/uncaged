@@ -1162,7 +1162,6 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(|_| ActiveAgentViewsModel::new());
     ctx.add_singleton_model(AgentNotificationsModel::new);
     ctx.add_singleton_model(BlocklistAIPermissions::new);
-    ctx.add_singleton_model(ai::blocklist::orchestration_events::OrchestrationEventService::new);
 
     mark_startup_sub_interval("conversation_models");
     ctx.add_singleton_model(RepoOutlines::new);

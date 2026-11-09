@@ -51,7 +51,6 @@ struct StateHandles {
 /// Zero state view shown when agent view is active but the conversation has no exchanges yet.
 pub struct AgentViewZeroStateBlock {
     conversation_id: AIConversationId,
-    origin: AgentViewEntryOrigin,
     agent_view_controller: ModelHandle<AgentViewController>,
     sessions: ModelHandle<Sessions>,
     terminal_model: Arc<FairMutex<TerminalModel>>,
@@ -153,7 +152,6 @@ impl AgentViewZeroStateBlock {
         let should_hide = matches!(origin, AgentViewEntryOrigin::AcceptedPassiveCodeDiff);
         Self {
             conversation_id,
-            origin,
             agent_view_controller,
             sessions: sessions.clone(),
             terminal_model,

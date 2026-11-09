@@ -27,7 +27,7 @@ use crate::model::{
 use crate::slides::{
     AgentSlide, AiAccessSlide, AiAccessSlideEvent, AiSetupSlide, ConnectGalleryData,
     CustomizeUISlide, IntentionSlide, IntroSlide, OnboardingModelInfo, OnboardingSlide,
-    ProjectSlide, ThemePickerSlide, ThemePickerSlideEvent, ThirdPartySlide,
+    ProjectSlide, ThemePickerSlide, ThemePickerSlideEvent,
 };
 
 #[derive(Clone, Debug)]
@@ -60,7 +60,6 @@ pub struct AgentOnboardingView {
     customize_slide: ViewHandle<CustomizeUISlide>,
     agent_slide: ViewHandle<AgentSlide>,
     ai_access_slide: ViewHandle<AiAccessSlide>,
-    third_party_slide: ViewHandle<ThirdPartySlide>,
     project_slide: ViewHandle<ProjectSlide>,
     skippable: bool,
     close_button: button::Button,
@@ -191,11 +190,6 @@ impl AgentOnboardingView {
             }
         });
 
-        let third_party_slide = {
-            let onboarding_state = onboarding_state.clone();
-            ctx.add_typed_action_view(move |ctx| ThirdPartySlide::new(onboarding_state, ctx))
-        };
-
         let project_slide = {
             let onboarding_state = onboarding_state.clone();
             ctx.add_typed_action_view(move |_| ProjectSlide::new(onboarding_state))
@@ -210,7 +204,6 @@ impl AgentOnboardingView {
             customize_slide,
             agent_slide,
             ai_access_slide,
-            third_party_slide,
             project_slide,
             skippable,
             close_button: button::Button::default(),
@@ -283,9 +276,6 @@ impl AgentOnboardingView {
             asset_cache.load_asset::<ImageType>(AssetSource::Bundled { path });
         }
         for path in CustomizeUISlide::VISUAL_IMAGE_PATHS {
-            asset_cache.load_asset::<ImageType>(AssetSource::Bundled { path });
-        }
-        for path in ThirdPartySlide::VISUAL_IMAGE_PATHS {
             asset_cache.load_asset::<ImageType>(AssetSource::Bundled { path });
         }
         for path in ThemePickerSlide::VISUAL_IMAGE_PATHS {
@@ -438,7 +428,6 @@ impl View for AgentOnboardingView {
             OnboardingStep::Customize => ChildView::new(&self.customize_slide).finish(),
             OnboardingStep::Agent => ChildView::new(&self.agent_slide).finish(),
             OnboardingStep::AiAccess => ChildView::new(&self.ai_access_slide).finish(),
-            OnboardingStep::ThirdParty => ChildView::new(&self.third_party_slide).finish(),
             OnboardingStep::Project => ChildView::new(&self.project_slide).finish(),
         };
 
@@ -554,9 +543,6 @@ impl TypedActionView for AgentOnboardingView {
                 dispatch_onboarding_action_to_slide(slide, *action, ctx)
             }),
             OnboardingStep::AiAccess => self.ai_access_slide.update(ctx, |slide, ctx| {
-                dispatch_onboarding_action_to_slide(slide, *action, ctx)
-            }),
-            OnboardingStep::ThirdParty => self.third_party_slide.update(ctx, |slide, ctx| {
                 dispatch_onboarding_action_to_slide(slide, *action, ctx)
             }),
             OnboardingStep::Project => self.project_slide.update(ctx, |slide, ctx| {

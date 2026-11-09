@@ -7,7 +7,7 @@ use instant::Instant;
 use uncaged_ui::color::ColorU;
 use uncaged_ui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Element, Expanded, Flex, MouseStateHandle,
-    ParentElement, Shrinkable, Text,
+    ParentElement, Text,
 };
 use uncaged_ui::text_layout::ClipConfig;
 use uncaged_ui::ui_components::components::UiComponent;
@@ -37,17 +37,8 @@ pub struct CopyableTextFieldConfig<'a> {
     pub is_selectable: bool,
     /// Whether the text should soft-wrap instead of being ellipsized.
     pub wrap_text: bool,
-    /// Placement of the copy button relative to the text.
-    pub copy_button_placement: CopyButtonPlacement,
-    /// Cross-axis alignment of the row (text + copy button).
-    pub cross_axis_alignment: Option<CrossAxisAlignment>,
 }
 
-#[derive(Clone, Copy)]
-pub enum CopyButtonPlacement {
-    NextToText,
-    EndOfContainer,
-}
 impl<'a> CopyableTextFieldConfig<'a> {
     /// Creates a new config with the given text.
     pub fn new(text: impl Into<String>) -> Self {
@@ -60,8 +51,6 @@ impl<'a> CopyableTextFieldConfig<'a> {
             last_copied_at: None,
             is_selectable: true,
             wrap_text: false,
-            copy_button_placement: CopyButtonPlacement::EndOfContainer,
-            cross_axis_alignment: None,
         }
     }
 
@@ -98,12 +87,6 @@ impl<'a> CopyableTextFieldConfig<'a> {
     /// Sets when the text was last copied (for checkmark feedback).
     pub fn with_last_copied_at(mut self, last_copied_at: Option<&'a Instant>) -> Self {
         self.last_copied_at = last_copied_at;
-        self
-    }
-
-    /// Sets the cross-axis alignment of the row.
-    pub fn with_cross_axis_alignment(mut self, alignment: CrossAxisAlignment) -> Self {
-        self.cross_axis_alignment = Some(alignment);
         self
     }
 
@@ -183,21 +166,9 @@ where
             .finish()
     };
 
-    let cross_axis_alignment = config
-        .cross_axis_alignment
-        .unwrap_or(CrossAxisAlignment::Center);
-
-    let mut row = Flex::row().with_cross_axis_alignment(cross_axis_alignment);
-    match config.copy_button_placement {
-        CopyButtonPlacement::NextToText => {
-            row.add_child(Shrinkable::new(1., text_element).finish());
-            row.add_child(Container::new(copy_button).with_padding_left(4.).finish());
-        }
-        CopyButtonPlacement::EndOfContainer => {
-            row.add_child(Expanded::new(1., text_element).finish());
-            row.add_child(Container::new(copy_button).with_padding_left(4.).finish());
-        }
-    }
-
-    row.finish()
+    Flex::row()
+        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(Expanded::new(1., text_element).finish())
+        .with_child(Container::new(copy_button).with_padding_left(4.).finish())
+        .finish()
 }
