@@ -20,7 +20,8 @@ use cocoa::appkit::NSMenuItem;
 use cocoa::base::nil;
 use cocoa::foundation::NSAutoreleasePool;
 use objc::runtime::Object;
-use objc::{msg_send, sel, sel_impl};
+use objc2::rc::Retained;
+use objc2::runtime::AnyObject;
 use uncaged_ui_core::actions::StandardAction;
 use uncaged_ui_core::keymap::Keystroke;
 use uncaged_ui_core::platform::menu::{MenuItem, MenuItemPropertyChanges};
@@ -68,9 +69,9 @@ fn apply_changes_local_pool_memory_behavior() {
         // we measure is the NSString temporaries inside `apply_changes`, not
         // the menu item objects themselves.
         let outer_pool = NSAutoreleasePool::new(nil);
-        let item: *mut Object = msg_send![NSMenuItem::alloc(nil), init];
+        let item: *mut Object = NSMenuItem::new(nil);
         // Retain so we can freely drain the outer pool after constructing it.
-        let _: *mut Object = msg_send![item, retain];
+        let retained_item = Retained::retain(item.cast::<AnyObject>());
         outer_pool.drain();
 
         for _ in 0..APPLY_CHANGES_ITERS {
@@ -89,6 +90,6 @@ fn apply_changes_local_pool_memory_behavior() {
         }
 
         // Balance the manual retain above.
-        let _: () = msg_send![item, release];
+        drop(retained_item);
     }
 }

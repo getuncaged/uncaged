@@ -75,11 +75,10 @@ deltae = "0.3.1"
 derivative.workspace = true
 dhat = { version = "0.3.2", optional = true }
 diesel.workspace = true
-difflib = { git = "https://github.com/warpdotdev/difflib.git", rev = "114177e7d8e1f8017baca397f943e11644b14d63" }
+difflib = "0.4.0"
 directories.workspace = true
 dirs.workspace = true
 dunce.workspace = true
-email_address = { git = "https://github.com/warpdotdev/rust-email_address", branch = "main" }
 embed_plist = "1.2"
 enclose = "1.1.8"
 enum-iterator.workspace = true
@@ -178,7 +177,7 @@ tabwriter = "1.4"
 tempfile.workspace = true
 thiserror.workspace = true
 thousands = "0.2.0"
-tikv-jemallocator = { version = "0.6", optional = true, features = [
+tikv-jemallocator = { version = "0.7", optional = true, features = [
     "override_allocator_on_supported_platforms",
 ] }
 toml = "0.8.13"
@@ -238,7 +237,6 @@ block.workspace = true
 cocoa.workspace = true
 core-foundation.workspace = true
 mach2 = "0.5"
-objc.workspace = true
 objc2.workspace = true
 objc2-app-kit = { workspace = true, features = [
     "NSApplication",

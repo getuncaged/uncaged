@@ -2272,7 +2272,7 @@ dependencies = [
 name = "command-corrections"
 version = "0.0.0"
 dependencies = [
- "difflib 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "difflib",
  "itertools 0.10.5",
  "lazy_static",
  "regex",
@@ -3142,14 +3142,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
 
 [[package]]
-name = "difflib"
-version = "0.4.0"
-source = "git+https://github.com/warpdotdev/difflib.git?rev=114177e7d8e1f8017baca397f943e11644b14d63#114177e7d8e1f8017baca397f943e11644b14d63"
-dependencies = [
- "rustc-hash 1.1.0",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3360,14 +3352,6 @@ name = "either"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
-
-[[package]]
-name = "email_address"
-version = "0.2.3"
-source = "git+https://github.com/warpdotdev/rust-email_address?branch=main#b3e5205b4efdc83832f230d8eb6894fd00a9ec32"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "email_address"
@@ -5915,7 +5899,7 @@ dependencies = [
  "ahash 0.8.11",
  "bytecount",
  "data-encoding",
- "email_address 0.2.9",
+ "email_address",
  "fancy-regex 0.17.0",
  "fraction",
  "getrandom 0.3.4",
@@ -7288,7 +7272,8 @@ dependencies = [
 [[package]]
 name = "objc"
 version = "0.2.7"
-source = "git+https://github.com/warpdotdev/rust-objc.git?rev=5b656827fa9f863ef0eb22e444a3fedac009e78a#5b656827fa9f863ef0eb22e444a3fedac009e78a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "915b1b472bc21c53464d6c8461c9d3af805ba1ef837e1cac254428f4a77177b1"
 dependencies = [
  "malloc_buf",
 ]
@@ -8065,7 +8050,8 @@ dependencies = [
 [[package]]
 name = "pathfinder_simd"
 version = "0.5.4"
-source = "git+https://github.com/warpdotdev/pathfinder.git?rev=34128a129ca6aee168fbc5060a4f21b4f7e486a9#34128a129ca6aee168fbc5060a4f21b4f7e486a9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cf07ef4804cfa9aea3b04a7bbdd5a40031dbb6b4f2cbaf2b011666c80c5b4f2"
 dependencies = [
  "rustc_version",
 ]
@@ -11338,8 +11324,9 @@ dependencies = [
 
 [[package]]
 name = "tikv-jemalloc-sys"
-version = "0.6.1+5.3.0-1-g0d7a26e9b6faa4ea33601ee605b5d86b68ff7790"
-source = "git+https://github.com/warpdotdev/jemallocator.git?rev=2ee30bfdf7059223b54810e4ea6c666f0a379e0b#2ee30bfdf7059223b54810e4ea6c666f0a379e0b"
+version = "0.7.1+5.3.1-0-g81034ce1f1373e37dc865038e1bc8eeecf559ce8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a2825c78386b4ae0314074867860ba9577875de945f05992c38815cbec327f0"
 dependencies = [
  "cc",
  "libc",
@@ -11347,8 +11334,9 @@ dependencies = [
 
 [[package]]
 name = "tikv-jemallocator"
-version = "0.6.1"
-source = "git+https://github.com/warpdotdev/jemallocator.git?rev=2ee30bfdf7059223b54810e4ea6c666f0a379e0b#2ee30bfdf7059223b54810e4ea6c666f0a379e0b"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "249f09e49ab1609436f34c776e84231bead18d6a955f119f939bdc1d847561bd"
 dependencies = [
  "libc",
  "tikv-jemalloc-sys",
@@ -12026,11 +12014,10 @@ dependencies = [
  "dhat",
  "diesel",
  "diesel_migrations",
- "difflib 0.4.0 (git+https://github.com/warpdotdev/difflib.git?rev=114177e7d8e1f8017baca397f943e11644b14d63)",
+ "difflib",
  "directories",
  "dirs 6.0.0",
  "dunce",
- "email_address 0.2.3",
  "embed-resource",
  "embed_plist",
  "enclose",
@@ -12096,7 +12083,6 @@ dependencies = [
  "num-traits",
  "num_cpus",
  "oauth2",
- "objc",
  "objc2 0.6.3",
  "objc2-app-kit 0.3.2",
  "objc2-core-foundation",

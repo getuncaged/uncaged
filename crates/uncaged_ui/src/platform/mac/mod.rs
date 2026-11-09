@@ -22,7 +22,6 @@ use cocoa::foundation::NSAutoreleasePool;
 pub use delegate::{AppDelegate, IntegrationTestDelegate};
 pub use fonts::FontDB;
 use geometry::*;
-use objc::{msg_send, sel, sel_impl};
 use objc2::rc::Retained;
 use objc2_foundation::NSString;
 pub use rendering::is_low_power_gpu_available;
@@ -76,7 +75,7 @@ impl Drop for AutoreleasePoolGuard {
         // SAFETY: `self.0` was produced by `NSAutoreleasePool::new` in
         // `Self::new` and is drained at most once here.
         unsafe {
-            let _: () = msg_send![self.0, drain];
+            self.0.drain();
         }
     }
 }

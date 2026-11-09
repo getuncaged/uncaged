@@ -136,6 +136,8 @@ enum-iterator = "1.1.3"
 env_logger = "0.10.0"
 event-listener = "5.4.0"
 float-cmp = "0.9.0"
+# font-kit pulls in crates.io pathfinder_simd, which Cargo.lock holds at 0.5.4:
+# 0.5.5 switched the scalar `round()` to round-half-to-even.
 font-kit = { path = "third_party/font-kit", default-features = false, features = [
   "source",
 ] }
@@ -482,12 +484,7 @@ core-foundation = { git = "https://github.com/servo/core-foundation-rs", rev = "
 core-foundation-sys = { git = "https://github.com/servo/core-foundation-rs", rev = "6f844cf1a1a18e25b70fcdf1bcdc458555bd2eff" }
 core-graphics = { git = "https://github.com/servo/core-foundation-rs", rev = "6f844cf1a1a18e25b70fcdf1bcdc458555bd2eff" }
 core-text = { git = "https://github.com/servo/core-foundation-rs", rev = "6f844cf1a1a18e25b70fcdf1bcdc458555bd2eff" }
-objc = { git = "https://github.com/warpdotdev/rust-objc.git", rev = "5b656827fa9f863ef0eb22e444a3fedac009e78a" }
-pathfinder_simd = { git = "https://github.com/warpdotdev/pathfinder.git", rev = "34128a129ca6aee168fbc5060a4f21b4f7e486a9" }
 # Vendored from Warp's fork: block scalars may contain a tab right after their
 # indentation, which upstream 0.4.5 rejects. See third_party/README.md.
 yaml-rust = { path = "third_party/yaml-rust" }
-
-tikv-jemallocator = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
-tikv-jemalloc-sys = { git = "https://github.com/warpdotdev/jemallocator.git", rev = "2ee30bfdf7059223b54810e4ea6c666f0a379e0b" }
 

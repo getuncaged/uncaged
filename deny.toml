@@ -49,5 +49,3 @@ allow-git = [
     # version to crates.io.
     "https://github.com/servo/core-foundation-rs",
 ]
-# Allow git references to all GitHub repositories in the warpdotdev organization.
-allow-org = { github = ["warpdotdev"] }

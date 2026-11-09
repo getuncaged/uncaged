@@ -925,10 +925,27 @@ async fn has_any_close_matches<'a>(
         // The fast ratio computations produce an upper bound on the value of
         // ratio, so if a faster check fails, the slower checks are guaranteed
         // to also fail.
-        if matcher.real_quick_ratio() >= cutoff && matcher.ratio() >= cutoff {
+        if real_quick_ratio(i, word) >= cutoff && matcher.ratio() >= cutoff {
             return true;
         }
     }
 
     false
 }
+
+/// Returns an upper bound on [`difflib::sequencematcher::SequenceMatcher::ratio`]
+/// for `a` and `b`, computed from their byte lengths alone (Python difflib's
+/// `real_quick_ratio`): `2 * min(len_a, len_b) / (len_a + len_b)`, or 1.0 when
+/// both are empty.
+fn real_quick_ratio(a: &str, b: &str) -> f32 {
+    let (len_a, len_b) = (a.len(), b.len());
+    let length = len_a + len_b;
+    if length == 0 {
+        return 1.0;
+    }
+    2.0 * len_a.min(len_b) as f32 / length as f32
+}
+
+#[cfg(test)]
+#[path = "input_model_tests.rs"]
+mod tests;
