@@ -49,9 +49,6 @@ pub struct AgentConfigSnapshot {
     /// If None, we use Warp's default ("oz").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub harness: Option<HarnessConfig>,
-    /// Authentication secrets for third-party harnesses.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub harness_auth_secrets: Option<HarnessAuthSecretsConfig>,
 }
 
 /// Configuration for a third-party execution harness.
@@ -82,14 +79,4 @@ fn deserialize_harness<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Har
         log::warn!("Unknown harness config name: {name:?}; treating as Unknown");
         Harness::Unknown
     }))
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct HarnessAuthSecretsConfig {
-    /// Name of a managed secret for Claude Code harness authentication.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub claude_auth_secret_name: Option<String>,
-    /// Name of a managed secret for Codex harness authentication.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub codex_auth_secret_name: Option<String>,
 }

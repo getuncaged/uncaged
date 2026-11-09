@@ -33,12 +33,6 @@ define_settings_group!(CloudAgentSettings, settings: [
         supported_platforms: SupportedPlatforms::ALL,
         private: true,
     },
-    harness_auth_ftux_completed: HarnessAuthFtuxCompleted {
-        type: HashMap<String, bool>,
-        default: HashMap::new(),
-        supported_platforms: SupportedPlatforms::ALL,
-        private: true,
-    },
     last_selected_harness: LastSelectedHarness {
         type: Option<String>,
         default: None,
@@ -53,22 +47,6 @@ define_settings_group!(CloudAgentSettings, settings: [
     },
     last_selected_harness_model: LastSelectedHarnessModel {
         type: HashMap<String, HarnessModelSelection>,
-        default: HashMap::new(),
-        supported_platforms: SupportedPlatforms::ALL,
-        private: true,
-    },
-    last_selected_auth_secret: LastSelectedAuthSecret {
-        type: HashMap<String, String>,
-        default: HashMap::new(),
-        supported_platforms: SupportedPlatforms::ALL,
-        private: true,
-    },
-    // Per-harness record of whether the user explicitly chose "Inherit
-    // key from environment" in the orchestration auth secret picker.
-    // Distinct from "never picked anything" (entry absent) so the plan
-    // card's Inherit choice survives across the RunAgents handoff.
-    inherit_auth_secret_harnesses: InheritAuthSecretHarnesses {
-        type: HashMap<String, bool>,
         default: HashMap::new(),
         supported_platforms: SupportedPlatforms::ALL,
         private: true,

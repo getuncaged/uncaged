@@ -21,8 +21,7 @@ use uncaged_ui::{
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::blocklist::inline_action::host_picker::{HostPicker, HostPickerEvent};
 use crate::ai::blocklist::inline_action::orchestration_controls::{
-    self as oc, AuthSecretSelection, OrchestrationControlAction, OrchestrationEditState,
-    OrchestrationPickerHandles,
+    self as oc, OrchestrationControlAction, OrchestrationEditState, OrchestrationPickerHandles,
 };
 use crate::ai::blocklist::BlocklistAIHistoryEvent;
 use crate::ai::document::ai_document_model::AIDocumentModel;
@@ -87,7 +86,6 @@ pub enum OrchestrationConfigBlockAction {
     HarnessChanged { harness_type: String },
     EnvironmentChanged { environment_id: String },
     WorkerHostChanged { worker_host: String },
-    AuthSecretChanged { auth_secret_name: Option<String> },
 }
 
 impl OrchestrationControlAction for OrchestrationConfigBlockAction {
@@ -102,9 +100,6 @@ impl OrchestrationControlAction for OrchestrationConfigBlockAction {
     }
     fn environment_changed(environment_id: String) -> Self {
         Self::EnvironmentChanged { environment_id }
-    }
-    fn auth_secret_changed(auth_secret_name: Option<String>) -> Self {
-        Self::AuthSecretChanged { auth_secret_name }
     }
 }
 
@@ -321,27 +316,6 @@ impl OrchestrationConfigBlockView {
         });
         self.pickers.host_picker = Some(host_handle);
 
-        // Seed the auth secret from persisted per-harness settings before
-        // building the picker so the dropdown shows the last selection.
-        // The full selection resolver honors an explicit `Inherit` choice
-        // (which isn't carried on the OrchestrationConfig wire payload).
-        if matches!(
-            self.edit_state.auth_secret_selection,
-            AuthSecretSelection::Unset
-        ) {
-            self.edit_state.auth_secret_selection =
-                oc::resolve_auth_secret_selection_for_harness(&self.edit_state.harness_type, ctx);
-        }
-        let auth_secret_handle = oc::new_standard_picker_dropdown(&colors, ctx);
-        auth_secret_handle.update(ctx, |d, c| d.set_use_overlay_layer(true, c));
-        oc::populate_auth_secret_picker_for_harness(
-            &auth_secret_handle,
-            &self.edit_state.auth_secret_selection,
-            &self.edit_state.harness_type,
-            ctx,
-        );
-        self.pickers.auth_secret_picker = Some(auth_secret_handle);
-
         self.pickers_initialized = true;
         oc::sync_picker_selections(&self.edit_state, &self.pickers, ctx);
     }
@@ -504,7 +478,7 @@ impl View for OrchestrationConfigBlockView {
                 column.add_child(Container::new(helper).with_margin_top(4.).finish());
 
                 // Validation
-                if let Some(reason) = oc::accept_disabled_reason_with_auth(&self.edit_state, app) {
+                if let Some(reason) = oc::accept_disabled_reason_with_setup(&self.edit_state) {
                     column.add_child(oc::render_validation_error(
                         reason,
                         theme.ui_error_color(),
@@ -597,17 +571,6 @@ impl TypedActionView for OrchestrationConfigBlockView {
                 self.edit_state.set_worker_host(worker_host.clone());
                 oc::persist_host_selection(worker_host, ctx);
                 self.apply_field_change(ctx);
-                ctx.notify();
-            }
-            OrchestrationConfigBlockAction::AuthSecretChanged { auth_secret_name } => {
-                // No `apply_field_change`: secrets are user-scoped and
-                // persisted side-channel, not baked into `OrchestrationConfig`.
-                oc::apply_auth_secret_change(
-                    &mut self.edit_state,
-                    &self.pickers,
-                    auth_secret_name.clone(),
-                    ctx,
-                );
                 ctx.notify();
             }
         }

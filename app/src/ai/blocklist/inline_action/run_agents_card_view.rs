@@ -34,7 +34,7 @@ use crate::ai::blocklist::inline_action::host_picker::{HostPicker, HostPickerEve
 use crate::ai::blocklist::inline_action::inline_action_header::{HeaderConfig, InteractionMode};
 use crate::ai::blocklist::inline_action::inline_action_icons;
 use crate::ai::blocklist::inline_action::orchestration_controls::{
-    self as oc, AuthSecretSelection, OrchestrationControlAction, OrchestrationPickerHandles,
+    self as oc, OrchestrationControlAction, OrchestrationPickerHandles,
 };
 use crate::ai::blocklist::inline_action::requested_action::{
     render_requested_action_row_for_text, CTRL_C_KEYSTROKE, ENTER_KEYSTROKE,
@@ -98,10 +98,6 @@ impl RunAgentsEditState {
             &req.harness_type,
             &req.execution_mode,
         );
-        // Carry the request's auth secret across the round trip. Absence
-        // becomes `Unset`; the picker re-resolves from persisted settings.
-        orch.auth_secret_selection =
-            AuthSecretSelection::from_optional_name(req.harness_auth_secret_name.clone());
         if matches!(req.execution_mode, RunAgentsExecutionMode::Local) {
             orch.sanitize_for_local_execution();
         }
@@ -125,7 +121,6 @@ impl RunAgentsEditState {
             execution_mode: self.orch.execution_mode.clone(),
             agent_run_configs: self.agent_run_configs.clone(),
             plan_id: self.plan_id.clone(),
-            harness_auth_secret_name: self.orch.auth_secret_name().map(str::to_string),
         }
     }
 }
@@ -142,9 +137,6 @@ impl OrchestrationControlAction for RunAgentsCardViewAction {
     }
     fn environment_changed(environment_id: String) -> Self {
         Self::EnvironmentChanged { environment_id }
-    }
-    fn auth_secret_changed(auth_secret_name: Option<String>) -> Self {
-        Self::AuthSecretChanged { auth_secret_name }
     }
 }
 
@@ -167,7 +159,6 @@ pub enum RunAgentsCardViewAction {
     HarnessChanged { harness_type: String },
     EnvironmentChanged { environment_id: String },
     WorkerHostChanged { worker_host: String },
-    AuthSecretChanged { auth_secret_name: Option<String> },
 }
 
 #[derive(Clone, Debug)]
@@ -375,8 +366,6 @@ impl RunAgentsCardView {
 
         view.ensure_pickers(ctx);
         view.refresh_accept_button_state(ctx);
-        // No-ops if secrets are still in flight; the `AuthSecretsLoaded`
-        // subscription will retry once they resolve.
 
         view
     }
@@ -406,15 +395,6 @@ impl RunAgentsCardView {
                 }
             }
         }
-        // Re-seed an Unset selection from persisted per-harness settings,
-        // honoring an explicit `Inherit` choice for this harness.
-        if matches!(
-            new_state.orch.auth_secret_selection,
-            AuthSecretSelection::Unset
-        ) {
-            new_state.orch.auth_secret_selection =
-                oc::resolve_auth_secret_selection_for_harness(&new_state.orch.harness_type, ctx);
-        }
         if self.state != new_state {
             let harness_or_model_changed = self.state.orch.harness_type
                 != new_state.orch.harness_type
@@ -439,7 +419,7 @@ impl RunAgentsCardView {
         if self.spawning.is_some() {
             return;
         }
-        if let Some(reason) = oc::accept_disabled_reason_with_auth(&self.state.orch, ctx) {
+        if let Some(reason) = oc::accept_disabled_reason_with_setup(&self.state.orch) {
             log::warn!("RunAgentsCardView: refusing Accept because action is disabled: {reason}");
             return;
         }
@@ -453,7 +433,7 @@ impl RunAgentsCardView {
     /// Re-derives the Accept button's `disabled` + tooltip from the gate.
     /// Call after every code path that mutates `self.state.orch`.
     fn refresh_accept_button_state(&mut self, ctx: &mut ViewContext<Self>) {
-        let reason = oc::accept_disabled_reason_with_auth(&self.state.orch, ctx);
+        let reason = oc::accept_disabled_reason_with_setup(&self.state.orch);
         let Some(mut accept) = self.handles.accept_button.clone() else {
             return;
         };
@@ -553,30 +533,6 @@ impl RunAgentsCardView {
                 }
             });
             self.handles.pickers.host_picker = Some(handle);
-        }
-
-        if self.handles.pickers.auth_secret_picker.is_none() {
-            // Seed from the request's secret name first; otherwise fall
-            // back to the persisted per-harness selection so the picker
-            // matches what cloud-mode would show. Honors an explicit
-            // `Inherit` choice for this harness.
-            if matches!(
-                self.state.orch.auth_secret_selection,
-                AuthSecretSelection::Unset
-            ) {
-                self.state.orch.auth_secret_selection =
-                    oc::resolve_auth_secret_selection_for_harness(
-                        &self.state.orch.harness_type,
-                        ctx,
-                    );
-            }
-            let selection = self.state.orch.auth_secret_selection.clone();
-            let harness_type = self.state.orch.harness_type.clone();
-            let handle = oc::new_standard_picker_dropdown(&colors, ctx);
-            Self::set_upward_menu_position(&handle, ctx);
-            oc::populate_auth_secret_picker_for_harness(&handle, &selection, &harness_type, ctx);
-            Self::subscribe_picker_close(&handle, ctx);
-            self.handles.pickers.auth_secret_picker = Some(handle);
         }
 
         self.sync_picker_selections(ctx);
@@ -810,16 +766,6 @@ impl TypedActionView for RunAgentsCardView {
             RunAgentsCardViewAction::WorkerHostChanged { worker_host } => {
                 self.state.orch.set_worker_host(worker_host.clone());
                 oc::persist_host_selection(worker_host, ctx);
-                self.refresh_accept_button_state(ctx);
-                ctx.notify();
-            }
-            RunAgentsCardViewAction::AuthSecretChanged { auth_secret_name } => {
-                oc::apply_auth_secret_change(
-                    &mut self.state.orch,
-                    &self.handles.pickers,
-                    auth_secret_name.clone(),
-                    ctx,
-                );
                 self.refresh_accept_button_state(ctx);
                 ctx.notify();
             }
@@ -1102,7 +1048,7 @@ fn render_editor(
         appearance,
     ));
 
-    if let Some(reason) = oc::accept_disabled_reason_with_auth(&state.orch, app) {
+    if let Some(reason) = oc::accept_disabled_reason_with_setup(&state.orch) {
         column.add_child(oc::render_validation_error(
             reason,
             theme.ui_error_color(),

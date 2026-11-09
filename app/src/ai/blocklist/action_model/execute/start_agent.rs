@@ -423,7 +423,6 @@ impl StartAgentExecutor {
                 worker_host,
                 harness_type,
                 title,
-                auth_secret_name,
             } => {
                 let harness_type = Harness::parse_orchestration_harness(&harness_type)
                     .map(|harness| harness.to_string())
@@ -470,7 +469,6 @@ impl StartAgentExecutor {
                         worker_host,
                         harness_type,
                         title,
-                        auth_secret_name,
                     },
                     Some(parent_run_id),
                 )

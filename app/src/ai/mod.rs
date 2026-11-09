@@ -13,7 +13,6 @@ pub(crate) mod api_error;
 pub(crate) mod artifact_download;
 pub mod artifacts;
 pub(crate) mod attachment_utils;
-pub mod auth_secret_types;
 pub(crate) mod block_context;
 pub(crate) mod blocklist;
 #[cfg(any(feature = "local_fs", not(target_family = "wasm")))]

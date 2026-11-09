@@ -14,7 +14,6 @@ use ai::agent::orchestration_config::OrchestrationConfig;
 use ai::skills::SkillReference;
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use settings::Setting;
 use uncaged_cli::agent::Harness;
 use uncaged_core::execution_mode::AppExecutionMode;
 use uncaged_ui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
@@ -26,10 +25,8 @@ use crate::ai::agent::{
     AIAgentAction, AIAgentActionId, AIAgentActionResultType, AIAgentActionType, AIAgentInput,
     StartAgentExecutionMode,
 };
-use crate::ai::auth_secret_types::harness_has_auth_secret_types;
 use crate::ai::blocklist::inline_action::orchestration_controls::OrchestrationEditState;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, BlocklistAIPermissions};
-use crate::ai::cloud_agent_settings::CloudAgentSettings;
 use crate::ai::document::plan_publication::{
     prepare_plan_publications, wait_for_plan_publications,
 };
@@ -234,7 +231,6 @@ impl RunAgentsExecutor {
             skills,
             agent_run_configs,
             base_prompt,
-            harness_auth_secret_name,
             ..
         } = request;
 
@@ -246,7 +242,6 @@ impl RunAgentsExecutor {
                 &harness_type,
                 &model_id,
                 &skills,
-                harness_auth_secret_name.as_deref(),
                 cfg,
             ) {
                 Ok(mode) => mode,
@@ -414,7 +409,6 @@ impl RunAgentsExecutor {
         }
         let mut resolved_request = request.clone();
         resolve_request_from_approved_config(&mut resolved_request, input.conversation_id, ctx);
-        populate_default_auth_secret_for_execution(&mut resolved_request, ctx);
         if self
             .duplicate_launched_agents_reason(&resolved_request, input.conversation_id, ctx)
             .is_some()
@@ -453,7 +447,6 @@ fn approved_orchestration_config_can_autoexecute(
     let mut resolved_request = request.clone();
     resolve_request_from_approved_config(&mut resolved_request, parent_conversation_id, ctx)
         .is_some_and(|status| status.is_approved())
-        && can_execute_with_auth_secret(&resolved_request, ctx)
 }
 
 fn resolve_request_from_approved_config(
@@ -473,8 +466,8 @@ fn resolve_request_from_approved_config(
 /// Normalizes the request and returns a denial reason when launch is blocked.
 ///
 /// Autonomous agents always run: their calls may still inherit approved plan
-/// config fields and default auth secrets, but they bypass interactive policy
-/// denials because they cannot present a confirmation card.
+/// config fields, but they bypass interactive policy denials because they
+/// cannot present a confirmation card.
 fn prepare_request_for_execution(
     request: &mut RunAgentsRequest,
     parent_conversation_id: AIConversationId,
@@ -483,7 +476,6 @@ fn prepare_request_for_execution(
     ctx: &ModelContext<RunAgentsExecutor>,
 ) -> Option<String> {
     let status = resolve_request_from_approved_config(request, parent_conversation_id, ctx);
-    populate_default_auth_secret_for_execution(request, ctx);
     if let Some(reason) =
         duplicate_launched_agents_reason(request, parent_conversation_id, launched_agents, ctx)
     {
@@ -504,13 +496,6 @@ fn prepare_request_for_execution(
     {
         return Some(
             "Running child agents is disabled by the active execution profile.".to_string(),
-        );
-    }
-
-    if !can_execute_with_auth_secret(request, ctx) {
-        return Some(
-            "Cloud child agents using this harness require an API key before they can run."
-                .to_string(),
         );
     }
 
@@ -610,65 +595,6 @@ fn normalize_agent_name(name: &str) -> Option<String> {
     (!trimmed.is_empty()).then(|| trimmed.to_ascii_lowercase())
 }
 
-fn requires_default_auth_secret_for_execution(request: &RunAgentsRequest) -> bool {
-    if !request.execution_mode.is_remote() {
-        return false;
-    }
-    let Some(harness) = Harness::parse_orchestration_harness(&request.harness_type) else {
-        return false;
-    };
-    harness != Harness::Oz && harness_has_auth_secret_types(harness)
-}
-
-fn can_execute_with_auth_secret(
-    request: &RunAgentsRequest,
-    ctx: &ModelContext<RunAgentsExecutor>,
-) -> bool {
-    if !requires_default_auth_secret_for_execution(request) {
-        return true;
-    }
-    if request
-        .harness_auth_secret_name
-        .as_deref()
-        .is_some_and(|name| !name.trim().is_empty())
-    {
-        return true;
-    }
-    default_auth_secret_name_for_harness(&request.harness_type, ctx).is_some()
-}
-
-fn default_auth_secret_name_for_harness(
-    harness_type: &str,
-    ctx: &ModelContext<RunAgentsExecutor>,
-) -> Option<String> {
-    let harness = Harness::parse_orchestration_harness(harness_type)?;
-    if harness == Harness::Oz {
-        return None;
-    }
-    CloudAgentSettings::as_ref(ctx)
-        .last_selected_auth_secret
-        .value()
-        .get(harness.config_name())
-        .cloned()
-        .filter(|name| !name.trim().is_empty())
-}
-
-fn populate_default_auth_secret_for_execution(
-    request: &mut RunAgentsRequest,
-    ctx: &ModelContext<RunAgentsExecutor>,
-) {
-    if !requires_default_auth_secret_for_execution(request)
-        || request
-            .harness_auth_secret_name
-            .as_deref()
-            .is_some_and(|name| !name.trim().is_empty())
-    {
-        return;
-    }
-    request.harness_auth_secret_name =
-        default_auth_secret_name_for_harness(&request.harness_type, ctx);
-}
-
 /// Unconditionally overrides run-wide fields on a `RunAgentsRequest`
 /// from the approved orchestration config, delegating to
 /// `OrchestrationEditState::override_from_approved_config`.
@@ -725,16 +651,11 @@ pub fn compose_run_agents_child_prompt(base_prompt: &str, per_agent_prompt: &str
 /// Translates run-wide config into a per-child
 /// [`StartAgentExecutionMode`]. Returns `Err` for rejected
 /// combinations (e.g. OpenCode+Remote).
-///
-/// `run_auth_secret_name` is the managed-secret name the orchestration UI
-/// resolved for the run-wide harness; only Remote mode currently consumes
-/// it (Local children inherit auth from the user's shell environment).
 pub fn run_agents_to_start_agent_mode(
     run_execution_mode: &RunAgentsExecutionMode,
     run_harness_type: &str,
     run_model_id: &str,
     run_skills: &[SkillReference],
-    run_auth_secret_name: Option<&str>,
     cfg: &RunAgentsAgentRunConfig,
 ) -> Result<StartAgentExecutionMode, String> {
     match run_execution_mode {
@@ -779,9 +700,6 @@ pub fn run_agents_to_start_agent_mode(
                 worker_host: worker_host.clone(),
                 harness_type: run_harness_type.to_string(),
                 title: cfg.title.clone(),
-                auth_secret_name: run_auth_secret_name
-                    .map(str::to_string)
-                    .filter(|s| !s.trim().is_empty()),
             })
         }
     }
