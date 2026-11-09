@@ -648,8 +648,7 @@ impl AgentConversationsModel {
                 .and_then(|entry| model.resolve_entry_copy_link(&entry)),
             AgentConversationNavigationSubject::ServerToken(server_token) => model
                 .entry_for_server_token(&server_token, app)
-                .and_then(|entry| model.resolve_entry_copy_link(&entry))
-                .or_else(|| Some(server_token.conversation_link())),
+                .and_then(|entry| model.resolve_entry_copy_link(&entry)),
         }
     }
 
@@ -729,11 +728,7 @@ impl AgentConversationsModel {
             }
         }
 
-        entry
-            .identity
-            .server_conversation_token
-            .as_ref()
-            .map(ServerConversationToken::conversation_link)
+        None
     }
 
     fn entry_for_server_token(

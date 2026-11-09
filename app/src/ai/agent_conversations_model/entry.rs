@@ -443,9 +443,8 @@ pub(super) fn entry_for_task(
     let can_open = has_open_ambient_session
         || local_conversation_id.is_some()
         || server_conversation_token.is_some();
-    let can_copy_link = task.has_active_execution()
-        && task.active_run_execution().session_link.is_some()
-        || server_conversation_token.is_some();
+    let can_copy_link =
+        task.has_active_execution() && task.active_run_execution().session_link.is_some();
 
     AgentConversationEntry {
         id: AgentConversationEntryId::AmbientRun(task.task_id),
@@ -605,12 +604,7 @@ fn entry_for_conversation_parts(
         },
         capabilities: AgentConversationCapabilities {
             can_open: has_local_persisted_data || has_cloud_data,
-            can_copy_link: server_conversation_token_for_conversation(
-                conversation_id,
-                Some(&metadata.nav_data),
-                history_model,
-            )
-            .is_some(),
+            can_copy_link: false,
             can_delete: has_local_persisted_data,
             can_fork_locally: has_local_persisted_data,
             can_cancel: status.is_cancellable(),

@@ -201,31 +201,13 @@ impl TerminalView {
         conversation_token: ServerConversationToken,
         server_output_id: Option<ServerOutputId>,
     ) -> Vec<(String, ContextMenuAction)> {
-        if ChannelState::channel().is_dogfood() {
-            vec![
-                (
-                    "Copy debugging link".to_string(),
-                    ContextMenuAction::CopyAIDebuggingLink {
-                        conversation_token: conversation_token.clone(),
-                        request_id: server_output_id,
-                    },
-                ),
-                (
-                    "Copy conversation ID".to_string(),
-                    ContextMenuAction::CopyConversationId {
-                        conversation_id: conversation_token,
-                    },
-                ),
-            ]
-        } else {
-            vec![(
-                "Copy debugging ID".to_string(),
-                ContextMenuAction::CopyExternalDebuggingId {
-                    request_id: server_output_id,
-                    conversation_id: conversation_token,
-                },
-            )]
-        }
+        vec![(
+            "Copy debugging ID".to_string(),
+            ContextMenuAction::CopyExternalDebuggingId {
+                request_id: server_output_id,
+                conversation_id: conversation_token,
+            },
+        )]
     }
 
     pub(super) fn create_copy_debugging_menu_item(

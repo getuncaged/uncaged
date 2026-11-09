@@ -289,8 +289,6 @@ pub enum TerminalAction {
     ClearMarkedText,
     ShowInitializationBlock,
     GenerateCodebaseIndex,
-    /// This is for debugging, dev only for now
-    LoadAgentModeConversation,
     /// Removes a pending attachment (image or file) by index in the unified list.
     DeleteAttachment {
         index: usize,
@@ -584,7 +582,6 @@ impl fmt::Debug for TerminalAction {
             ClearMarkedText => write!(f, "ClearMarkedText"),
             ShowInitializationBlock => write!(f, "ShowInitializationBlock"),
             GenerateCodebaseIndex => write!(f, "GenerateIndexForRepo"),
-            LoadAgentModeConversation => write!(f, "LoadAgentModeConversation"),
             DeleteAttachment { index } => write!(f, "DeleteAttachment({index:?})"),
             OpenAttachmentLightbox { index } => {
                 write!(f, "OpenAttachmentLightbox({index:?})")

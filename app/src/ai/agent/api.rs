@@ -16,7 +16,6 @@ use futures_lite::Stream;
 use mcp::TemplatableMCPServerInfo;
 pub use r#impl::generate_multi_agent_output;
 use serde::Serialize;
-use uncaged_core::channel::ChannelState;
 use uncaged_core::execution_mode::AppExecutionMode;
 use uncaged_core::features::FeatureFlag;
 use uncaged_core::user_preferences::GetUserPreferences;
@@ -46,22 +45,6 @@ impl ServerConversationToken {
 
     pub fn as_str(&self) -> &str {
         &self.0
-    }
-
-    pub fn debug_link(&self) -> String {
-        format!(
-            "{}/debug/maa/{}",
-            ChannelState::server_root_url(),
-            self.as_str()
-        )
-    }
-
-    pub fn conversation_link(&self) -> String {
-        format!(
-            "{}/conversation/{}",
-            ChannelState::server_root_url(),
-            self.as_str()
-        )
     }
 }
 

@@ -277,9 +277,8 @@ impl ConversationDetailsData {
             directory = first_exchange.working_directory.clone();
         }
 
-        let copy_link_url = conversation_id
-            .as_ref()
-            .map(|id| ServerConversationToken::new(id.clone()).conversation_link());
+        // Conversations have no web link.
+        let copy_link_url = None;
 
         let harness = conversation
             .server_metadata()

@@ -1164,7 +1164,7 @@ fn test_resolve_copy_link_prefers_active_session_link() {
 }
 
 #[test]
-fn test_resolve_copy_link_uses_cloud_conversation_link_for_inactive_task() {
+fn test_resolve_copy_link_returns_none_for_inactive_task() {
     App::test((), |mut app| async move {
         add_entry_projection_test_models(&mut app);
 
@@ -1187,15 +1187,12 @@ fn test_resolve_copy_link_uses_cloud_conversation_link_for_inactive_task() {
                 ctx,
             );
 
-            assert_eq!(
-                link,
-                Some(ServerConversationToken::new(token.to_string()).conversation_link())
-            );
+            assert_eq!(link, None);
 
             let entry = AgentConversationsModel::as_ref(ctx)
                 .get_entry_by_id(&AgentConversationEntryId::AmbientRun(task_id), ctx)
                 .expect("task entry should exist");
-            assert!(entry.capabilities.can_copy_link);
+            assert!(!entry.capabilities.can_copy_link);
         });
     });
 }
@@ -1237,7 +1234,7 @@ fn test_resolve_copy_link_returns_none_for_local_only_unsynced_conversation() {
 }
 
 #[test]
-fn test_server_token_assignment_updates_copy_link_resolution() {
+fn test_server_token_assignment_emits_conversation_updated() {
     App::test((), |mut app| async move {
         let _interactive_management_guard =
             FeatureFlag::InteractiveConversationManagementView.override_enabled(true);
@@ -1325,16 +1322,14 @@ fn test_server_token_assignment_updates_copy_link_resolution() {
                 )),
                 ctx,
             );
-            assert_eq!(
-                link,
-                Some(ServerConversationToken::new(token.to_string()).conversation_link())
-            );
+            // Conversations have no web link, with or without a server token.
+            assert_eq!(link, None);
         });
     });
 }
 
 #[test]
-fn test_resolve_copy_link_uses_attached_synced_conversation_for_task_without_token() {
+fn test_task_without_token_attaches_synced_conversation() {
     App::test((), |mut app| async move {
         add_entry_projection_test_models(&mut app);
 
@@ -1389,15 +1384,12 @@ fn test_resolve_copy_link_uses_attached_synced_conversation_for_task_without_tok
                 ctx,
             );
 
-            assert_eq!(
-                link,
-                Some(ServerConversationToken::new(token.to_string()).conversation_link())
-            );
+            assert_eq!(link, None);
 
             let entry = AgentConversationsModel::as_ref(ctx)
                 .get_entry_by_id(&AgentConversationEntryId::AmbientRun(task_id), ctx)
                 .expect("task entry should exist");
-            assert!(entry.capabilities.can_copy_link);
+            assert!(!entry.capabilities.can_copy_link);
             assert_eq!(entry.identity.local_conversation_id, Some(conversation_id));
         });
     });

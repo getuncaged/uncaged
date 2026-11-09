@@ -175,12 +175,7 @@ fn print_conversation_id_assertion(
         BlocklistAIHistoryModel::handle(app).read(app, |history_model, _| {
             if let Some(conversation) = history_model.active_conversation(terminal_view.id()) {
                 if let Some(token) = conversation.server_conversation_token() {
-                    // The debug link within the container will be using host.docker.internal, but we're opening
-                    // from outside the container.
-                    let debug_link = token
-                        .debug_link()
-                        .replace("host.docker.internal", "localhost");
-                    println!("Conversation ID (debug link): {debug_link}");
+                    println!("Conversation ID: {}", token.as_str());
                     return AssertionOutcome::Success;
                 }
             }
