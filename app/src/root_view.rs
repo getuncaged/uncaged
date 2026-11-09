@@ -35,7 +35,6 @@ use crate::ai::onboarding::build_onboarding_models;
 use crate::app_state::{AppState, PaneUuid, WindowSnapshot};
 use crate::appearance::Appearance;
 use crate::autoupdate::{AutoupdateState, AutoupdateStateEvent, RequestType, UpdateReady};
-use crate::changelog_model::ChangelogRequestType;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{GenericStringObjectFormat, JsonObjectType, ObjectType};
 use crate::drive::items::WarpDriveItemId;
@@ -1378,16 +1377,6 @@ impl RootView {
         };
         if root_view.launch_splash.is_some() {
             Self::schedule_launch_splash_frame(ctx);
-        }
-
-        match &root_view.auth_onboarding_state {
-            AuthOnboardingState::Terminal(workspace) if FeatureFlag::Changelog.is_enabled() => {
-                // Only show the changelog if we aren't about to launch onboarding
-                workspace.update(ctx, |workspace, ctx| {
-                    workspace.check_for_changelog(ChangelogRequestType::WindowLaunch, ctx);
-                })
-            }
-            AuthOnboardingState::Terminal(_) | AuthOnboardingState::Onboarding { .. } => {}
         }
 
         let autoupdate_handle = AutoupdateState::handle(ctx);

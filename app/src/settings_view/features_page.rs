@@ -53,10 +53,10 @@ use crate::search::command_search::settings::CommandSearchSettings;
 use crate::settings::ai::AISettings;
 use crate::settings::native_preference::{NativePreferenceSettings, UserNativePreference};
 use crate::settings::{
-    AISettingsChangedEvent, AliasExpansionSettings, AppEditorSettings, ChangelogSettings,
-    CodeEditorLineNumberMode, CodeSettings, CtrlTabBehavior, DefaultSessionMode, ExtraMetaKeys,
-    GPUSettings, GlobalHotkeyMode, InputSettings, InputSettingsChangedEvent, QuakeModeSettings,
-    ScrollSettings, ScrollSettingsChangedEvent, SelectionSettings, SshSettings, TabBehavior,
+    AISettingsChangedEvent, AliasExpansionSettings, AppEditorSettings, CodeEditorLineNumberMode,
+    CodeSettings, CtrlTabBehavior, DefaultSessionMode, ExtraMetaKeys, GPUSettings,
+    GlobalHotkeyMode, InputSettings, InputSettingsChangedEvent, QuakeModeSettings, ScrollSettings,
+    ScrollSettingsChangedEvent, SelectionSettings, SshSettings, TabBehavior,
     DEFAULT_QUAKE_MODE_SIZE_PERCENTAGES, QUAKE_WINDOW_AUTOHIDE_SUPPORTED,
 };
 use crate::terminal::alt_screen_reporting::AltScreenReporting;
@@ -765,7 +765,6 @@ pub enum FeaturesPageAction {
     SetDefaultTabConfig(String),
     SearchForKeybinding(String),
     ToggleAutosuggestions,
-    ToggleShowChangelogAfterUpdate,
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     ToggleForceX11,
     ToggleAutosuggestionKeybindingHint,
@@ -1496,13 +1495,6 @@ impl TypedActionView for FeaturesPageView {
                         .toggle_and_save_value(ctx));
                 });
             }
-            ToggleShowChangelogAfterUpdate => {
-                ChangelogSettings::handle(ctx).update(ctx, |changelog_settings, ctx| {
-                    report_if_error!(changelog_settings
-                        .show_changelog_after_update
-                        .toggle_and_save_value(ctx));
-                })
-            }
             ToggleLinuxClipboardSelection => {
                 SelectionSettings::handle(ctx).update(ctx, |selection_settings, ctx| {
                     report_if_error!(selection_settings
@@ -1643,7 +1635,6 @@ impl FeaturesPageView {
         ctx.subscribe_to_model(&AliasExpansionSettings::handle(ctx), |_, _, _, ctx| {
             ctx.notify()
         });
-        ctx.subscribe_to_model(&ChangelogSettings::handle(ctx), |_, _, _, ctx| ctx.notify());
         ctx.subscribe_to_model(&CommandSearchSettings::handle(ctx), |_, _, _, ctx| {
             ctx.notify()
         });
@@ -2183,9 +2174,6 @@ impl FeaturesPageView {
         {
             general_widgets.push(Box::new(QuitWhenAllWindowsClosedWidget::default()));
         }
-
-        // Uncaged: no "Show changelog toast after updates" -- Uncaged has no changelog feed for
-        // the toast to show.
 
         let scroll_settings = ScrollSettings::as_ref(ctx);
         if scroll_settings

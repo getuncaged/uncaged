@@ -17,15 +17,13 @@ use super::section_views::{
 };
 use super::sections::sections;
 use super::{
-    ChangelogSectionView, ContentSectionData, ContentSectionView, FeatureSection,
-    FeatureSectionData, FeatureSectionView, Section, TipsCompleted,
+    ContentSectionData, ContentSectionView, FeatureSection, FeatureSectionData, FeatureSectionView,
+    Section, TipsCompleted,
 };
 use crate::appearance::Appearance;
-use crate::changelog_model::ChangelogModel;
 use crate::channel::ChannelState;
 use crate::features::FeatureFlag;
 use crate::resource_center::skip_tips_and_write_to_user_defaults;
-use crate::settings::Settings;
 use crate::workspace::WorkspaceAction;
 
 #[derive(Default)]
@@ -52,18 +50,10 @@ pub enum ResourceCenterMainAction {
 }
 
 impl ResourceCenterMainView {
-    pub fn new(
-        ctx: &mut ViewContext<Self>,
-        tips_completed: ModelHandle<TipsCompleted>,
-        changelog_model_handle: ModelHandle<ChangelogModel>,
-    ) -> Self {
+    pub fn new(ctx: &mut ViewContext<Self>, tips_completed: ModelHandle<TipsCompleted>) -> Self {
         let action_target = ctx.add_model(|_| ActionTarget::None);
-        let section_views = Self::initialize_section_views(
-            tips_completed.clone(),
-            action_target.clone(),
-            ctx,
-            changelog_model_handle.clone(),
-        );
+        let section_views =
+            Self::initialize_section_views(tips_completed.clone(), action_target.clone(), ctx);
         Self {
             button_mouse_states: Default::default(),
             clipped_scroll_state: Default::default(),
@@ -76,7 +66,6 @@ impl ResourceCenterMainView {
         tips_completed: ModelHandle<TipsCompleted>,
         action_target: ModelHandle<ActionTarget>,
         ctx: &mut ViewContext<Self>,
-        changelog_model_handle: ModelHandle<ChangelogModel>,
     ) -> Vec<SectionViewHandle> {
         let sections = sections(ctx);
 
@@ -114,26 +103,20 @@ impl ResourceCenterMainView {
                     let is_expanded = match data.section_name {
                         // Always show What's New section
                         FeatureSection::WhatsNew => true,
-                        FeatureSection::GettingStarted => match ChannelState::app_version() {
-                            Some(version) => {
-                                match Settings::has_changelog_been_shown(version, ctx) {
-                                    true => !is_tips_completed && !is_onboarded,
-                                    false => false,
-                                }
-                            }
-                            None => !is_tips_completed && !is_onboarded,
-                        },
+                        // These sections used to expand only once the release's changelog had been
+                        // shown, which never happens in Uncaged, so they start collapsed in any
+                        // build that knows its version.
+                        FeatureSection::GettingStarted => {
+                            ChannelState::app_version().is_none()
+                                && !is_tips_completed
+                                && !is_onboarded
+                        }
                         // Expand Maximize Warp section once user has completed welcome tips,
                         // and keep open after users have completed/skipped all tips
-                        FeatureSection::MaximizeWarp => match ChannelState::app_version() {
-                            Some(version) => {
-                                match Settings::has_changelog_been_shown(version, ctx) {
-                                    true => is_tips_completed || is_onboarded,
-                                    false => false,
-                                }
-                            }
-                            None => is_tips_completed || is_onboarded,
-                        },
+                        FeatureSection::MaximizeWarp => {
+                            ChannelState::app_version().is_none()
+                                && (is_tips_completed || is_onboarded)
+                        }
                         _ => false,
                     };
 
@@ -152,9 +135,6 @@ impl ResourceCenterMainView {
                 Section::Content(data) => {
                     SectionViewHandle::Content(Self::build_content_section_view(data, ctx))
                 }
-                Section::Changelog() => SectionViewHandle::Changelog(
-                    Self::build_changelog_section_view(changelog_model_handle.clone(), ctx),
-                ),
             })
             .collect()
     }
@@ -211,7 +191,6 @@ impl ResourceCenterMainView {
                             }
                         }
                         SectionViewHandle::Content(_) => {}
-                        SectionViewHandle::Changelog(_) => {}
                     }
                 }
                 ctx.notify();
@@ -224,20 +203,6 @@ impl ResourceCenterMainView {
         ctx: &mut ViewContext<ResourceCenterMainView>,
     ) -> ViewHandle<ContentSectionView> {
         ctx.add_typed_action_view(|ctx| ContentSectionView::new(section_data.clone(), false, ctx))
-    }
-
-    fn build_changelog_section_view(
-        changelog_model_handle: ModelHandle<ChangelogModel>,
-        ctx: &mut ViewContext<ResourceCenterMainView>,
-    ) -> ViewHandle<ChangelogSectionView> {
-        let showing_new_changelog = match ChannelState::app_version() {
-            Some(version) => !Settings::has_changelog_been_shown(version, ctx),
-            None => false,
-        };
-
-        ctx.add_typed_action_view(|ctx: &mut ViewContext<_>| {
-            ChangelogSectionView::new(changelog_model_handle, showing_new_changelog, ctx)
-        })
     }
 
     pub fn set_action_target(
@@ -254,7 +219,6 @@ impl ResourceCenterMainView {
                     });
                 }
                 SectionViewHandle::Content(_) => {}
-                SectionViewHandle::Changelog(_) => {}
             }
         }
     }
@@ -268,9 +232,6 @@ impl ResourceCenterMainView {
                     body.add_child(ChildView::new(feature_view_handle).finish());
                 }
                 SectionViewHandle::Content(section_view_handle) => {
-                    body.add_child(ChildView::new(section_view_handle).finish());
-                }
-                SectionViewHandle::Changelog(section_view_handle) => {
                     body.add_child(ChildView::new(section_view_handle).finish());
                 }
             }

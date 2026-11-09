@@ -3,8 +3,6 @@ pub use feature_section::FeatureSectionView;
 pub mod content_section;
 pub use content_section::ContentSectionView;
 use uncaged_core::features::FeatureFlag;
-pub mod changelog_section;
-pub use changelog_section::ChangelogSectionView;
 use uncaged_ui::elements::{
     Align, Border, ConstrainedBox, Container, CrossAxisAlignment, Element, Flex, Hoverable, Icon,
     MouseStateHandle, ParentElement, ScrollbarWidth, Shrinkable,
@@ -46,7 +44,6 @@ pub const ELLIPSE_SVG_PATH: &str = "bundled/svg/ellipse.svg";
 pub enum SectionViewHandle {
     Feature(ViewHandle<FeatureSectionView>),
     Content(ViewHandle<ContentSectionView>),
-    Changelog(ViewHandle<ChangelogSectionView>),
 }
 
 #[derive(Debug)]
