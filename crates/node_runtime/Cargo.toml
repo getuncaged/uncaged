@@ -23,7 +23,13 @@ async-fs = { workspace = true }
 command.workspace = true
 flate2 = "1.0"
 tar = "0.4"
-zip = "2.1"
+# The Node.js, rust-analyzer and clangd zips we download and the log archives we
+# write all use Deflate; Deflate64 (pure Rust, tiny) covers 7-Zip's variant of it.
+# `time` keeps real modification times on written entries.
+zip = { version = "2.1", default-features = false, features = ["deflate", "deflate64", "time"] }
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

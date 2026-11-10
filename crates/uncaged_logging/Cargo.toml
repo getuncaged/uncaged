@@ -16,7 +16,10 @@ uncaged_core.workspace = true
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 dirs.workspace = true
 log-panics = { version = "2.1.0", features = ["with-backtrace"] }
-zip = "2.1"
+# The Node.js, rust-analyzer and clangd zips we download and the log archives we
+# write all use Deflate; Deflate64 (pure Rust, tiny) covers 7-Zip's variant of it.
+# `time` keeps real modification times on written entries.
+zip = { version = "2.1", default-features = false, features = ["deflate", "deflate64", "time"] }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 console_error_panic_hook = { version = "0.1.6" }

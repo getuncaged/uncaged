@@ -535,3 +535,7 @@ pub async fn fetch_npm_package_version(
         .map(|s| s.to_string())
         .with_context(|| format!("No version found for npm package {}", package_name))
 }
+
+#[cfg(all(test, feature = "local_fs", not(target_arch = "wasm32")))]
+#[path = "lib_tests.rs"]
+mod tests;
