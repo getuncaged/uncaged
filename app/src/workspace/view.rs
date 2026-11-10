@@ -74,7 +74,7 @@ use uncaged_ui::elements::{
     Highlight, Hoverable, Icon as WarpUiIcon, Image, MainAxisAlignment, MainAxisSize,
     MouseInBehavior, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Rect,
-    SavePosition, Shrinkable, SizeConstraintCondition, SizeConstraintSwitch, Stack, Text,
+    SavePosition, Shrinkable, Stack, Text,
 };
 use uncaged_ui::fonts::{Properties, Weight};
 use uncaged_ui::geometry::vector::{vec2f, Vector2F};
@@ -267,8 +267,7 @@ use crate::shell_indicator::ShellIndicatorType;
 use crate::tab::{
     color_picker_menu_items, tab_position_id, uses_vertical_tabs, ColorPickerTarget,
     NewSessionMenuItem, PaneNameMenuTarget, SelectedTabColor, TabBarState, TabComponent, TabData,
-    COMPACT_TAB_WIDTH_THRESHOLD, MOVE_TO_GROUP_LABEL, TAB_BAR_BORDER_HEIGHT, TAB_INDICATOR_HEIGHT,
-    TAB_PIN_INDICATOR_ICON_SIZE,
+    MOVE_TO_GROUP_LABEL, TAB_BAR_BORDER_HEIGHT, TAB_PIN_INDICATOR_ICON_SIZE,
 };
 use crate::tab_configs::action_sidecar::SidecarItemKind;
 use crate::tab_configs::remove_confirmation_dialog::{
@@ -15312,7 +15311,6 @@ impl Workspace {
         first_index: usize,
         run_len: usize,
         tab_bar_state: TabBarState,
-        is_first_in_bar: bool,
         appearance: &Appearance,
         ctx: &AppContext,
     ) -> Box<dyn Element> {
@@ -15336,25 +15334,29 @@ impl Workspace {
             && member_range.contains(&self.active_tab_index);
 
         let mut row = Flex::row().with_cross_axis_alignment(CrossAxisAlignment::Center);
-        // Header fills one slot like a member tab capped at the same 200px as a tab.
-        row.add_child(
-            Shrinkable::new(
-                1.0,
-                ConstrainedBox::new(self.render_horizontal_tab_group_header(
-                    group,
-                    &mouse_states,
-                    is_collapsed,
-                    any_member_active,
-                    is_first_in_bar,
-                    group_color,
-                    appearance,
-                    ctx,
-                ))
-                .with_max_width(200.)
-                .finish(),
-            )
-            .finish(),
-        );
+        // Uncaged: the header is a small label chip sized to the group name (like
+        // browser tab groups), not a tab-wide slot.
+        // A tab whose width the chip freezes while hovered, so collapsing or
+        // expanding doesn't slide the chip out from under the pointer.
+        let width_probe_index = if is_collapsed {
+            self.tabs.iter().position(|tab| {
+                tab.group_id
+                    .and_then(|gid| self.tab_groups.get(&gid))
+                    .is_none_or(|g| !g.collapsed)
+            })
+        } else {
+            Some(first_index)
+        };
+        row.add_child(self.render_horizontal_tab_group_header(
+            group,
+            &mouse_states,
+            is_collapsed,
+            any_member_active,
+            group_color,
+            width_probe_index,
+            appearance,
+            ctx,
+        ));
 
         if !is_collapsed {
             // Edge spacer before the first member (own flex slot, doesn't
@@ -15379,7 +15381,8 @@ impl Workspace {
             let is_sole_member = group_has_single_member(&self.tabs, group.id);
             for idx in member_range {
                 let tab = &self.tabs[idx];
-                let effective_color = self.effective_tab_color(tab);
+                // Members look like ordinary tabs; the group's color lives on
+                // its label and the line under the group instead.
                 let member = TabComponent::new(
                     idx,
                     tab_bar_state,
@@ -15389,7 +15392,7 @@ impl Workspace {
                     false,
                     ctx,
                 )
-                .with_effective_color(effective_color)
+                .with_effective_color(None)
                 .for_grouped_member(is_sole_member)
                 .with_multi_tab_selection(self.is_tab_in_multi_tab_selection(idx))
                 .build()
@@ -15414,31 +15417,24 @@ impl Workspace {
             row.add_child(
                 Shrinkable::new(
                     Self::GROUP_EDGE_SPACER_FLEX,
-                    ConstrainedBox::new(
-                        Container::new(Empty::new().finish())
-                            .with_border(
-                                Border::all(1.)
-                                    .with_sides(false, false, false, true)
-                                    .with_border_fill(internal_colors::fg_overlay_1(
-                                        appearance.theme(),
-                                    )),
-                            )
-                            .finish(),
-                    )
-                    .with_max_width(Self::GROUP_EDGE_SPACER_MAX_WIDTH)
-                    .finish(),
+                    ConstrainedBox::new(Empty::new().finish())
+                        .with_max_width(Self::GROUP_EDGE_SPACER_MAX_WIDTH)
+                        .finish(),
                 )
                 .finish(),
             );
         }
 
-        // Collapsed groups draw their divider on the header instead. When the
-        // group is colored, back the whole container with the group color at the
-        // same idle opacity a member tab uses, so the member tabs blend into the
-        // container and the group reads as one colored block.
+        // An expanded group is tied together by a thin line in the group's color
+        // under its label and tabs; a collapsed group is just its label.
         let mut container = Container::new(row.finish());
-        if let Some(color) = group_color {
-            container = container.with_background(coloru_with_opacity(color, 20));
+        if !is_collapsed {
+            let line_fill: ElementFill = match group_color {
+                Some(color) => color.into(),
+                None => internal_colors::fg_overlay_4(theme).into(),
+            };
+            container = container
+                .with_border(Border::bottom(GROUP_UNDERLINE_HEIGHT).with_border_fill(line_fill));
         }
         let container = container.finish();
         // While dragging, back the floating chip with an opaque color so it
@@ -15475,20 +15471,19 @@ impl Workspace {
         let positioned_container =
             SavePosition::new(positioned_container, &htab_group_position_id(group_id)).finish();
 
-        // Flex = header + one per member + a spacer each side, so every tab is
-        // one slot wide. A collapsed group claims one slot; the flex it gives up
-        // is re-added to the bar's trailing spacer (see render_tab_bar_contents)
-        // so total flex stays constant and the header doesn't move.
-        let group_flex = if is_collapsed {
-            1.0
-        } else {
-            1.0 + run_len as f32 + 2.0 * Self::GROUP_EDGE_SPACER_FLEX
-        };
+        // The label chip is content-sized, so an expanded group claims one slot
+        // per member plus its edge spacers, and a collapsed group (just the
+        // chip) claims none.
+        if is_collapsed {
+            return positioned_container;
+        }
+        let group_flex = run_len as f32 + 2.0 * Self::GROUP_EDGE_SPACER_FLEX;
         Shrinkable::new(group_flex, positioned_container).finish()
     }
 
-    /// Header (icon collage + name) for a horizontal tab group. Click
-    /// toggles collapse; double-click renames; right-click opens the menu.
+    /// Label chip for a horizontal tab group: a small rounded chip in the
+    /// group's color holding its name (a dot when unnamed). Click toggles
+    /// collapse; double-click renames; right-click opens the menu.
     #[allow(clippy::too_many_arguments)]
     fn render_horizontal_tab_group_header(
         &self,
@@ -15496,138 +15491,117 @@ impl Workspace {
         mouse_states: &HorizontalTabGroupMouseStates,
         is_collapsed: bool,
         any_member_active: bool,
-        is_first_in_bar: bool,
         group_color: Option<ColorU>,
+        width_probe_index: Option<usize>,
         appearance: &Appearance,
         ctx: &AppContext,
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
         let group_id = group.id;
         let font_family = appearance.ui_font_family();
-        let main_text_color = theme.main_text_color(theme.background());
+        // Dark text on a colored chip, regular text on the neutral one.
+        let text_color: ColorU = if group_color.is_some() {
+            theme.background().into_solid()
+        } else {
+            theme.main_text_color(theme.background()).into()
+        };
 
-        // When collapsed with an active hidden member, highlight the header
-        // so the active state stays visible.
+        // When collapsed with an active hidden member, strengthen the chip so
+        // the active state stays visible.
         let header_selected = is_collapsed && any_member_active;
 
-        let member_kinds = self.compute_group_member_kinds(group.id, ctx);
-
+        let name = group
+            .name
+            .as_deref()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned);
         let is_being_renamed = self
             .current_workspace_state
             .is_tab_group_being_renamed(group_id);
-        let name_element: Box<dyn Element> = if is_being_renamed {
+        let has_label = is_being_renamed || name.is_some();
+        let label: Box<dyn Element> = if is_being_renamed {
             ConstrainedBox::new(vertical_tabs::render_inline_tab_rename_editor(
                 &self.tab_group_rename_editor,
                 appearance,
                 ctx,
             ))
-            .with_max_width(150.)
+            .with_max_width(GROUP_LABEL_MAX_WIDTH)
+            .finish()
+        } else if let Some(name) = name {
+            ConstrainedBox::new(
+                Text::new_inline(name, font_family, 12.)
+                    .with_style(Properties::default().weight(Weight::Semibold))
+                    .with_clip(ClipConfig::end())
+                    .with_color(text_color)
+                    .finish(),
+            )
+            .with_max_width(GROUP_LABEL_MAX_WIDTH)
             .finish()
         } else {
-            let title = group
-                .name
-                .clone()
-                .unwrap_or_else(|| "New Group".to_string());
-            // No inner cap: the name fills the header slot and fades like a tab
-            // title; the header's outer `ConstrainedBox` bounds the width and
-            // keeps the tab bar's unbounded measurement finite.
-            Text::new_inline(title, font_family, 12.)
-                .with_clip(ClipConfig::end())
-                .with_color(main_text_color.into())
+            // Unnamed: the chip shrinks to a colored dot.
+            ConstrainedBox::new(Empty::new().finish())
+                .with_width(GROUP_DOT_SIZE)
+                .with_height(GROUP_DOT_SIZE)
                 .finish()
         };
 
-        // Full header: collage + name, with the horizontal padding inside it so
-        // the size switch below measures the full slot width, like a tab.
-        let mut full_row = Flex::row()
-            // Fill the slot and center the icon + title.
-            .with_main_axis_size(MainAxisSize::Max)
-            .with_main_axis_alignment(MainAxisAlignment::Center)
+        let mut chip_row = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
-            .with_spacing(6.)
-            .with_child(render_group_member_icon_collage(
-                &member_kinds,
-                GROUP_ICON_COLLAGE_SIZE,
-                appearance,
-            ))
-            .with_child(Shrinkable::new(1.0, name_element).finish());
-        // Collapsed + pinned: pin indicator to the right of the name, where an
-        // ungrouped tab would show its close button. Expanded groups show the
-        // pin after their last member instead.
+            .with_spacing(4.)
+            .with_child(label);
+        // Collapsed + pinned: pin indicator inside the chip. Expanded groups
+        // show the pin after their last member instead.
         if FeatureFlag::PinnedTabs.is_enabled() && group.pinned && is_collapsed {
-            full_row.add_child(render_horizontal_group_pin_indicator(appearance));
+            chip_row.add_child(render_horizontal_group_pin_indicator(appearance));
         }
-        let full_content = Container::new(full_row.finish())
-            .with_padding_left(8.)
-            .with_padding_right(if is_collapsed { 8. } else { 9. })
-            .finish();
+        let chip_content = chip_row.finish();
 
-        // Compact header (narrow slot): just the collage at the tab's compact
-        // icon size, centered and clipped, like a tab dropping its title.
-        let compact_content = Clipped::new(
-            Flex::row()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_main_axis_alignment(MainAxisAlignment::Center)
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(render_group_member_icon_collage(
-                    &member_kinds,
-                    TAB_INDICATOR_HEIGHT,
-                    appearance,
-                ))
-                .finish(),
-        )
-        .finish();
-
-        // Go compact at the same width as a tab, so headers and tabs shrink in step.
-        let content = SizeConstraintSwitch::new(
-            full_content,
-            vec![(
-                SizeConstraintCondition::WidthLessThan(COMPACT_TAB_WIDTH_THRESHOLD),
-                compact_content,
-            )],
-        )
-        .finish();
-
-        let header_active_bg = internal_colors::fg_overlay_2(theme);
-        let header_hover_bg = internal_colors::fg_overlay_1(theme);
-        let header_border_fill = internal_colors::fg_overlay_1(theme);
+        let neutral_idle = internal_colors::fg_overlay_2(theme);
+        let neutral_hover = internal_colors::fg_overlay_3(theme);
+        let neutral_selected = internal_colors::fg_overlay_4(theme);
         let mut header = Hoverable::new(mouse_states.header.clone(), move |state| {
             let hovered = state.is_hovered();
-            // Tint the header with the group's color on hover/active (40/60), and
-            // stay transparent at idle so the colored group container shows
-            // through. Fall back to the neutral overlay when the group has no
-            // color.
-            let bg: ElementFill = if let Some(color) = group_color {
-                if header_selected {
-                    coloru_with_opacity(color, 60).into()
-                } else if hovered {
-                    coloru_with_opacity(color, 40).into()
-                } else {
-                    ElementFill::None
+            let bg: ElementFill = match group_color {
+                Some(color) => {
+                    let opacity = if header_selected || hovered { 100 } else { 85 };
+                    coloru_with_opacity(color, opacity).into()
                 }
-            } else if header_selected {
-                header_active_bg.into()
-            } else if hovered {
-                header_hover_bg.into()
-            } else {
-                ElementFill::None
+                None if header_selected => neutral_selected.into(),
+                None if hovered => neutral_hover.into(),
+                None => neutral_idle.into(),
             };
-
-            // Tab-style border: left edge if first, right edge only when
-            // collapsed (the divider). Expanded swaps that right border for
-            // padding so the title doesn't shift on collapse/expand.
-            Container::new(content)
-                .with_vertical_padding(6.)
+            let (horizontal, vertical) = if has_label { (8., 2.) } else { (3., 3.) };
+            let chip = Container::new(chip_content)
+                .with_horizontal_padding(horizontal)
+                .with_vertical_padding(vertical)
                 .with_background(bg)
-                .with_border(
-                    Border::all(1.)
-                        .with_sides(false, is_first_in_bar, false, is_collapsed)
-                        .with_border_fill(header_border_fill),
-                )
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                    uncaged_core::ui::radius::SMALL,
+                )))
+                .finish();
+            Container::new(chip)
+                .with_padding_left(6.)
+                .with_padding_right(2.)
                 .finish()
         })
         .with_cursor(Cursor::PointingHand)
-        .with_defer_events_to_children();
+        .with_defer_events_to_children()
+        // Hold tab widths while the pointer is on the chip (like a tab's close
+        // button does), so a collapse/expand click leaves the chip in place for
+        // the next click. Widths settle once the pointer leaves.
+        .on_hover(move |is_hover, ctx, _, _| {
+            if !is_hover {
+                ctx.dispatch_typed_action(WorkspaceAction::TabHoverWidthEnd);
+                return;
+            }
+            let width = width_probe_index
+                .and_then(|index| ctx.element_position_by_id(tab_position_id(index)))
+                .map(|rect| rect.width());
+            if let Some(width) = width {
+                ctx.dispatch_typed_action(WorkspaceAction::TabHoverWidthStart { width });
+            }
+        });
 
         header = header.on_click(move |ctx, _, _| {
             ctx.dispatch_typed_action(WorkspaceAction::ToggleTabGroupCollapsed(group_id));
@@ -16388,7 +16362,6 @@ impl Workspace {
                             *first_index,
                             *run_len,
                             tab_bar_state,
-                            *first_index == 0,
                             appearance,
                             ctx,
                         ));
@@ -23131,7 +23104,12 @@ fn should_reserve_traffic_light_space_in_tab_bar(side: TrafficLightSide) -> bool
 }
 
 /// Total width/height of the collage area in the group header.
-const GROUP_ICON_COLLAGE_SIZE: f32 = 22.0;
+/// Height of the line under an expanded horizontal tab group.
+const GROUP_UNDERLINE_HEIGHT: f32 = 2.0;
+/// Widest a horizontal group's name chip grows before the name fades out.
+const GROUP_LABEL_MAX_WIDTH: f32 = 140.0;
+/// Size of the dot an unnamed horizontal group shows instead of a name.
+const GROUP_DOT_SIZE: f32 = 8.0;
 
 /// Renders the diagonal pin indicator shown on a pinned horizontal tab group:
 /// trailing the members of an expanded group, or to the right of the name on a
