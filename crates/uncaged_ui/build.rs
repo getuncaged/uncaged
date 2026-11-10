@@ -22,50 +22,9 @@ fn main() {
     }
 
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
-        bindgen_shader_types();
         compile_metal_shaders();
         compile_objc_lib();
     }
-}
-
-fn bindgen_shader_types() {
-    let header_path = "src/platform/mac/rendering/metal/shaders/shader_types.h";
-    println!("cargo:rerun-if-changed={header_path}");
-    let bindings = bindgen::Builder::default()
-        .header(header_path)
-        .allowlist_type("vector_float2")
-        .allowlist_type("Uniforms")
-        .allowlist_type("PerRectUniforms")
-        .allowlist_type("PerGlyphUniforms")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-        // Disable intrinsic headers that define types containing 16-bit floats (`_Float16`,
-        // `__m512h`, etc.) via preprocessor directive. `bindgen` doesn't know how to process
-        // these types and panics at compile time. The types aren't used by our shader headers,
-        // so suppressing the declarations is safe.
-        //
-        // - Xcode 15+: avx512fp16intrin.h, avx512vlfp16intrin.h
-        // - Xcode 26+ (clang 21): amxavx512intrin.h, avx10_2convertintrin.h,
-        //   avx10_2_512convertintrin.h
-        //
-        // TODO(charlespierce): Remove once https://github.com/rust-lang/rust-bindgen/issues/2500
-        // is resolved.
-        .clang_args([
-            "-D__AVX512VLFP16INTRIN_H",
-            "-D__AVX512FP16INTRIN_H",
-            "-D__AMX_AVX512INTRIN_H",
-            "-D__AVX10_2CONVERTINTRIN_H",
-            "-D__AVX10_2_512CONVERTINTRIN_H",
-            "-D__AVX10_2_512MINMAXINTRIN_H",
-            "-D__AVX10_2_512NIINTRIN_H",
-            "-D__AVX10_2_512SATCVTINTRIN_H",
-        ])
-        .generate()
-        .unwrap_or_else(|_| panic!("unable to generate bindings for {header_path}"));
-
-    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
-    bindings
-        .write_to_file(out_path.join("shader_types.rs"))
-        .expect("Couldn't write shader type bindings!");
 }
 
 fn compile_metal_shaders() {

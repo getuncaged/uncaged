@@ -871,7 +871,7 @@ mod shader {
         // Bindgen deferences null pointers in generated test code, see:
         // https://github.com/rust-lang/rust-bindgen/issues/1651
         #![allow(deref_nullptr)]
-        include!(concat!(env!("OUT_DIR"), "/shader_types.rs"));
+        include!("shader_types.rs");
     }
 
     pub struct Vector2F(vector_float2);
