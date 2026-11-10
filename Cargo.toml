@@ -359,6 +359,11 @@ rmcp = { version = "1.6" }
 debug = 1
 # Force the rust compiler to create a dSYM. Starting in 1.53 the default on MacOS is "unpacked".
 split-debuginfo = "packed"
+# Strip the debug symbol table entries (`strip -S`) from the shipped binary once the dSYM
+# above has been written. Function names stay in the symbol table, so panic backtraces in
+# uncaged.log still name every frame; file/line info comes from the dSYM, which the shipped
+# app never had next to it anyway. Saves about 11 MB on the arm64 binary.
+strip = "debuginfo"
 
 [profile.dev]
 # Use line-tables-only to speed up dev builds. Change to `debug = true` if you
@@ -446,6 +451,8 @@ inherits = "release"
 opt-level = "s"
 lto = true
 codegen-units = 1
+# The wasm bundle keeps its debug info (`wasm-bindgen --keep-debug`).
+strip = "none"
 
 [profile.release-wasm-debug_assertions]
 inherits = "release-wasm"
