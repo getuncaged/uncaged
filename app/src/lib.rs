@@ -374,6 +374,9 @@ pub fn run() -> Result<()> {
     // Perform any necessary platform-specific initialization.
     platform::init();
 
+    // Pick rustls's crypto provider before anything builds an HTTP client.
+    http_client::install_tls_crypto_provider();
+
     // Ensure feature flags are initialized before parsing command-line arguments.
     features::init_feature_flags();
 

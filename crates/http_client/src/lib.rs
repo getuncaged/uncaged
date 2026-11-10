@@ -18,6 +18,24 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use uncaged_core::report_error;
 
+/// Installs ring as rustls's process-wide crypto provider.
+///
+/// reqwest is built with `rustls-no-provider` (so aws-lc-rs isn't compiled in) and panics
+/// when it builds a client before a provider is installed. `uncaged::run` calls this at
+/// startup, which covers every client in the app, including ones built directly with
+/// reqwest or by rmcp; [`Client`] also calls it so tests and other binaries are covered.
+/// Calling it more than once is harmless.
+pub fn install_tls_crypto_provider() {
+    #[cfg(not(target_family = "wasm"))]
+    {
+        static INSTALL: std::sync::Once = std::sync::Once::new();
+        INSTALL.call_once(|| {
+            // An `Err` means a provider is already installed, which is all we need.
+            let _ = rustls::crypto::ring::default_provider().install_default();
+        });
+    }
+}
+
 /// A wrapper around a `reqwest::Client` to execute requests. Returns a custom `RequestBuilder` type
 /// that ensures any call to the underlying `reqwest::Client` are properly adapted so that they can
 /// run outside of a Tokio context.
@@ -134,6 +152,7 @@ impl Client {
     }
 
     pub fn from_client_builder(client_builder: reqwest::ClientBuilder) -> reqwest::Result<Self> {
+        install_tls_crypto_provider();
         client_builder.build().map(|client| Self {
             wrapped: client,
             before_request_sent: None,
