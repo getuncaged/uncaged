@@ -43,7 +43,6 @@ fuzzy_match = { path = "crates/fuzzy_match" }
 handlebars = { path = "crates/handlebars" }
 http_client = { path = "crates/http_client" }
 input_classifier = { path = "crates/input_classifier" }
-integration = { path = "crates/integration" }
 ipc = { path = "crates/ipc" }
 ipynb_parser = { path = "crates/ipynb_parser" }
 jsonrpc = { path = "crates/jsonrpc" }
@@ -94,7 +93,6 @@ anyhow = "1.0"
 arboard = { version = "3.6.1", default-features = false }
 arrayvec = "0.7.4"
 async-broadcast = "0.7.2"
-ashpd = { version = "0.11", default-features = false, features = ["async-std"] }
 async-channel = "2.3.1"
 async-compat = "0.2.5"
 async-io = "2.4.0"
@@ -103,7 +101,6 @@ async-stream = "0.3.5"
 async-task = "4.2.0"
 async-trait = "0.1.89"
 async-fs = "2.1.2"
-backtrace = "0.3.76"
 base64 = "0.22"
 bincode = "1.3.3"
 bitflags = { version = "2.4.0", features = ["serde"] }
@@ -123,7 +120,6 @@ chrono = { version = "0.4.38", features = ["serde"] }
 clap = { version = "4.5", features = ["derive"] }
 cocoa = "=0.26.0"
 ctrlc = "3.4.7"
-crc = "3.4.0"
 dashmap = "6.1.0"
 derive_more = "0.99.17"
 diesel = { version = "2.3.8", default-features = false }
@@ -154,7 +150,6 @@ hex = "0.4.3"
 hyper = "1.6.0"
 html5ever = "0.35.0"
 http = "1.1.0"
-humantime = "2.1.0"
 image = { version = "0.25.9", default-features = false, features = [
   "rayon",
   "jpeg",
@@ -165,12 +160,6 @@ image = { version = "0.25.9", default-features = false, features = [
 instant = { version = "0.1.12", features = ["wasm-bindgen"] }
 iso8601-duration = { version = "0.2.0", features = ["chrono", "serde"] }
 itertools = "0.14.0"
-jaq-json = { version = "2.0", features = ["serde"] }
-# Disabling the default `formats` feature is intended to avoid pulling in
-# CBOR/TOML/XML/YAML support, but `jaq-all` currently depends on `jaq-fmts`
-# with its default features enabled, which re-enables all those parsers transitively.
-# The long-term fix is https://github.com/01mf02/jaq/issues/431.
-jaq-all = { version = "0.1", default-features = false }
 jsonschema = { version = "0.45", default-features = false }
 lasso = { version = "0.7.3", features = ["multi-threaded"] }
 lazy_static = "1.4.0"
@@ -189,13 +178,11 @@ openh264 = "0.8"
 static_assertions = "1.1.0"
 url = "2.5.4"
 urlocator = "0.1.4"
-mockall = "0.13.1"
 objc = "0.2"
 objc2 = "0.6.3"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSScreen", "objc2-core-foundation"] }
 objc2-av-foundation = { version = "0.3.2", default-features = false }
 objc2-core-foundation = "0.3.2"
-objc2-core-graphics = "0.3.2"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std"] }
 objc2-metal = { version = "0.3.2", default-features = false }
 objc2-quartz-core = { version = "0.3.2", default-features = false }
@@ -209,7 +196,6 @@ pin-project = "1.0.10"
 pprof = "0.15.0"
 prost = "0.14.3"
 prost-types = "0.14.3"
-qrcode = { version = "0.14.1", default-features = false }
 rand = "0.8.6"
 rangemap = "1.3.0"
 reqwest = { version = "0.13", features = [
@@ -245,12 +231,8 @@ strum_macros = "0.27"
 tempfile = "3.8.0"
 thiserror = "2.0.17"
 tokio = "1.47.1"
-tokio-util = { version = "0.7", features = ["io"] }
 toml_edit = "0.25.5"
-tower = "0.5.2"
-tower-http = "0.6.6"
 tracing = "0.1.40"
-tracing-futures = "0.2.5"
 arborium = { version = "2", default-features = false, features = [
   "lang-rust",
   "lang-go",
@@ -361,7 +343,6 @@ winreg = "0.55.0"
 typed-path = "0.10.0"
 streaming-iterator = "0.1.0"
 derivative = "2.2.0"
-parquet = { version = "55.0.0", features = ["arrow"] }
 rmcp = { version = "1.6" }
 
 [profile.release]

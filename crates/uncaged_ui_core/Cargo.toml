@@ -21,7 +21,6 @@ test-util = []
 
 [dependencies]
 anyhow = "1.0"
-async-broadcast.workspace = true
 async-channel.workspace = true
 async-executor = "1.4.1"
 async-task.workspace = true

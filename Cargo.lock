@@ -855,12 +855,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arraydeque"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
-
-[[package]]
 name = "arrayref"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2201,12 +2195,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codesnake"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56a42f52649afc3d3378670ccaaab507e48edd165c29a1591fa027745fffd743"
-
-[[package]]
 name = "codespan-reporting"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2259,7 +2247,6 @@ dependencies = [
  "anyhow",
  "async-process",
  "futures-lite 1.13.0",
- "lazy_static",
  "libc",
  "log",
  "tempfile",
@@ -3272,12 +3259,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "downcast"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
-
-[[package]]
 name = "downcast-rs"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3946,12 +3927,6 @@ dependencies = [
  "lazy_static",
  "num",
 ]
-
-[[package]]
-name = "fragile"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c2141d6d6c8512188a7891b4b01590a45f6dac67afb4f255c4124dbb86d4eaa"
 
 [[package]]
 name = "freedesktop-desktop-entry"
@@ -4826,15 +4801,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hashlink"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
-dependencies = [
- "hashbrown 0.15.2",
-]
-
-[[package]]
 name = "heapless"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4879,12 +4845,6 @@ name = "hexf-parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
-
-[[package]]
-name = "hifijson"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "242402749acf71e6f32f5857598b7002c4058a4e3c3b22b4c7d51cab9aea754e"
 
 [[package]]
 name = "hkdf"
@@ -5462,29 +5422,23 @@ name = "integration"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "backtrace",
  "cfg-if",
  "chrono",
  "clap",
  "command",
- "diesel",
  "directories",
  "float-cmp",
  "instant",
  "itertools 0.14.0",
  "lazy_static",
  "log",
- "mockito",
  "nix 0.26.4",
  "parking_lot",
  "pathfinder_geometry",
- "rand 0.8.6",
  "regex",
  "rust-embed 8.7.2",
- "serde",
  "serde_json",
  "settings",
- "simplelog",
  "strum 0.27.1",
  "strum_macros 0.27.1",
  "sum_tree",
@@ -5497,8 +5451,6 @@ dependencies = [
  "uncaged_ui_core",
  "uncaged_ui_extras",
  "version-compare",
- "warp-command-signatures",
- "warp-workflows",
  "whoami",
 ]
 
@@ -5698,131 +5650,6 @@ name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
-
-[[package]]
-name = "jaq-all"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd409dad1bfae2a31f9aa0a2478532a315b2fa911026750a58b55f348bb8253e"
-dependencies = [
- "codesnake",
- "jaq-core",
- "jaq-fmts",
- "jaq-json",
- "jaq-std",
- "unicode-width 0.1.14",
-]
-
-[[package]]
-name = "jaq-core"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dca0f164c8e9c55fc5aefe60b371df735c719b09930dac185878f2f8c7ab6b68"
-dependencies = [
- "dyn-clone",
- "once_cell",
- "typed-arena",
-]
-
-[[package]]
-name = "jaq-fmts"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c199bdc175b37e68d6273bf581187743f8fd4aaa36dc8dfe091fde101298620b"
-dependencies = [
- "aho-corasick",
- "base64 0.22.1",
- "bstr",
- "bytes",
- "ciborium-io",
- "ciborium-ll",
- "jaq-core",
- "jaq-json",
- "jaq-std",
- "memmap2 0.9.7",
- "num-bigint",
- "saphyr-parser",
- "toml-span",
- "xmlparser",
-]
-
-[[package]]
-name = "jaq-json"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5c5baabe63d1d72cde60ec7548a098036773e3541dbc65c6a44fb38e9cfb272"
-dependencies = [
- "bstr",
- "bytes",
- "foldhash 0.1.5",
- "hifijson",
- "indexmap 2.12.0",
- "jaq-core",
- "jaq-std",
- "num-bigint",
- "num-traits",
- "ryu",
- "self_cell",
- "serde_core",
-]
-
-[[package]]
-name = "jaq-std"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a11bb307027b20b3dc7b212ad687e7e410cbc43933eec5d498672ab2bc60666"
-dependencies = [
- "aho-corasick",
- "base64 0.22.1",
- "bstr",
- "jaq-core",
- "jiff",
- "libm",
- "log",
- "regex-bites",
- "urlencoding",
-]
-
-[[package]]
-name = "jiff"
-version = "0.2.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f00b5dbd620d61dfdcb6007c9c1f6054ebd75319f163d886a9055cec1155073d"
-dependencies = [
- "jiff-static",
- "jiff-tzdb-platform",
- "log",
- "portable-atomic",
- "portable-atomic-util",
- "serde_core",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "jiff-static"
-version = "0.2.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e000de030ff8022ea1da3f466fbb0f3a809f5e51ed31f6dd931c35181ad8e6d7"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
-name = "jiff-tzdb"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c900ef84826f1338a557697dc8fc601df9ca9af4ac137c7fb61d4c6f2dfd3076"
-
-[[package]]
-name = "jiff-tzdb-platform"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "875a5a69ac2bab1a891711cf5eccbec1ce0341ea805560dcd90b7a2e925132e8"
-dependencies = [
- "jiff-tzdb",
-]
 
 [[package]]
 name = "jni"
@@ -6318,15 +6145,6 @@ dependencies = [
 
 [[package]]
 name = "lz4_flex"
-version = "0.11.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373f5eceeeab7925e0c1098212f2fbc4d416adec9d35051a6ab251e824c1854a"
-dependencies = [
- "twox-hash",
-]
-
-[[package]]
-name = "lz4_flex"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db9a0d582c2874f68138a16ce1867e0ffde6c0bb0a0df85e1f36d04146db488a"
@@ -6425,7 +6243,6 @@ dependencies = [
  "markup5ever_rcdom",
  "nom 7.1.3",
  "serde_yaml 0.8.26",
- "thiserror 2.0.17",
 ]
 
 [[package]]
@@ -6702,32 +6519,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mockall"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2"
-dependencies = [
- "cfg-if",
- "downcast",
- "fragile",
- "mockall_derive",
- "predicates",
- "predicates-tree",
-]
-
-[[package]]
-name = "mockall_derive"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25ca3004c2efe9011bd4e461bd8256445052b9615405b4f7ea43fc8ca5c20898"
-dependencies = [
- "cfg-if",
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
 name = "mockito"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6998,7 +6789,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-fs",
- "async-trait",
  "cfg-if",
  "command",
  "flate2",
@@ -7007,8 +6797,6 @@ dependencies = [
  "log",
  "semver",
  "serde",
- "serde_json",
- "sha2",
  "tar",
  "uncaged_core",
  "zip 2.4.2",
@@ -7627,21 +7415,15 @@ version = "0.1.0"
 dependencies = [
  "ai",
  "anyhow",
- "cfg-if",
  "log",
  "pathfinder_color",
  "pathfinder_geometry",
  "rust-embed 8.7.2",
- "serde",
- "serde_json",
- "strum 0.27.1",
- "strum_macros 0.27.1",
  "ui_components",
  "uncaged_core",
  "uncaged_logging",
  "uncaged_ui",
  "uncaged_ui_core",
- "uuid",
 ]
 
 [[package]]
@@ -8392,32 +8174,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
-name = "predicates"
-version = "3.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5d19ee57562043d37e82899fade9a22ebab7be9cef5026b07fda9cdd4293573"
-dependencies = [
- "anstyle",
- "predicates-core",
-]
-
-[[package]]
-name = "predicates-core"
-version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b794032607612e7abeb4db69adb4e33590fa6cf1149e95fd7cb00e634b92f174"
-
-[[package]]
-name = "predicates-tree"
-version = "1.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "368ba315fb8c5052ab692e68a0eefec6ec57b23a36959c14496f0b0df2c0cecf"
-dependencies = [
- "predicates-core",
- "termtree",
-]
-
-[[package]]
 name = "presser"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8437,7 +8193,6 @@ dependencies = [
 name = "prevent_sleep"
 version = "0.0.0"
 dependencies = [
- "cfg-if",
  "cfg_aliases 0.2.1",
  "futures",
  "itertools 0.14.0",
@@ -8730,12 +8485,6 @@ name = "pxfm"
 version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5a041e753da8b807c9255f28de81879c78c876392ff2469cde94799b2896b9d"
-
-[[package]]
-name = "qrcode"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d68782463e408eb1e668cf6152704bd856c78c5b6417adaee3203d8f4c1fc9ec"
 
 [[package]]
 name = "quick-error"
@@ -9278,12 +9027,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex-bites"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6a15a2fa0bfda9361941c45550896ae87b15cc6c8c939ea350079670332e211"
-
-[[package]]
 name = "regex-syntax"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9320,11 +9063,6 @@ dependencies = [
  "itertools 0.14.0",
  "log",
  "notify-debouncer-full",
- "once_cell",
- "serde",
- "serde_json",
- "strum 0.27.1",
- "strum_macros 0.27.1",
  "tempfile",
  "thiserror 2.0.17",
  "uncaged_core",
@@ -9332,7 +9070,6 @@ dependencies = [
  "uncaged_ui_core",
  "uncaged_util",
  "virtual-fs",
- "walkdir",
  "watcher",
 ]
 
@@ -9819,16 +9556,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "saphyr-parser"
-version = "0.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb771b59f6b1985d1406325ec28f97cfb14256abcec4fdfb37b36a1766d6af7"
-dependencies = [
- "arraydeque",
- "hashlink",
 ]
 
 [[package]]
@@ -10917,15 +10644,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tabwriter"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fce91f2f0ec87dff7e6bcbbeb267439aa1188703003c6055193c821487400432"
-dependencies = [
- "unicode-width 0.2.1",
-]
-
-[[package]]
 name = "takecell"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10956,7 +10674,7 @@ dependencies = [
  "levenshtein_automata",
  "log",
  "lru 0.16.3",
- "lz4_flex 0.13.0",
+ "lz4_flex",
  "measure_time",
  "memmap2 0.9.7",
  "once_cell",
@@ -11167,12 +10885,6 @@ checksum = "411c5bf740737c7918b8b1fe232dca4dc9f8e754b8ad5e20966814001ed0ac6b"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "termtree"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
 
 [[package]]
 name = "termwiz"
@@ -11580,15 +11292,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "toml-span"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f22ba417d437b5fa5dcba6c27dbd6c14f38845315b724d89fed73b7a426451b7"
-dependencies = [
- "smallvec 1.15.1",
-]
-
-[[package]]
 name = "toml_datetime"
 version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11769,18 +11472,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-futures"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
-dependencies = [
- "futures",
- "futures-task",
- "pin-project",
- "tracing",
-]
-
-[[package]]
 name = "trait-set"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11822,18 +11513,6 @@ checksum = "d2df906b07856748fa3f6e0ad0cbaa047052d4a7dd609e231c4f72cee8c36f31"
 dependencies = [
  "core_maths",
 ]
-
-[[package]]
-name = "twox-hash"
-version = "2.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ea3136b675547379c4bd395ca6b938e5ad3c3d20fad76e7fe85f9e0d011419c"
-
-[[package]]
-name = "typed-arena"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6af6ae20167a9ece4bcb41af5b80f8a1f1df981f6391189ce00fd257af04126a"
 
 [[package]]
 name = "typed-path"
@@ -11920,7 +11599,6 @@ name = "uncaged"
 version = "0.3.4"
 dependencies = [
  "addr",
- "aha-reqwest-eventsource",
  "aho-corasick",
  "ai",
  "alphanumeric-sort",
@@ -11934,15 +11612,12 @@ dependencies = [
  "async-executor",
  "async-fs",
  "async-io",
- "async-process",
  "async-recursion",
- "async-stream",
  "async-trait",
  "base64 0.22.1",
  "bimap",
  "bincode",
  "bitflags 2.13.0",
- "bitflags-serde-legacy",
  "block",
  "blocking",
  "bounded-vec-deque",
@@ -11959,15 +11634,12 @@ dependencies = [
  "cloud_object_models",
  "cloud_object_persistence",
  "cloud_objects",
- "cocoa 0.26.0",
  "command",
  "command-corrections",
  "concat-idents",
  "console_error_panic_hook",
  "content_inspector",
- "core-foundation 0.10.1",
  "counter",
- "crc",
  "csv",
  "ctor",
  "cvt",
@@ -11985,7 +11657,6 @@ dependencies = [
  "embed_plist",
  "enclose",
  "enum-iterator",
- "env_logger",
  "event-listener",
  "flate2",
  "float-cmp",
@@ -11997,7 +11668,6 @@ dependencies = [
  "fuzzy_match",
  "gethostname",
  "getrandom 0.2.16",
- "getset",
  "git2",
  "gloo",
  "handlebars",
@@ -12015,22 +11685,17 @@ dependencies = [
  "is_executable",
  "iso8601-duration",
  "itertools 0.14.0",
- "jaq-all",
- "jaq-json",
  "js-sys",
  "jsonschema",
  "kmeans_colors",
  "languages",
- "lasso",
  "lazy_static",
  "libc",
  "libsqlite3-sys",
  "line-ending",
  "log",
- "log-panics",
  "lsp",
  "lsp-types",
- "lz4_flex 0.11.6",
  "mach2",
  "markdown_parser",
  "mcp",
@@ -12038,14 +11703,9 @@ dependencies = [
  "mermaid_to_svg",
  "mime_guess",
  "mio",
- "mockall",
- "mockito",
- "natural_language_detection",
  "nix 0.26.4",
  "notify-debouncer-full",
  "num-traits",
- "num_cpus",
- "oauth2",
  "objc2 0.6.3",
  "objc2-app-kit 0.3.2",
  "objc2-core-foundation",
@@ -12060,12 +11720,10 @@ dependencies = [
  "pathfinder_geometry",
  "permissions",
  "persistence",
- "pin-project",
  "plist",
  "pprof",
  "prost",
  "prost-types",
- "qrcode",
  "rand 0.8.6",
  "rangemap",
  "rayon",
@@ -12077,7 +11735,6 @@ dependencies = [
  "rust-embed 8.7.2",
  "rustls",
  "schemars",
- "security-framework-sys",
  "serde",
  "serde-bytes-repr",
  "serde-wasm-bindgen",
@@ -12085,7 +11742,6 @@ dependencies = [
  "serde_json",
  "serde_regex",
  "serde_urlencoded",
- "serde_with",
  "serde_yaml 0.8.26",
  "serial_test",
  "settings",
@@ -12093,7 +11749,6 @@ dependencies = [
  "sha2",
  "shell-words",
  "shellexpand",
- "shlex",
  "signal-hook",
  "signal-hook-mio",
  "similar",
@@ -12101,7 +11756,6 @@ dependencies = [
  "siphasher 0.3.11",
  "smallvec 1.15.1",
  "smol_str",
- "static_assertions",
  "string-offset",
  "strum 0.27.1",
  "strum_macros 0.27.1",
@@ -12109,17 +11763,13 @@ dependencies = [
  "syntax_tree",
  "syntect",
  "sysinfo",
- "tabwriter",
  "tempfile",
  "thiserror 2.0.17",
  "thousands",
  "tikv-jemallocator",
  "tokio",
- "tokio-util",
  "toml 0.8.23",
- "toml_edit 0.25.6+spec-1.1.0",
  "tracing",
- "tracing-futures",
  "typed-path 0.10.0",
  "ui_components",
  "uncaged_agent_api",
@@ -12212,11 +11862,9 @@ dependencies = [
  "anyhow",
  "async-recursion",
  "async-trait",
- "bincode",
  "clap",
  "command",
  "derive-new",
- "dirs 6.0.0",
  "futures",
  "fuzzy_match",
  "getset",
@@ -12227,10 +11875,8 @@ dependencies = [
  "memo-map",
  "regex",
  "serde",
- "shellexpand",
  "smol_str",
  "string-offset",
- "thiserror 2.0.17",
  "typed-path 0.10.0",
  "uncaged_cli",
  "uncaged_completer",
@@ -12247,10 +11893,8 @@ dependencies = [
  "anyhow",
  "async-broadcast",
  "cfg-if",
- "chrono",
  "command-corrections",
  "concat-idents",
- "dashmap",
  "directories",
  "dirs 6.0.0",
  "enum-iterator",
@@ -12278,7 +11922,6 @@ dependencies = [
  "serde_yaml 0.8.26",
  "settings",
  "settings_value",
- "shellexpand",
  "string-offset",
  "strum 0.27.1",
  "strum_macros 0.27.1",
@@ -12304,7 +11947,6 @@ dependencies = [
  "async-channel",
  "bytes",
  "criterion",
- "enclose",
  "enum-iterator",
  "env_logger",
  "float-cmp",
@@ -12320,7 +11962,6 @@ dependencies = [
  "markdown_parser",
  "markup5ever",
  "mermaid_to_svg",
- "mime_guess",
  "num-traits",
  "ordered-float 3.9.2",
  "parking_lot",
@@ -12330,7 +11971,6 @@ dependencies = [
  "rayon",
  "regex-automata",
  "regex-syntax",
- "rust-embed 8.7.2",
  "serde",
  "serde_yaml 0.8.26",
  "string-offset",
@@ -12382,8 +12022,6 @@ dependencies = [
  "notify-debouncer-full",
  "repo_metadata",
  "tempfile",
- "thiserror 2.0.17",
- "uncaged_core",
  "uncaged_ui_core",
  "uncaged_util",
  "watcher",
@@ -12436,7 +12074,6 @@ dependencies = [
  "getrandom 0.2.16",
  "grep",
  "ignore",
- "instant",
  "log",
  "nix 0.26.4",
  "serde",
@@ -12464,7 +12101,6 @@ dependencies = [
  "paste",
  "pathfinder_color",
  "serde",
- "serde_json",
  "sha2",
  "string-offset",
  "strum 0.27.1",
@@ -12515,7 +12151,6 @@ dependencies = [
  "anyhow",
  "arboard",
  "asset_cache",
- "async-io",
  "async-task",
  "bimap",
  "bindgen 0.70.1",
@@ -12535,7 +12170,6 @@ dependencies = [
  "ctrlc",
  "dashmap",
  "derivative",
- "derive_more 0.99.17",
  "dirs 6.0.0",
  "dispatch",
  "dispatch2",
@@ -12546,7 +12180,6 @@ dependencies = [
  "fontdb",
  "futures",
  "futures-lite 1.13.0",
- "futures-timer",
  "futures-util",
  "global-hotkey",
  "gloo",
@@ -12555,7 +12188,6 @@ dependencies = [
  "itertools 0.14.0",
  "js-sys",
  "lazy_static",
- "libc",
  "log",
  "markdown_parser",
  "memmap2 0.9.7",
@@ -12580,7 +12212,6 @@ dependencies = [
  "resvg",
  "rust-embed 8.7.2",
  "serde",
- "sum_tree",
  "takecell",
  "tauri-winrt-notification",
  "thiserror 2.0.17",
@@ -12612,7 +12243,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arboard",
- "async-broadcast",
  "async-channel",
  "async-executor",
  "async-fs",
@@ -12691,7 +12321,6 @@ name = "uncaged_ui_extras"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "async-channel",
  "gloo-storage",
  "log",
  "objc2 0.6.3",
@@ -13130,7 +12759,6 @@ dependencies = [
  "dunce",
  "getset",
  "tempfile",
- "typed-path 0.10.0",
 ]
 
 [[package]]

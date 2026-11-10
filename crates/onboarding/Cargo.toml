@@ -17,17 +17,11 @@ bin = []
 [dependencies]
 ai.workspace = true
 anyhow.workspace = true
-cfg-if.workspace = true
 log.workspace = true
 pathfinder_color.workspace = true
 pathfinder_geometry.workspace = true
 rust-embed.workspace = true
-serde.workspace = true
 ui_components.workspace = true
-serde_json.workspace = true
-strum.workspace = true
-strum_macros.workspace = true
-uuid.workspace = true
 uncaged_core = { workspace = true }
 uncaged_ui.workspace = true
 uncaged_ui_core.workspace = true

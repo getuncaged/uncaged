@@ -31,7 +31,6 @@ anyhow.workspace = true
 bytemuck = { workspace = true, features = ["derive"], optional = true }
 cfg-if.workspace = true
 dashmap.workspace = true
-derive_more.workspace = true
 futures.workspace = true
 futures-util.workspace = true
 instant.workspace = true
@@ -44,7 +43,6 @@ ordered-float.workspace = true
 parking_lot.workspace = true
 pathfinder_color.workspace = true
 pathfinder_geometry.workspace = true
-sum_tree.workspace = true
 takecell = "0.1.1"
 thiserror.workspace = true
 url.workspace = true
@@ -56,7 +54,6 @@ wgpu = { workspace = true, optional = true }
 [dev-dependencies]
 asset_cache.workspace = true
 env_logger.workspace = true
-futures-timer = "3.0.2"
 image = { workspace = true, default-features = false, features = ["png"] }
 rust-embed.workspace = true
 uncaged_ui = { workspace = true, features = ["test-util"] }
@@ -71,7 +68,6 @@ core-graphics = "0.25.0"
 core-text = "21.0.0"
 dispatch = "0.2.0"
 font-kit.workspace = true
-libc.workspace = true
 objc.workspace = true
 objc2.workspace = true
 objc2-app-kit = { workspace = true, features = [
@@ -134,7 +130,6 @@ dispatch2 = { workspace = true }
 rand.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-async-io.workspace = true
 ctrlc.workspace = true
 font-kit.workspace = true
 

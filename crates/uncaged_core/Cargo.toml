@@ -15,10 +15,8 @@ test-util = ["dep:mockito", "uncaged_features/test-util"]
 anyhow.workspace = true
 cfg-if.workspace = true
 command-corrections.workspace = true
-dashmap.workspace = true
 dirs.workspace = true
 directories.workspace = true
-shellexpand.workspace = true
 enum-iterator.workspace = true
 futures-lite.workspace = true
 uncaged_features.workspace = true
@@ -54,7 +52,6 @@ uncaged_ui_extras = { workspace = true, features = ["default"] }
 mockito = { workspace = true, optional = true }
 string-offset.workspace = true
 inventory = "0.3.20"
-chrono.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 tokio.workspace = true
