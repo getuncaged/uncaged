@@ -1,9 +1,6 @@
-use std::path::PathBuf;
-
-use ai::agent::action::AskUserQuestionType;
-use ai::skills::{SkillPathOrigin, SkillReference};
+use ai::agent::action::{AskUserQuestionType, RunAgentsAgentRunConfig, RunAgentsRequest};
+use ai::skills::SkillPathOrigin;
 use uncaged_agent_api as api;
-use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::{
     convert_api_question, ConversionParams, ConvertAPIMessageToClientOutputMessage,
@@ -500,8 +497,10 @@ fn converts_start_agent_with_cancelled_and_blocked_lifecycle_subscription() {
     );
 }
 
+/// Uncaged has no cloud agents: a saved remote `StartAgent` call loads as a
+/// default local launch.
 #[test]
-fn converts_remote_start_agent_with_environment_id() {
+fn converts_remote_start_agent_to_local_default() {
     let task_id = TaskId::new("task-id".to_string());
     let message = start_agent_tool_call_message(
         "Agent 5",
@@ -525,21 +524,15 @@ fn converts_remote_start_agent_with_environment_id() {
     assert_eq!(prompt, "run in the remote environment");
     assert_eq!(
         execution_mode,
-        StartAgentExecutionMode::Remote {
-            environment_id: "env-123".to_string(),
-            skill_references: vec![],
-            model_id: String::new(),
-            computer_use_enabled: false,
-            worker_host: String::new(),
-            harness_type: String::new(),
-            title: String::new(),
-        }
+        StartAgentExecutionMode::local_with_defaults()
     );
     assert_eq!(lifecycle_subscription, None);
 }
 
+/// Uncaged has no cloud agents: a saved remote `StartAgentV2` call loads as a
+/// default local launch.
 #[test]
-fn converts_remote_start_agent_v2_with_skill_references() {
+fn converts_remote_start_agent_v2_to_local_default() {
     let task_id = TaskId::new("task-id".to_string());
     let message = start_agent_v2_tool_call_message(
         "Agent 6",
@@ -563,20 +556,81 @@ fn converts_remote_start_agent_v2_with_skill_references() {
     assert_eq!(prompt, "run in the remote environment");
     assert_eq!(
         execution_mode,
-        StartAgentExecutionMode::Remote {
-            environment_id: "env-123".to_string(),
-            skill_references: vec![
-                SkillReference::Path(LocalOrRemotePath::Local(PathBuf::from("/tmp/SKILL.md",))),
-                SkillReference::BundledSkillId("review-comments".to_string()),
-            ],
-            model_id: "gpt-test".to_string(),
-            computer_use_enabled: true,
-            worker_host: "worker-host".to_string(),
-            harness_type: "claude-code".to_string(),
-            title: "Remote child".to_string(),
-        }
+        StartAgentExecutionMode::local_with_defaults()
     );
     assert_eq!(lifecycle_subscription, None);
+}
+
+/// A `RunAgents` call saved in the removed cloud execution mode still loads;
+/// the cloud-only fields (execution mode, skills, titles) are dropped.
+#[test]
+fn converts_remote_run_agents_to_local_request() {
+    let task_id = TaskId::new("task-id".to_string());
+    let message = api::Message {
+        id: "message-id".to_string(),
+        task_id: "task-id".to_string(),
+        server_message_data: String::new(),
+        citations: vec![],
+        message: Some(api::message::Message::ToolCall(api::message::ToolCall {
+            tool_call_id: "tool-call-id".to_string(),
+            tool: Some(api::message::tool_call::Tool::RunAgents(api::RunAgents {
+                summary: "Split the work".to_string(),
+                base_prompt: "Base".to_string(),
+                skills: vec![api::SkillRef {
+                    skill_reference: Some(api::skill_ref::SkillReference::BundledSkillId(
+                        "review-comments".to_string(),
+                    )),
+                }],
+                model_id: "auto".to_string(),
+                harness: None,
+                agent_run_configs: vec![api::run_agents::AgentRunConfig {
+                    name: "child".to_string(),
+                    prompt: "Do it".to_string(),
+                    title: "Child".to_string(),
+                }],
+                execution_mode: Some(api::run_agents::ExecutionMode::Remote(
+                    api::run_agents::Remote {
+                        environment_id: "env-123".to_string(),
+                        worker_host: "warp".to_string(),
+                        computer_use_enabled: true,
+                    },
+                )),
+                plan_id: "plan-1".to_string(),
+            })),
+        })),
+        request_id: "request-id".to_string(),
+        timestamp: None,
+    };
+
+    let output = message
+        .to_client_output_message(ConversionParams {
+            task_id: &task_id,
+            current_todo_list: None,
+            active_code_review: None,
+            skill_path_origin: &SkillPathOrigin::Local,
+        })
+        .expect("conversion should succeed");
+
+    let MaybeAIAgentOutputMessage::Message(output) = output else {
+        panic!("expected a client output message");
+    };
+    let AIAgentOutputMessageType::Action(action) = output.message else {
+        panic!("expected an action");
+    };
+    assert_eq!(
+        action.action,
+        AIAgentActionType::RunAgents(RunAgentsRequest {
+            summary: "Split the work".to_string(),
+            base_prompt: "Base".to_string(),
+            model_id: "auto".to_string(),
+            harness_type: String::new(),
+            agent_run_configs: vec![RunAgentsAgentRunConfig {
+                name: "child".to_string(),
+                prompt: "Do it".to_string(),
+            }],
+            plan_id: "plan-1".to_string(),
+        })
+    );
 }
 
 #[test]

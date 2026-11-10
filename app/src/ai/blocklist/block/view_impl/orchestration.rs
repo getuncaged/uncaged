@@ -17,7 +17,7 @@ use crate::ai::agent::conversation::{
 };
 use crate::ai::agent::{
     AIAgentActionId, AIAgentActionResultType, MessageId, ReceivedMessageDisplay,
-    SendMessageToAgentResult, StartAgentExecutionMode, StartAgentResult,
+    SendMessageToAgentResult, StartAgentResult,
 };
 use crate::ai::blocklist::action_model::AIActionStatus;
 use crate::ai::blocklist::agent_view::orchestration_avatar::OrchestrationAvatar;
@@ -558,7 +558,6 @@ pub(super) fn render_start_agent(
     action_id: &AIAgentActionId,
     name: &str,
     prompt: &str,
-    execution_mode: &StartAgentExecutionMode,
     message_id: &MessageId,
     app: &AppContext,
 ) -> Box<dyn Element> {
@@ -580,13 +579,13 @@ pub(super) fn render_start_agent(
                 vec![
                     FormattedTextFragment::plain_text("Started agent "),
                     FormattedTextFragment::bold(name),
-                    FormattedTextFragment::plain_text(start_agent_success_suffix(execution_mode)),
+                    FormattedTextFragment::plain_text(" locally."),
                 ],
                 inline_action_icons::green_check_icon(appearance).finish(),
             ),
             StartAgentResult::Error { error, .. } => (
                 vec![
-                    FormattedTextFragment::plain_text(start_agent_error_prefix(execution_mode)),
+                    FormattedTextFragment::plain_text("Failed to start agent "),
                     FormattedTextFragment::bold(name),
                     FormattedTextFragment::plain_text(format!(": {error}")),
                 ],
@@ -594,7 +593,7 @@ pub(super) fn render_start_agent(
             ),
             StartAgentResult::Cancelled { .. } => (
                 vec![
-                    FormattedTextFragment::plain_text(start_agent_cancelled_prefix(execution_mode)),
+                    FormattedTextFragment::plain_text("Start agent "),
                     FormattedTextFragment::bold(name),
                     FormattedTextFragment::plain_text(" cancelled."),
                 ],
@@ -673,7 +672,7 @@ pub(super) fn render_start_agent(
         || status.as_ref().is_some_and(|s| s.is_queued());
 
     let label_fragments = vec![
-        FormattedTextFragment::plain_text(start_agent_in_progress_prefix(execution_mode)),
+        FormattedTextFragment::plain_text("Starting agent "),
         FormattedTextFragment::bold(name),
         FormattedTextFragment::plain_text(" ..."),
     ];
@@ -723,34 +722,6 @@ pub(super) fn render_start_agent(
         .with_background_color(blended_colors::neutral_2(theme))
         .with_corner_radius(CornerRadius::with_all(Radius::Pixels(8.)))
         .finish()
-}
-
-fn start_agent_success_suffix(execution_mode: &StartAgentExecutionMode) -> &'static str {
-    match execution_mode {
-        StartAgentExecutionMode::Local { .. } => " locally.",
-        StartAgentExecutionMode::Remote { .. } => " remotely.",
-    }
-}
-
-fn start_agent_error_prefix(execution_mode: &StartAgentExecutionMode) -> &'static str {
-    match execution_mode {
-        StartAgentExecutionMode::Local { .. } => "Failed to start agent ",
-        StartAgentExecutionMode::Remote { .. } => "Failed to start remote agent ",
-    }
-}
-
-fn start_agent_cancelled_prefix(execution_mode: &StartAgentExecutionMode) -> &'static str {
-    match execution_mode {
-        StartAgentExecutionMode::Local { .. } => "Start agent ",
-        StartAgentExecutionMode::Remote { .. } => "Start remote agent ",
-    }
-}
-
-fn start_agent_in_progress_prefix(execution_mode: &StartAgentExecutionMode) -> &'static str {
-    match execution_mode {
-        StartAgentExecutionMode::Local { .. } => "Starting agent ",
-        StartAgentExecutionMode::Remote { .. } => "Starting remote agent ",
-    }
 }
 
 /// Renders a selectable text block below an orchestration action header, using a muted color.

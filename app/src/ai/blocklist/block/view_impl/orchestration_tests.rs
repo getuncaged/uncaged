@@ -6,12 +6,11 @@ use uncaged_ui::{App, EntityId};
 
 use super::{
     agent_display_name_from_id, child_conversation_card_data_for_result, participant_for_agent_id,
-    render_conversation_navigation_card_row, start_agent_cancelled_prefix,
-    start_agent_error_prefix, start_agent_in_progress_prefix, start_agent_success_suffix,
-    transcript_metadata, ChildConversationCardData, OrchestrationAvatar, OrchestrationParticipant,
+    render_conversation_navigation_card_row, transcript_metadata, ChildConversationCardData,
+    OrchestrationAvatar, OrchestrationParticipant,
 };
 use crate::ai::agent::conversation::{AIConversationId, ConversationStatus};
-use crate::ai::agent::{StartAgentExecutionMode, StartAgentResult};
+use crate::ai::agent::StartAgentResult;
 use crate::test_util::settings::initialize_history_persistence_for_tests;
 use crate::BlocklistAIHistoryModel;
 
@@ -47,52 +46,6 @@ fn child_conversation_card_data_for_success_result_returns_conversation_id_and_t
             })
         );
     });
-}
-
-#[test]
-fn start_agent_copy_uses_local_labels_for_local_children() {
-    let execution_mode = StartAgentExecutionMode::local_harness("claude-code".to_string());
-
-    assert_eq!(start_agent_success_suffix(&execution_mode), " locally.");
-    assert_eq!(
-        start_agent_error_prefix(&execution_mode),
-        "Failed to start agent "
-    );
-    assert_eq!(
-        start_agent_cancelled_prefix(&execution_mode),
-        "Start agent "
-    );
-    assert_eq!(
-        start_agent_in_progress_prefix(&execution_mode),
-        "Starting agent "
-    );
-}
-
-#[test]
-fn start_agent_copy_uses_remote_labels_for_remote_children() {
-    let execution_mode = StartAgentExecutionMode::Remote {
-        environment_id: "env-123".to_string(),
-        skill_references: vec![],
-        model_id: String::new(),
-        computer_use_enabled: false,
-        worker_host: String::new(),
-        harness_type: String::new(),
-        title: String::new(),
-    };
-
-    assert_eq!(start_agent_success_suffix(&execution_mode), " remotely.");
-    assert_eq!(
-        start_agent_error_prefix(&execution_mode),
-        "Failed to start remote agent "
-    );
-    assert_eq!(
-        start_agent_cancelled_prefix(&execution_mode),
-        "Start remote agent "
-    );
-    assert_eq!(
-        start_agent_in_progress_prefix(&execution_mode),
-        "Starting remote agent "
-    );
 }
 
 #[test]

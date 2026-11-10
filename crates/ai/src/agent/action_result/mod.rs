@@ -1206,7 +1206,6 @@ pub enum RunAgentsResult {
     Launched {
         model_id: String,
         harness_type: String,
-        execution_mode: RunAgentsLaunchedExecutionMode,
         agents: Vec<RunAgentsAgentOutcome>,
     },
     /// Declined for a non-error reason (currently disapproval).
@@ -1218,16 +1217,6 @@ pub enum RunAgentsResult {
     /// `ToolCallResult.Cancel` marker, synthesized by the server's input
     /// interceptor on the next user input.
     Cancelled,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum RunAgentsLaunchedExecutionMode {
-    Local,
-    Remote {
-        environment_id: String,
-        worker_host: String,
-        computer_use_enabled: bool,
-    },
 }
 
 /// Per-agent outcome reported in `RunAgentsResult::Launched.agents`.

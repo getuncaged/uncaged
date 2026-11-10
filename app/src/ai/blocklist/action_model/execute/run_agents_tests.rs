@@ -1,7 +1,5 @@
-use ai::agent::action::{RunAgentsAgentRunConfig, RunAgentsExecutionMode, RunAgentsRequest};
-use ai::agent::orchestration_config::{
-    OrchestrationConfig, OrchestrationConfigStatus, OrchestrationExecutionMode,
-};
+use ai::agent::action::{RunAgentsAgentRunConfig, RunAgentsRequest};
+use ai::agent::orchestration_config::{OrchestrationConfig, OrchestrationConfigStatus};
 use uncaged_core::execution_mode::ExecutionMode;
 use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{App, Entity, EntityId, ModelHandle};
@@ -71,10 +69,6 @@ fn persist_plan_config_with_harness(
                 OrchestrationConfig {
                     model_id: "auto".to_string(),
                     harness_type: harness_type.to_string(),
-                    execution_mode: OrchestrationExecutionMode::Remote {
-                        environment_id: "env-1".to_string(),
-                        worker_host: "warp".to_string(),
-                    },
                 },
                 status,
             );
@@ -96,7 +90,7 @@ fn should_autoexecute_duplicate_launched_agent_denial() {
                 }],
             );
         });
-        let action = remote_run_agents_action("oz");
+        let action = run_agents_action("oz");
 
         let should_autoexecute = state.executor.update(&mut app, |executor, ctx| {
             executor.should_autoexecute(
@@ -127,7 +121,7 @@ fn execute_denies_duplicate_launched_agent() {
                 }],
             );
         });
-        let action = with_agent_name(remote_run_agents_action("oz"), "Child");
+        let action = with_agent_name(run_agents_action("oz"), "Child");
 
         let execution = state.executor.update(&mut app, |executor, ctx| {
             executor
@@ -199,7 +193,7 @@ fn subscribe_to_start_agent_requests(
     captured
 }
 
-fn remote_run_agents_action(harness_type: &str) -> AIAgentAction {
+fn run_agents_action(harness_type: &str) -> AIAgentAction {
     AIAgentAction {
         id: AIAgentActionId::from("run-agents-action".to_string()),
         task_id: TaskId::new("run-agents-task".to_string()),
@@ -207,18 +201,11 @@ fn remote_run_agents_action(harness_type: &str) -> AIAgentAction {
         action: AIAgentActionType::RunAgents(RunAgentsRequest {
             summary: "Run child agent".to_string(),
             base_prompt: "Help".to_string(),
-            skills: vec![],
             model_id: String::new(),
             harness_type: harness_type.to_string(),
-            execution_mode: RunAgentsExecutionMode::Remote {
-                environment_id: "env-1".to_string(),
-                worker_host: "warp".to_string(),
-                computer_use_enabled: false,
-            },
             agent_run_configs: vec![RunAgentsAgentRunConfig {
                 name: "child".to_string(),
                 prompt: "Help".to_string(),
-                title: String::new(),
             }],
             plan_id: String::new(),
         }),
@@ -236,15 +223,8 @@ fn with_agent_name(mut action: AIAgentAction, name: &str) -> AIAgentAction {
 #[test]
 fn local_codex_run_agents_maps_to_local_harness_mode_when_flag_enabled() {
     let _local_codex = FeatureFlag::LocalClaudeCodexChildHarnesses.override_enabled(true);
-    let cfg = RunAgentsAgentRunConfig {
-        name: "child".to_string(),
-        prompt: "Investigate the failure".to_string(),
-        title: String::new(),
-    };
-
-    let mode =
-        run_agents_to_start_agent_mode(&RunAgentsExecutionMode::Local, "codex", "", &[], &cfg)
-            .expect("local Codex should be accepted when the feature flag is enabled");
+    let mode = run_agents_to_start_agent_mode("codex", "")
+        .expect("local Codex should be accepted when the feature flag is enabled");
 
     assert_eq!(
         mode,
@@ -265,7 +245,7 @@ fn should_autoexecute_when_plan_has_approved_orchestration_config() {
             "plan-1",
             OrchestrationConfigStatus::Approved,
         );
-        let action = with_plan_id(remote_run_agents_action("oz"), "plan-1");
+        let action = with_plan_id(run_agents_action("oz"), "plan-1");
 
         let should_autoexecute = state.executor.update(&mut app, |executor, ctx| {
             executor.should_autoexecute(
@@ -291,7 +271,7 @@ fn execute_denies_disapproved_plan_config() {
             "plan-1",
             OrchestrationConfigStatus::Disapproved,
         );
-        let action = with_plan_id(remote_run_agents_action("oz"), "plan-1");
+        let action = with_plan_id(run_agents_action("oz"), "plan-1");
 
         let execution = state.executor.update(&mut app, |executor, ctx| {
             executor
@@ -320,7 +300,7 @@ fn execute_denies_never_allow_profile_setting() {
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
         set_run_agents_permission(&mut app, RunAgentsPermission::NeverAllow);
-        let action = remote_run_agents_action("oz");
+        let action = run_agents_action("oz");
 
         let execution = state.executor.update(&mut app, |executor, ctx| {
             executor
@@ -352,7 +332,7 @@ fn autonomous_mode_autoexecutes_and_does_not_deny_missing_api_key() {
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::Sdk);
         set_run_agents_permission(&mut app, RunAgentsPermission::NeverAllow);
-        let action = remote_run_agents_action("codex");
+        let action = run_agents_action("codex");
 
         let should_autoexecute = state.executor.update(&mut app, |executor, ctx| {
             executor.should_autoexecute(
@@ -421,7 +401,7 @@ fn execute_publishes_every_parent_owned_plan_before_dispatch() {
                 )
             });
         let captured = subscribe_to_start_agent_requests(&mut app, &state.start_agent_executor);
-        let action = remote_run_agents_action("oz");
+        let action = run_agents_action("oz");
 
         let execution = state.executor.update(&mut app, |executor, ctx| {
             executor
@@ -478,7 +458,7 @@ fn cancel_during_plan_publication_does_not_dispatch_children() {
             model.create_document("Plan", "# Plan", state.conversation_id, None, ctx)
         });
         let captured = subscribe_to_start_agent_requests(&mut app, &state.start_agent_executor);
-        let action = remote_run_agents_action("oz");
+        let action = run_agents_action("oz");
         let action_id = action.id.clone();
 
         let execution = state.executor.update(&mut app, |executor, ctx| {
@@ -534,7 +514,7 @@ fn set_run_agents_permission(app: &mut App, permission: RunAgentsPermission) {
 fn should_not_autoexecute_without_approved_plan_or_always_allow_profile() {
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
-        let action = remote_run_agents_action("oz");
+        let action = run_agents_action("oz");
 
         let should_autoexecute = state.executor.update(&mut app, |executor, ctx| {
             executor.should_autoexecute(
@@ -551,11 +531,11 @@ fn should_not_autoexecute_without_approved_plan_or_always_allow_profile() {
 }
 
 #[test]
-fn should_autoexecute_remote_non_warp_harness_with_always_allow() {
+fn should_autoexecute_third_party_harness_with_always_allow() {
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
         set_run_agents_permission(&mut app, RunAgentsPermission::AlwaysAllow);
-        let action = remote_run_agents_action("codex");
+        let action = run_agents_action("codex");
 
         let should_autoexecute = state.executor.update(&mut app, |executor, ctx| {
             executor.should_autoexecute(
@@ -572,11 +552,11 @@ fn should_autoexecute_remote_non_warp_harness_with_always_allow() {
 }
 
 #[test]
-fn should_autoexecute_remote_warp_harness_with_always_allow() {
+fn should_autoexecute_oz_harness_with_always_allow() {
     App::test((), |mut app| async move {
         let state = initialize_run_agents_test(&mut app, ExecutionMode::App);
         set_run_agents_permission(&mut app, RunAgentsPermission::AlwaysAllow);
-        let action = remote_run_agents_action("oz");
+        let action = run_agents_action("oz");
 
         let should_autoexecute = state.executor.update(&mut app, |executor, ctx| {
             executor.should_autoexecute(

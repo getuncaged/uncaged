@@ -6,9 +6,7 @@ use ai::agent::action::{LifecycleEventType as StartAgentLifecycleEventType, Read
 use ai::agent::action_result::StartAgentVersion;
 use ai::agent::convert::ToolToAIAgentActionError;
 use ai::agent::UnknownCitationTypeError;
-use ai::skills::{
-    skill_reference_from_api_skill_ref, skill_reference_from_read_skill_ref, SkillPathOrigin,
-};
+use ai::skills::{skill_reference_from_read_skill_ref, SkillPathOrigin};
 use api::ask_user_question::question::QuestionType;
 use uncaged_agent_api as api;
 use uncaged_core::channel::ChannelState;
@@ -23,9 +21,9 @@ use crate::ai::agent::util::parse_markdown_into_text_and_code_sections;
 use crate::ai::agent::{
     AIAgentAction, AIAgentActionType, AIAgentAttachment, AIAgentCitation, AIAgentInput,
     AIAgentOutputMessage, AIAgentText, AIAgentTodo, ArtifactCreatedData, CloneRepositoryURL,
-    MessageId, RunAgentsAgentRunConfig, RunAgentsExecutionMode, RunAgentsRequest,
-    StartAgentExecutionMode, SubagentCall, SubagentType, SuggestedAgentModeWorkflow, SuggestedRule,
-    Suggestions, SummarizationType, TodoOperation, UserQueryMode, WebFetchStatus, WebSearchStatus,
+    MessageId, RunAgentsAgentRunConfig, RunAgentsRequest, StartAgentExecutionMode, SubagentCall,
+    SubagentType, SuggestedAgentModeWorkflow, SuggestedRule, Suggestions, SummarizationType,
+    TodoOperation, UserQueryMode, WebFetchStatus, WebSearchStatus,
 };
 use crate::ai::artifact_download::sanitized_basename;
 use crate::ai::document::ai_document_model::{AIDocumentId, AIDocumentVersion};
@@ -108,97 +106,62 @@ pub(crate) fn convert_run_agents_harness(harness: Option<&api::Harness>) -> Opti
     )
 }
 
+/// Uncaged has no cloud agents: a `StartAgent` call in the removed remote mode
+/// (e.g. in a saved conversation) loads as a default local launch.
 fn convert_start_agent_execution_mode(
     execution_mode: Option<api::start_agent::ExecutionMode>,
 ) -> StartAgentExecutionMode {
     match execution_mode.and_then(|execution_mode| execution_mode.mode) {
-        Some(api::start_agent::execution_mode::Mode::Remote(remote)) => {
-            StartAgentExecutionMode::remote_with_defaults(remote.environment_id)
-        }
-        Some(api::start_agent::execution_mode::Mode::Local(_)) | None => {
-            StartAgentExecutionMode::local_with_defaults()
-        }
+        Some(api::start_agent::execution_mode::Mode::Remote(_))
+        | Some(api::start_agent::execution_mode::Mode::Local(_))
+        | None => StartAgentExecutionMode::local_with_defaults(),
     }
 }
 
-fn convert_run_agents_execution_mode(
-    execution_mode: Option<api::run_agents::ExecutionMode>,
-) -> RunAgentsExecutionMode {
-    match execution_mode {
-        Some(api::run_agents::ExecutionMode::Remote(remote)) => RunAgentsExecutionMode::Remote {
-            environment_id: remote.environment_id,
-            worker_host: remote.worker_host,
-            computer_use_enabled: remote.computer_use_enabled,
-        },
-        Some(api::run_agents::ExecutionMode::Local(_)) | None => RunAgentsExecutionMode::Local,
-    }
-}
-
-fn convert_run_agents(
-    run_agents: api::RunAgents,
-    skill_path_origin: &SkillPathOrigin,
-) -> AIAgentActionType {
+/// The run's execution mode, skills and per-agent titles are not converted:
+/// Uncaged launches child agents locally only, and only a cloud launch used
+/// the latter two.
+fn convert_run_agents(run_agents: api::RunAgents) -> AIAgentActionType {
     let api::RunAgents {
         summary,
         base_prompt,
-        skills,
+        skills: _,
         model_id,
         harness,
         agent_run_configs,
-        execution_mode,
+        execution_mode: _,
         plan_id,
     } = run_agents;
     AIAgentActionType::RunAgents(RunAgentsRequest {
         summary,
         base_prompt,
-        skills: skills
-            .into_iter()
-            .filter_map(|skill| skill_reference_from_api_skill_ref(skill, skill_path_origin))
-            .collect(),
         model_id,
         harness_type: convert_run_agents_harness(harness.as_ref()).unwrap_or_default(),
-        execution_mode: convert_run_agents_execution_mode(execution_mode),
         agent_run_configs: agent_run_configs
             .into_iter()
             .map(|config| RunAgentsAgentRunConfig {
                 name: config.name,
                 prompt: config.prompt,
-                title: config.title,
             })
             .collect(),
         plan_id,
     })
 }
 
+/// Uncaged has no cloud agents: a `StartAgentV2` call in the removed remote
+/// mode (e.g. in a saved conversation) loads as a default local launch.
 fn convert_start_agent_v2_execution_mode(
     execution_mode: Option<api::start_agent_v2::ExecutionMode>,
-    skill_path_origin: &SkillPathOrigin,
 ) -> StartAgentExecutionMode {
     match execution_mode.and_then(|execution_mode| execution_mode.mode) {
-        Some(api::start_agent_v2::execution_mode::Mode::Remote(remote)) => {
-            StartAgentExecutionMode::Remote {
-                environment_id: remote.environment_id,
-                skill_references: remote
-                    .skills
-                    .into_iter()
-                    .filter_map(|skill| {
-                        skill_reference_from_api_skill_ref(skill, skill_path_origin)
-                    })
-                    .collect(),
-                model_id: remote.model_id,
-                computer_use_enabled: remote.computer_use_enabled,
-                worker_host: remote.worker_host,
-                harness_type: convert_start_agent_v2_harness_type(remote.harness)
-                    .unwrap_or_default(),
-                title: remote.title,
-            }
-        }
         Some(api::start_agent_v2::execution_mode::Mode::Local(local)) => {
             convert_start_agent_v2_harness_type(local.harness)
                 .map(StartAgentExecutionMode::local_harness)
                 .unwrap_or_else(StartAgentExecutionMode::local_with_defaults)
         }
-        None => StartAgentExecutionMode::local_with_defaults(),
+        Some(api::start_agent_v2::execution_mode::Mode::Remote(_)) | None => {
+            StartAgentExecutionMode::local_with_defaults()
+        }
     }
 }
 
@@ -831,7 +794,6 @@ impl ConvertAPIToolCallToAIAgentAction for api::message::ToolCall {
                     prompt: start_agent.prompt,
                     execution_mode: convert_start_agent_v2_execution_mode(
                         start_agent.execution_mode,
-                        params.skill_path_origin,
                     ),
                     lifecycle_subscription: start_agent.lifecycle_subscription.map(
                         |subscription| {
@@ -845,7 +807,7 @@ impl ConvertAPIToolCallToAIAgentAction for api::message::ToolCall {
                 })
             }
             api::message::tool_call::Tool::RunAgents(orchestrate) => {
-                create_standard_action(convert_run_agents(orchestrate, params.skill_path_origin))
+                create_standard_action(convert_run_agents(orchestrate))
             }
             api::message::tool_call::Tool::SendMessageToAgent(send_message) => {
                 create_standard_action(AIAgentActionType::SendMessageToAgent {

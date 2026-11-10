@@ -1401,6 +1401,10 @@ pub enum CodeDiffAction {
     ScrollToExpand,
 }
 
+// Dropping the cloud child-agent launch mode shrank `StartAgentConversation`, leaving
+// `OpenCodeReviewPaneAndScrollToComment` far larger than the rest; boxing its payload would
+// touch every emitter for no real gain (same as `pane_group::Event`).
+#[allow(clippy::large_enum_variant)]
 pub enum Event {
     AppStateChanged,
     Escape,

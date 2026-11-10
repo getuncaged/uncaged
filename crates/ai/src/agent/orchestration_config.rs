@@ -6,27 +6,13 @@ use super::action::RunAgentsRequest;
 /// conversation via `OrchestrationConfigSnapshot`.
 ///
 /// Mirrors the proto `OrchestrationConfig` but uses Rust-native types
-/// to keep view / model code free of proto imports.
+/// to keep view / model code free of proto imports. Uncaged runs child
+/// agents locally only, so the proto's execution mode is not kept: a config
+/// saved with the removed cloud mode loads as a local one.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct OrchestrationConfig {
     pub model_id: String,
     pub harness_type: String,
-    pub execution_mode: OrchestrationExecutionMode,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum OrchestrationExecutionMode {
-    Local,
-    Remote {
-        environment_id: String,
-        worker_host: String,
-    },
-}
-
-impl OrchestrationExecutionMode {
-    pub fn is_remote(&self) -> bool {
-        matches!(self, Self::Remote { .. })
-    }
 }
 
 /// User's approval state for orchestration on the active config.
@@ -59,8 +45,7 @@ impl OrchestrationConfigStatus {
 ///
 /// Empty/unset fields on the call are treated as inheriting from the
 /// config (and therefore matching). Fields not in the config
-/// (`computer_use_enabled`, `skills`, `base_prompt`, `agent_run_configs`,
-/// per-agent `title`) are excluded from the check.
+/// (`base_prompt`, `agent_run_configs`) are excluded from the check.
 pub fn matches_active_config(request: &RunAgentsRequest, config: &OrchestrationConfig) -> bool {
     // model_id — empty on the call means "inherit from config" → matches.
     if !request.model_id.is_empty() && request.model_id != config.model_id {
@@ -68,31 +53,7 @@ pub fn matches_active_config(request: &RunAgentsRequest, config: &OrchestrationC
     }
 
     // harness_type
-    if !request.harness_type.is_empty() && request.harness_type != config.harness_type {
-        return false;
-    }
-
-    // execution_mode variant must agree.
-    match (&request.execution_mode, &config.execution_mode) {
-        (super::action::RunAgentsExecutionMode::Local, OrchestrationExecutionMode::Local) => true,
-        (
-            super::action::RunAgentsExecutionMode::Remote {
-                environment_id,
-                worker_host,
-                ..
-            },
-            OrchestrationExecutionMode::Remote {
-                environment_id: cfg_env,
-                worker_host: cfg_host,
-            },
-        ) => {
-            let env_matches = environment_id.is_empty() || environment_id == cfg_env;
-            let host_matches = worker_host.is_empty() || worker_host == cfg_host;
-            env_matches && host_matches
-        }
-        // Variant mismatch (Local vs Remote).
-        _ => false,
-    }
+    request.harness_type.is_empty() || request.harness_type == config.harness_type
 }
 
 // ---------------------------------------------------------------------------
@@ -100,52 +61,24 @@ pub fn matches_active_config(request: &RunAgentsRequest, config: &OrchestrationC
 // ---------------------------------------------------------------------------
 
 impl OrchestrationConfig {
-    /// Converts from the proto `OrchestrationConfig` message.
+    /// Converts from the proto `OrchestrationConfig` message. The execution
+    /// mode is ignored: Uncaged only launches local child agents.
     pub fn from_proto(proto: &api::OrchestrationConfig) -> Self {
-        let execution_mode = match &proto.execution_mode {
-            Some(api::orchestration_config::ExecutionMode::Remote(remote)) => {
-                OrchestrationExecutionMode::Remote {
-                    environment_id: remote.environment_id.clone(),
-                    worker_host: remote.worker_host.clone(),
-                }
-            }
-            Some(api::orchestration_config::ExecutionMode::Local(_)) | None => {
-                OrchestrationExecutionMode::Local
-            }
-        };
-
-        let harness_type = harness_proto_to_string(proto.harness.as_ref()).unwrap_or_default();
-
         Self {
             model_id: proto.model_id.clone(),
-            harness_type,
-            execution_mode,
+            harness_type: harness_proto_to_string(proto.harness.as_ref()).unwrap_or_default(),
         }
     }
 
-    /// Converts to the proto `OrchestrationConfig` message.
+    /// Converts to the proto `OrchestrationConfig` message, always in local
+    /// execution mode.
     pub fn to_proto(&self) -> api::OrchestrationConfig {
-        let execution_mode = match &self.execution_mode {
-            OrchestrationExecutionMode::Local => {
-                Some(api::orchestration_config::ExecutionMode::Local(
-                    api::orchestration_config::Local {},
-                ))
-            }
-            OrchestrationExecutionMode::Remote {
-                environment_id,
-                worker_host,
-            } => Some(api::orchestration_config::ExecutionMode::Remote(
-                api::orchestration_config::Remote {
-                    environment_id: environment_id.clone(),
-                    worker_host: worker_host.clone(),
-                },
-            )),
-        };
-
         api::OrchestrationConfig {
             model_id: self.model_id.clone(),
             harness: harness_type_to_proto(&self.harness_type),
-            execution_mode,
+            execution_mode: Some(api::orchestration_config::ExecutionMode::Local(
+                api::orchestration_config::Local {},
+            )),
         }
     }
 }

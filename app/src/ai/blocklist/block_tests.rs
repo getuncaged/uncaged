@@ -1,12 +1,7 @@
-use std::path::PathBuf;
-
-use ai::agent::action::{RunAgentsAgentRunConfig, RunAgentsExecutionMode};
 use ai::agent::action_result::StartAgentVersion;
-use ai::skills::SkillReference;
 use cloud_objects::UserUid;
 use settings::Setting;
 use uncaged_ui::{App, SingletonEntity};
-use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::{
     default_collapsible_state_for_orchestration_action,
@@ -375,118 +370,17 @@ fn compose_child_prompt_treats_whitespace_only_base_as_empty() {
     assert_eq!(composed, "do X");
 }
 
-fn agent_cfg() -> RunAgentsAgentRunConfig {
-    RunAgentsAgentRunConfig {
-        name: "child".to_string(),
-        prompt: "do X".to_string(),
-        title: "Child".to_string(),
-    }
-}
-
-#[test]
-fn remote_arm_propagates_skills_into_skill_references() {
-    let skills = vec![
-        SkillReference::BundledSkillId("writing-pr-descriptions".to_string()),
-        SkillReference::Path(LocalOrRemotePath::Local(PathBuf::from(
-            "/tmp/skill/SKILL.md",
-        ))),
-    ];
-    let mode = run_agents_to_start_agent_mode(
-        &RunAgentsExecutionMode::Remote {
-            environment_id: "env-1".to_string(),
-            worker_host: "warp".to_string(),
-            computer_use_enabled: true,
-        },
-        "oz",
-        "auto",
-        &skills,
-        &agent_cfg(),
-    )
-    .expect("Remote+oz must convert");
-    let StartAgentExecutionMode::Remote {
-        skill_references,
-        environment_id,
-        worker_host,
-        harness_type,
-        model_id,
-        computer_use_enabled,
-        title,
-    } = mode
-    else {
-        panic!("expected Remote start-agent mode");
-    };
-    assert_eq!(skill_references, skills);
-    assert_eq!(environment_id, "env-1");
-    assert_eq!(worker_host, "warp");
-    assert_eq!(harness_type, "oz");
-    assert_eq!(model_id, "auto");
-    assert!(computer_use_enabled);
-    assert_eq!(title, "Child");
-}
-
-#[test]
-fn remote_arm_with_empty_skills_propagates_empty_vec() {
-    let mode = run_agents_to_start_agent_mode(
-        &RunAgentsExecutionMode::Remote {
-            environment_id: "env-1".to_string(),
-            worker_host: "warp".to_string(),
-            computer_use_enabled: false,
-        },
-        "claude",
-        "auto",
-        &[],
-        &agent_cfg(),
-    )
-    .expect("Remote+claude must convert");
-    let StartAgentExecutionMode::Remote {
-        skill_references, ..
-    } = mode
-    else {
-        panic!("expected Remote start-agent mode");
-    };
-    assert!(skill_references.is_empty());
-}
-
-#[test]
-fn remote_arm_rejects_opencode() {
-    let err = run_agents_to_start_agent_mode(
-        &RunAgentsExecutionMode::Remote {
-            environment_id: "env-1".to_string(),
-            worker_host: "warp".to_string(),
-            computer_use_enabled: false,
-        },
-        "opencode",
-        "auto",
-        &[],
-        &agent_cfg(),
-    )
-    .expect_err("Remote+opencode must be rejected");
-    assert!(err.to_lowercase().contains("opencode"));
-}
-
 #[test]
 fn local_arm_rejects_disabled_codex() {
-    let err = run_agents_to_start_agent_mode(
-        &RunAgentsExecutionMode::Local,
-        "codex",
-        "auto",
-        &[],
-        &agent_cfg(),
-    )
-    .expect_err("Local+codex must be rejected while disabled");
+    let err = run_agents_to_start_agent_mode("codex", "auto")
+        .expect_err("Local+codex must be rejected while disabled");
     assert_eq!(err, "Local Codex child agents are temporarily disabled.");
 }
 
 #[test]
 fn local_arm_allows_claude() {
-    let mode = run_agents_to_start_agent_mode(
-        &RunAgentsExecutionMode::Local,
-        "claude",
-        "auto",
-        &[],
-        &agent_cfg(),
-    )
-    .expect("Local+claude should convert");
+    let mode =
+        run_agents_to_start_agent_mode("claude", "auto").expect("Local+claude should convert");
     assert!(matches!(
         mode,
         StartAgentExecutionMode::Local {

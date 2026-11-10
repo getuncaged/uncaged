@@ -104,8 +104,10 @@ Still open:
   it (`entry_for_task`, the `Task*` display statuses, the agent management view's task paths),
   and the remote-host catalog in `BundledSkills`. Removing them is behaviour-neutral but a larger
   refactor.
-- The run-agents "Cloud" execution mode is still offered but cannot run (no parent run_id
-  without Warp's server); removing it takes the remote orchestration paths with it.
+- `/init` still ends with a "create an environment for this project so you can run cloud
+  agents in it" step (`init_project`, always Ready), and the `/create-environment` slash
+  command (default feature `create_environment_slash_command`) sets up Warp's cloud
+  environments; neither can do anything without Warp's server.
 - Bundled agent skills under `resources/bundled/skills` still describe Warp (and `oz-platform`
   only Warp's cloud).
 - The Linux secure-storage key seed string that names `releases.warp.dev` must stay (changing

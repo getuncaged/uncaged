@@ -1,10 +1,9 @@
 //! Inline config block rendered on plan cards when the conversation has
 //! an active `OrchestrationConfigSnapshot`. Shows a "Use orchestration"
-//! toggle, Cloud/Local picker, and run-wide config dropdowns.
+//! toggle and run-wide config dropdowns.
 
 use std::collections::HashMap;
 
-use ai::agent::action::RunAgentsExecutionMode;
 use ai::agent::orchestration_config::OrchestrationConfigStatus;
 use pathfinder_color::ColorU;
 use uncaged_core::ui::theme::WarpTheme;
@@ -19,7 +18,6 @@ use uncaged_ui::{
 };
 
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::blocklist::inline_action::host_picker::{HostPicker, HostPickerEvent};
 use crate::ai::blocklist::inline_action::orchestration_controls::{
     self as oc, OrchestrationControlAction, OrchestrationEditState, OrchestrationPickerHandles,
 };
@@ -81,25 +79,16 @@ const BASE_MODEL_HELPER: &str = "The primary model all agents will use.";
 pub enum OrchestrationConfigBlockAction {
     ToggleApproval,
     ToggleDetails,
-    ExecutionModeToggled { is_remote: bool },
     ModelChanged { model_id: String },
     HarnessChanged { harness_type: String },
-    EnvironmentChanged { environment_id: String },
-    WorkerHostChanged { worker_host: String },
 }
 
 impl OrchestrationControlAction for OrchestrationConfigBlockAction {
-    fn execution_mode_toggled(is_remote: bool) -> Self {
-        Self::ExecutionModeToggled { is_remote }
-    }
     fn model_changed(model_id: String) -> Self {
         Self::ModelChanged { model_id }
     }
     fn harness_changed(harness_type: String) -> Self {
         Self::HarnessChanged { harness_type }
-    }
-    fn environment_changed(environment_id: String) -> Self {
-        Self::EnvironmentChanged { environment_id }
     }
 }
 
@@ -144,11 +133,7 @@ impl OrchestrationConfigBlockView {
             })
             .unwrap_or_else(|| {
                 (
-                    OrchestrationEditState::from_run_agents_fields(
-                        "auto",
-                        "oz",
-                        &RunAgentsExecutionMode::Local,
-                    ),
+                    OrchestrationEditState::from_run_agents_fields("auto", "oz"),
                     false,
                 )
             });
@@ -174,12 +159,10 @@ impl OrchestrationConfigBlockView {
         ctx.subscribe_to_model(&LLMPreferences::handle(ctx), |me, _, event, ctx| {
             if let LLMPreferencesEvent::UpdatedAvailableLLMs = event {
                 if let Some(handle) = &me.pickers.model_picker {
-                    let is_local = !me.edit_state.execution_mode.is_remote();
                     oc::populate_model_picker_for_harness(
                         handle,
                         &me.edit_state.model_id,
                         &me.edit_state.harness_type,
-                        is_local,
                         ctx,
                     );
                 }
@@ -242,79 +225,20 @@ impl OrchestrationConfigBlockView {
         } else {
             self.edit_state.model_id.clone()
         };
-        let is_local = !self.edit_state.execution_mode.is_remote();
         let model_handle = oc::new_standard_filterable_picker_dropdown(&styles, ctx);
         model_handle.update(ctx, |d, c| d.set_use_overlay_layer(true, c));
         oc::populate_model_picker_for_harness(
             &model_handle,
             &display_model_id,
             &self.edit_state.harness_type,
-            is_local,
             ctx,
         );
         self.pickers.model_picker = Some(model_handle);
 
         let harness_handle = oc::new_standard_picker_dropdown(&colors, ctx);
         harness_handle.update(ctx, |d, c| d.set_use_overlay_layer(true, c));
-        oc::populate_harness_picker(
-            &harness_handle,
-            &self.edit_state.harness_type,
-            is_local,
-            ctx,
-        );
+        oc::populate_harness_picker(&harness_handle, &self.edit_state.harness_type, ctx);
         self.pickers.harness_picker = Some(harness_handle);
-
-        // When restoring a Remote config with empty host or
-        // environment, fill defaults so the pickers aren't blank.
-        // If the config is approved, persist the defaults so the
-        // stored config used by auto-launch has concrete values.
-        let needs_host = match &self.edit_state.execution_mode {
-            RunAgentsExecutionMode::Remote { worker_host, .. } => worker_host.is_empty(),
-            RunAgentsExecutionMode::Local => false,
-        };
-        let mut filled_defaults = false;
-        if needs_host {
-            // Prefer the workspace default (or the dev env-var override)
-            // over the bare "warp" fallback so self-hosted teams see
-            // their default pre-selected. Mirrors the Oz webapp's
-            // `HostSelector` initial-selection behavior.
-            let default_host = oc::resolve_default_host_slug()
-                .unwrap_or_else(|| oc::ORCHESTRATION_WARP_WORKER_HOST.to_string());
-            self.edit_state.set_worker_host(default_host);
-            filled_defaults = true;
-        }
-        if filled_defaults && self.is_approved {
-            self.apply_field_change(ctx);
-        }
-        let initial_env = match &self.edit_state.execution_mode {
-            RunAgentsExecutionMode::Remote { environment_id, .. } => environment_id.as_str(),
-            RunAgentsExecutionMode::Local => "",
-        };
-        let env_handle = oc::create_environment_picker(initial_env, &styles, ctx);
-        env_handle.update(ctx, |d, c| d.set_use_overlay_layer(true, c));
-        self.pickers.environment_picker = Some(env_handle);
-
-        let initial_host = match &self.edit_state.execution_mode {
-            RunAgentsExecutionMode::Remote { worker_host, .. } => worker_host.as_str(),
-            RunAgentsExecutionMode::Local => oc::ORCHESTRATION_WARP_WORKER_HOST,
-        };
-        let host_handle = ctx.add_typed_action_view(HostPicker::new);
-        // Paint the open menu in the overlay layer so it doesn't get covered
-        // by sibling pickers, matching the other pickers in this view.
-        host_handle.update(ctx, |picker, picker_ctx| {
-            picker.set_use_overlay_layer(true, picker_ctx);
-        });
-        oc::populate_host_picker(&host_handle, initial_host, ctx);
-        ctx.subscribe_to_view(&host_handle, |_me, _, event, ctx| match event {
-            HostPickerEvent::Opened => {}
-            HostPickerEvent::HostChanged { slug } => {
-                ctx.dispatch_typed_action(&OrchestrationConfigBlockAction::WorkerHostChanged {
-                    worker_host: slug.clone(),
-                });
-            }
-            HostPickerEvent::Closed => {}
-        });
-        self.pickers.host_picker = Some(host_handle);
 
         self.pickers_initialized = true;
         oc::sync_picker_selections(&self.edit_state, &self.pickers, ctx);
@@ -444,21 +368,6 @@ impl View for OrchestrationConfigBlockView {
 
             // Expanded controls
             if self.details_expanded {
-                // Cloud / Local mode toggle (full width)
-                let active_seg_bg =
-                    uncaged_core::ui::theme::color::internal_colors::accent_overlay_2(theme);
-                column.add_child(
-                    Container::new(oc::render_mode_toggle(
-                        self.edit_state.execution_mode.is_remote(),
-                        &self.pickers,
-                        appearance,
-                        Some(active_seg_bg),
-                        true,
-                    ))
-                    .with_margin_top(12.)
-                    .finish(),
-                );
-
                 // Pickers stacked vertically
                 column.add_child(oc::render_picker_row_with_layout(
                     &self.edit_state,
@@ -522,23 +431,6 @@ impl TypedActionView for OrchestrationConfigBlockView {
                 }
                 ctx.notify();
             }
-            OrchestrationConfigBlockAction::ExecutionModeToggled { is_remote } => {
-                let conversation_id = self.conversation_id;
-                oc::apply_execution_mode_change(
-                    &mut self.edit_state,
-                    &self.pickers,
-                    *is_remote,
-                    |ctx| {
-                        BlocklistAIHistoryModel::as_ref(ctx)
-                            .conversation(&conversation_id)
-                            .and_then(|conv| conv.latest_exchange())
-                            .map(|ex| ex.model_id.to_string())
-                    },
-                    ctx,
-                );
-                self.apply_field_change(ctx);
-                ctx.notify();
-            }
             OrchestrationConfigBlockAction::ModelChanged { model_id } => {
                 self.edit_state.model_id = model_id.clone();
                 self.apply_field_change(ctx);
@@ -559,17 +451,6 @@ impl TypedActionView for OrchestrationConfigBlockView {
                     },
                     ctx,
                 );
-                self.apply_field_change(ctx);
-                ctx.notify();
-            }
-            OrchestrationConfigBlockAction::EnvironmentChanged { environment_id } => {
-                self.edit_state.set_environment_id(environment_id.clone());
-                self.apply_field_change(ctx);
-                ctx.notify();
-            }
-            OrchestrationConfigBlockAction::WorkerHostChanged { worker_host } => {
-                self.edit_state.set_worker_host(worker_host.clone());
-                oc::persist_host_selection(worker_host, ctx);
                 self.apply_field_change(ctx);
                 ctx.notify();
             }

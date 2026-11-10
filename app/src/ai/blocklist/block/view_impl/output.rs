@@ -738,7 +738,7 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                     version: _,
                                     name,
                                     prompt,
-                                    execution_mode,
+                                    execution_mode: _,
                                     lifecycle_subscription: _,
                                 },
                             id,
@@ -751,7 +751,6 @@ pub(super) fn render(props: Props, app: &AppContext) -> Box<dyn Element> {
                                 id,
                                 name,
                                 prompt,
-                                execution_mode,
                                 &output_message.id,
                                 app,
                             ));

@@ -110,21 +110,6 @@ fn skill_reference_for_path(
         .map(SkillReference::Path)
 }
 
-pub fn skill_reference_from_api_skill_ref(
-    skill_ref: api::SkillRef,
-    path_origin: &SkillPathOrigin,
-) -> Option<SkillReference> {
-    match skill_ref.skill_reference {
-        Some(api::skill_ref::SkillReference::Path(path)) => {
-            skill_reference_for_path(path, path_origin).ok()
-        }
-        Some(api::skill_ref::SkillReference::BundledSkillId(id)) => {
-            Some(SkillReference::BundledSkillId(id))
-        }
-        None => None,
-    }
-}
-
 pub fn skill_reference_from_read_skill_ref(
     skill_reference: api::message::tool_call::read_skill::SkillReference,
     path_origin: &SkillPathOrigin,

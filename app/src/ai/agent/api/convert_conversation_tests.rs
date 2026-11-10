@@ -2147,3 +2147,71 @@ fn one_history_off_exchange_ids_stay_random() {
         second.iter().map(|e| e.id).collect::<Vec<_>>()
     );
 }
+
+/// A `RunAgents` result saved from a launch in the removed cloud execution
+/// mode still loads, as a local launch result.
+#[test]
+fn test_convert_tool_call_result_to_input_remote_run_agents_result_loads() {
+    use ai::agent::action_result::{
+        RunAgentsAgentOutcome, RunAgentsAgentOutcomeKind, RunAgentsResult,
+    };
+
+    let task_id = crate::ai::agent::task::TaskId::new("task".to_string());
+    let mut document_versions = HashMap::new();
+    let tool_call_result = api::message::ToolCallResult {
+        tool_call_id: "tool_call".to_string(),
+        context: None,
+        result: Some(api::message::tool_call_result::Result::RunAgentsResult(
+            api::RunAgentsResult {
+                outcome: Some(api::run_agents_result::Outcome::Launched(
+                    api::run_agents_result::Launched {
+                        resolved_model_id: "auto".to_string(),
+                        resolved_harness: None,
+                        resolved_execution_mode: Some(
+                            api::run_agents_result::launched::ResolvedExecutionMode::Remote(
+                                api::run_agents::Remote {
+                                    environment_id: "env-1".to_string(),
+                                    worker_host: "warp".to_string(),
+                                    computer_use_enabled: true,
+                                },
+                            ),
+                        ),
+                        agents: vec![api::run_agents_result::AgentOutcome {
+                            name: "child".to_string(),
+                            result: Some(api::run_agents_result::agent_outcome::Result::Launched(
+                                api::run_agents_result::LaunchedAgent {
+                                    agent_id: "agent-1".to_string(),
+                                },
+                            )),
+                        }],
+                    },
+                )),
+            },
+        )),
+    };
+
+    let input = convert_tool_call_result_to_input(
+        &task_id,
+        &tool_call_result,
+        &HashMap::new(),
+        &mut document_versions,
+    )
+    .unwrap();
+
+    let AIAgentInput::ActionResult { result, .. } = input else {
+        panic!("expected an action result");
+    };
+    assert_eq!(
+        result.result,
+        crate::ai::agent::AIAgentActionResultType::RunAgents(RunAgentsResult::Launched {
+            model_id: "auto".to_string(),
+            harness_type: String::new(),
+            agents: vec![RunAgentsAgentOutcome {
+                name: "child".to_string(),
+                kind: RunAgentsAgentOutcomeKind::Launched {
+                    agent_id: "agent-1".to_string(),
+                },
+            }],
+        })
+    );
+}

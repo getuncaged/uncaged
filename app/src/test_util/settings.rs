@@ -26,7 +26,6 @@ pub fn initialize_settings_for_tests_with_mode(
     use uncaged_core::execution_mode::AppExecutionMode;
     use uncaged_core::semantic_selection::SemanticSelection;
 
-    use crate::ai::cloud_agent_settings::CloudAgentSettings;
     use crate::drive::settings::WarpDriveSettings;
     use crate::search::command_search::settings::CommandSearchSettings;
     use crate::settings::app_icon::AppIconSettings;
@@ -64,7 +63,6 @@ pub fn initialize_settings_for_tests_with_mode(
     AccessibilitySettings::register(app);
     app.update(AISettings::register_and_subscribe_to_events);
     AliasExpansionSettings::register(app);
-    CloudAgentSettings::register(app);
     AppEditorSettings::register(app);
     BlockVisibilitySettings::register(app);
     BlockListSettings::register(app);

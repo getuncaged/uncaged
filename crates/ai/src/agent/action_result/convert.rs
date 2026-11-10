@@ -1201,31 +1201,6 @@ impl From<AskUserQuestionResult> for api::request::input::tool_call_result::Resu
     }
 }
 
-impl From<RunAgentsLaunchedExecutionMode>
-    for api::run_agents_result::launched::ResolvedExecutionMode
-{
-    fn from(mode: RunAgentsLaunchedExecutionMode) -> Self {
-        match mode {
-            RunAgentsLaunchedExecutionMode::Local => {
-                api::run_agents_result::launched::ResolvedExecutionMode::Local(
-                    api::run_agents::Local {},
-                )
-            }
-            RunAgentsLaunchedExecutionMode::Remote {
-                environment_id,
-                worker_host,
-                computer_use_enabled,
-            } => api::run_agents_result::launched::ResolvedExecutionMode::Remote(
-                api::run_agents::Remote {
-                    environment_id,
-                    worker_host,
-                    computer_use_enabled,
-                },
-            ),
-        }
-    }
-}
-
 impl From<RunAgentsAgentOutcome> for api::run_agents_result::AgentOutcome {
     fn from(outcome: RunAgentsAgentOutcome) -> Self {
         let result = match outcome.kind {
@@ -1274,7 +1249,6 @@ impl TryFrom<RunAgentsResult> for api::request::input::tool_call_result::Result 
             RunAgentsResult::Launched {
                 model_id,
                 harness_type,
-                execution_mode,
                 agents,
             } => Ok(
                 api::request::input::tool_call_result::Result::RunAgentsResult(
@@ -1283,7 +1257,12 @@ impl TryFrom<RunAgentsResult> for api::request::input::tool_call_result::Result 
                             api::run_agents_result::Launched {
                                 resolved_model_id: model_id,
                                 resolved_harness: build_api_harness(&harness_type),
-                                resolved_execution_mode: Some(execution_mode.into()),
+                                // Uncaged launches child agents locally only.
+                                resolved_execution_mode: Some(
+                                    api::run_agents_result::launched::ResolvedExecutionMode::Local(
+                                        api::run_agents::Local {},
+                                    ),
+                                ),
                                 agents: agents.into_iter().map(Into::into).collect(),
                             },
                         )),

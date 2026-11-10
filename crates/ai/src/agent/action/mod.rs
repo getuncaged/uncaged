@@ -185,46 +185,28 @@ pub enum AIAgentActionType {
 
 /// Run-wide + per-agent configuration for a `RunAgents` tool call.
 ///
-/// Mirrors the proto `RunAgents` message. Server-resolved fields
-/// (`model_id`, `harness_type`, `execution_mode`'s remote details) are
-/// folded in by the server's final tool-call re-emission once the
-/// payload is complete; the client renders the full layout from a
-/// fully-resolved instance only.
+/// Mirrors the proto `RunAgents` message. Uncaged launches child agents
+/// locally only, so the proto's cloud execution mode and the fields only a
+/// cloud launch consumed (run-wide skills, per-agent titles) are dropped on
+/// conversion.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RunAgentsRequest {
     pub summary: String,
     pub base_prompt: String,
-    pub skills: Vec<SkillReference>,
     pub model_id: String,
     pub harness_type: String,
-    pub execution_mode: RunAgentsExecutionMode,
     pub agent_run_configs: Vec<RunAgentsAgentRunConfig>,
     pub plan_id: String,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum RunAgentsExecutionMode {
-    Local,
-    Remote {
-        environment_id: String,
-        worker_host: String,
-        computer_use_enabled: bool,
-    },
-}
-
-impl RunAgentsExecutionMode {
-    pub fn is_remote(&self) -> bool {
-        matches!(self, Self::Remote { .. })
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RunAgentsAgentRunConfig {
     pub name: String,
     pub prompt: String,
-    pub title: String,
 }
 
+/// How a legacy `StartAgent` child launches. Uncaged has no cloud agents, so
+/// the proto's remote mode converts to the local default.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StartAgentExecutionMode {
     Local {
@@ -236,15 +218,6 @@ pub enum StartAgentExecutionMode {
         /// model id (used by the orchestrate confirmation card so the user's
         /// model selection is honored on local launches).
         model_id: Option<String>,
-    },
-    Remote {
-        environment_id: String,
-        skill_references: Vec<SkillReference>,
-        model_id: String,
-        computer_use_enabled: bool,
-        worker_host: String,
-        harness_type: String,
-        title: String,
     },
 }
 
@@ -261,19 +234,6 @@ impl StartAgentExecutionMode {
         Self::Local {
             harness_type: Some(harness_type),
             model_id: None,
-        }
-    }
-    /// Constructs a remote execution mode using the legacy v1 defaults for
-    /// fields that were added later in StartAgentV2.
-    pub fn remote_with_defaults(environment_id: String) -> Self {
-        Self::Remote {
-            environment_id,
-            skill_references: Vec::new(),
-            model_id: String::new(),
-            computer_use_enabled: false,
-            worker_host: String::new(),
-            harness_type: String::new(),
-            title: String::new(),
         }
     }
 }

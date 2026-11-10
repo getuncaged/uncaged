@@ -1420,22 +1420,13 @@ pub(crate) fn convert_tool_call_result_to_input(
         }
         Some(ToolCallResultType::RunAgentsResult(result)) => {
             use ai::agent::action_result::{
-                RunAgentsAgentOutcome, RunAgentsAgentOutcomeKind, RunAgentsLaunchedExecutionMode,
-                RunAgentsResult,
+                RunAgentsAgentOutcome, RunAgentsAgentOutcomeKind, RunAgentsResult,
             };
             let run_agents_result = match &result.outcome {
                 Some(api::run_agents_result::Outcome::Launched(launched)) => {
-                    let execution_mode = match &launched.resolved_execution_mode {
-                        Some(api::run_agents_result::launched::ResolvedExecutionMode::Remote(
-                            remote,
-                        )) => RunAgentsLaunchedExecutionMode::Remote {
-                            environment_id: remote.environment_id.clone(),
-                            worker_host: remote.worker_host.clone(),
-                            computer_use_enabled: remote.computer_use_enabled,
-                        },
-                        Some(api::run_agents_result::launched::ResolvedExecutionMode::Local(_))
-                        | None => RunAgentsLaunchedExecutionMode::Local,
-                    };
+                    // The resolved execution mode is not kept: Uncaged launches
+                    // child agents locally only, so a result saved from a cloud
+                    // launch loads like a local one.
                     let agents = launched
                         .agents
                         .iter()
@@ -1465,7 +1456,6 @@ pub(crate) fn convert_tool_call_result_to_input(
                                 launched.resolved_harness.as_ref(),
                             )
                             .unwrap_or_default(),
-                        execution_mode,
                         agents,
                     }
                 }
