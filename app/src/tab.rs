@@ -68,7 +68,6 @@ pub fn uses_vertical_tabs(ctx: &AppContext) -> bool {
 
 const WARP_2_TAB_COLOR_OPACITY: Opacity = 25;
 const WARP_2_HOVERED_TAB_COLOR_OPACITY: Opacity = 50;
-const TAB_CLOSE_BUTTON_OPACITY: Opacity = 60;
 const TAB_CLOSE_BUTTON_WIDTH: f32 = 20.0;
 const MAX_TOOLTIP_LENGTH: usize = 80;
 pub(crate) const TAB_PIN_INDICATOR_ICON_SIZE: f32 = 16.0;
@@ -79,6 +78,10 @@ const TAB_INDICATOR_SYNCED_COLOR: u32 = 0x4A93FFFF;
 pub(crate) const COMPACT_TAB_WIDTH_THRESHOLD: f32 = 42.0;
 // Horizontal inset for the tab close button
 const TAB_CLOSE_BUTTON_HORIZONTAL_INSET: f32 = 2.0;
+/// Horizontal padding around a tab's title: room for the close button and its
+/// inset on either side, so the title never runs under the button.
+const TAB_TITLE_HORIZONTAL_PADDING: f32 =
+    TAB_CLOSE_BUTTON_WIDTH + TAB_CLOSE_BUTTON_HORIZONTAL_INSET + 4.0;
 /// Uncaged: the inset and rounding of a tab's highlight inside the tab bar.
 const TAB_VERTICAL_INSET: f32 = 4.0;
 /// Vertical gap between the tab bar's edge and an open horizontal group's glow.
@@ -1187,11 +1190,7 @@ impl<'a> TabComponent<'a> {
     /// Renders the close-button slot for the tab: the close button when
     /// hovered, a pin indicator when the tab is pinned, or an empty
     /// width-reserving placeholder otherwise.
-    fn render_close_button_or_pin_icon(
-        &self,
-        background: Option<Fill>,
-        is_hovered: bool,
-    ) -> Box<dyn Element> {
+    fn render_close_button_or_pin_icon(&self, is_hovered: bool) -> Box<dyn Element> {
         let should_render = {
             let is_last_tab = self.tab_bar.tab_count == 1;
             ContextFlag::CloseWindow.is_enabled() || !is_last_tab
@@ -1202,36 +1201,18 @@ impl<'a> TabComponent<'a> {
             let position_id = tab_position_id(tab_index);
             let is_last_tab = tab_index == self.tab_bar.tab_count - 1;
 
-            let default_background = background.unwrap_or_else(|| {
-                Fill::Solid(coloru_with_opacity(
-                    self.appearance.theme().surface_3().into(),
-                    TAB_CLOSE_BUTTON_OPACITY,
-                ))
-            });
-
-            // Create 100% opacity background for hover state
-            let hover_background = if let Some(custom_background) = self.styles.background {
-                match custom_background {
-                    ThemeFill::Solid(color) => Fill::Solid(color),
-                    ThemeFill::VerticalGradient(gradient) => {
-                        Fill::Solid(gradient.get_most_opaque())
-                    }
-                    ThemeFill::HorizontalGradient(gradient) => {
-                        Fill::Solid(gradient.get_most_opaque())
-                    }
-                }
-            } else {
-                Fill::Solid(self.appearance.theme().surface_3().into())
-            };
-
+            // Uncaged: the same close button on every tab, whatever its color or
+            // state: just the X at rest, and a round neutral highlight on hover.
+            // The title keeps room for it (see `full_tab_content`), so nothing
+            // needs masking behind it.
             let default_styles = UiComponentStyles {
-                background: Some(default_background),
-                border_radius: Some(CornerRadius::with_all(Radius::Pixels(2.0))),
+                background: Some(Fill::None),
+                border_radius: Some(CornerRadius::with_all(Radius::Percentage(50.))),
                 ..UiComponentStyles::default()
             };
 
             let hover_styles = UiComponentStyles {
-                background: Some(hover_background),
+                background: Some(internal_colors::fg_overlay_3(self.appearance.theme()).into()),
                 ..default_styles
             };
 
@@ -1551,7 +1532,10 @@ impl<'a> TabComponent<'a> {
                 )
                 .finish(),
             );
-            let mut container = Container::new(flex_row.finish()).with_horizontal_padding(8.);
+            // Keep room for the close button (shown on hover) on both sides, so
+            // the title never runs under it and stays centered either way.
+            let mut container = Container::new(flex_row.finish())
+                .with_horizontal_padding(TAB_TITLE_HORIZONTAL_PADDING);
             // Pad inside the Stack so the close-button overlay (anchored to
             // the Stack) stays vertically centered within the visible pill.
             if self.grouped_member {
@@ -1591,27 +1575,6 @@ impl<'a> TabComponent<'a> {
         )
         .finish();
 
-        let close_button_background = if let Some(custom_background) = self.styles.background {
-            match custom_background {
-                ThemeFill::Solid(color) => {
-                    Fill::Solid(coloru_with_opacity(color, TAB_CLOSE_BUTTON_OPACITY))
-                }
-                ThemeFill::VerticalGradient(gradient) => Fill::Solid(coloru_with_opacity(
-                    gradient.get_most_opaque(),
-                    TAB_CLOSE_BUTTON_OPACITY,
-                )),
-                ThemeFill::HorizontalGradient(gradient) => Fill::Solid(coloru_with_opacity(
-                    gradient.get_most_opaque(),
-                    TAB_CLOSE_BUTTON_OPACITY,
-                )),
-            }
-        } else {
-            Fill::Solid(coloru_with_opacity(
-                theme.surface_3().into(),
-                TAB_CLOSE_BUTTON_OPACITY,
-            ))
-        };
-
         // The old code always used a negative offset, which I (Harry) think is wrong for the left-side case (pushes outward).
         // We preserve that behavior in the flag-OFF path out of an abundance of caution to avoid breaking existing functionality.
         let (parent_anchor, child_anchor, horizontal_inset) =
@@ -1649,12 +1612,10 @@ impl<'a> TabComponent<'a> {
 
         let build_close_button_overlay = |is_hovered: bool| {
             Container::new(
-                ConstrainedBox::new(
-                    self.render_close_button_or_pin_icon(Some(close_button_background), is_hovered),
-                )
-                .with_width(TAB_CLOSE_BUTTON_WIDTH)
-                .with_height(TAB_CLOSE_BUTTON_WIDTH)
-                .finish(),
+                ConstrainedBox::new(self.render_close_button_or_pin_icon(is_hovered))
+                    .with_width(TAB_CLOSE_BUTTON_WIDTH)
+                    .with_height(TAB_CLOSE_BUTTON_WIDTH)
+                    .finish(),
             )
             .finish()
         };

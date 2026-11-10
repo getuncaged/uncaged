@@ -2855,8 +2855,7 @@ fn test_close_tab_group_removes_group_and_members() {
 
         let workspace = mock_workspace(&mut app);
         workspace.update(&mut app, |workspace, ctx| {
-            // Create a group, then add another tab which inherits the
-            // active tab's group_id via `add_tab_with_pane_layout`.
+            // Create a group, then add a second member with "New tab in group".
             workspace.handle_action(
                 &WorkspaceAction::SelectNewSessionMenuItem(NewSessionMenuItem::CreateNewTabGroup),
                 ctx,
@@ -2865,7 +2864,7 @@ fn test_close_tab_group_removes_group_and_members() {
                 .group_id
                 .expect("active tab should be in a group");
 
-            workspace.add_terminal_tab(false, ctx);
+            workspace.handle_action(&WorkspaceAction::NewTabInGroup(group_id), ctx);
 
             let group_members: Vec<usize> = workspace
                 .tabs
@@ -2877,7 +2876,7 @@ fn test_close_tab_group_removes_group_and_members() {
             assert_eq!(
                 group_members.len(),
                 2,
-                "new tab should inherit the active tab's group_id"
+                "New tab in group should add a member"
             );
 
             workspace.handle_action(&WorkspaceAction::CloseTabGroup(group_id), ctx);
@@ -2892,12 +2891,38 @@ fn test_close_tab_group_removes_group_and_members() {
     });
 }
 
+/// Creates a group from the active tab and grows it to two members with
+/// "New tab in group", returning the group's id.
+fn create_two_member_group(
+    workspace: &mut Workspace,
+    ctx: &mut ViewContext<Workspace>,
+) -> TabGroupId {
+    workspace.handle_action(
+        &WorkspaceAction::SelectNewSessionMenuItem(NewSessionMenuItem::CreateNewTabGroup),
+        ctx,
+    );
+    let group_id = workspace.tabs[workspace.active_tab_index()]
+        .group_id
+        .expect("active tab should be in a group");
+    workspace.handle_action(&WorkspaceAction::NewTabInGroup(group_id), ctx);
+    group_id
+}
+
+fn group_member_indices_of(workspace: &Workspace, group_id: TabGroupId) -> Vec<usize> {
+    workspace
+        .tabs
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| t.group_id == Some(group_id))
+        .map(|(idx, _)| idx)
+        .collect()
+}
+
 #[test]
-fn test_new_tab_with_after_all_tabs_setting_lands_at_group_end() {
-    // With `new_tab_placement = AfterAllTabs` and the active tab in a
-    // group, a new tab should land at the end of the group's contiguous
-    // run instead of at the workspace's global end so group contiguity
-    // is preserved while honoring the user's "end" placement preference.
+fn test_new_tab_with_after_all_tabs_setting_lands_at_bar_end_outside_group() {
+    // Like a browser: with `new_tab_placement = AfterAllTabs`, a new tab
+    // opened while a grouped tab is active goes to the end of the bar on its
+    // own instead of joining the active tab's group.
     let _grouped_tabs_guard = FeatureFlag::GroupedTabs.override_enabled(true);
 
     App::test((), |mut app| async move {
@@ -2912,79 +2937,25 @@ fn test_new_tab_with_after_all_tabs_setting_lands_at_group_end() {
 
         let workspace = mock_workspace(&mut app);
         workspace.update(&mut app, |workspace, ctx| {
-            // Create a group and add a second tab so the group has two
-            // contiguous members.
-            workspace.handle_action(
-                &WorkspaceAction::SelectNewSessionMenuItem(NewSessionMenuItem::CreateNewTabGroup),
-                ctx,
-            );
-            let group_id = workspace.tabs[workspace.active_tab_index()]
-                .group_id
-                .expect("active tab should be in a group");
-            workspace.add_terminal_tab(false, ctx);
-
-            // Add an ungrouped tab past the end of the group by first
-            // activating the trailing ungrouped tab.
-            let ungrouped_idx = workspace
-                .tabs
-                .iter()
-                .position(|t| t.group_id.is_none())
-                .expect("expected at least one ungrouped tab");
-            workspace.activate_tab(ungrouped_idx, ctx);
-            workspace.add_terminal_tab(false, ctx);
-
-            // Now activate the first grouped tab and add a new tab. With
-            // `AfterAllTabs`, the new tab must land at the end of the
-            // group's contiguous run rather than past the trailing
-            // ungrouped tabs.
-            let first_grouped_idx = workspace
-                .tabs
-                .iter()
-                .position(|t| t.group_id == Some(group_id))
-                .expect("expected at least one grouped tab");
+            let group_id = create_two_member_group(workspace, ctx);
+            let first_grouped_idx = group_member_indices_of(workspace, group_id)[0];
             workspace.activate_tab(first_grouped_idx, ctx);
 
-            let group_run_end_before = workspace
-                .tabs
-                .iter()
-                .enumerate()
-                .filter(|(_, t)| t.group_id == Some(group_id))
-                .map(|(idx, _)| idx)
-                .max()
-                .expect("group should be non-empty")
-                + 1;
-
             workspace.add_terminal_tab(false, ctx);
 
-            // The new tab lands at the prior group-run end, inherits the
-            // group_id, and keeps the group's run contiguous.
-            assert_eq!(workspace.active_tab_index(), group_run_end_before);
-            assert_eq!(
-                workspace.tabs[group_run_end_before].group_id,
-                Some(group_id)
-            );
-
-            let group_indices: Vec<usize> = workspace
-                .tabs
-                .iter()
-                .enumerate()
-                .filter(|(_, t)| t.group_id == Some(group_id))
-                .map(|(idx, _)| idx)
-                .collect();
-            assert!(
-                group_indices.windows(2).all(|w| w[1] == w[0] + 1),
-                "group's tab indices should be contiguous, got {group_indices:?}"
-            );
+            let new_idx = workspace.active_tab_index();
+            assert_eq!(new_idx, workspace.tabs.len() - 1);
+            assert_eq!(workspace.tabs[new_idx].group_id, None);
+            assert_eq!(group_member_indices_of(workspace, group_id).len(), 2);
         });
     });
 }
 
 #[test]
-fn test_new_tab_with_after_current_tab_setting_lands_after_active_tab_in_group() {
+fn test_new_tab_with_after_current_tab_setting_lands_after_active_group_outside_it() {
     // With `new_tab_placement = AfterCurrentTab` and the active tab in the
-    // middle of a group, a new tab should land immediately after the active
-    // tab and inherit the group_id, preserving group contiguity rather than
-    // jumping to the end of the group or past it.
+    // middle of a group, a new tab lands just past the group, on its own, so
+    // it neither joins the group nor splits it.
     let _grouped_tabs_guard = FeatureFlag::GroupedTabs.override_enabled(true);
 
     App::test((), |mut app| async move {
@@ -2999,56 +2970,20 @@ fn test_new_tab_with_after_current_tab_setting_lands_after_active_tab_in_group()
 
         let workspace = mock_workspace(&mut app);
         workspace.update(&mut app, |workspace, ctx| {
-            // Create a group and grow it to two contiguous members so we can
-            // activate the first one (i.e. a member that isn't at the end of
-            // the group's run).
-            workspace.handle_action(
-                &WorkspaceAction::SelectNewSessionMenuItem(NewSessionMenuItem::CreateNewTabGroup),
-                ctx,
-            );
-            let group_id = workspace.tabs[workspace.active_tab_index()]
-                .group_id
-                .expect("active tab should be in a group");
-            workspace.add_terminal_tab(false, ctx);
-
-            // Activate the first grouped tab so the next insertion happens in
-            // the middle of the group's contiguous run.
-            let first_grouped_idx = workspace
-                .tabs
-                .iter()
-                .position(|t| t.group_id == Some(group_id))
-                .expect("expected at least one grouped tab");
-            workspace.activate_tab(first_grouped_idx, ctx);
-
-            let expected_new_idx = first_grouped_idx + 1;
+            let group_id = create_two_member_group(workspace, ctx);
+            let members = group_member_indices_of(workspace, group_id);
+            workspace.activate_tab(members[0], ctx);
+            let expected_new_idx = members[members.len() - 1] + 1;
 
             workspace.add_terminal_tab(false, ctx);
 
-            // The new tab lands immediately after the previously-active
-            // grouped tab, inherits its group_id, and keeps the group's run
-            // contiguous.
             assert_eq!(workspace.active_tab_index(), expected_new_idx);
-            assert_eq!(
-                workspace.tabs[expected_new_idx].group_id,
-                Some(group_id),
-                "new tab should inherit the active tab's group_id"
-            );
-
-            let group_indices: Vec<usize> = workspace
-                .tabs
-                .iter()
-                .enumerate()
-                .filter(|(_, t)| t.group_id == Some(group_id))
-                .map(|(idx, _)| idx)
-                .collect();
-            assert_eq!(
-                group_indices.len(),
-                3,
-                "group should have grown to three members"
-            );
+            assert_eq!(workspace.tabs[expected_new_idx].group_id, None);
+            let members = group_member_indices_of(workspace, group_id);
+            assert_eq!(members.len(), 2);
             assert!(
-                group_indices.windows(2).all(|w| w[1] == w[0] + 1),
-                "group's tab indices should be contiguous, got {group_indices:?}"
+                members.windows(2).all(|w| w[1] == w[0] + 1),
+                "group's tab indices should be contiguous, got {members:?}"
             );
         });
     });

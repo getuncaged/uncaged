@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use lsp::LspManagerModel;
@@ -29,6 +30,7 @@ use uncaged_ui::{
     id, AppContext, Element, Entity, ModelHandle, SingletonEntity, TypedActionView, View,
     ViewContext, ViewHandle, WindowId,
 };
+use uncaged_util::file::FileLoadError;
 use uncaged_util::path::LineAndColumnArg;
 
 use super::buffer_location::LocalOrRemotePath;
@@ -492,7 +494,7 @@ impl CodeView {
                 editor.set_interaction_state(InteractionState::Selectable, ctx);
             });
         }
-        ctx.subscribe_to_view(&code_editor, |me, _, event, ctx| match event {
+        ctx.subscribe_to_view(&code_editor, |me, code_editor, event, ctx| match event {
             LocalCodeEditorEvent::FileLoaded => {
                 me.pane_configuration.update(ctx, |pane_config, ctx| {
                     pane_config.refresh_pane_header_overflow_menu_items(ctx);
@@ -510,7 +512,23 @@ impl CodeView {
                     return;
                 }
                 log::warn!("Failed to load file. {err:?}");
-                CodeView::display_load_failure(ctx.window_id(), ctx);
+                // Name the file, and say plainly when it's gone (typically a file tab
+                // restored from a previous session whose file was moved or deleted).
+                let file_name = code_editor
+                    .as_ref(ctx)
+                    .file_path()
+                    .and_then(Path::file_name)
+                    .map(|name| name.to_string_lossy().into_owned());
+                let is_missing = match err.as_ref() {
+                    FileLoadError::DoesNotExist => true,
+                    FileLoadError::IOError(io_err) => io_err.kind() == io::ErrorKind::NotFound,
+                };
+                CodeView::display_load_failure(
+                    file_name.as_deref(),
+                    is_missing,
+                    ctx.window_id(),
+                    ctx,
+                );
             }
             LocalCodeEditorEvent::SelectionAddedAsContext {
                 relative_file_path,
@@ -906,10 +924,21 @@ impl CodeView {
         }
     }
 
-    fn display_load_failure(window_id: WindowId, ctx: &mut ViewContext<Self>) {
+    fn display_load_failure(
+        file_name: Option<&str>,
+        is_missing: bool,
+        window_id: WindowId,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let file = file_name.map_or_else(|| "the file".to_owned(), |name| format!("“{name}”"));
+        let message = if is_missing {
+            format!("Couldn't open {file}: it was moved or deleted.")
+        } else {
+            format!("Couldn't open {file}.")
+        };
         ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-            let toast = DismissibleToast::error(String::from("Failed to load file."))
-                .with_object_id("failed_to_load_file".to_string());
+            let toast =
+                DismissibleToast::error(message).with_object_id("failed_to_load_file".to_string());
             toast_stack.add_ephemeral_toast(toast, window_id, ctx);
         });
     }

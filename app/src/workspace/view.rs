@@ -5878,11 +5878,6 @@ impl Workspace {
         if !FeatureFlag::GroupedTabs.is_enabled() || !self.tab_groups.contains_key(&group_id) {
             return;
         }
-        let active_is_member = self
-            .tabs
-            .get(self.active_tab_index)
-            .is_some_and(|tab| tab.group_id == Some(group_id));
-
         self.add_new_session_tab_with_default_mode(
             NewSessionSource::Tab,
             Some(ctx.window_id()),
@@ -5892,18 +5887,16 @@ impl Workspace {
             ctx,
         );
 
-        // If the active tab is a member of the group, the new tab inherits this group on creation.
-        // Otherwise we must manually update it here, and place this new tab at the end of the group.
-        if !active_is_member {
-            let new_idx = self.active_tab_index;
-            // Resolve the destination from the group's existing members before
-            // adding the new tab to the group.
-            let target_index = self.index_after_group(group_id).unwrap_or(self.tabs.len());
-            if let Some(tab) = self.tabs.get_mut(new_idx) {
-                tab.group_id = Some(group_id);
-            }
-            self.move_tab_to_index(new_idx, target_index, ctx);
+        // New tabs never join a group on their own, so add this one to the group
+        // and move it to the end of the group's run.
+        let new_idx = self.active_tab_index;
+        // Resolve the destination from the group's existing members before
+        // adding the new tab to the group.
+        let target_index = self.index_after_group(group_id).unwrap_or(self.tabs.len());
+        if let Some(tab) = self.tabs.get_mut(new_idx) {
+            tab.group_id = Some(group_id);
         }
+        self.move_tab_to_index(new_idx, target_index, ctx);
         self.expand_tab_group(group_id, ctx);
     }
 
@@ -10321,36 +10314,29 @@ impl Workspace {
     }
 
     /// Returns where a newly-opened tab should be inserted and the group it
-    /// should inherit, so it joins the active tab's group (keeping that group
-    /// contiguous) instead of splitting it. Honors the `NewTabPlacement`
-    /// setting within the group's bounds.
+    /// joins. Uncaged follows browsers: a new tab never joins a group on its own
+    /// (use "New tab in group" for that). "After all tabs" puts it at the end of
+    /// the bar; "after current tab" puts it beside the active tab, or just past
+    /// the active tab's group when that tab is grouped, so the group isn't split.
     fn new_tab_index_and_group(&self, ctx: &AppContext) -> (usize, Option<TabGroupId>) {
-        let active_group_id = if FeatureFlag::GroupedTabs.is_enabled() {
-            self.tabs
-                .get(self.active_tab_index)
-                .and_then(|tab| tab.group_id)
-        } else {
-            None
-        };
-
         let insert_idx = match TabSettings::as_ref(ctx).new_tab_placement {
-            // Land at the end of the group's contiguous run rather than past it
-            // so the "after all tabs" preference is honored within the group.
-            NewTabPlacement::AfterAllTabs => active_group_id
-                .and_then(|gid| self.index_after_group(gid))
-                .unwrap_or_else(|| self.tab_count()),
-            NewTabPlacement::AfterCurrentTab => self.active_tab_index + 1,
+            NewTabPlacement::AfterAllTabs => self.tab_count(),
+            NewTabPlacement::AfterCurrentTab => {
+                let active_group_id = if FeatureFlag::GroupedTabs.is_enabled() {
+                    self.tabs
+                        .get(self.active_tab_index)
+                        .and_then(|tab| tab.group_id)
+                } else {
+                    None
+                };
+                active_group_id
+                    .and_then(|gid| self.index_after_group(gid))
+                    .unwrap_or(self.active_tab_index + 1)
+            }
         };
 
-        // A standalone (ungrouped) new tab must not land inside the pinned
-        // region; a tab joining a group already sits wherever its group lives.
-        let insert_idx = if active_group_id.is_none() {
-            self.clamp_to_unpinned_region(&self.tabs, insert_idx)
-        } else {
-            insert_idx
-        };
-
-        (insert_idx, active_group_id)
+        // A new tab is standalone, so it must not land inside the pinned region.
+        (self.clamp_to_unpinned_region(&self.tabs, insert_idx), None)
     }
 
     pub fn add_tab_with_pane_layout(
