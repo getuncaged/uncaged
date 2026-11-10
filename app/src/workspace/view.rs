@@ -70,11 +70,11 @@ use uncaged_ui::elements::Percentage;
 use uncaged_ui::elements::{
     Align, Border, CacheOption, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container,
     CornerRadius, CrossAxisAlignment, Dismiss, DispatchEventResult, DragAxis, Draggable,
-    DraggableState, DropTarget, Element, Empty, EventHandler, Expanded, Fill as ElementFill, Flex,
-    Highlight, Hoverable, Icon as WarpUiIcon, Image, MainAxisAlignment, MainAxisSize,
-    MouseInBehavior, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
-    ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Rect,
-    SavePosition, Shrinkable, Stack, Text,
+    DraggableState, DropShadow, DropTarget, Element, Empty, EventHandler, Expanded,
+    Fill as ElementFill, Flex, Highlight, Hoverable, Icon as WarpUiIcon, Image, MainAxisAlignment,
+    MainAxisSize, MouseInBehavior, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds,
+    Radius, Rect, SavePosition, Shrinkable, Stack, Text,
 };
 use uncaged_ui::fonts::{Properties, Weight};
 use uncaged_ui::geometry::vector::{vec2f, Vector2F};
@@ -267,8 +267,8 @@ use crate::shell_indicator::ShellIndicatorType;
 use crate::tab::{
     color_picker_menu_items, tab_position_id, uses_vertical_tabs, ColorPickerTarget,
     NewSessionMenuItem, PaneNameMenuTarget, SelectedTabColor, TabBarState, TabComponent, TabData,
-    GROUP_UNDERLINE_BAND, MOVE_TO_GROUP_LABEL, TAB_BAR_BORDER_HEIGHT, TAB_HORIZONTAL_INSET,
-    TAB_PIN_INDICATOR_ICON_SIZE,
+    GROUP_GLOW_BORDER, GROUP_GLOW_MARGIN, MOVE_TO_GROUP_LABEL, TAB_BAR_BORDER_HEIGHT,
+    TAB_HORIZONTAL_INSET, TAB_PIN_INDICATOR_ICON_SIZE,
 };
 use crate::tab_configs::action_sidecar::SidecarItemKind;
 use crate::tab_configs::remove_confirmation_dialog::{
@@ -15388,7 +15388,7 @@ impl Workspace {
             for idx in member_range {
                 let tab = &self.tabs[idx];
                 // Members look like ordinary tabs; the group's color lives on
-                // its label and the line under the group instead.
+                // its chip and the glow around the group instead.
                 let member = TabComponent::new(
                     idx,
                     tab_bar_state,
@@ -15413,52 +15413,45 @@ impl Workspace {
             row.add_child(render_horizontal_group_pin_indicator(appearance));
         }
 
-        // An expanded group is tied together by a thin rounded line in the
-        // group's color, running from the label to the last member's edge just
-        // under the tab highlights; a collapsed group is just its label.
+        // An open group sits in a soft rounded glow of its color that wraps the
+        // chip and its tabs; a collapsed group is just its chip.
         let content: Box<dyn Element> = if is_collapsed {
-            // Keep the underline's band so the chip doesn't hop vertically when
-            // the group collapses or expands.
-            Container::new(row.finish())
-                .with_padding_bottom(GROUP_UNDERLINE_BAND)
-                .finish()
+            row.finish()
         } else {
-            let line_fill: ElementFill = match group_color {
-                Some(color) => color.into(),
-                None => internal_colors::fg_overlay_4(theme).into(),
-            };
-            let line = Container::new(
-                ConstrainedBox::new(Empty::new().finish())
-                    .with_height(GROUP_UNDERLINE_HEIGHT)
-                    .finish(),
-            )
-            .with_background(line_fill)
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                GROUP_UNDERLINE_HEIGHT / 2.,
-            )))
-            .finish();
-            let underline_gap = (GROUP_UNDERLINE_BAND - GROUP_UNDERLINE_HEIGHT) / 2.;
-            let underlined = Flex::column()
-                .with_main_axis_size(MainAxisSize::Max)
-                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-                .with_child(Shrinkable::new(1.0, row.finish()).finish())
-                .with_child(
-                    Container::new(line)
-                        .with_margin_top(underline_gap)
-                        .with_margin_bottom(underline_gap)
-                        .with_margin_left(GROUP_CHIP_LEADING_INSET)
-                        .with_margin_right(TAB_HORIZONTAL_INSET)
-                        .finish(),
-                )
+            let (glow_fill, glow_border, glow_shadow): (ElementFill, ElementFill, ColorU) =
+                match group_color {
+                    Some(color) => (
+                        coloru_with_opacity(color, 8).into(),
+                        coloru_with_opacity(color, 40).into(),
+                        coloru_with_opacity(color, 22),
+                    ),
+                    None => (
+                        internal_colors::fg_overlay_1(theme).into(),
+                        internal_colors::fg_overlay_3(theme).into(),
+                        ColorU::new(0, 0, 0, 0),
+                    ),
+                };
+            let glow = Container::new(row.finish())
+                .with_background(glow_fill)
+                .with_border(Border::all(GROUP_GLOW_BORDER).with_border_fill(glow_border))
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(GROUP_GLOW_RADIUS)))
+                .with_drop_shadow(DropShadow {
+                    color: glow_shadow,
+                    offset: Vector2F::zero(),
+                    blur_radius: 8.,
+                    spread_radius: 0.,
+                })
+                .with_padding_right(TAB_HORIZONTAL_INSET)
+                .with_vertical_margin(GROUP_GLOW_MARGIN)
+                .with_margin_left(TAB_HORIZONTAL_INSET)
                 .finish();
-            // Matching edge spacer after the last member, outside the line. Same
-            // loose flex cap as the leading spacer so the group shrink-wraps
-            // instead of this spacer ballooning toward the bar's trailing edge.
+            // Matching edge spacer after the glow. Same loose flex cap as the
+            // leading spacer so the group shrink-wraps instead of this spacer
+            // ballooning toward the bar's trailing edge.
             Flex::row()
-                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_child(
-                    Shrinkable::new(run_len as f32 + Self::GROUP_EDGE_SPACER_FLEX, underlined)
-                        .finish(),
+                    Shrinkable::new(run_len as f32 + Self::GROUP_EDGE_SPACER_FLEX, glow).finish(),
                 )
                 .with_child(
                     Shrinkable::new(
@@ -15472,11 +15465,18 @@ impl Workspace {
                 .finish()
         };
         let container = Container::new(content).finish();
-        // While dragging, back the floating chip with an opaque color so it
-        // doesn't render translucently like the resting group background.
+        // While dragging, back the floating group with an opaque fill, rounded
+        // like the glow (or the chip, when collapsed), so it doesn't render
+        // translucently over the tabs it passes.
         let container: Box<dyn Element> = if group.draggable_state.is_dragging() {
+            let radius = if is_collapsed {
+                uncaged_core::ui::radius::SMALL
+            } else {
+                GROUP_GLOW_RADIUS
+            };
             Container::new(container)
                 .with_background_color(theme.background().into_solid_bias_top_color())
+                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(radius)))
                 .finish()
         } else {
             container
@@ -23151,11 +23151,11 @@ fn should_reserve_traffic_light_space_in_tab_bar(side: TrafficLightSide) -> bool
 }
 
 /// Total width/height of the collage area in the group header.
-/// Height of the line under an expanded horizontal tab group. It sits in the
-/// `GROUP_UNDERLINE_BAND` that member tabs give up below their highlight.
-const GROUP_UNDERLINE_HEIGHT: f32 = 2.0;
-/// Gap before a horizontal group's chip; the underline starts at the same edge.
-const GROUP_CHIP_LEADING_INSET: f32 = 6.0;
+/// Corner radius of an open horizontal group's glow: a tab's radius plus the
+/// gap between the glow's edge and the tab highlights inside it.
+const GROUP_GLOW_RADIUS: f32 = uncaged_core::ui::radius::MEDIUM + 3.0;
+/// Gap before a horizontal group's chip.
+const GROUP_CHIP_LEADING_INSET: f32 = 4.0;
 /// Widest a horizontal group's name chip grows before the name fades out.
 const GROUP_LABEL_MAX_WIDTH: f32 = 140.0;
 /// Size of the dot an unnamed horizontal group shows instead of a name.

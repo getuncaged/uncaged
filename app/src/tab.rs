@@ -81,10 +81,10 @@ pub(crate) const COMPACT_TAB_WIDTH_THRESHOLD: f32 = 42.0;
 const TAB_CLOSE_BUTTON_HORIZONTAL_INSET: f32 = 2.0;
 /// Uncaged: the inset and rounding of a tab's highlight inside the tab bar.
 const TAB_VERTICAL_INSET: f32 = 4.0;
-/// Vertical band under an expanded horizontal tab group's members that holds
-/// the group's underline. Members give it up from their bottom inset so their
-/// highlights line up with ungrouped tabs.
-pub(crate) const GROUP_UNDERLINE_BAND: f32 = TAB_VERTICAL_INSET;
+/// Vertical gap between the tab bar's edge and an open horizontal group's glow.
+pub(crate) const GROUP_GLOW_MARGIN: f32 = 2.0;
+/// Width of an open horizontal group's glow outline.
+pub(crate) const GROUP_GLOW_BORDER: f32 = 1.0;
 pub(crate) const TAB_HORIZONTAL_INSET: f32 = 2.0;
 const TAB_CORNER_RADIUS: f32 = uncaged_core::ui::radius::MEDIUM;
 
@@ -1684,63 +1684,66 @@ impl<'a> TabComponent<'a> {
         )
         .finish();
 
-        // Grouped member: same inset rounded highlight as an ordinary tab, no
-        // drop target (members can't be dragged currently). The bottom inset
-        // is given to the group's underline band, so members line up with
-        // ungrouped tabs.
-        if self.grouped_member {
-            let highlight = Container::new(stack)
-                .with_background(background_color)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(TAB_CORNER_RADIUS)))
-                .finish();
-            return Container::new(highlight)
-                .with_padding_top(TAB_VERTICAL_INSET)
-                .with_padding_bottom(TAB_VERTICAL_INSET - GROUP_UNDERLINE_BAND)
-                .with_horizontal_padding(TAB_HORIZONTAL_INSET)
-                .finish();
-        }
+        let opaque_fill = self
+            .ui_builder
+            .warp_theme()
+            .background()
+            .into_solid_bias_top_color();
+        // Uncaged: a tab is an inset, rounded highlight rather than a full-height cell boxed
+        // in by dividers. The bar reads as one light strip with the active tab lifted out of
+        // it, instead of a row of blocks. Group members use the same shape; the group's glow
+        // takes part of their vertical inset so they line up with ungrouped tabs.
+        let tab: Box<dyn Element> =
+            if self.grouped_member || FeatureFlag::NewTabStyling.is_enabled() {
+                let corner_radius = CornerRadius::with_all(Radius::Pixels(TAB_CORNER_RADIUS));
+                let mut highlight = Container::new(stack)
+                    .with_background(background_color)
+                    .with_corner_radius(corner_radius)
+                    .finish();
+                // A dragged tab floats over its neighbours: back the highlight with an opaque,
+                // equally rounded fill so nothing shows through it.
+                if is_tab_dragging {
+                    highlight = Container::new(highlight)
+                        .with_background_color(opaque_fill)
+                        .with_corner_radius(corner_radius)
+                        .finish();
+                }
+                let vertical_inset = if self.grouped_member {
+                    TAB_VERTICAL_INSET - GROUP_GLOW_MARGIN - GROUP_GLOW_BORDER
+                } else {
+                    TAB_VERTICAL_INSET
+                };
+                Container::new(highlight)
+                    .with_vertical_padding(vertical_inset)
+                    .with_horizontal_padding(TAB_HORIZONTAL_INSET)
+                    .finish()
+            } else {
+                let tab = Container::new(stack)
+                    .with_vertical_padding(2.)
+                    .with_background(background_color)
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                        uncaged_core::ui::radius::SMALL,
+                    )))
+                    .with_border(Border::all(1.).with_border_fill(border_fill))
+                    .finish();
+                // If the tab is being dragged, add an opaque background behind it
+                if is_tab_dragging {
+                    Container::new(tab)
+                        .with_background_color(opaque_fill)
+                        .finish()
+                } else {
+                    tab
+                }
+            };
 
-        let tab = if FeatureFlag::NewTabStyling.is_enabled() {
-            // Uncaged: a tab is an inset, rounded highlight -- the grouped-member style -- rather
-            // than a full-height cell boxed in by dividers. The bar reads as one light strip
-            // with the active tab lifted out of it, instead of a row of blocks.
-            let highlight = Container::new(stack)
-                .with_background(background_color)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(TAB_CORNER_RADIUS)))
-                .finish();
-            Container::new(highlight)
-                .with_vertical_padding(TAB_VERTICAL_INSET)
-                .with_horizontal_padding(TAB_HORIZONTAL_INSET)
-        } else {
-            Container::new(stack)
-                .with_vertical_padding(2.)
-                .with_background(background_color)
-                .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
-                    uncaged_core::ui::radius::SMALL,
-                )))
-                .with_border(Border::all(1.).with_border_fill(border_fill))
-        };
-
-        // If the tab is being dragged, add an opaque background behind it
-        if is_tab_dragging {
-            Container::new(tab.finish())
-                .with_background_color(
-                    self.ui_builder
-                        .warp_theme()
-                        .background()
-                        .into_solid_bias_top_color(),
-                )
-                .finish()
-        } else if self.for_drag_ghost {
-            // The chip overlay is a purely visual snapshot of the source tab.
-            // It must not act as a drop target — both because that's not
-            // semantically meaningful for an element that follows the cursor,
-            // and because the inner `DropTarget`'s position is unrelated to
-            // any real tab in the target window.
-            tab.finish()
+        // Group members aren't drop targets; a dragged tab or the drag chip overlay
+        // (a purely visual snapshot of the source tab that follows the cursor, whose
+        // position is unrelated to any real tab in the target window) mustn't be one.
+        if self.grouped_member || is_tab_dragging || self.for_drag_ghost {
+            tab
         } else {
             DropTarget::new(
-                tab.finish(),
+                tab,
                 TabBarDropTargetData {
                     tab_bar_location: TabBarLocation::TabIndex(self.tab_index),
                 },
