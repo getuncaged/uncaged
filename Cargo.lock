@@ -5125,7 +5125,7 @@ dependencies = [
  "ort",
  "parking_lot",
  "prost",
- "rust-embed 8.7.2",
+ "rust-embed",
  "serde",
  "smol_str",
  "tokenizers",
@@ -5177,7 +5177,7 @@ dependencies = [
  "parking_lot",
  "pathfinder_geometry",
  "regex",
- "rust-embed 8.7.2",
+ "rust-embed",
  "serde_json",
  "settings",
  "strum 0.27.1",
@@ -5560,7 +5560,7 @@ version = "0.0.0"
 dependencies = [
  "arborium",
  "lazy_static",
- "rust-embed 8.7.2",
+ "rust-embed",
  "serde",
  "serde_yaml 0.8.26",
  "uncaged_editor",
@@ -7124,7 +7124,7 @@ dependencies = [
  "log",
  "pathfinder_color",
  "pathfinder_geometry",
- "rust-embed 8.7.2",
+ "rust-embed",
  "ui_components",
  "uncaged_core",
  "uncaged_logging",
@@ -8826,36 +8826,12 @@ dependencies = [
 
 [[package]]
 name = "rust-embed"
-version = "6.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a36224c3276f8c4ebc8c20f158eca7ca4359c8db89991c4925132aaaf6702661"
-dependencies = [
- "rust-embed-impl 6.8.1",
- "rust-embed-utils 7.8.1",
- "walkdir",
-]
-
-[[package]]
-name = "rust-embed"
 version = "8.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "025908b8682a26ba8d12f6f2d66b987584a4a87bc024abc5bbc12553a8cd178a"
 dependencies = [
- "rust-embed-impl 8.7.2",
- "rust-embed-utils 8.7.2",
- "walkdir",
-]
-
-[[package]]
-name = "rust-embed-impl"
-version = "6.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49b94b81e5b2c284684141a2fb9e2a31be90638caf040bf9afbc5a0416afe1ac"
-dependencies = [
- "proc-macro2",
- "quote",
- "rust-embed-utils 7.8.1",
- "syn 2.0.117",
+ "rust-embed-impl",
+ "rust-embed-utils",
  "walkdir",
 ]
 
@@ -8867,19 +8843,8 @@ checksum = "6065f1a4392b71819ec1ea1df1120673418bf386f50de1d6f54204d836d4349c"
 dependencies = [
  "proc-macro2",
  "quote",
- "rust-embed-utils 8.7.2",
+ "rust-embed-utils",
  "syn 2.0.117",
- "walkdir",
-]
-
-[[package]]
-name = "rust-embed-utils"
-version = "7.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d38ff6bf570dc3bb7100fce9f7b60c33fa71d80e88da3f2580df4ff2bdded74"
-dependencies = [
- "globset",
- "sha2",
  "walkdir",
 ]
 
@@ -11072,7 +11037,7 @@ dependencies = [
  "asset_cache",
  "pathfinder_color",
  "pathfinder_geometry",
- "rust-embed 8.7.2",
+ "rust-embed",
  "rustls",
  "uncaged_core",
  "uncaged_ui",
@@ -11216,7 +11181,7 @@ dependencies = [
  "repo_metadata",
  "reqwest",
  "rmcp",
- "rust-embed 8.7.2",
+ "rust-embed",
  "schemars",
  "serde",
  "serde-bytes-repr",
@@ -11317,7 +11282,7 @@ name = "uncaged_assets"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "rust-embed 8.7.2",
+ "rust-embed",
  "uncaged_ui_core",
 ]
 
@@ -11689,7 +11654,7 @@ dependencies = [
  "pathfinder_geometry",
  "rand 0.8.6",
  "resvg",
- "rust-embed 8.7.2",
+ "rust-embed",
  "serde",
  "takecell",
  "tauri-winrt-notification",
@@ -11768,7 +11733,7 @@ dependencies = [
  "raw-window-handle 0.6.2",
  "resvg",
  "rstar",
- "rust-embed 8.7.2",
+ "rust-embed",
  "rustc-hash 2.1.1",
  "schemars",
  "serde",
@@ -12321,12 +12286,12 @@ name = "warp-command-signatures"
 version = "0.0.0"
 dependencies = [
  "cfg-if",
+ "flate2",
  "itertools 0.10.5",
  "lazy_static",
  "log",
  "rayon",
  "regex",
- "rust-embed 6.8.1",
  "serde",
  "serde_json",
  "serde_with",

@@ -13,8 +13,8 @@ pub use warp_completion_metadata::*;
 #[cfg(feature = "embed-signatures")]
 pub fn signature_by_name(name: impl AsRef<str>) -> Option<Signature> {
     let file_path = format!("{}.json", name.as_ref());
-    Assets::get(&file_path).and_then(|embedded_file| {
-        let json_content = std::str::from_utf8(&embedded_file.data).ok()?;
+    Assets::get(&file_path).and_then(|json| {
+        let json_content = std::str::from_utf8(&json).ok()?;
         let fig_command: warp_completion_metadata::fig_types::Command =
             serde_json::from_str(json_content).ok()?;
         let signatures: Vec<Signature> = fig_command.into();
@@ -43,7 +43,7 @@ pub fn commands() -> Vec<Signature> {
         .into_par_iter()
         .map(|path| Assets::get(&path))
         .filter_map(|embedded_file| {
-            let embedded_data = embedded_file?.data;
+            let embedded_data = embedded_file?;
             let json_content = std::str::from_utf8(&embedded_data).ok()?;
             let fig_command: warp_completion_metadata::fig_types::Command =
                 serde_json::from_str(json_content).ok()?;
