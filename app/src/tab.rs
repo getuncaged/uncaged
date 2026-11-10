@@ -218,11 +218,20 @@ impl TabData {
         let terminal_colors = appearance.theme().terminal_colors().normal;
         let mut menu_items = vec![];
 
+        // Pinning shares the rename/move section rather than adding its own,
+        // so the menu keeps the same number of dividers as before pinning.
+        let mut modify_items = self.pin_menu_items(index);
+        modify_items.extend(self.modify_tab_menu_items(
+            index,
+            can_move_left,
+            can_move_right,
+            pane_name_target,
+            ctx,
+        ));
         for section_items in [
-            self.pin_menu_items(index),
             self.tab_group_menu_items(index, tab_groups),
             self.copy_metadata_menu_items(pane_name_target, ctx),
-            self.modify_tab_menu_items(index, can_move_left, can_move_right, pane_name_target, ctx),
+            modify_items,
             self.close_tab_menu_items(index, tabs_len, ctx),
             Self::save_config_menu_items(index),
             self.color_option_menu_items(index, terminal_colors),

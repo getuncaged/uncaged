@@ -538,8 +538,7 @@ default = [
     # SuggestPrompt chips, so turn on passive prompt suggestions by default.
     "prompt_suggestions_via_maa",
     # Uncaged: features Warp left in staff/preview builds, tried by hand on macOS and
-    # turned on for everyone. Grouped tabs stays macOS-only (see features.rs).
-    "grouped_tabs",
+    # turned on for everyone. Grouped tabs stays off: it felt slow and unfinished.
     "pinned_tabs",
     "editable_markdown_mermaid",
     "code_review_scroll_preservation",
