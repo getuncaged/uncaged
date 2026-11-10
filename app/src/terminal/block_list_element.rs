@@ -3212,15 +3212,6 @@ impl Element for BlockListElement {
                         continue;
                     }
 
-                    fn adjusted_bytes(bytes: usize) -> byte_unit::AdjustedByte {
-                        let unit = if bytes >= 1_000_000 {
-                            byte_unit::Unit::MB
-                        } else {
-                            byte_unit::Unit::KB
-                        };
-                        byte_unit::Byte::from(bytes).get_adjusted_unit(unit)
-                    }
-
                     let grid_storage_lines = block.grid_storage_lines();
                     let grid_storage_bytes = block.grid_storage_bytes();
                     let flat_storage_lines = block.flat_storage_lines();
@@ -3231,11 +3222,11 @@ impl Element for BlockListElement {
                     let text = format!(
                         "\
                             Lines: {total_lines} (grid: {grid_storage_lines}, flat: {flat_storage_lines}); \
-                            Size: {:#.1} (grid: {:#.1}, flat: {:#.1})\
+                            Size: {} (grid: {}, flat: {})\
                         ",
-                        adjusted_bytes(total_bytes),
-                        adjusted_bytes(grid_storage_bytes),
-                        adjusted_bytes(flat_storage_bytes),
+                        format_kb_or_mb(total_bytes),
+                        format_kb_or_mb(grid_storage_bytes),
+                        format_kb_or_mb(flat_storage_bytes),
                     );
 
                     let mut element = Text::new_inline(text, self.ui_font_family, self.font_size)
@@ -4427,3 +4418,19 @@ where
 
     button.finish()
 }
+
+/// Formats a byte count in decimal megabytes from one megabyte up and in kilobytes below,
+/// rounded to one decimal place without a trailing `.0` (`1.5 MB`, `12 KB`).
+fn format_kb_or_mb(bytes: usize) -> String {
+    let (value, unit) = if bytes >= 1_000_000 {
+        (bytes as f64 / 1_000_000.0, "MB")
+    } else {
+        (bytes as f64 / 1_000.0, "KB")
+    };
+    let rounded = (value * 10.0).round() / 10.0;
+    format!("{rounded} {unit}")
+}
+
+#[cfg(test)]
+#[path = "block_list_element_tests.rs"]
+mod tests;

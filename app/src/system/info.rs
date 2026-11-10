@@ -1,13 +1,12 @@
 use std::ffi::OsStr;
 
-use byte_unit::Byte;
 use sysinfo::ProcessesToUpdate;
 use uncaged_ui::{Entity, ModelContext, SingletonEntity};
 
 use crate::system::memory_footprint;
 
-/// The threshold at which we emit a memory usage warning.
-const MEMORY_USAGE_WARNING_THRESHOLD: Option<Byte> = byte_unit::Byte::GIGABYTE.multiply(10);
+/// The threshold at which we emit a memory usage warning: 10 GB, in bytes.
+const MEMORY_USAGE_WARNING_THRESHOLD: u64 = 10 * 1_000_000_000;
 
 /// The refresh interval for system information, in seconds.
 const REFRESH_INTERVAL_S: usize = 5;
@@ -62,8 +61,8 @@ impl SystemInfo {
     /// Unlike [`used_memory`] (RSS), this includes memory that has been
     /// swapped out or compressed by the OS.  On macOS this matches the value
     /// shown by Activity Monitor.
-    pub fn memory_footprint(&self) -> Byte {
-        memory_footprint::memory_footprint_bytes().into()
+    pub fn memory_footprint(&self) -> u64 {
+        memory_footprint::memory_footprint_bytes()
     }
 
     fn schedule_refresh(ctx: &mut ModelContext<Self>) {
@@ -97,7 +96,7 @@ impl SystemInfo {
     /// and compressed pages) so we actually detect high memory situations.
     fn check_for_excessive_memory_usage(
         &mut self,
-        memory_footprint: Byte,
+        memory_footprint: u64,
         ctx: &mut ModelContext<Self>,
     ) {
         if self.has_emitted_memory_warning_event {
@@ -106,9 +105,7 @@ impl SystemInfo {
 
         // Use footprint (not RSS) for the threshold so we catch memory
         // that has been swapped out or compressed by the OS.
-        if memory_footprint
-            < MEMORY_USAGE_WARNING_THRESHOLD.expect("Threshold should not overflow u64")
-        {
+        if memory_footprint < MEMORY_USAGE_WARNING_THRESHOLD {
             return;
         }
 

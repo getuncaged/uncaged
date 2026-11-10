@@ -18,13 +18,11 @@ use std::time::Duration;
 use std::{io, str};
 
 use ansi_c_decoder::*;
-use byte_unit::{Byte, Unit as ByteUnit};
 pub use dcs_hooks::*;
 pub use handler::*;
 use hex;
 use instant::Instant;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use log::debug;
 pub use uncaged_terminal::model::ansi::control_sequence_parameters::*;
 use uncaged_terminal::model::{KeyboardModes, KeyboardModesApplyBehavior};
@@ -61,13 +59,9 @@ const WARP_RESET_GRID_OSC_MARKER: &[u8] = b"9279";
 /// 'Set Mode' escape sequence is processed.
 const SYNC_OUTPUT_MAX_TIMEOUT: Duration = Duration::from_millis(150);
 
-lazy_static! {
-    /// The maximum number of bytes that can be processed in a single synchronized update.
-    /// This means that synchronized updates can only be as large before a redraw is forced.
-    ///
-    /// Defined as a lazy static to get around the fact that `unwrap` is not a const fn.
-    static ref SYNC_OUTPUT_MAX_BUFFER_SIZE: Byte = Byte::from_u64_with_unit(2, ByteUnit::MiB).expect("Can create byte size for sync output max buffer size");
-}
+/// The maximum number of bytes that can be processed in a single synchronized update (2 MiB).
+/// This means that synchronized updates can only be as large before a redraw is forced.
+const SYNC_OUTPUT_MAX_BUFFER_SIZE: usize = 2 * 1024 * 1024;
 
 const WARP_COMPLETIONS_OSC_MARKER: &[u8] = b"9280";
 const WARP_COMPLETIONS_START_BYTE: &[u8] = b"A";
@@ -275,7 +269,7 @@ impl SyncOutputState {
         match self {
             Self::Inactive => {
                 *self = Self::Active {
-                    buffer: Vec::with_capacity(SYNC_OUTPUT_MAX_BUFFER_SIZE.as_u64() as usize),
+                    buffer: Vec::with_capacity(SYNC_OUTPUT_MAX_BUFFER_SIZE),
                     last_activated_at: Instant::now(),
                 }
             }
@@ -476,7 +470,7 @@ impl Processor {
             // No need to actually process the 'Unset Mode' escape sequence.
             buffer.truncate(offset);
             self.finish_sync_output(handler, writer);
-        } else if Byte::from(len) >= *SYNC_OUTPUT_MAX_BUFFER_SIZE {
+        } else if len >= SYNC_OUTPUT_MAX_BUFFER_SIZE {
             // The update is too large, so let's end it.
             self.finish_sync_output(handler, writer);
         }
