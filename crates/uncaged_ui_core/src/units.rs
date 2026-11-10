@@ -1,7 +1,6 @@
 use std::fmt::{Display, Formatter};
-use std::ops::Neg;
+use std::ops::{AddAssign, Neg, SubAssign};
 
-use derive_more::{AddAssign, SubAssign};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 
@@ -16,8 +15,6 @@ use serde::{Deserialize, Serialize};
     PartialEq,
     Ord,
     PartialOrd,
-    AddAssign,
-    SubAssign,
     num_derive::FromPrimitive,
     num_derive::ToPrimitive,
     num_derive::NumCast,
@@ -28,6 +25,18 @@ use serde::{Deserialize, Serialize};
     num_derive::Float,
 )]
 pub struct Lines(OrderedFloat<f64>);
+
+impl AddAssign for Lines {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
+impl SubAssign for Lines {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 -= rhs.0;
+    }
+}
 
 impl Lines {
     /// The epsilon value used for approximate equality checks.
@@ -118,8 +127,6 @@ impl float_cmp::ApproxEq for Lines {
     Default,
     PartialOrd,
     PartialEq,
-    AddAssign,
-    SubAssign,
     Serialize,
     Deserialize,
     num_derive::FromPrimitive,
@@ -135,6 +142,18 @@ impl float_cmp::ApproxEq for Lines {
 #[cfg_attr(feature = "schema_gen", schemars(description = "A value in pixels."))]
 #[cfg_attr(feature = "settings_value", derive(settings_value::SettingsValue))]
 pub struct Pixels(f32);
+
+impl AddAssign for Pixels {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
+impl SubAssign for Pixels {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 -= rhs.0;
+    }
+}
 
 impl Pixels {
     pub const fn new(pixels: f32) -> Self {

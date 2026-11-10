@@ -7,7 +7,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use derivative::Derivative;
-use derive_more::AddAssign;
 use ordered_float::OrderedFloat;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
@@ -531,8 +530,14 @@ impl<'a> sum_tree::Dimension<'a, LayoutSummary> for Height {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, AddAssign)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Count(usize);
+
+impl AddAssign for Count {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
 
 impl<'a> sum_tree::Dimension<'a, LayoutSummary> for Count {
     fn add_summary(&mut self, summary: &'a LayoutSummary) {

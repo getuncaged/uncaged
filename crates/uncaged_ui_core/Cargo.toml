@@ -31,7 +31,6 @@ cfg-if.workspace = true
 chrono = "0.4"
 dashmap.workspace = true
 derivative.workspace = true
-derive_more.workspace = true
 dirs.workspace = true
 enum-iterator.workspace = true
 float-cmp.workspace = true

@@ -2427,7 +2427,7 @@ checksum = "d8b9f2e4c67f833b660cdb0a3523065869fb35570177239812ed4c905aeff87b"
 dependencies = [
  "bitflags 2.13.0",
  "crossterm_winapi",
- "derive_more 2.0.1",
+ "derive_more",
  "document-features",
  "mio",
  "parking_lot",
@@ -2744,17 +2744,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "derive-new"
-version = "0.5.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3418329ca0ad70234b9735dc4ceed10af4df60eff9c8e7b06cb5e520d92c3535"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "derive-where"
 version = "1.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2805,19 +2794,6 @@ checksum = "4abae7035bf79b9877b779505d8cf3749285b80c43941eda66604841889451dc"
 dependencies = [
  "derive_builder_core",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "derive_more"
-version = "0.99.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb810d30a7c1953f91334de7244731fc3f3c10d7fe163338a35b9f640960321"
-dependencies = [
- "convert_case 0.4.0",
- "proc-macro2",
- "quote",
- "rustc_version",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -4110,18 +4086,6 @@ dependencies = [
  "r-efi",
  "wasip2",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "getset"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e45727250e75cc04ff2846a66397da8ef2b3db8e40e0cef4df67950a07621eb9"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -11383,10 +11347,8 @@ dependencies = [
  "async-trait",
  "clap",
  "command",
- "derive-new",
  "futures",
  "fuzzy_match",
- "getset",
  "instant",
  "itertools 0.14.0",
  "lazy_static",
@@ -11419,7 +11381,6 @@ dependencies = [
  "enum-iterator",
  "futures",
  "futures-lite 1.13.0",
- "getset",
  "http",
  "instant",
  "inventory",
@@ -11777,7 +11738,6 @@ dependencies = [
  "ctrlc",
  "dashmap",
  "derivative",
- "derive_more 0.99.17",
  "dirs 6.0.0",
  "enum-iterator",
  "float-cmp",
@@ -12275,7 +12235,6 @@ name = "virtual-fs"
 version = "0.1.0"
 dependencies = [
  "dunce",
- "getset",
  "tempfile",
 ]
 

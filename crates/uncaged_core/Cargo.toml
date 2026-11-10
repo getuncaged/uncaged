@@ -21,7 +21,6 @@ enum-iterator.workspace = true
 futures-lite.workspace = true
 uncaged_features.workspace = true
 itertools.workspace = true
-getset.workspace = true
 http.workspace = true
 lazy_static.workspace = true
 log.workspace = true

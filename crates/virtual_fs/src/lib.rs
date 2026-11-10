@@ -1,22 +1,28 @@
 use std::path::PathBuf;
 
-use getset::Getters;
 use tempfile::{tempdir, TempDir};
 
 /// A virtual filesystem for testing purposes.
-#[derive(Getters)]
-#[get = "pub"]
 pub struct VirtualFS {
     root: TempDir,
     cwd: PathBuf,
     tests: String,
 }
 
-#[derive(Default, Getters, Clone)]
-#[get = "pub"]
+#[derive(Default, Clone)]
 pub struct Dirs {
     pub root: PathBuf,
     pub tests: PathBuf,
+}
+
+impl Dirs {
+    pub fn root(&self) -> &PathBuf {
+        &self.root
+    }
+
+    pub fn tests(&self) -> &PathBuf {
+        &self.tests
+    }
 }
 
 impl Dirs {
@@ -36,6 +42,18 @@ pub enum Stub<'a> {
 }
 
 impl VirtualFS {
+    pub fn root(&self) -> &TempDir {
+        &self.root
+    }
+
+    pub fn cwd(&self) -> &PathBuf {
+        &self.cwd
+    }
+
+    pub fn tests(&self) -> &String {
+        &self.tests
+    }
+
     pub fn test(tag: &str, test_callback: impl FnOnce(Dirs, VirtualFS)) {
         let root = tempdir().expect("failed create root directory.");
 

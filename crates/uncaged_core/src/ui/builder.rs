@@ -189,7 +189,7 @@ impl UiBuilder {
                     &self
                         .warp_theme
                         .foreground()
-                        .with_opacity(*details.accent_button_opacity()),
+                        .with_opacity(details.accent_button_opacity),
                 ),
                 self.warp_theme.foreground().with_opacity(0),
             ),
@@ -198,7 +198,7 @@ impl UiBuilder {
                     &self
                         .warp_theme
                         .foreground()
-                        .with_opacity(*details.foreground_button_opacity()),
+                        .with_opacity(details.foreground_button_opacity),
                 ),
                 self.warp_theme.foreground().with_opacity(0),
             ),
@@ -254,18 +254,19 @@ impl UiBuilder {
         let details = self.warp_theme.details();
         let (background, border) = match variant {
             ButtonVariant::Accent => (
-                self.warp_theme
-                    .accent()
-                    .blend(&self.warp_theme.foreground().with_opacity(
-                        details.accent_button_opacity() + details.button_hover_opacity(),
-                    )),
+                self.warp_theme.accent().blend(
+                    &self
+                        .warp_theme
+                        .foreground()
+                        .with_opacity(details.accent_button_opacity + details.button_hover_opacity),
+                ),
                 self.warp_theme.foreground().with_opacity(20),
             ),
             ButtonVariant::Basic => (
                 self.warp_theme
                     .background()
                     .blend(&self.warp_theme.foreground().with_opacity(
-                        details.foreground_button_opacity() + details.button_hover_opacity(),
+                        details.foreground_button_opacity + details.button_hover_opacity,
                     )),
                 self.warp_theme.foreground().with_opacity(20),
             ),
@@ -310,13 +311,13 @@ impl UiBuilder {
             ButtonVariant::Accent => (
                 self.warp_theme
                     .accent()
-                    .blend(&Fill::black().with_opacity(*details.button_click_opacity())),
+                    .blend(&Fill::black().with_opacity(details.button_click_opacity)),
                 Fill::black().with_opacity(30),
             ),
             ButtonVariant::Basic => (
                 self.warp_theme
                     .background()
-                    .blend(&Fill::black().with_opacity(*details.button_click_opacity())),
+                    .blend(&Fill::black().with_opacity(details.button_click_opacity)),
                 Fill::black().with_opacity(30),
             ),
             ButtonVariant::Secondary => (self.warp_theme.surface_3(), self.warp_theme.outline()),
@@ -327,7 +328,7 @@ impl UiBuilder {
                     &self
                         .warp_theme
                         .foreground()
-                        .with_opacity(*details.accent_button_opacity()),
+                        .with_opacity(details.accent_button_opacity),
                 ),
                 Fill::black().with_opacity(30),
             ),

@@ -3,7 +3,6 @@ use std::ops::AddAssign;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use derive_more::AddAssign as DeriveAddAssign;
 use ordered_float::OrderedFloat;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
@@ -94,8 +93,14 @@ impl<'a> sum_tree::Dimension<'a, RowLayoutSummary> for Height {
 }
 
 /// Count dimension for sum tree seeking by row index.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, DeriveAddAssign)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct RowCount(usize);
+
+impl AddAssign for RowCount {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
 
 impl<'a> sum_tree::Dimension<'a, RowLayoutSummary> for RowCount {
     fn add_summary(&mut self, summary: &'a RowLayoutSummary) {

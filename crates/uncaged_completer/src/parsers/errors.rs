@@ -1,11 +1,9 @@
 #![allow(dead_code)]
-use getset::Getters;
 
 use crate::meta::{Span, Spanned, SpannedItem};
 
-#[derive(Getters, Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct ParseError {
-    #[get = "pub"]
     pub reason: ParseErrorReason,
 }
 

@@ -3,7 +3,6 @@
 //! These colors can be further understood here:
 //! https://docs.google.com/document/d/1YMovEoXsPRziPk99a4i9LZNEKGm_rjEyzhcHsFkT3ac/edit.
 
-use getset::Getters;
 use serde::{Deserialize, Serialize};
 use uncaged_ui_core::color::ColorU;
 
@@ -18,8 +17,7 @@ use crate::ui::color::Opacity;
 
 const BLOCK_SELECTION_OPACITY: Opacity = 10;
 
-#[derive(Serialize, Copy, Clone, Debug, Deserialize, Getters, PartialEq, Eq)]
-#[get = "pub"]
+#[derive(Serialize, Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
 // TODO handle optional fields (so users can specify some and not all)
 pub struct CustomDetails {
     pub main_text_opacity: Opacity,
