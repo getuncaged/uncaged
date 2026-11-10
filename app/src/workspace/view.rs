@@ -96,8 +96,6 @@ use uncaged_ui::{
     UpdateModel, UpdateView, View, ViewAsRef, ViewContext, ViewHandle, WindowId,
 };
 use uncaged_util::path::{user_friendly_path, LineAndColumnArg};
-#[cfg(target_family = "wasm")]
-use url::Url;
 
 use self::vertical_tabs::{
     htab_group_position_id, pane_summary_kind, render_detail_sidecar, render_settings_popup,
