@@ -1,5 +1,5 @@
 {
-  description = "Warp is an agentic development environment, born out of the terminal (Experimental Nix Support, Linux-only).";
+  description = "Uncaged, an account-free, bring-your-own-model terminal (experimental Nix support, Linux-only).";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -44,49 +44,26 @@
           version = "${appCargoToml.package.version}+${self.shortRev or "dirty"}";
           src = self;
           cargoLock = ./Cargo.lock;
-          # Match Zed's approach: derive the main app vendor directory from
-          # Cargo.lock instead of maintaining a top-level cargoVendorHash.
+          # Derive the vendor directory from Cargo.lock instead of maintaining a
+          # cargoVendorHash. The only git dependency is servo's core-foundation-rs;
+          # the forks under third_party/ are path dependencies, so they come from
+          # `src` and need no vendoring.
           cargoVendorDir =
             let
               craneVendorDir = craneLib.vendorCargoDeps {
                 inherit src cargoLock;
                 overrideVendorGitCheckout =
-                  crates: drv:
-                  let
-                    hasCrate = crateName: builtins.any (crate: crate.name == crateName) crates;
-                  in
+                  _crates: drv:
                   drv.overrideAttrs (old: {
                     postPatch = (old.postPatch or "") + ''
                       find . -name 'Cargo.toml.orig' -delete
-
-                      ${lib.optionalString (hasCrate "warp_multi_agent_api") ''
-                        mkdir -p apis/multi_agent/v1/gen/rust/nix-vendored-protos
-                        cp apis/multi_agent/v1/*.proto \
-                          apis/multi_agent/v1/gen/rust/nix-vendored-protos/
-                        substituteInPlace apis/multi_agent/v1/gen/rust/build.rs \
-                          --replace-fail \
-                            'let proto_path = manifest_dir.parent().unwrap().parent().unwrap();' \
-                            'let proto_path = manifest_dir.join("nix-vendored-protos");'
-                      ''}
-
-                      ${lib.optionalString (hasCrate "warp-workflows") ''
-                        mkdir -p workflows/nix-vendored-specs
-                        cp -R specs/. workflows/nix-vendored-specs/
-                        substituteInPlace workflows/build.rs \
-                          --replace-fail \
-                            'println!("cargo:rerun-if-changed=../specs");' \
-                            'println!("cargo:rerun-if-changed=nix-vendored-specs");' \
-                          --replace-fail \
-                            'for entry in WalkDir::new("../specs") {' \
-                            'for entry in WalkDir::new("nix-vendored-specs") {'
-                      ''}
                     '';
                   });
               };
             in
             # crane writes a root config.toml; buildRustPackage expects the
             # cargoDeps layout to include .cargo/config.toml and Cargo.lock.
-            pkgs.runCommand "warp-terminal-experimental-${version}-cargo-vendor" { } ''
+            pkgs.runCommand "uncaged-${version}-cargo-vendor" { } ''
               cp -R ${craneVendorDir}/. "$out"
               chmod u+w "$out"
               mkdir -p "$out/.cargo"
@@ -128,8 +105,8 @@
             "gui"
           ];
 
-          warp-terminal-experimental = rustPlatform.buildRustPackage {
-            pname = "warp-terminal-experimental";
+          uncaged = rustPlatform.buildRustPackage {
+            pname = "uncaged";
             inherit version;
 
             inherit src;
@@ -144,7 +121,6 @@
               makeWrapper
               patchelf
               pkg-config
-              protobuf
               python3
             ];
 
@@ -167,13 +143,11 @@
             env = {
               APPIMAGE_NAME = "Uncaged-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
               LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-              PROTOC = "${pkgs.protobuf}/bin/protoc";
-              PROTOC_INCLUDE = "${pkgs.protobuf}/include";
               CARGO_PROFILE_RELEASE_DEBUG = "false";
             };
             postInstall =
               let
-                installDir = "$out/opt/warpdotdev/warp-terminal-experimental";
+                installDir = "$out/opt/uncaged";
                 resourcesDir = "${installDir}/resources";
                 releaseChannel = "stable";
                 libraryPath = lib.makeLibraryPath linuxRuntimeLibraries;
@@ -197,15 +171,15 @@
 
                 install -Dm644 \
                   "${resourcesDir}/THIRD_PARTY_LICENSES.txt" \
-                  "$out/share/licenses/warp-terminal-experimental/THIRD_PARTY_LICENSES.txt"
+                  "$out/share/licenses/uncaged/THIRD_PARTY_LICENSES.txt"
 
-                install -Dm644 LICENSE-AGPL "$out/share/licenses/warp-terminal-experimental/LICENSE-AGPL"
-                install -Dm644 LICENSE-MIT "$out/share/licenses/warp-terminal-experimental/LICENSE-MIT"
+                install -Dm644 LICENSE-AGPL "$out/share/licenses/uncaged/LICENSE-AGPL"
+                install -Dm644 LICENSE-MIT "$out/share/licenses/uncaged/LICENSE-MIT"
 
                 install -Dm644 app/channels/oss/dev.uncaged.Uncaged.desktop \
                   "$out/share/applications/dev.uncaged.Uncaged.desktop"
                 substituteInPlace "$out/share/applications/dev.uncaged.Uncaged.desktop" \
-                  --replace-fail "Exec=warp-terminal-oss %U" "Exec=warp-terminal-experimental %U"
+                  --replace-fail "Exec=warp-terminal-oss %U" "Exec=uncaged %U"
 
                 for size in 16x16 32x32 64x64 128x128 256x256 512x512; do
                   icon="app/channels/oss/icon/no-padding/$size.png"
@@ -223,28 +197,28 @@
                 ln -s "${installDir}/uncaged" "$out/bin/uncaged"
                 # Pre-rename name (v0.3.4 and earlier), kept for existing scripts.
                 ln -s "${installDir}/uncaged" "$out/bin/warp-oss"
-                ln -s "${installDir}/uncaged" "$out/bin/warp-terminal-experimental"
               '';
 
             postFixup = lib.optionalString pkgs.stdenv.isLinux ''
-              wrapped="/opt/warpdotdev/warp-terminal-experimental/.uncaged-wrapped"
+              wrapped="/opt/uncaged/.uncaged-wrapped"
               if [ -e "$out$wrapped" ] && ! patchelf --print-needed "$out$wrapped" | grep -q '^libfontconfig\.so\.1$'; then
                 patchelf --add-needed libfontconfig.so.1 "$out$wrapped"
               fi
             '';
 
             meta = {
-              description = "Warp is an agentic development environment, born out of the terminal (Experimental Nix Support, Linux-only).";
-              homepage = "https://www.warp.dev";
+              description = "Uncaged, an account-free, bring-your-own-model terminal (experimental Nix support, Linux-only).";
+              homepage = "https://github.com/getuncaged/uncaged";
               license = lib.licenses.agpl3Only;
-              mainProgram = "warp-terminal-experimental";
+              mainProgram = "uncaged";
               platforms = systems;
               sourceProvenance = with lib.sourceTypes; [ fromSource ];
             };
           };
         in
         {
-          inherit warp-terminal-experimental;
+          inherit uncaged;
+          default = uncaged;
         }
       );
 
@@ -268,7 +242,6 @@
             makeWrapper
             patchelf
             pkg-config
-            protobuf
             python3
             rustToolchain
             rust-analyzer
@@ -305,8 +278,6 @@
             inherit nativeBuildInputs buildInputs;
             APPIMAGE_NAME = "Uncaged-${pkgs.stdenv.hostPlatform.parsed.cpu.name}.AppImage";
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-            PROTOC = "${pkgs.protobuf}/bin/protoc";
-            PROTOC_INCLUDE = "${pkgs.protobuf}/include";
             LD_LIBRARY_PATH = lib.makeLibraryPath buildInputs;
           };
         }
