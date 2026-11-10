@@ -8,34 +8,14 @@ use uncaged_ui::platform::Cursor;
 
 use super::{AIBlockAction, TextLocation};
 use crate::ai::agent::{AIAgentOutput, AIAgentTextSection, AgentOutputText};
-use crate::terminal::model::secrets::{SecretLevel, SecretsRegex, SECRETS_REGEX};
+use crate::terminal::model::secrets::{SecretsRegex, SECRETS_REGEX};
 
 pub const SECRET_REDACTION_REPLACEMENT_CHARACTER: &str = "*";
 
 /// Returns the ranges of detected secrets in the given text.
 pub(crate) fn find_secrets_in_text(text: &str) -> Vec<SecretRange> {
-    find_secrets_in_text_with_levels(text)
-        .into_iter()
-        .map(|(range, _level)| range)
-        .collect()
-}
-
-/// Returns the ranges of detected secrets in the given text along with their SecretLevel.
-pub(crate) fn find_secrets_in_text_with_levels(text: &str) -> Vec<(SecretRange, SecretLevel)> {
     let secrets_regex: Arc<SecretsRegex> = { SECRETS_REGEX.lock().clone() };
-
-    find_secrets_in_text_with_levels_using_regex(text, &secrets_regex)
-}
-
-pub(crate) fn find_secrets_in_text_with_levels_using_regex(
-    text: &str,
-    secrets_regex: &SecretsRegex,
-) -> Vec<(SecretRange, SecretLevel)> {
-    let SecretsRegex {
-        regex,
-        level_metadata,
-        ..
-    } = secrets_regex;
+    let SecretsRegex { regex, .. } = secrets_regex.as_ref();
 
     let mut secret_ranges = vec![];
     let mut byte_to_char_index = vec![0; text.len() + 1]; // Map byte index to char index
@@ -53,66 +33,37 @@ pub(crate) fn find_secrets_in_text_with_levels_using_regex(
     for mat in regex.find_iter(text) {
         let start_byte = mat.start();
         let end_byte = mat.end();
-        let start_char = byte_to_char_index[start_byte];
-        let end_char = byte_to_char_index[end_byte];
-
-        // Determine which pattern matched by getting the pattern ID and map via counts
-        let pattern_id = mat.pattern().as_usize();
-        let total_patterns = level_metadata.enterprise_count + level_metadata.user_count;
-        if pattern_id >= total_patterns {
-            log::error!("Secret level not found for pattern ID {pattern_id}");
-            continue;
-        }
-        let secret_level = if pattern_id < level_metadata.enterprise_count {
-            SecretLevel::Enterprise
-        } else {
-            SecretLevel::User
-        };
-
-        secret_ranges.push((
-            SecretRange {
-                char_range: start_char..end_char,
-                byte_range: start_byte..end_byte,
-            },
-            secret_level,
-        ));
+        secret_ranges.push(SecretRange {
+            char_range: byte_to_char_index[start_byte]..byte_to_char_index[end_byte],
+            byte_range: start_byte..end_byte,
+        });
     }
 
-    // Merge overlapping ranges, preserving the highest priority SecretLevel
-    merge_sorted_ranges_with_levels(secret_ranges)
+    merge_sorted_ranges(secret_ranges)
 }
 
-/// Merges overlapping ranges while preserving the highest priority SecretLevel
-fn merge_sorted_ranges_with_levels(
-    ranges: Vec<(SecretRange, SecretLevel)>,
-) -> Vec<(SecretRange, SecretLevel)> {
-    if ranges.is_empty() {
-        return ranges;
-    }
+/// Merges overlapping ranges.
+fn merge_sorted_ranges(ranges: Vec<SecretRange>) -> Vec<SecretRange> {
+    let mut ranges = ranges.into_iter();
+    let Some(mut current_range) = ranges.next() else {
+        return vec![];
+    };
 
     let mut merged_ranges = vec![];
-    let mut current_range = ranges[0].0.clone();
-    let mut current_level = ranges[0].1;
-
-    for (range, level) in ranges.into_iter().skip(1) {
+    for range in ranges {
         // We can merge based on character ranges since non-overlapping character ranges result in non-overlapping byte ranges.
         if range.char_range.start <= current_range.char_range.end {
             // Extend the current range to include the overlapping range.
             current_range.extend_range_end(&range);
-            // Keep the highest priority level
-            if level.priority() > current_level.priority() {
-                current_level = level;
-            }
         } else {
             // No overlap, push the current range and move to the next.
-            merged_ranges.push((current_range, current_level));
+            merged_ranges.push(current_range);
             current_range = range;
-            current_level = level;
         }
     }
 
     // Add the last range.
-    merged_ranges.push((current_range, current_level));
+    merged_ranges.push(current_range);
 
     merged_ranges
 }
@@ -128,7 +79,6 @@ pub struct Secret {
     pub secret: String,
     pub is_obfuscated: bool,
     pub mouse_state: MouseStateHandle,
-    pub secret_level: SecretLevel,
 }
 
 #[derive(Default, Debug)]
@@ -288,8 +238,8 @@ impl SecretRedactionState {
         should_obfuscate: bool,
     ) {
         // Detect secrets in user's query.
-        let secret_ranges_with_levels = find_secrets_in_text_with_levels(text);
-        for (secret_range, secret_level) in secret_ranges_with_levels {
+        let secret_ranges = find_secrets_in_text(text);
+        for secret_range in secret_ranges {
             if let Some(secret_text) =
                 text.get(secret_range.byte_range.start..secret_range.byte_range.end)
             {
@@ -303,7 +253,6 @@ impl SecretRedactionState {
                             secret: secret_text.to_string(),
                             is_obfuscated: should_obfuscate,
                             mouse_state: Default::default(),
-                            secret_level,
                         },
                     );
             }
@@ -507,10 +456,9 @@ impl SecretRedactionState {
                         &self.last_word_to_rescan_for_redaction,
                         &text[self.last_scanned_secret_redaction_byte_index..]
                     );
-                    let secret_ranges_with_levels =
-                        find_secrets_in_text_with_levels(&combined_text);
+                    let secret_ranges = find_secrets_in_text(&combined_text);
 
-                    for (secret_range, secret_level) in secret_ranges_with_levels {
+                    for secret_range in secret_ranges {
                         // Adjust the ranges to map correctly within the new text.
                         let adjusted_byte_start =
                             start_of_last_word_byte_index + secret_range.byte_range.start;
@@ -539,7 +487,6 @@ impl SecretRedactionState {
                                         secret: secret_text.to_string(),
                                         is_obfuscated: should_obfuscate,
                                         mouse_state: Default::default(),
-                                        secret_level,
                                     },
                                 );
                         }
@@ -584,8 +531,8 @@ impl SecretRedactionState {
                     _ => vec![text.text()],
                 };
                 for (line_index, text) in texts.iter().enumerate() {
-                    let secret_ranges_with_levels = find_secrets_in_text_with_levels(text);
-                    for (secret_range, secret_level) in secret_ranges_with_levels {
+                    let secret_ranges = find_secrets_in_text(text);
+                    for secret_range in secret_ranges {
                         if let Some(secret_text) =
                             text.get(secret_range.byte_range.start..secret_range.byte_range.end)
                         {
@@ -602,7 +549,6 @@ impl SecretRedactionState {
                                         secret: secret_text.to_string(),
                                         is_obfuscated: true,
                                         mouse_state: Default::default(),
-                                        secret_level,
                                     },
                                 );
                         }
@@ -630,8 +576,8 @@ impl SecretRedactionState {
         self.detected_secrets.remove(&entry_location);
 
         if let Some(line_text) = text_line {
-            let secret_ranges_with_levels = find_secrets_in_text_with_levels(line_text);
-            for (secret_range, secret_level) in secret_ranges_with_levels {
+            let secret_ranges = find_secrets_in_text(line_text);
+            for secret_range in secret_ranges {
                 // No adjustment is needed - we're redoing this entire line
                 if let Some(secret_text) = line_text.get(secret_range.byte_range.clone()) {
                     self.detected_secrets
@@ -644,7 +590,6 @@ impl SecretRedactionState {
                                 secret: secret_text.to_string(),
                                 is_obfuscated: true,
                                 mouse_state: Default::default(),
-                                secret_level,
                             },
                         );
                 }

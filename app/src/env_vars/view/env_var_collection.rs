@@ -18,7 +18,7 @@ use uncaged_ui::{
 
 use super::command_dialog::EnvVarCommandDialog;
 use super::menus::Menus;
-use crate::ai::blocklist::block::secret_redaction::find_secrets_in_text_with_levels;
+use crate::ai::blocklist::block::secret_redaction::find_secrets_in_text;
 use crate::cloud_object::breadcrumbs::ContainingObject;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::Owner;
@@ -41,7 +41,6 @@ use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
 use crate::search::external_secrets::view::ExternalSecretsMenu;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::ids::SyncId;
-use crate::terminal::model::secrets::SecretLevel;
 use crate::terminal::safe_mode_settings::get_secret_obfuscation_mode;
 use crate::ui_components::breadcrumb::{render_breadcrumbs, BreadcrumbState};
 use crate::ui_components::buttons::icon_button;
@@ -110,8 +109,6 @@ pub(super) enum EditorType {
 /// Validation error for a specific field containing secrets
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct ValidationError {
-    /// The highest priority secret level detected in this field
-    pub(super) secret_level: SecretLevel,
     /// User-friendly error message
     pub(super) message: String,
 }
@@ -165,7 +162,7 @@ impl RowValidationState {
         [&self.name_error, &self.value_error, &self.description_error]
             .iter()
             .filter_map(|error| error.as_ref())
-            .max_by_key(|error| error.secret_level.priority())
+            .next_back()
     }
 }
 
@@ -190,7 +187,7 @@ impl FormValidationState {
         [&self.title_error, &self.description_error]
             .iter()
             .filter_map(|error| error.as_ref())
-            .max_by_key(|error| error.secret_level.priority())
+            .next_back()
     }
 }
 
@@ -342,15 +339,10 @@ pub enum EnvVarCollectionAction {
 
 /// Defines the view for a collection of environment variables
 impl ValidationError {
-    /// Create validation error from detected secret level
-    fn from_secret_level(secret_level: SecretLevel) -> Self {
-        let message = match secret_level {
-            SecretLevel::Enterprise => "This environment variable cannot be created due to conflicts with your enterprise's secret redaction settings. Contact a team admin for details.".to_string(),
-            SecretLevel::User => "This environment variable cannot be created due to conflicts with your secret redaction settings. Save the secret as an environment variable (in your shell config or a .env file), or update your secret redaction settings in Settings > Privacy.".to_string(),
-        };
+    /// The error for a field that matched the user's secret redaction patterns.
+    fn secret_detected() -> Self {
         Self {
-            secret_level,
-            message,
+            message: "This environment variable cannot be created due to conflicts with your secret redaction settings. Save the secret as an environment variable (in your shell config or a .env file), or update your secret redaction settings in Settings > Privacy.".to_string(),
         }
     }
 }
@@ -358,19 +350,7 @@ impl ValidationError {
 impl EnvVarCollectionView {
     /// Validates field content for secrets and returns validation error if found
     fn validate_field_content(text: &str) -> Option<ValidationError> {
-        let detected_secrets = find_secrets_in_text_with_levels(text);
-        if detected_secrets.is_empty() {
-            return None;
-        }
-
-        // Find the highest priority secret level
-        detected_secrets
-            .iter()
-            .map(|(_, level)| *level)
-            .max_by_key(|level| level.priority())
-            .map(|highest_priority_level| {
-                ValidationError::from_secret_level(highest_priority_level)
-            })
+        (!find_secrets_in_text(text).is_empty()).then(ValidationError::secret_detected)
     }
 
     /// Updates validation state for a specific field in a row
@@ -975,7 +955,7 @@ impl EnvVarCollectionView {
         std::iter::once(form_error)
             .flatten()
             .chain(row_errors)
-            .max_by_key(|error| error.secret_level.priority())
+            .last()
     }
 
     pub fn set_saving_status(&mut self, status: SavingStatus, ctx: &mut ViewContext<Self>) {

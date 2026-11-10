@@ -4801,7 +4801,6 @@ impl AIBlock {
                     secret_range: secret_range.clone(),
                     location: *location,
                     view_id: ctx.view_id(),
-                    secret_level: hoverable_secret.secret_level,
                 },
             ));
         }

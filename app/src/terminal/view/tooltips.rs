@@ -282,27 +282,24 @@ impl TerminalView {
 
         let secret_redaction = get_secret_obfuscation_mode(app);
 
-        // Get the secret level from the current tooltip
-        let secret_level = self.open_secret_tool_tip.as_ref().and_then(|tooltip| {
-            match tooltip {
-                SecretTooltip::Grid { tooltip, .. } => {
-                    // For grid secrets, get the secret level from the secret itself
-                    model
-                        .secret_from_handle(tooltip)
-                        .map(|secret| secret.secret_level())
-                }
-                SecretTooltip::RichContent { tooltip, .. } => Some(tooltip.secret_level),
-            }
-        });
+        let secret_found =
+            self.open_secret_tool_tip
+                .as_ref()
+                .is_some_and(|tooltip| match tooltip {
+                    SecretTooltip::Grid { tooltip, .. } => {
+                        model.secret_from_handle(tooltip).is_some()
+                    }
+                    SecretTooltip::RichContent { .. } => true,
+                });
 
         let redaction = match (
             self.open_secret_tool_tip.is_some(),
             secret_redaction.should_redact_secret(),
             is_agent_conversation,
         ) {
-            (true, true, true) => TooltipRedaction::SecretNotSentToLLMMessaging { secret_level },
+            (true, true, true) => TooltipRedaction::SecretNotSentToLLMMessaging { secret_found },
             (true, true, false) => {
-                TooltipRedaction::SecretWillNotBeSentToLLMMessaging { secret_level }
+                TooltipRedaction::SecretWillNotBeSentToLLMMessaging { secret_found }
             }
             (_, _, _) => TooltipRedaction::NoRedaction,
         };

@@ -38,8 +38,7 @@ pub mod terminal_model;
 pub mod test_utils;
 
 pub use secrets::{
-    set_user_and_enterprise_secret_regexes, ObfuscateSecrets, RespectObfuscatedSecrets, Secret,
-    SecretHandle,
+    set_user_secret_regexes, ObfuscateSecrets, RespectObfuscatedSecrets, Secret, SecretHandle,
 };
 pub use uncaged_terminal::model::grid::cell;
 pub use uncaged_terminal::model::{char_or_str, escape_sequences, mouse, BlockId};

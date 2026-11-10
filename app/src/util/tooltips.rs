@@ -10,7 +10,6 @@ use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyl
 use uncaged_ui::{AppContext, Element, EventContext};
 
 use crate::appearance::Appearance;
-use crate::terminal::model::secrets::SecretLevel;
 
 /// A link to be shown in a tooltip
 pub struct TooltipLink<OnClick> {
@@ -42,13 +41,15 @@ pub enum TooltipRedaction {
     /// When sending text to an LLM, we want to ensure users this secret
     /// was obfuscated and not sent to the LLM.
     SecretNotSentToLLMMessaging {
-        secret_level: Option<SecretLevel>,
+        /// Whether the secret under the tooltip is still known to the model.
+        secret_found: bool,
     },
     /// When displaying text which is secret and could be added to an Agent Mode
     /// conversation, we want to ensure users this secret will not be sent to
     /// the LLM.
     SecretWillNotBeSentToLLMMessaging {
-        secret_level: Option<SecretLevel>,
+        /// Whether the secret under the tooltip is still known to the model.
+        secret_found: bool,
     },
     NoRedaction,
 }
@@ -125,8 +126,8 @@ where
     };
 
     match redaction {
-        TooltipRedaction::SecretNotSentToLLMMessaging { secret_level }
-        | TooltipRedaction::SecretWillNotBeSentToLLMMessaging { secret_level } => {
+        TooltipRedaction::SecretNotSentToLLMMessaging { secret_found }
+        | TooltipRedaction::SecretWillNotBeSentToLLMMessaging { secret_found } => {
             let theme = appearance.theme();
             let title = if matches!(
                 redaction,
@@ -137,13 +138,10 @@ where
                 "This won't be included in any AI conversations or shared blocks."
             };
 
-            // Generate the appropriate message based on secret level
-            let secret_message = match secret_level {
-                Some(SecretLevel::Enterprise) => {
-                    "Pattern matched your organization's secret redaction regex list."
-                }
-                Some(SecretLevel::User) => "Pattern matched your secret redaction regex list.",
-                None => "Pattern matched the secret redaction regex list.",
+            let secret_message = if secret_found {
+                "Pattern matched your secret redaction regex list."
+            } else {
+                "Pattern matched the secret redaction regex list."
             };
 
             tooltip.add_child(
