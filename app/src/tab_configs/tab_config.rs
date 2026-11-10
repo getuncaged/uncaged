@@ -39,15 +39,18 @@ fn handlebars_placeholder(name: &str) -> String {
     format!("{{{{{name}}}}}")
 }
 
+/// The directory generated worktrees are created under, one subdirectory per
+/// repository.
+pub(crate) fn generated_worktrees_dir() -> PathBuf {
+    uncaged_core::paths::data_dir().join("worktrees")
+}
 pub(crate) fn generated_worktree_repo_dir(repo_path: &Path) -> PathBuf {
     let repo_name = repo_path
         .file_name()
         .and_then(|name| name.to_str())
         .filter(|name| !name.is_empty())
         .unwrap_or("untitled");
-    uncaged_core::paths::data_dir()
-        .join("worktrees")
-        .join(repo_name)
+    generated_worktrees_dir().join(repo_name)
 }
 pub(crate) fn generated_worktree_path(repo_path: &Path, worktree_name: &str) -> PathBuf {
     generated_worktree_repo_dir(repo_path).join(worktree_name)

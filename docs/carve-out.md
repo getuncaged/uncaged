@@ -108,8 +108,6 @@ Still open:
   agents in it" step (`init_project`, always Ready), and the `/create-environment` slash
   command (default feature `create_environment_slash_command`) sets up Warp's cloud
   environments; neither can do anything without Warp's server.
-- Bundled agent skills under `resources/bundled/skills` still describe Warp (and `oz-platform`
-  only Warp's cloud).
 - The Linux secure-storage key seed string that names `releases.warp.dev` must stay (changing
   it would make stored secrets unreadable).
 

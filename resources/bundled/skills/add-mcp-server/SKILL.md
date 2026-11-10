@@ -1,19 +1,21 @@
 ---
 name: agent-add-mcp
-description: Use this skill when helping users add MCP servers to their Warp configuration.
+description: Use this skill when helping users add MCP servers to their Uncaged configuration.
 ---
 
-# Adding MCP Servers to Warp
+# Adding MCP Servers to Uncaged
 
-Warp supports MCP servers via native config files. Follow these steps when helping a user add an MCP server.
+Uncaged supports MCP servers via native config files. Follow these steps when helping a user add an MCP server.
 
 ## Step 1: Determine Scope
 
 If the user hasn't specified, ask whether they want to configure the server **globally** (for all projects) or **project-scoped** (for a specific repository only).
 
 Config file paths:
-- **Global (user-scoped):** `~/.warp/.mcp.json`
-- **Project-scoped:** `{repo_root}/.warp/.mcp.json`
+- **Global (user-scoped):** `{{mcp_config_file_path}}`
+- **Project-scoped:** `{repo_root}/.warp/.mcp.json` (the project directory keeps the `.warp` name)
+
+Use the global path verbatim — it depends on the platform and the running build.
 
 ## Step 2: Gather Server Details
 
@@ -37,9 +39,8 @@ Check whether the target config file exists.
   - `mcp_servers`
   - `servers`
   - `mcp.servers` (nested under a `mcp` key)
-  - Flat map (each top-level key is a server name)
 
-  Preserve the existing wrapper key when writing. If the existing key is unrecognized or incompatible, switch to `mcpServers`.
+  Servers must sit under one of these keys: a config file whose top-level keys are server names is not read. Preserve the existing wrapper key when writing. If the existing key is unrecognized, switch to `mcpServers`.
 
   **Never remove existing server entries** — only add or update the new server.
 
@@ -61,9 +62,9 @@ Check whether the target config file exists.
 }
 ```
 
-By default, Warp spawns stdio servers from the directory the config was discovered in:
+By default, Uncaged spawns stdio servers from the directory the config was discovered in:
 - Project-scoped configs (`{repo_root}/.warp/.mcp.json`) run from the repo root.
-- Global configs (`~/.warp/.mcp.json`, `~/.claude.json`, etc.) run from the home directory.
+- Global configs (`{{mcp_config_file_path}}`, `~/.claude.json`, etc.) run from the home directory.
 
 If the server's `command` or `args` are relative paths (e.g. `./tooling/mcp/server.js`) or the server expects a specific cwd, set `working_directory` to override the default:
 
@@ -81,23 +82,25 @@ If the server's `command` or `args` are relative paths (e.g. `./tooling/mcp/serv
 
 ### URL-based server (HTTP/SSE streaming transport)
 
+URL servers take `url` and optional `headers`; they have no `env`:
+
 ```json
 {
   "mcpServers": {
     "server-name": {
       "url": "https://example.com/mcp",
-      "env": {
-        "API_KEY": "${API_KEY}"
+      "headers": {
+        "Authorization": "Bearer ${API_KEY}"
       }
     }
   }
 }
 ```
 
-For environment variables containing secrets, use `${VAR_NAME}` syntax — Warp will substitute the value from the user's environment at runtime.
+For secrets, use `${VAR_NAME}` syntax — Uncaged substitutes the value from the user's environment when it starts the server. If a referenced variable is missing or empty, the server does not start.
 
 ## Notes
 
-- Warp auto-detects changes to `.mcp.json` files on save — no restart required.
-- Configured servers appear in Warp's Settings under MCP, labeled **"Detected from Warp"**.
-- Global config applies across all sessions; project config only applies when working inside that repository.
+- Uncaged auto-detects changes to these config files on save — no restart required.
+- Configured servers appear in Uncaged's Settings → MCP servers, under **"Detected from Uncaged"**.
+- Servers in the global config start automatically. Project-scoped servers never start on their own: the user enables each one in that section of the MCP servers settings, and it only applies when working inside that repository.

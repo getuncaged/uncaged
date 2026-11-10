@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use ai::skills::{parse_bundled_skill, ParsedSkill, SkillPathOrigin, SkillReference};
 use futures::TryStreamExt;
-use uncaged_core::channel::ChannelState;
+use uncaged_core::paths::warp_home_mcp_config_file_path;
 use uncaged_core::ui::icons::Icon;
 use uncaged_core::{report_error, safe_warn};
 use uncaged_ui::{AppContext, SingletonEntity};
@@ -15,6 +15,8 @@ use super::SkillDescriptor;
 use crate::ai::mcp::{McpIntegration, TemplatableMCPServerManager};
 use crate::keyboard::keybinding_file_path;
 use crate::settings::user_preferences_toml_file_path;
+use crate::tab_configs::tab_config::generated_worktrees_dir;
+use crate::user_config::tab_configs_dir;
 
 /// Activation condition for a bundled skill.
 #[derive(Debug, Clone)]
@@ -365,30 +367,18 @@ pub(crate) async fn read_bundled_skills(
 /// Builds the context map for bundled skill variable substitution.
 ///
 /// Supported variables:
-/// - `{{warp_server_url}}` - The server root URL (e.g., `https://api.warp.dev`)
-/// - `{{warp_cli_binary_name}}` - The CLI binary name (e.g., `warp` or `warp-cli`)
-/// - `{{warp_url_scheme}}` - The URL scheme (e.g., `warp`, `warpdev`, `warppreview`)
 /// - `{{settings_schema_path}}` - Path to the bundled JSON settings schema
 /// - `{{skill_dir}}` - Path to the bundled skill's directory
 /// - `{{settings_file_path}}` - Path to the user's settings TOML file
 /// - `{{keybindings_file_path}}` - Path to the user's keybindings YAML file
+/// - `{{mcp_config_file_path}}` - Path to the user's global MCP config (`.mcp.json`)
+/// - `{{tab_configs_dir}}` - Directory the user's tab config TOML files live in
+/// - `{{worktrees_dir}}` - Directory generated tab-config worktrees are created under
 pub(crate) fn build_bundled_skill_context(
     resources_dir: &Path,
     skill_dir: &Path,
 ) -> HashMap<String, String> {
     [
-        (
-            "warp_server_url".to_owned(),
-            ChannelState::server_root_url().into_owned(),
-        ),
-        (
-            "warp_cli_binary_name".to_owned(),
-            ChannelState::channel().cli_command_name().to_owned(),
-        ),
-        (
-            "warp_url_scheme".to_owned(),
-            ChannelState::url_scheme().to_owned(),
-        ),
         (
             "settings_file_path".to_owned(),
             user_preferences_toml_file_path().display().to_string(),
@@ -405,6 +395,20 @@ pub(crate) fn build_bundled_skill_context(
                 .to_string(),
         ),
         ("skill_dir".to_owned(), skill_dir.display().to_string()),
+        (
+            "mcp_config_file_path".to_owned(),
+            warp_home_mcp_config_file_path()
+                .map(|path| path.display().to_string())
+                .unwrap_or_default(),
+        ),
+        (
+            "tab_configs_dir".to_owned(),
+            tab_configs_dir().display().to_string(),
+        ),
+        (
+            "worktrees_dir".to_owned(),
+            generated_worktrees_dir().display().to_string(),
+        ),
     ]
     .into_iter()
     .collect()

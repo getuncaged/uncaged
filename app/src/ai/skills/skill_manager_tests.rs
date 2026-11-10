@@ -5,7 +5,6 @@ use ai::skills::{get_provider_for_path, ParsedSkill, SkillProvider, SkillReferen
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::{DirectoryWatcher, RepoMetadataModel};
 use tempfile::TempDir;
-use uncaged_core::channel::ChannelState;
 use uncaged_ui::App;
 use uncaged_util::host_id::HostId;
 use uncaged_util::local_or_remote_path::LocalOrRemotePath;
@@ -282,7 +281,7 @@ name: test-skill
 description: Test skill with variables
 ---
 
-Run `{{warp_cli_binary_name}}` to connect to {{warp_server_url}}.
+Write to {{tab_configs_dir}} and {{mcp_config_file_path}}.
 "#,
     )
     .unwrap();
@@ -292,10 +291,12 @@ Run `{{warp_cli_binary_name}}` to connect to {{warp_server_url}}.
     assert_eq!(skills.len(), 1);
     let skill = skills.get("test-skill").unwrap();
 
-    let expected_cli = ChannelState::channel().cli_command_name();
-    let expected_url = ChannelState::server_root_url();
+    let expected_dir = crate::user_config::tab_configs_dir();
+    let expected_mcp = uncaged_core::paths::warp_home_mcp_config_file_path().unwrap_or_default();
     assert!(skill.content.contains(&format!(
-        "Run `{expected_cli}` to connect to {expected_url}."
+        "Write to {} and {}.",
+        expected_dir.display(),
+        expected_mcp.display()
     )));
 }
 
@@ -353,7 +354,7 @@ name: test-skill
 description: Test skill with mixed variables
 ---
 
-Use {{other_var}}, {{warp_cli_binary_name}}, and {{skill_dir}} together.
+Use {{other_var}}, {{tab_configs_dir}}, and {{skill_dir}} together.
 "#,
     )
     .unwrap();
@@ -363,9 +364,10 @@ Use {{other_var}}, {{warp_cli_binary_name}}, and {{skill_dir}} together.
     assert_eq!(skills.len(), 1);
     let skill = skills.get("test-skill").unwrap();
 
-    let expected_cli = ChannelState::channel().cli_command_name();
+    let expected_dir = crate::user_config::tab_configs_dir();
     assert!(skill.content.contains(&format!(
-        "Use {{{{other_var}}}}, {expected_cli}, and {} together.",
+        "Use {{{{other_var}}}}, {}, and {} together.",
+        expected_dir.display(),
         skill_dir.display()
     )));
 }
@@ -407,9 +409,6 @@ fn test_build_bundled_skill_context() {
     let context = build_bundled_skill_context(resources_dir, &skill_dir);
 
     assert_eq!(context.len(), 7);
-    assert!(context.contains_key("warp_server_url"));
-    assert!(context.contains_key("warp_cli_binary_name"));
-    assert!(context.contains_key("warp_url_scheme"));
     assert!(context.contains_key("settings_file_path"));
     assert!(context.contains_key("keybindings_file_path"));
     assert_eq!(
@@ -425,16 +424,22 @@ fn test_build_bundled_skill_context() {
     );
 
     assert_eq!(
-        context.get("warp_server_url").unwrap(),
-        &ChannelState::server_root_url().to_string()
+        context.get("tab_configs_dir").unwrap(),
+        &crate::user_config::tab_configs_dir().display().to_string()
     );
     assert_eq!(
-        context.get("warp_cli_binary_name").unwrap(),
-        ChannelState::channel().cli_command_name()
+        context.get("worktrees_dir").unwrap(),
+        &uncaged_core::paths::data_dir()
+            .join("worktrees")
+            .display()
+            .to_string()
     );
     assert_eq!(
-        context.get("warp_url_scheme").unwrap(),
-        ChannelState::url_scheme()
+        context.get("mcp_config_file_path").unwrap(),
+        &uncaged_core::paths::warp_home_mcp_config_file_path()
+            .unwrap_or_default()
+            .display()
+            .to_string()
     );
     assert_eq!(
         context.get("settings_file_path").unwrap(),
