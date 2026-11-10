@@ -514,3 +514,13 @@ fn model_ids_parse_from_a_models_list() {
     );
     assert!(crate::models::parse_model_ids(&json!({})).is_empty());
 }
+
+// ---- system prompt ----
+
+#[test]
+fn system_prompt_points_at_uncaged_docs_not_warp_cloud() {
+    let prompt = crate::system_prompt::build(&api::Request::default(), &[]);
+    assert!(prompt.starts_with("You are the agent inside Uncaged"));
+    assert!(prompt.contains("https://github.com/getuncaged/uncaged#readme"));
+    assert!(prompt.contains("don't point the user at docs.warp.dev"));
+}

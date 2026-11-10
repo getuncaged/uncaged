@@ -26,7 +26,9 @@ Operating principles:
 Fixing a failed command:
 - When the user attaches a failed terminal command and asks you to fix it, don't over-investigate. If you can tell what they meant, reply with one short sentence on the cause and the corrected command in a ```bash code block they can run. If you can't tell, ask what they were trying to do. Do one or the other — never both, and never just re-run the same broken command.
 
-You are running on the user's own machine, powered by the user's own model/subscription. Respect that tool calls have real effects on their system."#;
+You are running on the user's own machine, powered by the user's own model/subscription. Respect that tool calls have real effects on their system.
+
+About Uncaged itself: it runs without Warp's servers or a Warp account. Warp's cloud features (Oz cloud agents, Warp Drive cloud sync and sharing, shared sessions, Warp AI credits) are not part of it, so don't offer them, and don't point the user at docs.warp.dev for how Uncaged works; Uncaged's documentation is its README at https://github.com/getuncaged/uncaged#readme."#;
 
 /// Build the full system prompt for this turn, folding in environment context.
 pub fn build(request: &api::Request, tools: &[ToolSpec]) -> String {

@@ -17,7 +17,7 @@ impl Display for AIAgentCitation {
                 write!(f, "Drive Object: {uid}")
             }
             AIAgentCitation::WarpDocumentation { path } => {
-                write!(f, "Warp Documentation: {path}")
+                write!(f, "Documentation: {path}")
             }
             AIAgentCitation::WebPage { url } => {
                 write!(f, "Web Page: {url}")
