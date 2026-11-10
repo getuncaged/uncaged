@@ -44,18 +44,33 @@ What still ties us to Warp, by size (files in `app/src` that use it):
 | AWS SDK (Bedrock credentials) | 2 | credentials only ever went to Warp's server |
 | Sentry, OpenTelemetry | 20 + 3 | crash and trace reporting to Warp |
 
-## Where we ended (2026-11-08, branch `uncaged-carve-phase1` at 88cbc18, not released)
+## Where we ended (2026-11-10, branch `uncaged-carve-phase1` at 8cf6a3d, not released)
 
-| Measure | Start (v0.3.4) | Now | Target |
-| --- | --- | --- | --- |
-| Workspace crates | 78 | 59 | about 45 |
-| Crates compiled for the app (macOS) | 943 | 787 | under 600 |
-| Packages in `Cargo.lock` | 1,465 | 1,354 | |
-| Rust in `app/src` | 1.06M lines | 769k lines | under 700k |
-| Launch to first frame (debug bundle, real data, idle) | ~700 ms | ~430-490 ms | |
-| macOS arm64 DMG, release launch time | 136 MB, 549 ms | not measured yet (needs a release build) | under 90 MB, under 250 ms |
+| Measure | Start (v0.3.4) | 2026-11-08 (88cbc18) | Now | Target |
+| --- | --- | --- | --- | --- |
+| Workspace crates | 78 | 59 | 57 | about 45 |
+| Crates compiled for the app (macOS) | 943 | 787 | 719 | under 600 |
+| Packages in `Cargo.lock` | 1,465 | 1,354 | 1,258 | |
+| Rust in `app/src` | 1.06M lines | 769k lines | 747k lines | under 700k |
+| Launch to first frame (debug bundle, real data, idle) | ~700 ms | ~430-490 ms | not re-measured | |
+| macOS arm64 DMG | 136.6 MB | not measured | 90.8 MB (86.6 MiB) | under 90 MB |
+| Main binary (release) | 374.6 MB | not measured | 226.2 MB | |
+| Release launch to first frame, onboarding window | 859 ms | not measured | 527 ms | |
+| Release launch to first frame, terminal window | 472 ms | not measured | 432 ms | under 250 ms |
+| RSS 15 s after launch, terminal window | 253 MB | not measured | 231 MB | |
 
-63 commits since v0.3.4: 3,304 files changed, 378,981 lines deleted, 32,442 added.
+How the release numbers were taken (2026-11-10): the arm64 bundle built the way
+`uncaged-release.yml` builds it (`./script/bundle --channel oss --selfsign --arch aarch64`),
+against v0.3.4's released arm64 DMG, each copy given its own bundle id (so its preferences
+domain is its own), run with a fresh fake `HOME` per launch, interleaved, median of the
+`Startup timing:` total (5 launches each for the onboarding window, 10 for the terminal window). "Onboarding window" is a fresh profile; "terminal window" has onboarding
+marked done, so a shell starts. The machine was under heavy unrelated load (load average 30-500)
+throughout, so the absolute times are inflated and noisy; in the quietest runs both builds
+reached the terminal's first frame in about 210-290 ms. Most of the onboarding-window gain is
+window creation (669 → 344 ms). The 549 ms start figure above was measured with real data.
+
+Commits since v0.3.4: 112; 3,930 files changed, 480,097 lines deleted, 28,793 added (not
+counting the vendored `third_party/` crates and the generated agent API code).
 
 Gone: AWS/Sentry/OpenTelemetry, telemetry, accounts and Firebase, teams and workspaces,
 settings sync, shared sessions, the SSH remote server, Oz/cloud agents, the AI server
@@ -99,6 +114,18 @@ the generated proto fields remain, always `None`. `/init` no longer ends with th
 environment … to run cloud agents" step (it finishes after the AGENTS.md step), and the
 `/create-environment` request, its `create_environment_slash_command` feature and flag, and the
 `CreateEnvironment` agent input are gone; the proto message stays in the generated wire types.
+
+Since 655aef30 (2026-11-10, 31 commits; 912 files changed, 89,531 lines deleted, 2,318 added):
+besides the removals listed in the previous paragraph, dead-code warnings went to zero; the JS
+plugin host (`uncaged_js`, rquickjs), the completions_v2 prototype and
+`crates/command-signatures-v2`, the FinishUpdate shell hook, Warp's internal design specs and
+Warp-process agent skills, the run-agents Cloud execution mode, never-enabled flags that needed
+Warp's cloud, and unused dependencies are gone. rustls uses ring instead of aws-lc-rs, zip and
+reqwest build only the codecs we use, byte-unit, derive_more 0.99, getset and derive-new are
+replaced by plain code, the Metal shader-type bindings are checked in (no bindgen), the command
+signatures are embedded deflated, images were dropped or recompressed losslessly, and release
+binaries no longer carry debug symbol entries. The bundled agent skills and the agent's system
+prompt describe Uncaged and say it has no Warp cloud.
 
 Still open:
 - Dead-code warnings are at zero (`cargo check -p uncaged --bin uncaged`, with and without
