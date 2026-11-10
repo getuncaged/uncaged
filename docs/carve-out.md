@@ -88,6 +88,15 @@ installer or ask for a gcloud login, the issue templates point at Uncaged's own 
 shell bootstrap lost Warp's apt-repo repair helper. The only git dependency left is servo's
 core-foundation-rs (an upstream fix not yet released).
 
+Since then (2026-11-10): the free-AI-removal notice (its view is now just the
+prompt-suggestions-unavailable modal), the HOA onboarding tour, the changelog (the resource
+center keeps its keyboard-shortcuts page, version row and footer), conversation links to Warp's
+web app and the dogfood debug-conversation loader, wasm web-intent parsing, the cloud harness
+auth-secret picker, and enterprise secret levels are gone. User-visible text says Uncaged and
+Drive, the X-Warp-Error-Code handling is gone, and `flake.nix` builds `uncaged` (not yet
+evaluated with Nix). `RequestParams.api_keys`/`custom_model_providers` had already gone; only
+the generated proto fields remain, always `None`.
+
 Still open:
 - Dead-code warnings are at zero (`cargo check -p uncaged --bin uncaged`, with and without
   `--all-features`). Still compiler-live but never populated: the ambient-task map in
@@ -95,12 +104,10 @@ Still open:
   it (`entry_for_task`, the `Task*` display statuses, the agent management view's task paths),
   and the remote-host catalog in `BundledSkills`. Removing them is behaviour-neutral but a larger
   refactor.
-- The free-AI-removal notice modal and the HOA onboarding flow (never opened; the modal's view
-  also backs the live prompt-suggestions-unavailable modal), the changelog-only resource
-  center, and server-sentinel links (`ServerConversationToken::conversation_link`/`debug_link`).
-- Cleanup-backlog leftovers: harness auth-secret UI, enterprise secrets in the terminal model,
-  web-intent parsing (wasm only), and `RequestParams.api_keys`/`custom_model_providers`
-  always `None`.
+- The run-agents "Cloud" execution mode is still offered but cannot run (no parent run_id
+  without Warp's server); removing it takes the remote orchestration paths with it.
+- Bundled agent skills under `resources/bundled/skills` still describe Warp (and `oz-platform`
+  only Warp's cloud). A few links still point at `github.com/uncaged-terminal/uncaged`.
 - The Linux secure-storage key seed string that names `releases.warp.dev` must stay (changing
   it would make stored secrets unreadable).
 
