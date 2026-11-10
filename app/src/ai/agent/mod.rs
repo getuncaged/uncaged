@@ -744,11 +744,6 @@ impl From<&Arc<AIApiError>> for RenderableAIError {
         // state rather than ERROR state.
         let is_user_error = !value.is_recoverable();
         match value.as_ref() {
-            AIApiError::QuotaLimit {
-                user_display_message,
-            } => Self::QuotaLimit {
-                user_display_message: user_display_message.clone(),
-            },
             AIApiError::ServerOverloaded => Self::ServerOverloaded,
             AIApiError::Transport(error)
             | AIApiError::Deserialization(DeserializationError::Transport(error)) => {

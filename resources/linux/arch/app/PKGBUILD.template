@@ -1,9 +1,9 @@
 pkgname=warp-terminal@@CHANNEL_SUFFIX@@
 pkgver=@@VERSION@@
 pkgrel=@@RELEASE@@
-pkgdesc="Warp, the Rust-based terminal for developers and teams"
+pkgdesc="Uncaged, an account-free, bring-your-own-model terminal"
 arch=('@@ARCH@@')
-url="https://warp.dev"
+url="https://github.com/getuncaged/uncaged"
 license=('custom')
 depends=(
 	'curl'

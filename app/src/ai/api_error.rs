@@ -1,18 +1,6 @@
 //! Errors from AI requests, shared by the local engine's response stream and the agent UI.
 
-use serde::Deserialize;
 use uncaged_core::errors::{register_error, AnyhowErrorExt, ErrorExt};
-
-/// We use a special error code header `X-Warp-Error-Code` to allow the server to send
-/// more specific error code information, so that the client can discern between different
-/// errors with the same error code.
-/// See errors/http_error_codes.go on the server for possible values.
-const WARP_ERROR_CODE_HEADER: &str = "X-Warp-Error-Code";
-
-/// An error indicating the user is out of credits. The server sends 429s to communicate this
-/// state, but if Cloud Run is overloaded, it can also send 429s that aren't credit-related.
-/// So we use this to distinguish between the two cases.
-const WARP_ERROR_CODE_OUT_OF_CREDITS: &str = "OUT_OF_CREDITS";
 
 /// Wrapper for deserialization errors. This covers both:
 /// * Using `serde` directly
@@ -25,19 +13,8 @@ pub enum DeserializationError {
     Transport(reqwest::Error),
 }
 
-#[derive(Deserialize, Debug)]
-struct OutOfCreditsResponse {
-    #[serde(default, rename = "userDisplayMessage")]
-    user_display_message: Option<String>,
-}
-
 #[derive(thiserror::Error, Debug)]
 pub enum AIApiError {
-    #[error("Request failed due to lack of AI quota.")]
-    QuotaLimit {
-        user_display_message: Option<String>,
-    },
-
     #[error("The model is currently overloaded. Please try again later.")]
     ServerOverloaded,
 
@@ -65,12 +42,7 @@ pub enum AIApiError {
 
 impl From<http_client::ResponseError> for AIApiError {
     fn from(err: http_client::ResponseError) -> Self {
-        let http_client::ResponseError {
-            source,
-            headers,
-            body,
-        } = err;
-        Self::from_response_error(source, &headers, body)
+        Self::from_response_error(err.source)
     }
 }
 
@@ -87,17 +59,11 @@ impl From<serde_json::Error> for AIApiError {
 }
 
 impl AIApiError {
-    /// Converts a reqwest error to an AIApiError, using response headers to distinguish
-    /// between different types of 429 errors.
-    fn from_response_error(
-        err: reqwest::Error,
-        headers: &::http::HeaderMap,
-        body: Option<String>,
-    ) -> Self {
-        // For HTTP 429 errors, check the X-Warp-Error-Code header to distinguish
-        // between out-of-credits and server-overload.
+    /// Converts a reqwest error to an AIApiError. A 429 means the model provider is
+    /// rate-limiting or overloaded.
+    fn from_response_error(err: reqwest::Error) -> Self {
         if err.status() == Some(http::StatusCode::TOO_MANY_REQUESTS) {
-            return Self::error_for_429(headers, body);
+            return AIApiError::ServerOverloaded;
         }
 
         Self::from_transport_error(err)
@@ -132,24 +98,6 @@ impl AIApiError {
         AIApiError::Transport(err)
     }
 
-    /// Returns the appropriate error for a 429 response by checking the X-Warp-Error-Code header.
-    fn error_for_429(headers: &::http::HeaderMap, body: Option<String>) -> Self {
-        if headers
-            .get(WARP_ERROR_CODE_HEADER)
-            .and_then(|v| v.to_str().ok())
-            == Some(WARP_ERROR_CODE_OUT_OF_CREDITS)
-        {
-            let user_display_message = body
-                .and_then(|body| serde_json::from_str::<OutOfCreditsResponse>(&body).ok())
-                .and_then(|r| r.user_display_message);
-            AIApiError::QuotaLimit {
-                user_display_message,
-            }
-        } else {
-            AIApiError::ServerOverloaded
-        }
-    }
-
     /// Whether the error is worth an automatic recovery attempt — a fresh request may
     /// succeed. Gates both retry (pre-actions) and resume (post-actions).
     pub fn is_recoverable(&self) -> bool {
@@ -182,9 +130,7 @@ impl ErrorExt for AIApiError {
             AIApiError::Other(error) => error.is_actionable(),
             AIApiError::ErrorStatus(_, _) => self.is_recoverable(),
             AIApiError::UnexpectedEof => true,
-            AIApiError::QuotaLimit { .. }
-            | AIApiError::ServerOverloaded
-            | AIApiError::NoContextFound => false,
+            AIApiError::ServerOverloaded | AIApiError::NoContextFound => false,
         }
     }
 }

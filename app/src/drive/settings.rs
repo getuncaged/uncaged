@@ -10,7 +10,7 @@ define_settings_group!(WarpDriveSettings, settings: [
         supported_platforms: SupportedPlatforms::ALL,
         private: false,
         toml_path: "warp_drive.sorting_choice",
-        description: "The sort order for items in Warp Drive.",
+        description: "The sort order for items in Drive.",
     },
     // Controls whether Warp Drive appears in the tools panel, command palette, and command search.
     enable_warp_drive: EnableWarpDrive {

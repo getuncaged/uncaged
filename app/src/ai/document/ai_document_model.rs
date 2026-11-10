@@ -280,7 +280,7 @@ impl AIDocumentModel {
                 AIDocumentSaveStatus::NotSaved => {
                     if !self.sync_to_warp_drive(document_id, ctx) {
                         log::error!(
-                            "Failed to publish plan document {document_id} to Warp Drive before child-agent launch."
+                            "Failed to publish plan document {document_id} to Drive before child-agent launch."
                         );
                     } else if !self.get_document_save_status(&document_id).is_saved() {
                         awaiting_backing.push(document_id);
@@ -453,9 +453,7 @@ impl AIDocumentModel {
                     notebook.model().data.clone(),
                 )
             })
-            .ok_or_else(|| {
-                format!("Plan document {ai_document_id} was not found in Warp Drive.")
-            })?;
+            .ok_or_else(|| format!("Plan document {ai_document_id} was not found in Drive."))?;
         let (sync_id, title, content) = notebook;
 
         self.latest_document_id_by_conversation_id

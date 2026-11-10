@@ -777,7 +777,7 @@ impl Action {
             | Self::NewAgentConversation => W::default(),
             Self::NewTab => W::ShowPrimaryWindow(WindowActivationFallbackBehavior::Notify {
                 title: "New tab created".to_owned(),
-                description: "Go to Warp to see your new tab.".to_owned(),
+                description: "Go to Uncaged to see your new tab.".to_owned(),
             }),
             Self::NewWindow => W::Nothing,
         }

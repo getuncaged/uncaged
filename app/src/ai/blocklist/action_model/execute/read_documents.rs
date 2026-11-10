@@ -54,7 +54,7 @@ impl ReadDocumentsExecutor {
                         model.hydrate_saved_plan_from_warp_drive(*id, conversation_id, ctx)
                     {
                         log::warn!(
-                            "Failed to hydrate requested plan document {id} from Warp Drive: {error}"
+                            "Failed to hydrate requested plan document {id} from Drive: {error}"
                         );
                     }
                 });

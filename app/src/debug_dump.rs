@@ -9,7 +9,7 @@ use uncaged_core::channel::ChannelState;
 use uncaged_ui::windowing;
 
 pub(crate) fn run() -> anyhow::Result<()> {
-    println!("Warp version: {:?}", ChannelState::app_version());
+    println!("Uncaged version: {:?}", ChannelState::app_version());
 
     #[cfg(not(windows))]
     {

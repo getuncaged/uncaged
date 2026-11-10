@@ -941,7 +941,7 @@ impl FeatureFlag {
                 Some("Enables rendering and interaction support for markdown tables in notebooks.")
             }
             SettingsFile => Some(
-                "Enables configuring Warp via a user-editable `settings.toml` file, with hot reload and error reporting for invalid values.",
+                "Enables configuring Uncaged via a user-editable `settings.toml` file, with hot reload and error reporting for invalid values.",
             ),
             GitOperationsInCodeReview => Some(
                 "Enables commit, push, and create-PR actions directly from the code review panel.",

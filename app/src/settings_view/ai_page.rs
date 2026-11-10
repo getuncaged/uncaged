@@ -6489,7 +6489,7 @@ impl SettingsWidget for CloudHandoffWidget {
                 );
                 column.add_child(auto_handoff_on_sleep_row);
                 column.add_child(render_ai_setting_description(
-                    "When macOS is about to sleep, automatically moves the most recently focused running local Warp Agent conversation to Cloud Mode so it can keep working.",
+                    "When macOS is about to sleep, automatically moves the most recently focused running local agent conversation to Cloud Mode so it can keep working.",
                     true,
                     app,
                 ));

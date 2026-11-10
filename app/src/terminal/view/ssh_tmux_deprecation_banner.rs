@@ -24,7 +24,8 @@ use crate::Appearance;
 
 const BANNER_TITLE: &str = "Tmux SSH warpification has been deprecated";
 
-const BANNER_BODY: &str = "Warp now connects to remote sessions using the SSH extension, which is \
+const BANNER_BODY: &str =
+    "Uncaged now connects to remote sessions using the SSH extension, which is \
     more robust than the tmux-based flow. The tmux option has been removed.";
 
 const LEARN_MORE_LABEL: &str = "Learn more";

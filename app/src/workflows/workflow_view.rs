@@ -147,7 +147,7 @@ const BUTTON_HEIGHT: f32 = 32.;
 
 const ALIAS_HELP_TEXT: &str = "Aliases allow you to create short strings to execute workflows. Each alias can have different argument values and environment variables, and aliases are personal to you.";
 
-const RUN_ON_DESKTOP_BUTTON_TEXT: &str = "Run in Warp";
+const RUN_ON_DESKTOP_BUTTON_TEXT: &str = "Run in Uncaged";
 const RUN_ON_DESKTOP_BUTTON_WIDTH: f32 = 108.;
 
 const UNSAVED_CHANGES_TEXT: &str = "You have unsaved changes.";

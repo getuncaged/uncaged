@@ -113,10 +113,7 @@ impl fmt::Display for DriveObjectType {
     schemars::JsonSchema,
     settings_value::SettingsValue,
 )]
-#[schemars(
-    description = "Sort order for Warp Drive items.",
-    rename_all = "snake_case"
-)]
+#[schemars(description = "Sort order for Drive items.", rename_all = "snake_case")]
 pub enum DriveSortOrder {
     /// Sort by newest revision first in main index, most recently trashed in trash index
     #[default]

@@ -639,7 +639,7 @@ impl AIDocumentView {
                 let appearance = Appearance::as_ref(app);
                 let ui_builder = appearance.ui_builder().clone();
                 let tooltip = ui_builder
-                    .tool_tip("Save and auto-sync this plan to your Warp Drive".to_string())
+                    .tool_tip("Save and auto-sync this plan to your Drive".to_string())
                     .build()
                     .finish();
                 let sync_button_mouse_state = self.sync_button_mouse_state.clone();
@@ -667,7 +667,7 @@ impl AIDocumentView {
                 let color = theme.nonactive_ui_detail().into_solid();
                 let ui_builder = appearance.ui_builder().clone();
                 let tooltip_text =
-                    "This plan is synced to your Warp Drive and will auto save any edits you make."
+                    "This plan is synced to your Drive and will auto save any edits you make."
                         .to_string();
                 let synced_status_mouse_state = self.synced_status_mouse_state.clone();
                 Container::new(
@@ -1235,13 +1235,13 @@ impl BackingView for AIDocumentView {
     ) -> Vec<MenuItem<Self::PaneHeaderOverflowMenuAction>> {
         let mut menu_items = vec![];
 
-        // Only show "Show in Warp Drive" when the document was synced to Warp Drive
+        // Only show "Show in Drive" when the document was synced to Drive
         if AIDocumentModel::as_ref(ctx)
             .get_document_warp_drive_object_link(&self.document_id, ctx)
             .is_some()
         {
             menu_items.push(
-                MenuItemFields::new("Show in Warp Drive")
+                MenuItemFields::new("Show in Drive")
                     .with_on_select_action(AIDocumentAction::ShowInWarpDrive)
                     .with_icon(Icon::WarpDrive)
                     .into_item(),
