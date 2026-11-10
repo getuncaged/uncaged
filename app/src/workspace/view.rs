@@ -15421,9 +15421,9 @@ impl Workspace {
             let (glow_fill, glow_border, glow_shadow): (ElementFill, ElementFill, ColorU) =
                 match group_color {
                     Some(color) => (
-                        coloru_with_opacity(color, 8).into(),
-                        coloru_with_opacity(color, 40).into(),
-                        coloru_with_opacity(color, 22),
+                        coloru_with_opacity(color, 4).into(),
+                        coloru_with_opacity(color, 35).into(),
+                        coloru_with_opacity(color, 10),
                     ),
                     None => (
                         internal_colors::fg_overlay_1(theme).into(),
@@ -15438,7 +15438,7 @@ impl Workspace {
                 .with_drop_shadow(DropShadow {
                     color: glow_shadow,
                     offset: Vector2F::zero(),
-                    blur_radius: 8.,
+                    blur_radius: 6.,
                     spread_radius: 0.,
                 })
                 .with_padding_right(TAB_HORIZONTAL_INSET)
@@ -15606,11 +15606,11 @@ impl Workspace {
             let bg: ElementFill = match group_color {
                 Some(color) => {
                     let opacity = if header_selected {
-                        55
+                        45
                     } else if hovered {
-                        42
+                        34
                     } else {
-                        30
+                        24
                     };
                     coloru_with_opacity(color, opacity).into()
                 }

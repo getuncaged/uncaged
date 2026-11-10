@@ -1469,6 +1469,16 @@ impl<'a> TabComponent<'a> {
                         }
                     }
                 }
+            } else if self.grouped_member && !is_in_multi_tab_selection {
+                // Inside a group's glow every member keeps a faint pill of its own so
+                // each tab reads as a tab, with the active one a clear step above.
+                if is_active {
+                    internal_colors::fg_overlay_3(theme).into()
+                } else if is_hovered {
+                    internal_colors::fg_overlay_2(theme).into()
+                } else {
+                    internal_colors::fg_overlay_1(theme).into()
+                }
             } else if is_active {
                 internal_colors::fg_overlay_2(theme).into()
             } else if is_in_multi_tab_selection && is_hovered {
