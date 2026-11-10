@@ -23,7 +23,9 @@ use crate::persistence::ModelEvent;
 #[cfg(feature = "local_tty")]
 use crate::terminal::available_shells::AvailableShell;
 #[cfg(feature = "local_tty")]
-use crate::terminal::local_tty::docker_sandbox::resolve_sbx_path_from_user_shell;
+use crate::terminal::local_tty::docker_sandbox::{
+    resolve_sbx_path_from_user_shell, SBX_NOT_FOUND_MESSAGE,
+};
 #[cfg(feature = "local_tty")]
 use crate::terminal::local_tty::{
     create_terminal_view_surface, TerminalManager as LocalTtyTerminalManager,
@@ -132,6 +134,7 @@ impl TerminalView {
             ctx.spawn(sbx_future, move |me, sbx_path, ctx| {
                 let Some(sbx_path) = sbx_path else {
                     log::error!("sbx binary not found; cannot create Docker sandbox");
+                    me.show_error_toast(SBX_NOT_FOUND_MESSAGE.to_owned(), ctx);
                     return;
                 };
                 me.create_and_push_docker_sandbox_with_sbx(sbx_path, ctx);

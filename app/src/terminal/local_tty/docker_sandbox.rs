@@ -60,6 +60,11 @@ pub fn resolve_sbx_path() -> Option<PathBuf> {
     resolve_executable("sbx").map(|p| p.into_owned())
 }
 
+/// Shown when a Docker sandbox can't start because `sbx` isn't installed.
+#[cfg(feature = "local_tty")]
+pub(crate) const SBX_NOT_FOUND_MESSAGE: &str =
+    "Couldn't start a Docker sandbox: the `sbx` command wasn't found on your PATH. Install Docker's `sbx` tool and try again.";
+
 /// Resolves `sbx` using the PATH captured from the user's interactive login
 /// shell, matching how MCP servers and LSP find binaries.
 ///

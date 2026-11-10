@@ -289,7 +289,9 @@ use crate::terminal::input::{Input, MenuPositioning};
 use crate::terminal::keys_settings::KeysSettings;
 use crate::terminal::ligature_settings::should_use_ligature_rendering;
 #[cfg(feature = "local_tty")]
-use crate::terminal::local_tty::docker_sandbox::resolve_sbx_path_from_user_shell;
+use crate::terminal::local_tty::docker_sandbox::{
+    resolve_sbx_path_from_user_shell, SBX_NOT_FOUND_MESSAGE,
+};
 use crate::terminal::model::blockgrid::BlockGrid;
 #[cfg(feature = "local_fs")]
 use crate::terminal::model::session::Session;
@@ -10184,6 +10186,12 @@ impl Workspace {
             ctx.spawn(sbx_future, move |me, sbx_path, ctx| {
                 let Some(sbx_path) = sbx_path else {
                     log::error!("sbx binary not found; cannot create Docker sandbox");
+                    me.toast_stack.update(ctx, |toast_stack, ctx| {
+                        toast_stack.add_ephemeral_toast(
+                            DismissibleToast::error(SBX_NOT_FOUND_MESSAGE.to_owned()),
+                            ctx,
+                        );
+                    });
                     return;
                 };
                 let shell = AvailableShell::new_docker_sandbox_shell(
