@@ -6222,9 +6222,7 @@ impl PaneGroup {
             terminal_view.update(ctx, |terminal_view, terminal_view_ctx| {
                 terminal_view.enter_agent_view_for_new_conversation(
                     None,
-                    // TODO(zachbai): This is just a placeholder origin - I'm not even sure
-                    // if this is called in live codepaths beyond the create-environment deep
-                    // link flow.
+                    // TODO(zachbai): This is just a placeholder origin.
                     AgentViewEntryOrigin::Input {
                         was_prompt_autodetected: false,
                         was_mode_explicitly_chosen: false,

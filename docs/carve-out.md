@@ -95,7 +95,10 @@ web app and the dogfood debug-conversation loader, wasm web-intent parsing, the 
 auth-secret picker, and enterprise secret levels are gone. User-visible text says Uncaged and
 Drive, the X-Warp-Error-Code handling is gone, and `flake.nix` builds `uncaged` (not yet
 evaluated with Nix). `RequestParams.api_keys`/`custom_model_providers` had already gone; only
-the generated proto fields remain, always `None`.
+the generated proto fields remain, always `None`. `/init` no longer ends with the "create an
+environment … to run cloud agents" step (it finishes after the AGENTS.md step), and the
+`/create-environment` request, its `create_environment_slash_command` feature and flag, and the
+`CreateEnvironment` agent input are gone; the proto message stays in the generated wire types.
 
 Still open:
 - Dead-code warnings are at zero (`cargo check -p uncaged --bin uncaged`, with and without
@@ -104,10 +107,6 @@ Still open:
   it (`entry_for_task`, the `Task*` display statuses, the agent management view's task paths),
   and the remote-host catalog in `BundledSkills`. Removing them is behaviour-neutral but a larger
   refactor.
-- `/init` still ends with a "create an environment for this project so you can run cloud
-  agents in it" step (`init_project`, always Ready), and the `/create-environment` slash
-  command (default feature `create_environment_slash_command`) sets up Warp's cloud
-  environments; neither can do anything without Warp's server.
 - The Linux secure-storage key seed string that names `releases.warp.dev` must stay (changing
   it would make stored secrets unreadable).
 

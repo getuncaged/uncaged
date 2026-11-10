@@ -64,14 +64,6 @@ pub enum LanguageServersResult {
     Skipped,
 }
 
-/// Result of the create environment step
-pub enum CreateEnvironmentResult {
-    /// Environment was created
-    Created,
-    /// User skipped environment creation
-    Skipped,
-}
-
 /// Result of a completed /init step
 pub enum InitActionResult {
     /// Welcome step completed (always auto-completes)
@@ -79,7 +71,6 @@ pub enum InitActionResult {
     CodebaseContext(CodebaseIndexingResult),
     ProjectScopedRules(ProjectScopedRulesResult),
     LanguageServers(LanguageServersResult),
-    CreateEnvironment(CreateEnvironmentResult),
 }
 
 pub enum ProjectScopedRulesResult {
@@ -142,14 +133,6 @@ pub enum InitProjectBlockAction {
     RegenerateRules,
     SkipRules,
     ViewCodebaseContextStatus,
-    StartCreateEnvironment,
-    SkipCreateEnvironment,
-}
-
-#[derive(Default)]
-struct CreateEnvironmentMouseStateHandles {
-    create_button: MouseStateHandle,
-    skip_button: MouseStateHandle,
 }
 
 enum StepState {
@@ -169,10 +152,6 @@ enum StepState {
     },
     ProjectRules {
         mouse_states: ProjectRulesMouseStateHandles,
-        keyboard_nav_buttons: Option<ViewHandle<KeyboardNavigableButtons>>,
-    },
-    CreateEnvironment {
-        mouse_states: CreateEnvironmentMouseStateHandles,
         keyboard_nav_buttons: Option<ViewHandle<KeyboardNavigableButtons>>,
     },
 }
@@ -247,10 +226,6 @@ impl InitStepBlock {
                 mouse_states: ProjectRulesMouseStateHandles::default(),
                 keyboard_nav_buttons: None,
             },
-            InitStepKind::CreateEnvironment => StepState::CreateEnvironment {
-                mouse_states: CreateEnvironmentMouseStateHandles::default(),
-                keyboard_nav_buttons: None,
-            },
         };
 
         let mut new_block = Self { model, state };
@@ -309,17 +284,6 @@ impl InitStepBlock {
                 *keyboard_nav_buttons =
                     Some(ctx.add_typed_action_view(|_| KeyboardNavigableButtons::new(buttons)));
             }
-            (
-                InitStepStatus::Ready(InitStepData::CreateEnvironment),
-                StepState::CreateEnvironment {
-                    mouse_states,
-                    keyboard_nav_buttons,
-                },
-            ) => {
-                let buttons = Self::create_environment_buttons(mouse_states);
-                *keyboard_nav_buttons =
-                    Some(ctx.add_typed_action_view(|_| KeyboardNavigableButtons::new(buttons)));
-            }
             _ => {}
         }
     }
@@ -335,10 +299,6 @@ impl InitStepBlock {
                 ..
             }
             | StepState::ProjectRules {
-                keyboard_nav_buttons: Some(buttons),
-                ..
-            }
-            | StepState::CreateEnvironment {
                 keyboard_nav_buttons: Some(buttons),
                 ..
             } => ctx.focus(buttons),
@@ -358,7 +318,6 @@ impl InitStepBlock {
                 InitStepKind::LanguageServers
             }
             StepState::ProjectRules { .. } => InitStepKind::ProjectScopedRules,
-            StepState::CreateEnvironment { .. } => InitStepKind::CreateEnvironment,
         }
     }
 
@@ -446,25 +405,6 @@ impl InitStepBlock {
         ));
 
         buttons
-    }
-
-    fn create_environment_buttons(
-        mouse_states: &CreateEnvironmentMouseStateHandles,
-    ) -> Vec<KeyboardNavigableButtonBuilder> {
-        vec![
-            simple_navigation_button(
-                "Create an environment".to_string(),
-                mouse_states.create_button.clone(),
-                InitProjectBlockAction::StartCreateEnvironment,
-                false,
-            ),
-            simple_navigation_button(
-                "Skip for now".to_string(),
-                mouse_states.skip_button.clone(),
-                InitProjectBlockAction::SkipCreateEnvironment,
-                false,
-            ),
-        ]
     }
 
     /// Renders a "ready" state block with keyboard-navigable buttons and a header prompt.
@@ -838,65 +778,6 @@ impl InitStepBlock {
         }
     }
 
-    fn render_create_environment(&self, app: &AppContext) -> Box<dyn Element> {
-        let step = self
-            .model
-            .as_ref(app)
-            .get_step(InitStepKind::CreateEnvironment);
-
-        let Some(step) = step else {
-            return Empty::new().finish();
-        };
-
-        match &step.status {
-            InitStepStatus::Pending => Empty::new().finish(),
-            InitStepStatus::Ready(_) => {
-                let StepState::CreateEnvironment {
-                    keyboard_nav_buttons: Some(action_view),
-                    ..
-                } = &self.state
-                else {
-                    return Empty::new().finish();
-                };
-                Self::render_ready_with_buttons(
-                    action_view,
-                    "Would you like to create an environment for this project so you can run cloud agents in it? The agent will guide you through choosing GitHub repos, configuring a Docker image, and specifying startup commands.",
-                    app,
-                )
-            }
-            InitStepStatus::Running => {
-                let appearance = Appearance::as_ref(app);
-                RenderableAction::new("Creating environment...", app)
-                    .with_icon(in_progress_icon(appearance).finish())
-                    .with_content_item_spacing()
-                    .render(app)
-                    .finish()
-            }
-            InitStepStatus::Completed(result) => {
-                self.render_completed_create_environment(result, app)
-            }
-        }
-    }
-
-    fn render_completed_create_environment(
-        &self,
-        result: &InitActionResult,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        let InitActionResult::CreateEnvironment(env_result) = result else {
-            return Empty::new().finish();
-        };
-
-        match env_result {
-            CreateEnvironmentResult::Created => {
-                Self::render_success_completion("Environment created", app)
-            }
-            CreateEnvironmentResult::Skipped => {
-                Self::render_skipped_completion("Environment creation skipped", app)
-            }
-        }
-    }
-
     fn render_completed_project_rules(
         &self,
         result: &InitActionResult,
@@ -1020,7 +901,6 @@ impl View for InitStepBlock {
             InitStepKind::CodebaseContext => self.render_codebase_context(app),
             InitStepKind::LanguageServers => self.render_language_servers(app),
             InitStepKind::ProjectScopedRules => self.render_project_rules(app),
-            InitStepKind::CreateEnvironment => self.render_create_environment(app),
         }
     }
 }
@@ -1179,21 +1059,6 @@ impl TypedActionView for InitStepBlock {
             InitProjectBlockAction::ViewCodebaseContextStatus => {
                 self.model.update(ctx, |_, ctx| {
                     ctx.emit(InitProjectModelEvent::ViewCodebaseContextStatus);
-                });
-            }
-            InitProjectBlockAction::StartCreateEnvironment => {
-                self.model.update(ctx, |model, ctx| {
-                    model.mark_step_running(InitStepKind::CreateEnvironment, ctx);
-                    ctx.emit(InitProjectModelEvent::CreateEnvironment);
-                });
-            }
-            InitProjectBlockAction::SkipCreateEnvironment => {
-                self.model.update(ctx, |model, ctx| {
-                    model.mark_step_completed(
-                        InitStepKind::CreateEnvironment,
-                        InitActionResult::CreateEnvironment(CreateEnvironmentResult::Skipped),
-                        ctx,
-                    );
                 });
             }
         }

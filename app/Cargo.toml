@@ -464,7 +464,6 @@ default = [
     "integration_command",
     "artifact_command",
     "conversation_api",
-    "create_environment_slash_command",
     "code_review_find",
     "mcp_grouped_server_context",
     "fork_from_command",
@@ -739,7 +738,6 @@ auto_open_code_review_pane = []
 inline_code_review = []
 integration_command = []
 artifact_command = []
-create_environment_slash_command = []
 summarize_conversation_command = []
 mcp_grouped_server_context = []
 web_search_ui = []
