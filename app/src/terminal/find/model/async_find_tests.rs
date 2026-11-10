@@ -15,6 +15,7 @@ use crate::terminal::find::model::block_list::run_find_on_block_list;
 use crate::terminal::find::model::{FindOptions, TerminalFindModel};
 use crate::terminal::find::{BlockListMatch, RichContentMatchId};
 use crate::terminal::model::blocks::TotalIndex;
+use crate::terminal::model::find::{FindConfig, RegexDFAs};
 use crate::terminal::model::grid::grid_handler::AbsolutePoint;
 use crate::terminal::model::index::Point;
 use crate::terminal::model::terminal_model::{BlockIndex, BlockSortDirection};
@@ -945,4 +946,119 @@ fn test_focused_match_index_walks_across_terminal_and_ai_blocks() {
         .expect("Index 1 should resolve to terminal match.");
     assert_eq!(focused_terminal.block_index, BlockIndex(0));
     assert_eq!(focused_terminal.grid_type, GridType::Output);
+}
+
+/// Runs `item` the way the background task does and merges its results the way
+/// `AsyncFindController::process_message` does.
+fn run_and_merge_work_item(
+    item: super::work_queue::FindWorkItem,
+    terminal_model: &Arc<FairMutex<TerminalModel>>,
+    dfas: &RegexDFAs,
+    results: &mut BlockFindResults,
+) {
+    let (result_tx, result_rx) = async_channel::unbounded();
+    futures_lite::future::block_on(super::background_task::run_work_item(
+        item,
+        terminal_model,
+        dfas,
+        &result_tx,
+        BlockSortDirection::MostRecentLast,
+    ));
+    drop(result_tx);
+    while let Ok(message) = result_rx.try_recv() {
+        match message {
+            FindTaskMessage::BlockGridMatches {
+                block_index,
+                grid_type,
+                matches,
+            } => results
+                .terminal_matches
+                .entry((block_index, grid_type))
+                .or_default()
+                .extend(matches),
+            FindTaskMessage::DirtyRangeMatches {
+                block_index,
+                grid_type,
+                dirty_range,
+                matches,
+            } => results.update_dirty_matches(block_index, grid_type, dirty_range, matches),
+            FindTaskMessage::ScanAIBlock { .. } | FindTaskMessage::Done => {}
+        }
+    }
+}
+
+/// Searching while a command is still printing (`seq 1 3000000`, Cmd-F, `9`):
+/// a dirty range queued before more output scrolled lines out of the
+/// scrollback must still merge into the right place once it is scanned.
+#[test]
+fn test_dirty_range_queued_before_scrollback_truncation_merges_in_order() {
+    // The mock keeps 1000 rows of scrollback, so this block is already
+    // truncating its oldest lines.
+    let mut mock_terminal_model = TerminalModel::mock(None, None);
+    let initial_output = "x\r\n".repeat(1100);
+    mock_terminal_model.simulate_long_running_block("seq", initial_output.as_str());
+    let terminal_model = Arc::new(FairMutex::new(mock_terminal_model));
+    let block_index = terminal_model.lock().block_list().active_block_index();
+    let dfas = RegexDFAs::new_with_config(
+        "x",
+        FindConfig {
+            is_regex_enabled: false,
+            is_case_sensitive: false,
+        },
+    )
+    .unwrap();
+
+    // Find starts: the rows written so far are covered by the full scan.
+    let take_output_dirty_info = |model: &mut TerminalModel| {
+        let grid = model
+            .block_list_mut()
+            .active_block_mut()
+            .grid_of_type_mut(GridType::Output)
+            .unwrap();
+        let dirty = grid.grid_handler_mut().take_find_dirty_rows_range()?;
+        Some((dirty, GridType::Output))
+    };
+    take_output_dirty_info(&mut terminal_model.lock());
+
+    // More output arrives and its dirty range is queued...
+    let queue = super::work_queue::FindWorkQueue::new();
+    {
+        let mut model = terminal_model.lock();
+        model.process_bytes("x\r\n".repeat(5).as_str());
+        queue.invalidate_block(block_index, take_output_dirty_info(&mut model));
+    }
+    let (dirty_item, _) = futures_lite::future::block_on(queue.pop()).unwrap();
+
+    // ...but before it is scanned, enough output streams in to scroll another
+    // 300 lines out of the scrollback, and the full scan (which chases the end
+    // of the growing block) covers all of it.
+    terminal_model
+        .lock()
+        .process_bytes(format!("{}x", "x\r\n".repeat(300)).as_str());
+    let mut results = BlockFindResults::default();
+    run_and_merge_work_item(
+        super::work_queue::FindWorkItem::FullBlock { block_index },
+        &terminal_model,
+        &dfas,
+        &mut results,
+    );
+    let full_scan = results
+        .terminal_matches
+        .get(&(block_index, GridType::Output))
+        .cloned()
+        .unwrap();
+    assert!(full_scan.windows(2).all(|w| w[0] < w[1]));
+
+    // Rescanning the queued dirty rows must leave the (already complete)
+    // results unchanged.
+    run_and_merge_work_item(dirty_item, &terminal_model, &dfas, &mut results);
+    let merged = results
+        .terminal_matches
+        .get(&(block_index, GridType::Output))
+        .unwrap();
+    assert!(
+        merged.windows(2).all(|w| w[0] < w[1]),
+        "matches must stay in strictly ascending order"
+    );
+    assert_eq!(merged, &full_scan);
 }

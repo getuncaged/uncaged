@@ -26,8 +26,9 @@ pub enum FindWorkItem {
     DirtyRange {
         block_index: BlockIndex,
         grid_type: GridType,
-        row_range: RangeInclusive<usize>,
-        num_lines_truncated: u64,
+        /// Absolute rows (see `AbsolutePoint`), so the range still names the
+        /// same lines if scrollback truncates more of them before the scan runs.
+        row_range: RangeInclusive<u64>,
     },
     /// Request scanning of an AI block on the main thread.
     AIBlock {
@@ -105,7 +106,7 @@ impl FindWorkQueue {
     pub fn invalidate_block(
         &self,
         block_index: BlockIndex,
-        dirty_range: Option<(RangeInclusive<usize>, GridType, u64)>,
+        dirty_range: Option<(RangeInclusive<u64>, GridType)>,
     ) {
         let mut inner = self.inner.lock().unwrap();
 
@@ -119,11 +120,10 @@ impl FindWorkQueue {
 
         // Enqueue the appropriate item at the front (high priority).
         let item = match dirty_range {
-            Some((row_range, grid_type, num_lines_truncated)) => FindWorkItem::DirtyRange {
+            Some((row_range, grid_type)) => FindWorkItem::DirtyRange {
                 block_index,
                 grid_type,
                 row_range,
-                num_lines_truncated,
             },
             None => FindWorkItem::FullBlock { block_index },
         };

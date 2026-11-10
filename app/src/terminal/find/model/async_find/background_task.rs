@@ -27,7 +27,7 @@ use crate::terminal::model::TerminalModel;
 const MAX_LOCK_DURATION_MS: u64 = 5;
 
 /// Number of rows to scan per chunk within a terminal block.
-const ROWS_PER_CHUNK: usize = 1000;
+const ROWS_PER_CHUNK: u64 = 1000;
 
 /// Spawns a background find task that pulls work from the given queue.
 ///
@@ -70,56 +70,71 @@ async fn run_find_task_loop(
     };
 
     while let Ok((item, queue_drained)) = queue.pop().await {
-        match item {
-            FindWorkItem::FullBlock { block_index } => {
-                scan_terminal_block_chunked(
-                    block_index,
-                    &terminal_model,
-                    &dfas,
-                    &result_tx,
-                    config.block_sort_direction,
-                )
-                .await;
-            }
-            FindWorkItem::DirtyRange {
-                block_index,
-                grid_type,
-                row_range,
-                num_lines_truncated,
-            } => {
-                scan_grid_chunked(
-                    block_index,
-                    grid_type,
-                    *row_range.start(),
-                    Some(*row_range.end() + 1),
-                    ScanResultMode::DirtyRange {
-                        num_lines_truncated,
-                    },
-                    &terminal_model,
-                    &dfas,
-                    &result_tx,
-                )
-                .await;
-            }
-            FindWorkItem::AIBlock {
-                view_id,
-                total_index,
-            } => {
-                // Forward to main thread for execution.
-                let _ = result_tx
-                    .send(FindTaskMessage::ScanAIBlock {
-                        view_id,
-                        total_index,
-                    })
-                    .await;
-            }
-        }
+        run_work_item(
+            item,
+            &terminal_model,
+            &dfas,
+            &result_tx,
+            config.block_sort_direction,
+        )
+        .await;
 
         // The emptiness flag is checked atomically with the pop inside
         // the queue lock, avoiding the TOCTOU race of a separate
         // `is_empty()` call.
         if queue_drained {
             let _ = result_tx.send(FindTaskMessage::Done).await;
+        }
+    }
+}
+
+/// Runs one work item, streaming its results back to the main thread.
+pub(super) async fn run_work_item(
+    item: FindWorkItem,
+    terminal_model: &Arc<FairMutex<TerminalModel>>,
+    dfas: &RegexDFAs,
+    result_tx: &async_channel::Sender<FindTaskMessage>,
+    block_sort_direction: crate::terminal::model::terminal_model::BlockSortDirection,
+) {
+    match item {
+        FindWorkItem::FullBlock { block_index } => {
+            scan_terminal_block_chunked(
+                block_index,
+                terminal_model,
+                dfas,
+                result_tx,
+                block_sort_direction,
+            )
+            .await;
+        }
+        FindWorkItem::DirtyRange {
+            block_index,
+            grid_type,
+            row_range,
+        } => {
+            scan_grid_chunked(
+                block_index,
+                grid_type,
+                *row_range.start(),
+                Some(*row_range.end() + 1),
+                ScanResultMode::DirtyRange,
+                terminal_model,
+                dfas,
+                result_tx,
+            )
+            .await;
+        }
+        FindWorkItem::AIBlock {
+            view_id,
+            total_index,
+        } => {
+            // Forward to main thread for execution.
+            let _ = result_tx
+                .send(FindTaskMessage::ScanAIBlock {
+                    view_id,
+                    total_index,
+                })
+                .await;
         }
     }
 }
@@ -162,11 +177,10 @@ enum ScanResultMode {
     /// Send [`FindTaskMessage::BlockGridMatches`] per chunk. Empty chunks are
     /// skipped (no message sent).
     FullBlock,
-    /// Send [`FindTaskMessage::DirtyRangeMatches`] per chunk, converting the
-    /// scanned row range to absolute coordinates using the provided truncation
-    /// offset. Messages are always sent, even for empty chunks, so that old
-    /// matches in the sub-range are cleared.
-    DirtyRange { num_lines_truncated: u64 },
+    /// Send [`FindTaskMessage::DirtyRangeMatches`] per chunk, labelled with the
+    /// absolute rows the chunk scanned. Messages are always sent, even for empty
+    /// chunks, so that old matches in the sub-range are cleared.
+    DirtyRange,
 }
 
 /// Scans a range of rows within a single grid in chunks, releasing the
@@ -176,17 +190,23 @@ enum ScanResultMode {
 /// function; the [`ScanResultMode`] determines the message type sent per
 /// chunk.
 ///
+/// Rows are absolute (see `AbsolutePoint`) and converted to grid rows under the
+/// lock for each chunk. Output that keeps streaming can scroll lines out of the
+/// scrollback between chunks, or between queueing a dirty range and scanning it;
+/// converting per chunk keeps each chunk, and the row range it reports, on the
+/// lines it was meant to cover. Rows already truncated are skipped.
+///
 /// # Arguments
-/// * `start_row` — First row to scan (inclusive).
-/// * `end_row` — Upper bound on rows to scan (exclusive). `None` scans to
-///   the end of the grid.
+/// * `start_row` — First absolute row to scan (inclusive).
+/// * `end_row` — Upper bound on absolute rows to scan (exclusive). `None` scans
+///   to the end of the grid.
 /// * `mode` — Determines the message type sent per chunk.
 #[allow(clippy::too_many_arguments)]
 async fn scan_grid_chunked(
     block_index: BlockIndex,
     grid_type: GridType,
-    start_row: usize,
-    end_row: Option<usize>,
+    start_row: u64,
+    end_row: Option<u64>,
     mode: ScanResultMode,
     terminal_model: &Arc<FairMutex<TerminalModel>>,
     dfas: &RegexDFAs,
@@ -211,26 +231,33 @@ async fn scan_grid_chunked(
             };
 
             let grid_handler = grid.grid_handler();
-            let total_rows = grid_handler.total_rows();
+            let num_lines_truncated = grid_handler.num_lines_truncated();
+            let total_rows = grid_handler.total_rows() as u64 + num_lines_truncated;
             let effective_end = end_row.unwrap_or(total_rows).min(total_rows);
+            let chunk_start = current_row.max(num_lines_truncated);
 
-            if current_row >= effective_end {
+            if chunk_start >= effective_end {
                 return;
             }
 
-            let chunk_end = (current_row + ROWS_PER_CHUNK).min(effective_end);
+            let chunk_end = (chunk_start + ROWS_PER_CHUNK).min(effective_end);
 
-            let point_matches = scan_grid_range(grid_handler, dfas, current_row, chunk_end);
+            let point_matches = scan_grid_range(
+                grid_handler,
+                dfas,
+                (chunk_start - num_lines_truncated) as usize,
+                (chunk_end - num_lines_truncated) as usize,
+            );
             let matches: Vec<AbsoluteMatch> = point_matches
                 .iter()
                 .map(|range| AbsoluteMatch::from_range(range, grid_handler))
                 .collect();
 
             let elapsed = lock_start.elapsed();
-            (matches, chunk_end, effective_end, elapsed)
+            (matches, chunk_start, chunk_end, effective_end, elapsed)
         };
 
-        let (mut matches, chunk_end, effective_end, elapsed) = chunk_result;
+        let (mut matches, chunk_start, chunk_end, effective_end, elapsed) = chunk_result;
 
         // find_in_range returns matches in descending order; reverse to ascending.
         matches.reverse();
@@ -248,16 +275,12 @@ async fn scan_grid_chunked(
                         .await;
                 }
             }
-            ScanResultMode::DirtyRange {
-                num_lines_truncated,
-            } => {
-                let absolute_start = current_row as u64 + num_lines_truncated;
-                let absolute_end = (chunk_end - 1) as u64 + num_lines_truncated;
+            ScanResultMode::DirtyRange => {
                 let _ = result_tx
                     .send(FindTaskMessage::DirtyRangeMatches {
                         block_index,
                         grid_type,
-                        dirty_range: absolute_start..=absolute_end,
+                        dirty_range: chunk_start..=chunk_end - 1,
                         matches,
                     })
                     .await;
