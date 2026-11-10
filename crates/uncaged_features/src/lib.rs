@@ -602,8 +602,6 @@ pub const LOCAL_FLAGS: &[FeatureFlag] = &[FeatureFlag::LocalClaudeCodexChildHarn
 /// time, these will move on to PREVIEW_FLAGS before being launched.
 pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::ToggleBootstrapBlock,
-    FeatureFlag::RemoveAutosuggestionDuringTabCompletions,
-    FeatureFlag::ResizeFix,
     FeatureFlag::AgentModeWorkflows,
     FeatureFlag::SshDragAndDrop,
     FeatureFlag::ImeMarkedText,

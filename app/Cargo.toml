@@ -544,6 +544,10 @@ default = [
     "editable_markdown_mermaid",
     "code_review_scroll_preservation",
     "context_line_review_comments",
+    # Cursor reflow fix on resize, and no ghost autosuggestion while the tab
+    # completion menu is open. Both have unit tests for the on path.
+    "resize_fix",
+    "remove_autosuggestion_during_tab_completions",
 ]
 # Enable this feature to automatically perform heap profiling.  NOTE: This will
 # substantially slow down program execution.
@@ -634,6 +638,7 @@ notebook_parameter = []
 personal_cloud_objects = []
 # Fix for cursor reflow bug during window resize, from Alacritty resizing logic.
 resize_fix = []
+remove_autosuggestion_during_tab_completions = []
 pluggable_notifications = []
 # This enables `read_files` to support images.
 read_image_files = []

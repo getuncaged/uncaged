@@ -41,6 +41,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::AgentMode,
         #[cfg(feature = "resize_fix")]
         FeatureFlag::ResizeFix,
+        #[cfg(feature = "remove_autosuggestion_during_tab_completions")]
+        FeatureFlag::RemoveAutosuggestionDuringTabCompletions,
         #[cfg(feature = "richtext_multiselect")]
         FeatureFlag::RichTextMultiselect,
         #[cfg(feature = "default_waterfall_mode")]
