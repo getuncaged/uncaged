@@ -1,16 +1,23 @@
 use std::ops::Range;
 
+#[cfg(target_family = "wasm")]
 use fuzzy_match::match_indices_case_insensitive;
+#[cfg(target_family = "wasm")]
 use itertools::Itertools;
-use uncaged_ui::{AppContext, ModelHandle};
+use uncaged_ui::AppContext;
+#[cfg(target_family = "wasm")]
+use uncaged_ui::ModelHandle;
 
 use crate::pane_group::PaneId;
 use crate::search::command_palette::navigation::render::CommandRenderInfo;
+#[cfg(target_family = "wasm")]
 use crate::search::command_palette::navigation::search_item::SearchItem;
 use crate::search::command_palette::navigation::DataSource;
 use crate::search::data_source::QueryResult;
 use crate::search::SyncDataSource;
-use crate::session_management::{CommandContext, SessionNavigationData, SessionSource};
+#[cfg(target_family = "wasm")]
+use crate::session_management::SessionSource;
+use crate::session_management::{CommandContext, SessionNavigationData};
 
 /// A session that was fuzzy matched against a search term.
 pub struct MatchedSession {
@@ -89,6 +96,7 @@ impl SessionHighlightIndices {
 }
 
 /// Returns an iterator of sessions that match `search_term`.
+#[cfg(target_family = "wasm")]
 pub fn filter_sessions<'a, 'b, I>(
     sessions_iter: I,
     search_term: &'b str,
@@ -208,10 +216,12 @@ pub trait SessionSearcher {
     fn active_session_id(&self, app: &AppContext) -> Option<PaneId>;
 }
 
+#[cfg(target_family = "wasm")]
 pub struct FuzzySessionSearcher {
     pub(crate) session_source_handle: ModelHandle<SessionSource>,
 }
 
+#[cfg(target_family = "wasm")]
 impl SessionSearcher for FuzzySessionSearcher {
     fn search(
         &self,

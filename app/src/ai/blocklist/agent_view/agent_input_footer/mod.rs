@@ -5,7 +5,6 @@ pub mod toolbar_item;
 use std::sync::Arc;
 
 use ai::document::{AIDocumentId, AIDocumentVersion};
-use chrono::{DateTime, Local};
 use parking_lot::FairMutex;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
@@ -16,15 +15,14 @@ use uncaged_core::ui::color::blend::Blend;
 use uncaged_core::ui::color::contrast::MinimumAllowedContrast;
 use uncaged_core::ui::color::ContrastingColor;
 use uncaged_core::ui::theme::color::internal_colors;
-use uncaged_core::ui::theme::{AnsiColorIdentifier, Fill};
+use uncaged_core::ui::theme::Fill;
 use uncaged_ui::elements::{
     Border, ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, CornerRadius,
-    CrossAxisAlignment, DispatchEventResult, Element, Empty, EventHandler, Expanded, Flex,
-    MainAxisAlignment, MainAxisSize, OffsetPositioning, ParentAnchor, ParentElement,
-    ParentOffsetBounds, PositionedElementAnchor, PositionedElementOffsetBounds, Radius, Shrinkable,
-    Stack, Text, Wrap, WrapFill, WrapFillEntireRun, DEFAULT_UI_LINE_HEIGHT_RATIO,
+    CrossAxisAlignment, DispatchEventResult, Element, EventHandler, Expanded, Flex,
+    MainAxisAlignment, MainAxisSize, OffsetPositioning, ParentElement, PositionedElementAnchor,
+    PositionedElementOffsetBounds, Radius, Shrinkable, Stack, Text, Wrap, WrapFill,
+    WrapFillEntireRun, DEFAULT_UI_LINE_HEIGHT_RATIO,
 };
-use uncaged_ui::r#async::{SpawnedFutureHandle, Timer};
 use uncaged_ui::ui_components::segmented_control::SegmentedControl;
 use uncaged_ui::{
     AppContext, Entity, EntityId, ModelHandle, SingletonEntity, TypedActionView, View, ViewContext,
@@ -115,15 +113,6 @@ pub struct AgentInputFooter {
 
     // Fast-forward (auto-approve) toggle button shown in the agent view footer.
     fast_forward_button: ViewHandle<ActionButton>,
-
-    /// Pending one-shot timer that refreshes the context-window button at the
-    /// prompt-cache expiry instant so the notification dot appears while idle.
-    prompt_cache_expiry_timer_handle: Option<SpawnedFutureHandle>,
-
-    /// Whether the active conversation's prompt cache has expired. Drives the
-    /// yellow notification dot on the context-window chip when the
-    /// `PromptCacheExpiryWarning` flag is enabled.
-    prompt_cache_expired: bool,
 
     ai_input_model: ModelHandle<BlocklistAIInputModel>,
 
@@ -456,8 +445,6 @@ impl AgentInputFooter {
                         ctx.dispatch_typed_action(AgentInputFooterAction::DismissFtuModelCallout);
                     })
             }),
-            prompt_cache_expiry_timer_handle: None,
-            prompt_cache_expired: false,
             ai_input_model,
             mode_toggle: None,
         };
@@ -813,58 +800,13 @@ impl AgentInputFooter {
             let usage = conversation.context_window_usage();
             let icon = icon_for_context_window_usage(usage);
             let remaining_pct = ((1.0 - usage) * 100.0).round() as i32;
+            let tooltip = format!("{remaining_pct}% context remaining");
 
-            let expiry = conversation.latest_exchange().and_then(|exchange| {
-                let output = exchange.output_status.output()?;
-                output.get().model_info.as_ref()?.prompt_cache_expires_at
-            });
-            let is_cache_expired = FeatureFlag::PromptCacheExpiryWarning.is_enabled()
-                && expiry.is_some_and(|expiry| expiry <= Local::now());
-            let context_remaining_tooltip = format!("{remaining_pct}% context remaining");
-            let tooltip = if is_cache_expired {
-                format!("{context_remaining_tooltip} · prompt cache expired")
-            } else {
-                context_remaining_tooltip
-            };
-
-            self.prompt_cache_expired = is_cache_expired;
             self.context_window_button.update(ctx, |button, ctx| {
                 button.set_icon(Some(icon), ctx);
                 button.set_tooltip(Some(tooltip), ctx);
             });
-
-            self.reschedule_prompt_cache_expiry_timer(expiry, ctx);
         }
-    }
-
-    /// Schedules a refresh of the context-window button at the prompt-cache
-    /// expiry instant so the notification dot appears while the conversation is idle.
-    fn reschedule_prompt_cache_expiry_timer(
-        &mut self,
-        expiry: Option<DateTime<Local>>,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if let Some(handle) = self.prompt_cache_expiry_timer_handle.take() {
-            handle.abort();
-        }
-        if !FeatureFlag::PromptCacheExpiryWarning.is_enabled() {
-            return;
-        }
-        // Only future expiries need a timer; past ones already render as expired.
-        let Some(delay) = expiry.and_then(|expiry| (expiry - Local::now()).to_std().ok()) else {
-            return;
-        };
-        let handle = ctx.spawn(
-            async move {
-                Timer::after(delay).await;
-            },
-            |me, _, ctx| {
-                me.prompt_cache_expiry_timer_handle = None;
-                me.update_context_window_button(ctx);
-                ctx.notify();
-            },
-        );
-        self.prompt_cache_expiry_timer_handle = Some(handle);
     }
 
     fn render_toolbar_item(
@@ -904,40 +846,7 @@ impl AgentInputFooter {
                     && BlocklistAIHistoryModel::as_ref(app)
                         .active_conversation(self.terminal_view_id)
                         .is_some();
-                has_conversation.then(|| {
-                    let chip = ChildView::new(&self.context_window_button).finish();
-                    if !self.prompt_cache_expired {
-                        return chip;
-                    }
-
-                    let appearance = Appearance::as_ref(app);
-                    let dot = Container::new(
-                        ConstrainedBox::new(Empty::new().finish())
-                            .with_width(6.)
-                            .with_height(6.)
-                            .finish(),
-                    )
-                    .with_corner_radius(CornerRadius::with_all(Radius::Percentage(50.)))
-                    .with_background(Fill::Solid(
-                        AnsiColorIdentifier::Yellow
-                            .to_ansi_color(&appearance.theme().terminal_colors().normal)
-                            .into(),
-                    ))
-                    .finish();
-
-                    let mut stack = Stack::new();
-                    stack.add_child(chip);
-                    stack.add_positioned_overlay_child(
-                        dot,
-                        OffsetPositioning::offset_from_parent(
-                            vec2f(3., -3.),
-                            ParentOffsetBounds::WindowByPosition,
-                            ParentAnchor::TopRight,
-                            ChildAnchor::TopRight,
-                        ),
-                    );
-                    stack.finish()
-                })
+                has_conversation.then(|| ChildView::new(&self.context_window_button).finish())
             }
             AgentToolbarItemKind::FastForwardToggle => FeatureFlag::FastForwardAutoexecuteButton
                 .is_enabled()

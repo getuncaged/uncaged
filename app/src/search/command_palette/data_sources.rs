@@ -276,12 +276,6 @@ impl DataSourceStore {
                 };
                 Some(QueryResult::from(search_item))
             }
-            ItemSummary::Project { path: _ } => {
-                // For project summaries, we would need a project data source to reconstruct the item,
-                // but this is typically handled by the welcome palette, not the command palette.
-                // For now, return None as projects aren't expected in the regular command palette.
-                None
-            }
             ItemSummary::Conversation { id } => conversations::DataSource::query_result(id, app),
 
             ItemSummary::NewConversation => {

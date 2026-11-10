@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
-use uncaged_ui::keymap::{BindingId, DescriptionContext};
+#[cfg(target_family = "wasm")]
+use fuzzy_match::match_indices_case_insensitive;
+use fuzzy_match::FuzzyMatchResult;
+use uncaged_ui::keymap::BindingId;
+#[cfg(target_family = "wasm")]
+use uncaged_ui::keymap::DescriptionContext;
 use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle};
 
 use crate::search::action::search_item::MatchedBinding;
@@ -21,11 +25,7 @@ pub struct CommandBindingDataSource {
 impl CommandBindingDataSource {
     #[cfg(not(target_family = "wasm"))]
     pub fn new(binding_source: ModelHandle<BindingSource>, ctx: &mut ModelContext<Self>) -> Self {
-        if uncaged_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
-            Self::new_full_text(binding_source, ctx)
-        } else {
-            Self::new_fuzzy(binding_source, ctx)
-        }
+        Self::new_full_text(binding_source, ctx)
     }
 
     #[cfg(target_family = "wasm")]
@@ -44,6 +44,7 @@ impl CommandBindingDataSource {
         Self { searcher }
     }
 
+    #[cfg(target_family = "wasm")]
     fn new_fuzzy(binding_source: ModelHandle<BindingSource>, ctx: &mut ModelContext<Self>) -> Self {
         ctx.observe(&binding_source, Self::on_binding_source_changed);
 
@@ -132,10 +133,12 @@ trait ActionSearcher {
     fn bindings_mut(&mut self) -> &mut HashMap<BindingId, Arc<CommandBinding>>;
 }
 
+#[cfg(target_family = "wasm")]
 struct FuzzyActionSearcher {
     all_bindings: HashMap<BindingId, Arc<CommandBinding>>,
 }
 
+#[cfg(target_family = "wasm")]
 impl ActionSearcher for FuzzyActionSearcher {
     fn search(&self, search_term: &str) -> anyhow::Result<Vec<QueryResult<SearcherAction>>> {
         Ok(self

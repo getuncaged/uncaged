@@ -89,3 +89,25 @@ fn predicates_serialize_compare_and_print_like_regexes() {
     assert!(lazy_pattern(&custom).compiled.get().is_some());
     assert_ne!(custom, predicate);
 }
+
+/// The profile editor no longer shows computer-use rows, but profiles saved
+/// with them must keep loading and keep their values on the next save.
+#[test]
+fn profiles_saved_with_computer_use_settings_still_load() {
+    let json = r#"{
+        "name": "Saved",
+        "computer_use": "AlwaysAllow",
+        "computer_use_model": "some-computer-use-model"
+    }"#;
+    let profile: AIExecutionProfile = serde_json::from_str(json).unwrap();
+    assert_eq!(profile.name, "Saved");
+    assert_eq!(profile.computer_use, ComputerUsePermission::AlwaysAllow);
+    assert_eq!(
+        profile.computer_use_model,
+        Some(LLMId::from("some-computer-use-model"))
+    );
+
+    let round_tripped: AIExecutionProfile =
+        serde_json::from_str(&serde_json::to_string(&profile).unwrap()).unwrap();
+    assert_eq!(round_tripped, profile);
+}

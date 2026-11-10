@@ -60,8 +60,8 @@ use crate::ai::llms::LLMPreferences;
 use crate::ai::skills::SkillDescriptor;
 use crate::notebooks::NotebookId;
 use crate::persistence::model::{
-    AgentConversationData, ContextWindowSegment, ConversationUsageMetadata, ModelTokenUsage,
-    PersistedAutoexecuteMode, ToolUsageMetadata,
+    AgentConversationData, ConversationUsageMetadata, ModelTokenUsage, PersistedAutoexecuteMode,
+    ToolUsageMetadata,
 };
 use crate::persistence::ModelEvent;
 use crate::server::ids::ServerId;
@@ -672,13 +672,6 @@ impl AIConversation {
 
     pub fn context_window_usage(&self) -> f32 {
         self.conversation_usage_metadata.context_window_usage
-    }
-
-    /// The per-segment breakdown of the context window (e.g. system prompt,
-    /// tool definitions, conversation history). Scaled so the segments sum to
-    /// `context_window_usage`. Empty when the server did not emit segments.
-    pub fn context_window_segments(&self) -> &[ContextWindowSegment] {
-        &self.conversation_usage_metadata.context_window_segments
     }
 
     /// Total credits spent in the conversation, including both LLM inference
@@ -2649,10 +2642,6 @@ impl AIConversation {
                             }
                         }
                         Some(api::message::Message::ModelUsed(model_used)) => {
-                            let prompt_cache_expires_at = model_used
-                                .prompt_cache_expires_at
-                                .as_ref()
-                                .map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos));
                             let exchange_id = self
                                 .added_exchanges_by_response
                                 .get(response_stream_id)
@@ -2666,7 +2655,6 @@ impl AIConversation {
                                     model_id: model_used.model_id.clone().into(),
                                     display_name: model_used.model_display_name.clone(),
                                     is_fallback: model_used.is_fallback,
-                                    prompt_cache_expires_at,
                                 });
                             }
                         }

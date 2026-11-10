@@ -167,53 +167,14 @@ fn upsert_ai_query_with_limit(
     })?)
 }
 
-/// Returns the most recent [`MAX_BLOCK_COUNT_PER_SESSION`] block list items for each session. The
-/// items are in chronological order.
-pub(super) fn get_all_restored_blocks(
-    conn: &mut SqliteConnection,
-) -> Result<PersistedBlocks, diesel::result::Error> {
-    let terminal_sessions = schema::terminal_panes::table
-        .select(model::TerminalSession::as_select())
-        .load::<model::TerminalSession>(conn)?;
-
-    let block_lists = Block::belonging_to(&terminal_sessions)
-        .select(Block::as_select())
-        .order_by(schema::blocks::columns::id.asc())
-        .load::<Block>(conn)?
-        .grouped_by(&terminal_sessions);
-
-    let mut all_block_items_by_pane = block_lists
-        .into_iter()
-        .zip(terminal_sessions)
-        .map(|(blocks, terminal_pane)| {
-            (
-                PaneUuid(terminal_pane.uuid),
-                blocks.into_iter().map(Into::into).collect(),
-            )
-        })
-        .collect::<HashMap<_, Vec<SerializedBlockListItem>>>();
-
-    for (_, blocks) in all_block_items_by_pane.iter_mut() {
-        blocks.sort_by_key(|item| item.start_ts());
-        // Only keep most recent command blocks
-        blocks.drain(
-            0..blocks
-                .len()
-                .saturating_sub(MAX_TERMINAL_BLOCKS_TO_PERSIST_PER_SESSION as usize),
-        );
-    }
-
-    Ok(all_block_items_by_pane)
-}
-
-/// Uncaged one-history: the turn_index-driven restore read.
+/// Uncaged one-history: the turn_index-driven restore read. Returns the most
+/// recent [`MAX_TERMINAL_BLOCKS_TO_PERSIST_PER_SESSION`] shell blocks per pane.
 ///
 /// Blocks are returned in `turn_index.seq` order per pane, with turns below the
 /// pane's Cmd-K watermark filtered out. Blocks without a turn row (written
-/// while the flag was off, or legacy) are appended after the indexed ones in
-/// rowid order so nothing is ever silently dropped. `get_all_restored_blocks`
-/// stays byte-identical as the kill-switch fallback.
-pub(super) fn get_all_restored_blocks_v2(
+/// before one-history, or legacy) are appended after the indexed ones in
+/// rowid order so nothing is ever silently dropped.
+pub(super) fn get_all_restored_blocks(
     conn: &mut SqliteConnection,
 ) -> Result<PersistedBlocks, diesel::result::Error> {
     use std::collections::HashMap as StdHashMap;
@@ -236,7 +197,7 @@ pub(super) fn get_all_restored_blocks_v2(
         ))
         .load(conn)?;
 
-    // q3: all blocks (same shape as v1), joined in memory by turn_id/block_id.
+    // q3: all blocks, joined in memory by turn_id/block_id.
     let terminal_sessions = schema::terminal_panes::table
         .select(model::TerminalSession::as_select())
         .load::<model::TerminalSession>(conn)?;
@@ -267,7 +228,7 @@ pub(super) fn get_all_restored_blocks_v2(
                 }
             }
         }
-        // Un-indexed leftovers (flag-off writes, legacy rows): keep them, in
+        // Un-indexed leftovers (pre-one-history writes, legacy rows): keep them, in
         // rowid order, after the indexed timeline -- but only when the pane was
         // never cleared, since a cleared pane's leftovers predate the clear.
         if !watermarks.contains_key(&pane_uuid) {
@@ -276,7 +237,7 @@ pub(super) fn get_all_restored_blocks_v2(
             ordered.extend(leftovers.into_iter().map(Into::into));
         }
 
-        // Same cap semantics as v1 (shell blocks only, most recent kept).
+        // Cap per pane (shell blocks only, most recent kept).
         let overflow = ordered
             .len()
             .saturating_sub(MAX_TERMINAL_BLOCKS_TO_PERSIST_PER_SESSION as usize);

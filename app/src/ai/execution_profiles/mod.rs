@@ -3,8 +3,6 @@ pub use cloud_object_models::{
     CloudAIExecutionProfileModel, ComputerUsePermission, RunAgentsPermission, WriteToPtyPermission,
     PROFILE_NAME_MAX_LENGTH,
 };
-use markdown_parser::{FormattedTextFragment, FormattedTextInline};
-use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{AppContext, SingletonEntity};
 
 use super::llms::{LLMContextWindow, LLMInfo, LLMPreferences, LLMProvider};
@@ -13,32 +11,13 @@ use crate::cloud_object::model::json_model::JsonModel;
 use crate::cloud_object::{
     GenericStringObjectFormat, GenericStringObjectUniqueKey, JsonObjectType, UniquePer,
 };
+#[cfg(not(feature = "agent_mode_evals"))]
 use crate::settings::AISettings;
-/// This threshold currently only applies to GPT 5.4 and GPT 5.5 models
-pub const LONG_CONTEXT_WARNING_THRESHOLD: u32 = 272_000;
-pub(crate) const LONG_CONTEXT_PRICING_WARNING_URL: &str =
-    "https://developers.openai.com/api/docs/pricing";
-pub(crate) fn long_context_pricing_warning_title() -> FormattedTextInline {
-    vec![
-        FormattedTextFragment::plain_text(
-            "OpenAI automatically applies long-context pricing when context exceeds 272,000 tokens. ",
-        ),
-        FormattedTextFragment::hyperlink("Learn more", LONG_CONTEXT_PRICING_WARNING_URL),
-    ]
-}
 
 pub mod editor;
 pub mod model_menu_items;
 pub mod profiles;
 
-/// Result of resolving the cloud agent computer use setting.
-/// Contains both the effective value and whether it's forced by organization policy.
-pub struct CloudAgentComputerUseState {
-    /// Whether computer use is enabled for cloud agents.
-    pub enabled: bool,
-    /// Whether this value is forced by organization settings (true = user cannot change it).
-    pub is_forced_by_org: bool,
-}
 fn effective_base_model<'a>(profile: &AIExecutionProfile, app: &'a AppContext) -> &'a LLMInfo {
     let prefs = LLMPreferences::as_ref(app);
     profile
@@ -46,22 +25,6 @@ fn effective_base_model<'a>(profile: &AIExecutionProfile, app: &'a AppContext) -
         .as_ref()
         .and_then(|id| prefs.get_llm_info(id))
         .unwrap_or_else(|| prefs.get_default_base_model())
-}
-
-/// Resolves the effective cloud agent computer use state from the user's local preference.
-pub fn resolve_cloud_agent_computer_use_state(ctx: &AppContext) -> CloudAgentComputerUseState {
-    if !FeatureFlag::AgentModeComputerUse.is_enabled() {
-        return CloudAgentComputerUseState {
-            enabled: false,
-            is_forced_by_org: false,
-        };
-    }
-
-    // Uncaged has no workspace, so no org setting forces computer use either way.
-    CloudAgentComputerUseState {
-        enabled: *AISettings::as_ref(ctx).cloud_agent_computer_use_enabled,
-        is_forced_by_org: false,
-    }
 }
 
 #[cfg(not(feature = "agent_mode_evals"))]
@@ -93,20 +56,12 @@ pub trait AIExecutionProfileAppExt {
 
     fn context_window_display_value(&self, app: &AppContext) -> Option<u32>;
     fn context_window_limit_for_request(&self, app: &AppContext) -> Option<u32>;
-    fn should_show_long_context_pricing_warning(
-        &self,
-        context_window_limit: Option<u32>,
-        app: &AppContext,
-    ) -> bool;
 }
 
 impl AIExecutionProfileAppExt for AIExecutionProfile {
     fn configurable_context_window(&self, app: &AppContext) -> Option<LLMContextWindow> {
         let llm = effective_base_model(self, app);
-        if has_configurable_context_window(
-            llm,
-            FeatureFlag::GPTConfigurableContextWindow.is_enabled(),
-        ) {
+        if has_configurable_context_window(llm) {
             Some(llm.context_window.clone())
         } else {
             None
@@ -119,54 +74,21 @@ impl AIExecutionProfileAppExt for AIExecutionProfile {
     }
     fn context_window_limit_for_request(&self, app: &AppContext) -> Option<u32> {
         let llm = effective_base_model(self, app);
-        if !has_configurable_context_window(
-            llm,
-            FeatureFlag::GPTConfigurableContextWindow.is_enabled(),
-        ) {
+        if !has_configurable_context_window(llm) {
             return None;
         }
 
         self.context_window_limit
             .map(|limit| limit.clamp(llm.context_window.min, llm.context_window.max))
     }
-
-    fn should_show_long_context_pricing_warning(
-        &self,
-        context_window_limit: Option<u32>,
-        app: &AppContext,
-    ) -> bool {
-        let llm = effective_base_model(self, app);
-        should_show_long_context_pricing_warning(
-            llm,
-            Some(
-                context_window_limit
-                    .or(self.context_window_limit)
-                    .unwrap_or(llm.context_window.default_max),
-            ),
-            FeatureFlag::GPTConfigurableContextWindow.is_enabled(),
-        )
-    }
 }
 
-pub(crate) fn has_configurable_context_window(
-    llm: &LLMInfo,
-    gpt_configurable_context_window_enabled: bool,
-) -> bool {
+/// OpenAI models keep their fixed context window; their expanded (long-context
+/// priced) windows are not offered.
+pub(crate) fn has_configurable_context_window(llm: &LLMInfo) -> bool {
     llm.context_window.is_configurable
         && llm.context_window.max > 0
-        && (llm.provider != LLMProvider::OpenAI || gpt_configurable_context_window_enabled)
-}
-
-pub(crate) fn should_show_long_context_pricing_warning(
-    llm: &LLMInfo,
-    selected_limit: Option<u32>,
-    gpt_configurable_context_window_enabled: bool,
-) -> bool {
-    llm.provider == LLMProvider::OpenAI
-        && has_configurable_context_window(llm, gpt_configurable_context_window_enabled)
-        && selected_limit
-            .map(|limit| limit.clamp(llm.context_window.min, llm.context_window.max))
-            .is_some_and(|limit| limit > LONG_CONTEXT_WARNING_THRESHOLD)
+        && llm.provider != LLMProvider::OpenAI
 }
 
 impl StringModel for AIExecutionProfile {

@@ -1,9 +1,13 @@
+#[cfg(target_family = "wasm")]
 use std::collections::HashMap;
+#[cfg(target_family = "wasm")]
 use std::sync::Arc;
 
+#[cfg(target_family = "wasm")]
 use fuzzy_match::match_indices_case_insensitive;
 use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
+#[cfg(target_family = "wasm")]
 use crate::launch_configs::launch_config::LaunchConfig;
 use crate::search::command_palette::launch_config::search_item::SearchItem;
 use crate::search::command_palette::mixer::CommandPaletteItemAction;
@@ -19,11 +23,7 @@ pub struct DataSource {
 impl DataSource {
     #[cfg(not(target_family = "wasm"))]
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        if uncaged_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
-            Self::new_full_text(ctx)
-        } else {
-            Self::new_fuzzy(ctx)
-        }
+        Self::new_full_text(ctx)
     }
 
     #[cfg(target_family = "wasm")]
@@ -31,6 +31,7 @@ impl DataSource {
         Self::new_fuzzy(ctx)
     }
 
+    #[cfg(target_family = "wasm")]
     fn new_fuzzy(ctx: &mut ModelContext<Self>) -> Self {
         ctx.subscribe_to_model(&WarpConfig::handle(ctx), Self::handle_config_event);
         let mut searcher = Box::new(FuzzyLaunchConfigSearcher::default());
@@ -89,11 +90,13 @@ trait LaunchConfigSearcher {
     fn refresh_search_index(&mut self, app: &AppContext);
 }
 
+#[cfg(target_family = "wasm")]
 #[derive(Default)]
 struct FuzzyLaunchConfigSearcher {
     configs: HashMap<String, LaunchConfig>,
 }
 
+#[cfg(target_family = "wasm")]
 impl LaunchConfigSearcher for FuzzyLaunchConfigSearcher {
     fn search(&self, search_term: &str) -> anyhow::Result<Vec<SearchItem>> {
         Ok(self

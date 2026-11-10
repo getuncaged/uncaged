@@ -700,11 +700,6 @@ impl LLMPreferences {
             .unwrap_or(&self.models_by_feature.agent_mode)
     }
 
-    /// Returns the set of LLMs available for computer use agent.
-    pub fn get_computer_use_llm_choices(&self) -> impl Iterator<Item = &LLMInfo> {
-        self.get_computer_use_available().choices.iter()
-    }
-
     /// Returns the `LLMInfo` for the computer use agent model.
     pub fn get_active_computer_use_model<'a>(
         &'a self,
@@ -720,11 +715,6 @@ impl LLMPreferences {
             .clone()
             .and_then(|id| available.info_for_id(&id))
             .unwrap_or_else(|| available.default_llm_info())
-    }
-
-    /// Returns the default computer use model as a fallback.
-    pub fn get_default_computer_use_model(&self) -> &LLMInfo {
-        self.get_computer_use_available().default_llm_info()
     }
 
     /// Helper to get the AvailableLLMs for computer_use.

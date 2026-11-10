@@ -352,12 +352,10 @@ fn pane_close_purges_turns_and_watermark() {
     assert_eq!((turns, watermarks), (0, 0));
 }
 
-/// One-history (stage 5): on a pure-shell database the v2 (turn_index-driven)
-/// restore read returns exactly what v1 returns -- same panes, same blocks,
-/// same order. This is the kill-switch guarantee: flipping the flag off can
-/// never change what a healthy database restores.
+/// One-history (stage 5): on a pure-shell database the turn_index-driven
+/// restore read returns every pane's blocks in turn order.
 #[test]
-fn restored_blocks_v2_matches_v1_on_pure_shell_db() {
+fn restored_blocks_follow_turn_order_on_pure_shell_db() {
     use diesel::sql_query;
 
     let mut conn = test_connection();
@@ -392,24 +390,21 @@ fn restored_blocks_v2_matches_v1_on_pure_shell_db() {
         .unwrap();
     }
 
-    let v1 = super::get_all_restored_blocks(&mut conn).unwrap();
-    let v2 = super::get_all_restored_blocks_v2(&mut conn).unwrap();
+    let restored = super::get_all_restored_blocks(&mut conn).unwrap();
 
-    assert_eq!(v1.len(), v2.len());
-    for (pane_uuid, v1_items) in &v1 {
-        let v2_items = v2.get(pane_uuid).expect("pane present in v2");
-        assert_eq!(
-            v1_items.iter().map(|item| item.id()).collect::<Vec<_>>(),
-            v2_items.iter().map(|item| item.id()).collect::<Vec<_>>(),
-            "block order must match between v1 and v2"
-        );
-    }
+    assert_eq!(restored.len(), 1);
+    let items = restored.values().next().expect("one pane");
+    assert_eq!(
+        items.iter().map(|item| item.id()).collect::<Vec<_>>(),
+        vec!["b-0".to_string(), "b-1".to_string(), "b-2".to_string()],
+        "blocks restore in turn order"
+    );
 }
 
-/// One-history (stage 5): v2 honors the Cmd-K watermark -- turns below it do
-/// not restore -- while v1 (the kill-switch path) ignores it by design.
+/// One-history (stage 5): the restore read honors the Cmd-K watermark --
+/// turns below it do not restore.
 #[test]
-fn restored_blocks_v2_honors_clear_watermark() {
+fn restored_blocks_honor_clear_watermark() {
     use diesel::sql_query;
 
     let mut conn = test_connection();
@@ -450,19 +445,12 @@ fn restored_blocks_v2_honors_clear_watermark() {
     .execute(&mut conn)
     .unwrap();
 
-    let v2 = super::get_all_restored_blocks_v2(&mut conn).unwrap();
-    let items = v2.values().next().expect("one pane");
+    let restored = super::get_all_restored_blocks(&mut conn).unwrap();
+    let items = restored.values().next().expect("one pane");
     assert_eq!(
         items.iter().map(|item| item.id()).collect::<Vec<_>>(),
         vec!["w-2".to_string()],
         "only the post-clear turn restores"
-    );
-
-    let v1 = super::get_all_restored_blocks(&mut conn).unwrap();
-    assert_eq!(
-        v1.values().next().unwrap().len(),
-        3,
-        "kill-switch path ignores the watermark"
     );
 }
 

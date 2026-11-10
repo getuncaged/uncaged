@@ -19,7 +19,7 @@ use uncaged_ui::fonts::{Properties, Weight};
 use uncaged_ui::keymap::{ContextPredicate, Keystroke};
 use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use uncaged_ui::ui_components::slider::SliderStateHandle;
-use uncaged_ui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
+use uncaged_ui::ui_components::switch::SwitchStateHandle;
 use uncaged_ui::{
     id, Action, AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
     ViewHandle,
@@ -49,8 +49,7 @@ use crate::ai::execution_profiles::profiles::{
     AIExecutionProfilesModel, AIExecutionProfilesModelEvent, ClientProfileId,
 };
 use crate::ai::execution_profiles::{
-    long_context_pricing_warning_title, AIExecutionProfile, AIExecutionProfileAppExt,
-    ActionPermission, WriteToPtyPermission,
+    AIExecutionProfile, AIExecutionProfileAppExt, ActionPermission, WriteToPtyPermission,
 };
 use crate::ai::llms::{LLMContextWindow, LLMId, LLMPreferences, LLMPreferencesEvent};
 use crate::ai::mcp::TemplatableMCPServerManager;
@@ -68,10 +67,7 @@ use crate::settings::{
 use crate::terminal::session_settings::{SessionSettings, SessionSettingsChangedEvent};
 use crate::terminal::CLIAgent;
 use crate::view_components::action_button::{ActionButton, ButtonSize, SecondaryTheme};
-use crate::view_components::{
-    render_warning_box, FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent,
-    WarningBoxConfig,
-};
+use crate::view_components::{FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent};
 
 /// Identifies which subpage of the AI settings the user is viewing.
 /// When `None`, the page shows all widgets (legacy/full view).
@@ -550,7 +546,6 @@ pub struct AISettingsPageView {
     context_window_slider_state: SliderStateHandle,
     context_window_editor: ViewHandle<EditorView>,
     last_synced_context_window_editor_value: Option<u32>,
-    dragged_context_window_value: Option<u32>,
 
     thinking_display_mode_dropdown: ViewHandle<Dropdown<AISettingsPageAction>>,
     orchestration_message_display_mode_dropdown: ViewHandle<Dropdown<AISettingsPageAction>>,
@@ -1638,7 +1633,6 @@ impl AISettingsPageView {
             context_window_slider_state,
             context_window_editor,
             last_synced_context_window_editor_value,
-            dragged_context_window_value: None,
             autonomy_dropdown_menu,
             code_read_allowlist_editor,
             code_read_autonomy_dropdown_menu,
@@ -2190,16 +2184,6 @@ impl AISettingsPageView {
                 // fields could only render greyed out.
                 widgets.push(Box::new(AgentAttributionWidget::default()));
                 widgets.push(Box::new(OtherAIWidget::default()));
-                // Uncaged (Oss) has no cloud agents, so the experimental
-                // "Computer use in Cloud Agents" toggle doesn't apply — hide it.
-                if FeatureFlag::AgentModeComputerUse.is_enabled()
-                    && !matches!(
-                        uncaged_core::channel::ChannelState::channel(),
-                        uncaged_core::channel::Channel::Oss
-                    )
-                {
-                    widgets.push(Box::new(CloudAgentComputerUseWidget::default()));
-                }
             }
             Some(AISubpage::WarpAgent) => {
                 // Oz page: global toggle + Active AI + Input + Other
@@ -2222,16 +2206,6 @@ impl AISettingsPageView {
                 }
                 widgets.push(Box::new(AgentAttributionWidget::default()));
                 widgets.push(Box::new(OtherAIWidget::default()));
-                // Uncaged (Oss) has no cloud agents, so the experimental
-                // "Computer use in Cloud Agents" toggle doesn't apply — hide it.
-                if FeatureFlag::AgentModeComputerUse.is_enabled()
-                    && !matches!(
-                        uncaged_core::channel::ChannelState::channel(),
-                        uncaged_core::channel::Channel::Oss
-                    )
-                {
-                    widgets.push(Box::new(CloudAgentComputerUseWidget::default()));
-                }
             }
             Some(AISubpage::Profiles) => {
                 // Uncaged: no credits, plans or billing -- models are bring-your-own.
@@ -2324,7 +2298,6 @@ impl AISettingsPageView {
     }
 
     fn sync_context_window_editor(&mut self, ctx: &mut ViewContext<Self>, force: bool) {
-        self.dragged_context_window_value = None;
         let Some(value) = Self::current_context_window_display_value(ctx) else {
             self.last_synced_context_window_editor_value = None;
             self.context_window_slider_state.reset_offset();
@@ -3007,7 +2980,6 @@ pub enum AISettingsPageAction {
     AddToMCPDenylist(uuid::Uuid),
     RemoveFromMCPDenylist(uuid::Uuid),
     CreateProfile,
-    ToggleCloudAgentComputerUse,
     ToggleFileBasedMcp,
     ToggleIncludeAgentCommandsInHistory,
     ToggleAgentAttribution,
@@ -3296,7 +3268,6 @@ impl TypedActionView for AISettingsPageView {
                     return;
                 }
                 if Self::configurable_context_window(ctx).is_some() {
-                    self.dragged_context_window_value = Some(*value);
                     let formatted = value.to_string();
                     self.context_window_editor.update(ctx, |editor, ctx| {
                         editor.system_reset_buffer_text(&formatted, ctx);
@@ -3305,7 +3276,6 @@ impl TypedActionView for AISettingsPageView {
                 }
             }
             AISettingsPageAction::SetContextWindowSize(value) => {
-                self.dragged_context_window_value = None;
                 if !AISettings::as_ref(ctx).is_any_ai_enabled(ctx) {
                     self.sync_context_window_editor(ctx, true);
                     return;
@@ -3490,14 +3460,6 @@ impl TypedActionView for AISettingsPageView {
                     self.profile_views = Self::create_profile_views(ctx);
                     ctx.emit(AISettingsPageEvent::OpenExecutionProfileEditor(profile_id));
                 }
-                ctx.notify();
-            }
-            AISettingsPageAction::ToggleCloudAgentComputerUse => {
-                AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    report_if_error!(settings
-                        .cloud_agent_computer_use_enabled
-                        .toggle_and_save_value(ctx));
-                });
                 ctx.notify();
             }
             AISettingsPageAction::ToggleFileBasedMcp => {
@@ -4300,17 +4262,7 @@ impl AgentsWidget {
             .with_child(input_box)
             .finish();
 
-        let mut column = Flex::column().with_child(label).with_child(row);
-        if AISettingsPageView::active_profile_data(app)
-            .should_show_long_context_pricing_warning(view.dragged_context_window_value, app)
-        {
-            column.add_child(render_warning_box(
-                WarningBoxConfig::formatted_title(long_context_pricing_warning_title()),
-                appearance,
-            ));
-        }
-
-        Some(column.finish())
+        Some(Flex::column().with_child(label).with_child(row).finish())
     }
 
     fn render_permissions_section(
@@ -6188,106 +6140,6 @@ impl SettingsWidget for AgentAttributionWidget {
             .with_child(render_ai_setting_description(
                 "Uncaged can add attribution to commit messages and pull requests it creates",
                 is_any_ai_enabled,
-                app,
-            ))
-            .finish()
-    }
-}
-
-#[derive(Default)]
-struct CloudAgentComputerUseWidget {
-    toggle: SwitchStateHandle,
-}
-
-impl SettingsWidget for CloudAgentComputerUseWidget {
-    type View = AISettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "oz cloud agent computer use orchestration multi-agent"
-    }
-
-    fn render(
-        &self,
-        _view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        use crate::ai::execution_profiles::{
-            resolve_cloud_agent_computer_use_state, CloudAgentComputerUseState,
-        };
-
-        let is_any_ai_enabled = AISettings::as_ref(app).is_any_ai_enabled(app);
-
-        // Determine toggle state based on workspace autonomy setting and user preference
-        let CloudAgentComputerUseState {
-            enabled: is_checked,
-            is_forced_by_org,
-        } = resolve_cloud_agent_computer_use_state(app);
-
-        // Toggle is disabled if forced by org settings OR if AI is globally disabled
-        let is_disabled = is_forced_by_org || !is_any_ai_enabled;
-
-        let ui_builder = appearance.ui_builder();
-        let toggle = if is_forced_by_org {
-            // Disabled by organization setting - show tooltip on hover
-            ui_builder
-                .switch(self.toggle.clone())
-                .check(is_checked)
-                .with_tooltip(TooltipConfig {
-                    text: "This option is enforced by your organization's settings and cannot be customized.".to_string(),
-                    styles: ui_builder.default_tool_tip_styles(),
-                })
-                .disable()
-                .build()
-                .finish()
-        } else if !is_any_ai_enabled {
-            // Disabled because AI is off globally - no tooltip needed
-            ui_builder
-                .switch(self.toggle.clone())
-                .check(is_checked)
-                .with_disabled(true)
-                .build()
-                .finish()
-        } else {
-            // Enabled - allow toggling
-            ui_builder
-                .switch(self.toggle.clone())
-                .check(is_checked)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AISettingsPageAction::ToggleCloudAgentComputerUse);
-                })
-                .finish()
-        };
-
-        let toggle_row = build_toggle_element(
-            render_body_item_label::<AISettingsPageAction>(
-                "Computer use in Cloud Agents".to_string(),
-                Some(styles::header_font_color(!is_disabled, app)),
-                None,
-                ToggleState::Enabled,
-                appearance,
-            ),
-            toggle,
-            appearance,
-            None,
-        );
-
-        Flex::column()
-            .with_child(render_separator(appearance))
-            .with_child(
-                build_sub_header(
-                    appearance,
-                    "Experimental",
-                    Some(styles::header_font_color(is_any_ai_enabled, app)),
-                )
-                .with_padding_bottom(HEADER_PADDING)
-                .finish(),
-            )
-            .with_child(toggle_row)
-            .with_child(render_ai_setting_description(
-                "Enable computer use in cloud agent conversations started from Uncaged.",
-                !is_disabled,
                 app,
             ))
             .finish()

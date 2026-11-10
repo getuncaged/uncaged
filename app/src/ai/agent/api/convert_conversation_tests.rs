@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use uncaged_agent_api as api;
-use uncaged_core::features::FeatureFlag;
 
 use crate::ai::agent::api::convert_conversation::*;
 use crate::ai::agent::conversation::AIConversationId;
@@ -2103,13 +2102,11 @@ fn task_with_user_query_and_response(query: &str, response: &str) -> api::Task {
     }
 }
 
-/// One-history (B1): with the flag on, exchange ids derive deterministically
-/// from (conversation id, first message id) -- identical across conversions of
+/// One-history (B1): exchange ids derive deterministically from
+/// (conversation id, first message id) -- identical across conversions of
 /// the same task, and disjoint across conversations (fork safety).
 #[test]
 fn one_history_exchange_ids_are_stable_and_conversation_namespaced() {
-    let _flag = FeatureFlag::OneHistory.override_enabled(true);
-
     let task = task_with_user_query_and_response("q", "a");
     let conversation_a = AIConversationId::new();
     let conversation_b = AIConversationId::new();
@@ -2129,22 +2126,6 @@ fn one_history_exchange_ids_are_stable_and_conversation_namespaced() {
     assert!(
         ids_first.iter().all(|id| !ids_other.contains(id)),
         "the same task under two conversations must derive disjoint ids"
-    );
-}
-
-/// One-history off (kill-switch): ids stay random per conversion.
-#[test]
-fn one_history_off_exchange_ids_stay_random() {
-    let _flag = FeatureFlag::OneHistory.override_enabled(false);
-
-    let task = task_with_user_query_and_response("q", "a");
-    let conversation = AIConversationId::new();
-    let first = (&task).into_exchanges(conversation);
-    let second = (&task).into_exchanges(conversation);
-    assert!(!first.is_empty());
-    assert_ne!(
-        first.iter().map(|e| e.id).collect::<Vec<_>>(),
-        second.iter().map(|e| e.id).collect::<Vec<_>>()
     );
 }
 

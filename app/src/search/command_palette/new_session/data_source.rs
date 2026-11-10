@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use fuzzy_match::{match_indices_case_insensitive, FuzzyMatchResult};
+#[cfg(target_family = "wasm")]
+use fuzzy_match::match_indices_case_insensitive;
+use fuzzy_match::FuzzyMatchResult;
 use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity};
 
@@ -56,11 +58,7 @@ pub struct NewSessionDataSource {
 impl NewSessionDataSource {
     #[cfg(not(target_family = "wasm"))]
     pub fn new(binding_source: ModelHandle<BindingSource>, ctx: &mut ModelContext<Self>) -> Self {
-        if FeatureFlag::UseTantivySearch.is_enabled() {
-            Self::new_full_text(binding_source, ctx)
-        } else {
-            Self::new_fuzzy(binding_source, ctx)
-        }
+        Self::new_full_text(binding_source, ctx)
     }
 
     #[cfg(target_family = "wasm")]
@@ -68,6 +66,7 @@ impl NewSessionDataSource {
         Self::new_fuzzy(binding_source, ctx)
     }
 
+    #[cfg(target_family = "wasm")]
     fn new_fuzzy(binding_source: ModelHandle<BindingSource>, ctx: &mut ModelContext<Self>) -> Self {
         ctx.observe(&binding_source, Self::on_binding_source_changed);
         Self {
@@ -228,11 +227,13 @@ trait NewSessionSearcher {
     /// matches should have this value as a ceiling.
     fn compute_max_match(&self, query_str: &str) -> Option<f64>;
 }
+#[cfg(target_family = "wasm")]
 #[derive(Default)]
 struct FuzzyNewSessionSearcher {
     shell_id_to_options: HashMap<NewSessionOptionId, Arc<NewSessionOption>>,
 }
 
+#[cfg(target_family = "wasm")]
 impl NewSessionSearcher for FuzzyNewSessionSearcher {
     fn search(&self, search_term: &str) -> anyhow::Result<Vec<QueryResult<SearcherAction>>> {
         let max_match = self.compute_max_match(search_term);

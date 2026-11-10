@@ -9,11 +9,6 @@ pub enum FeatureFlag {
     DebugMode,
     Autoupdate,
 
-    WelcomeTips,
-    ThinStrokes,
-    WelcomeBlock,
-    KnowledgeSidebar,
-
     RuntimeFeatureFlags,
 
     /// Does grid storage go forwards or backwards
@@ -32,9 +27,6 @@ pub enum FeatureFlag {
     /// menu bar.
     ToggleBootstrapBlock,
 
-    /// Enabling context chips functionality for prompt
-    ContextChips,
-
     /// Ligature Support in the Editor and Grid
     Ligatures,
 
@@ -42,10 +34,6 @@ pub enum FeatureFlag {
     /// will be enabled. When the `History` rule is enabled, the command_corrections
     /// lib will use the user's history as a last-ditch effort to find a reasonable correction.
     CommandCorrectionsHistoryRule,
-
-    /// Enables a setting on Intel Dual-GPU Macs to enable use of the integrated GPU over the
-    /// discrete GPU.
-    IntegratedGPU,
 
     /// Warp Agent Mode.
     AgentMode,
@@ -84,9 +72,6 @@ pub enum FeatureFlag {
     /// Enable dynamic enum parameter types for workflow arguments
     DynamicWorkflowEnums,
 
-    /// Enables next action prediction within Warp, powered by AI.
-    AgentPredict,
-
     /// Enables workflows for use with Agent Mode.
     AgentModeWorkflows,
 
@@ -96,10 +81,6 @@ pub enum FeatureFlag {
     /// Enables the shell selector, allowing us to open a new tab in
     /// a shell other than the default shell.
     ShellSelector,
-
-    /// Lazily builds scenes at render time instead of eagerly when a view
-    /// changes.
-    LazySceneBuilding,
 
     /// Enables the full-screen "zen mode" setting, where we hide the tab bar if there's only one
     /// tab.
@@ -121,9 +102,6 @@ pub enum FeatureFlag {
     SshDragAndDrop,
     DragTabsToWindows,
 
-    /// Enables the overflow menu on AI blocks.
-    AIBlockOverflowMenu,
-
     /// Enables cycling through the next command suggestions with down arrow.
     CycleNextCommandSuggestion,
 
@@ -134,8 +112,6 @@ pub enum FeatureFlag {
 
     /// Enables partial next command suggestions with a prefix.
     PartialNextCommandSuggestions,
-
-    AIGeneratedOnboardingSuggestions,
 
     /// Enables iTerm image rendering
     ITermImages,
@@ -149,17 +125,11 @@ pub enum FeatureFlag {
     /// Enables using `esc` to clear autosuggestions.
     ClearAutosuggestionOnEscape,
 
-    /// If enabled, the default theme is set to Adeberry for new users.
-    DefaultAdeberryTheme,
-
     /// New, less intrusive autoupdate UI.
     AutoupdateUIRevamp,
 
     /// Enables Kitty image rendering
     KittyImages,
-
-    /// Enables auto-generated AI memories.
-    AIMemories,
 
     /// Enables the XML output system prompt for the primary (terminal) agent in Agent Mode.
     AgentModePrimaryXML,
@@ -179,15 +149,6 @@ pub enum FeatureFlag {
     /// Enables full source code embedding of repos when using codebase context.
     FullSourceCodeEmbedding,
 
-    /// If enabled, command palette searches will use Tantivy search instead of the default fuzzy search.
-    UseTantivySearch,
-
-    /// Uncaged one-history (§3): stable exchange identity, the persisted
-    /// turn_index timeline read path, blocks-row-wins restore, and the
-    /// non-destructive Cmd-K watermark. Default off until stage 5 flips it on;
-    /// the runtime flag menu is the kill-switch afterwards.
-    OneHistory,
-
     /// Allows AI to call the grep tool.
     GrepTool,
 
@@ -205,9 +166,6 @@ pub enum FeatureFlag {
 
     /// Reload files in an AI conversation to prevent stale files.
     ReloadStaleConversationFiles,
-
-    /// Retry truncated file edit responses from the coding agent.
-    RetryTruncatedCodeResponses,
 
     /// Enables reading images with the `read_files` tool.
     ReadImageFiles,
@@ -299,14 +257,8 @@ pub enum FeatureFlag {
     /// A new first-time user experience which prioritizes choosing a coding repository.
     GetStartedTab,
 
-    /// Enables Projects and Project management
-    Projects,
-
     /// Enables selection-as-context functionality in the code editor.
     SelectionAsContext,
-
-    /// A context chip that shows when the PWD is inside of a git repository.
-    CodeModeChip,
 
     /// Enables the prompt chip that displays the GitHub PR for the current branch.
     GithubPrPromptChip,
@@ -392,8 +344,6 @@ pub enum FeatureFlag {
     /// Displays debugging IDs for MCP servers, installations, and gallery items.
     McpDebuggingIds,
 
-    /// Enables rendering of images in markdown files and AI responses.
-    MarkdownImages,
     /// Enables rendering Mermaid diagrams in markdown notebooks.
     MarkdownMermaid,
     /// Enables editable Mermaid diagrams to behave atomically in notebook and plan editors.
@@ -412,10 +362,6 @@ pub enum FeatureFlag {
 
     /// Enables v2 of the context window usage UI.
     ContextWindowUsageV2,
-
-    /// Dev-only: enables the expandable per-segment context window usage
-    /// breakdown in the conversation usage card.
-    ContextWindowUsageBreakdown,
 
     /// Enables global search
     GlobalSearch,
@@ -454,12 +400,6 @@ pub enum FeatureFlag {
 
     /// Enables agent tips displayed below the warping indicator in Agent Mode.
     AgentTips,
-
-    /// Allows agent mode to use computer use tools.
-    AgentModeComputerUse,
-
-    /// Enables computer use functionality in local clients.
-    LocalComputerUse,
 
     /// Enables the "New agent" prompt chip in terminal mode when AgentView is enabled.
     ///
@@ -622,12 +562,6 @@ pub enum FeatureFlag {
     /// background refresh loop that keeps them fresh during a task run.
     GitCredentialRefresh,
 
-    /// Enables configurable expanded context windows for eligible GPT models.
-    GPTConfigurableContextWindow,
-
-    /// Replaces the raw harness CLI command with a styled header showing CLI name + status icon.
-    HarnessSessionHeader,
-
     /// Gates the Grouped Tabs feature.
     GroupedTabs,
 
@@ -643,10 +577,6 @@ pub enum FeatureFlag {
     /// Gates the custom model router feature, which allows users to define
     /// their own model routers.
     CustomModelRouters,
-
-    /// Shows a warning in the agent view when the active conversation's
-    /// provider-side prompt cache has expired.
-    PromptCacheExpiryWarning,
 }
 
 static FLAG_STATES: [AtomicBool; cardinality::<FeatureFlag>()] =
@@ -675,17 +605,12 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::RemoveAutosuggestionDuringTabCompletions,
     FeatureFlag::ResizeFix,
     FeatureFlag::AgentModeWorkflows,
-    FeatureFlag::LazySceneBuilding,
     FeatureFlag::SshDragAndDrop,
     FeatureFlag::ImeMarkedText,
     FeatureFlag::MSYS2Shells,
-    FeatureFlag::RetryTruncatedCodeResponses,
     FeatureFlag::RunGeneratorsWithCmdExe,
-    FeatureFlag::Projects,
-    FeatureFlag::MarkdownImages,
     FeatureFlag::FileAndDiffSetComments,
     FeatureFlag::FileGlobV2Warnings,
-    FeatureFlag::LocalComputerUse,
     // These are enabled via 100% experiment on prod warp-server,
     // but we need to enable here for dogfood builds.
     FeatureFlag::CrossRepoContext,
@@ -695,10 +620,7 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     // End manually enabled Code features.
     FeatureFlag::RememberFastForwardState,
     FeatureFlag::LocalDockerSandbox,
-    FeatureFlag::GPTConfigurableContextWindow,
     FeatureFlag::RestorePromptOnInlineModelSelectorSearch,
-    FeatureFlag::PromptCacheExpiryWarning,
-    FeatureFlag::ContextWindowUsageBreakdown,
 ];
 
 /// Features enabled for feature preview build users (e.g.: Friends of Warp).
@@ -718,10 +640,7 @@ pub const RELEASE_FLAGS: &[FeatureFlag] = &[
 ];
 
 /// Flags that we want to allow to switch at runtime (assuming RuntimeFeatureFlags is set)
-pub const RUNTIME_FEATURE_FLAGS: &[FeatureFlag] = &[
-    FeatureFlag::LocalClaudeCodexChildHarnesses,
-    FeatureFlag::OneHistory,
-];
+pub const RUNTIME_FEATURE_FLAGS: &[FeatureFlag] = &[FeatureFlag::LocalClaudeCodexChildHarnesses];
 
 impl FeatureFlag {
     pub fn is_enabled(&self) -> bool {

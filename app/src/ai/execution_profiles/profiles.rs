@@ -647,25 +647,6 @@ impl AIExecutionProfilesModel {
         );
     }
 
-    pub fn set_computer_use(
-        &mut self,
-        profile_id: ClientProfileId,
-        permission: &super::ComputerUsePermission,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        self.edit_profile_internal(
-            profile_id,
-            |profile| {
-                if profile.computer_use != *permission {
-                    profile.computer_use = *permission;
-                    return true;
-                }
-                false
-            },
-            ctx,
-        );
-    }
-
     pub fn set_ask_user_question(
         &mut self,
         profile_id: ClientProfileId,

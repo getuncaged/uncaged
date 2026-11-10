@@ -81,9 +81,7 @@ use crate::drive::OpenWarpDriveObjectSettings;
 use crate::interval_timer::mark_startup_sub_interval;
 use crate::notebooks::NotebookId;
 use crate::persistence::agent::read_agent_conversations;
-use crate::persistence::block_list::{
-    get_all_restored_blocks, get_all_restored_blocks_v2, read_ai_queries,
-};
+use crate::persistence::block_list::{get_all_restored_blocks, read_ai_queries};
 use crate::persistence::model::{
     NewPersistedObjectAction, ProjectRules, UserProfile, CODE_REVIEW_PANE_KIND,
     GET_STARTED_PANE_KIND,
@@ -2212,13 +2210,8 @@ fn read_sqlite_data(conn: &mut SqliteConnection) -> Result<PersistedData, Error>
         .collect();
     mark_startup_sub_interval("read_profiles_object_actions");
 
-    // Uncaged one-history: the turn_index-driven read, with the legacy
-    // heuristic byte-identical behind the kill-switch.
-    let restored_blocks = if uncaged_core::features::FeatureFlag::OneHistory.is_enabled() {
-        get_all_restored_blocks_v2(conn)?
-    } else {
-        get_all_restored_blocks(conn)?
-    };
+    // Uncaged one-history: the turn_index-driven read.
+    let restored_blocks = get_all_restored_blocks(conn)?;
     mark_startup_sub_interval("read_blocks");
 
     // Load active MCP servers from database

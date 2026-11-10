@@ -711,10 +711,6 @@ fn run_internal(mut launch_mode: LaunchMode) -> Result<()> {
         mark_startup_sub_interval("early_singletons");
         let app_state = initialize_app(timer, startup_toml_parse_error, ctx);
 
-        // Pinned from the ImprovedPaletteSearch client experiment, which assigned every user
-        // (100% of buckets) to the full-text palette search.
-        FeatureFlag::UseTantivySearch.set_enabled(true);
-
         launch(ctx, app_state, launch_mode);
     })
 }
@@ -791,13 +787,6 @@ pub(crate) fn initialize_app(
     // If any part of sqlite initialization fails, we just don't do session restoration (i.e.
     // feature degradation).
     let persistence_scope = persistence::PersistenceScope::App;
-    // Uncaged one-history (§3): default ON. The runtime feature-flag menu is
-    // the kill-switch -- flipping it off reverts to the legacy restore
-    // heuristic and destructive Cmd-K (turns cleared while it was on will
-    // reappear then; a kill-switch that resurrects data errs on the safe
-    // side). Must precede persistence::initialize so the restore read path
-    // sees it.
-    FeatureFlag::OneHistory.set_enabled(true);
     mark_startup_sub_interval("pre_sqlite_singletons");
     let (sqlite_data, writer_handles) = persistence::initialize(persistence_scope);
     timer.mark_interval_end("SQLITE_INITIALIZED");

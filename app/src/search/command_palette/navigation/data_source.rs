@@ -1,8 +1,10 @@
 use uncaged_ui::{AppContext, Entity, ModelHandle};
 
 use crate::search::command_palette::mixer::CommandPaletteItemAction;
+#[cfg(target_family = "wasm")]
+use crate::search::command_palette::navigation::search::FuzzySessionSearcher;
 use crate::search::command_palette::navigation::search::{
-    FuzzySessionSearcher, MatchedSession, SessionMatchResult, SessionSearcher,
+    MatchedSession, SessionMatchResult, SessionSearcher,
 };
 use crate::search::command_palette::navigation::search_item::SearchItem;
 use crate::search::data_source::{DataSourceSearchError, Query, QueryResult};
@@ -19,11 +21,7 @@ pub struct DataSource {
 impl DataSource {
     #[cfg(not(target_family = "wasm"))]
     pub fn new(active_session_handle: ModelHandle<SessionSource>) -> Self {
-        if uncaged_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
-            Self::new_full_text(active_session_handle)
-        } else {
-            Self::new_fuzzy(active_session_handle)
-        }
+        Self::new_full_text(active_session_handle)
     }
 
     #[cfg(target_family = "wasm")]
@@ -38,6 +36,7 @@ impl DataSource {
         Self { searcher }
     }
 
+    #[cfg(target_family = "wasm")]
     fn new_fuzzy(active_session_handle: ModelHandle<SessionSource>) -> Self {
         let searcher = Box::new(FuzzySessionSearcher {
             session_source_handle: active_session_handle,

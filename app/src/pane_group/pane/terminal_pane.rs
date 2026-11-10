@@ -2,7 +2,6 @@
 use std::sync::mpsc::SyncSender;
 
 use uncaged_core::execution_mode::AppExecutionMode;
-use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{
     AppContext, EntityId, ModelHandle, SingletonEntity, ViewContext, ViewHandle, WindowId,
 };
@@ -728,17 +727,11 @@ fn handle_terminal_view_event(
             Event::Pane(pane_event) => group.handle_pane_event(pane_id, pane_event, ctx),
             Event::BlockListCleared => {
                 if let Some(terminal_pane) = group.terminal_session_by_id(pane_id) {
-                    if FeatureFlag::OneHistory.is_enabled() {
-                        // Uncaged one-history (B5): Cmd-K is non-destructive.
-                        // Move the pane's clear watermark instead of deleting
-                        // the persisted blocks -- the agent half of history was
-                        // never deleted on clear, and now neither half is.
-                        terminal_pane.set_cleared_before_seq(ctx);
-                    } else {
-                        // Capture CMD-K to clear blocks here so we could remove
-                        // all the associated blocks stored in the history.
-                        terminal_pane.delete_blocks(ctx);
-                    }
+                    // Uncaged one-history (B5): Cmd-K is non-destructive.
+                    // Move the pane's clear watermark instead of deleting
+                    // the persisted blocks -- the agent half of history was
+                    // never deleted on clear, and now neither half is.
+                    terminal_pane.set_cleared_before_seq(ctx);
                 }
             }
             Event::SendNotification(notification) => {

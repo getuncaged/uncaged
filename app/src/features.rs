@@ -93,8 +93,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::AutoupdateUIRevamp,
         #[cfg(all(not(windows), feature = "kitty_images"))]
         FeatureFlag::KittyImages,
-        #[cfg(feature = "default_adeberry_theme")]
-        FeatureFlag::DefaultAdeberryTheme,
         #[cfg(feature = "agent_mode_primary_xml")]
         FeatureFlag::AgentModePrimaryXML,
         #[cfg(feature = "agent_mode_pre_plan_xml")]
@@ -109,8 +107,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::CommandCorrectionKey,
         #[cfg(feature = "full_source_code_embedding")]
         FeatureFlag::FullSourceCodeEmbedding,
-        #[cfg(feature = "use_tantivy_search")]
-        FeatureFlag::UseTantivySearch,
         #[cfg(feature = "grep_tool")]
         FeatureFlag::GrepTool,
         #[cfg(feature = "mcp_server")]
@@ -135,8 +131,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::FileRetrievalTools,
         #[cfg(feature = "reload_stale_conversation_files")]
         FeatureFlag::ReloadStaleConversationFiles,
-        #[cfg(feature = "retry_truncated_code_responses")]
-        FeatureFlag::RetryTruncatedCodeResponses,
         #[cfg(feature = "read_image_files")]
         FeatureFlag::ReadImageFiles,
         #[cfg(feature = "cross_repo_context")]
@@ -191,8 +185,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::ConversationArtifacts,
         #[cfg(feature = "get_started_tab")]
         FeatureFlag::GetStartedTab,
-        #[cfg(feature = "projects")]
-        FeatureFlag::Projects,
         #[cfg(feature = "drive_objects_as_context")]
         FeatureFlag::DriveObjectsAsContext,
         #[cfg(feature = "pr_comments_slash_command")]
@@ -203,8 +195,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::PRCommentsSkill,
         #[cfg(feature = "selection_as_context")]
         FeatureFlag::SelectionAsContext,
-        #[cfg(feature = "code_mode_chip")]
-        FeatureFlag::CodeModeChip,
         #[cfg(feature = "github_pr_prompt_chip")]
         FeatureFlag::GithubPrPromptChip,
         #[cfg(feature = "create_project_flow")]
@@ -255,8 +245,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::ForkFromCommand,
         #[cfg(feature = "context_window_usage_v2")]
         FeatureFlag::ContextWindowUsageV2,
-        #[cfg(feature = "context_window_usage_breakdown")]
-        FeatureFlag::ContextWindowUsageBreakdown,
         #[cfg(feature = "global_search")]
         FeatureFlag::GlobalSearch,
         #[cfg(feature = "embedded_code_review_comments")]
@@ -366,8 +354,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::TransferControlTool,
         #[cfg(feature = "warpify_footer")]
         FeatureFlag::WarpifyFooter,
-        #[cfg(feature = "gpt_configurable_context_window")]
-        FeatureFlag::GPTConfigurableContextWindow,
         #[cfg(feature = "git_operations_in_code_review")]
         FeatureFlag::GitOperationsInCodeReview,
         #[cfg(feature = "codex_plugin")]
@@ -380,8 +366,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::CustomModelRouters,
         #[cfg(feature = "supergrok")]
         FeatureFlag::SuperGrok,
-        #[cfg(feature = "prompt_cache_expiry_warning")]
-        FeatureFlag::PromptCacheExpiryWarning,
     ]);
 
     flags

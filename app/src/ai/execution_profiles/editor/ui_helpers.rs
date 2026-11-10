@@ -12,17 +12,12 @@ use uncaged_ui::{AppContext, Element, SingletonEntity, ViewHandle};
 use uuid::Uuid;
 
 use super::{ExecutionProfileEditorView, ExecutionProfileEditorViewAction};
-use crate::ai::blocklist::BlocklistAIPermissions;
-use crate::ai::execution_profiles::{
-    long_context_pricing_warning_title, AIExecutionProfile, AIExecutionProfileAppExt as _,
-    ActionPermission,
-};
+use crate::ai::execution_profiles::{AIExecutionProfile, ActionPermission};
 use crate::editor::EditorView;
 use crate::settings::AISettings;
 use crate::ui_components::icons::Icon;
 use crate::view_components::{
-    render_warning_box, Dropdown, DropdownItemAction, FilterableDropdown, SubmittableTextInput,
-    WarningBoxConfig,
+    Dropdown, DropdownItemAction, FilterableDropdown, SubmittableTextInput,
 };
 use crate::{Appearance, TemplatableMCPServerManager};
 
@@ -202,13 +197,6 @@ fn render_info_section(
         .finish();
     Container::new(description).with_margin_bottom(12.).finish()
 }
-fn render_long_context_pricing_warning(appearance: &Appearance) -> Box<dyn Element> {
-    render_warning_box(
-        WarningBoxConfig::formatted_title(long_context_pricing_warning_title()),
-        appearance,
-    )
-}
-
 fn render_permission_row<T: DropdownItemAction>(
     appearance: &Appearance,
     icon: Icon,
@@ -281,15 +269,6 @@ pub fn render_models_section(
         "The model used when the agent operates inside interactive terminal applications like database shells, debuggers, REPLs, or dev servers—reading live output and writing commands to the PTY.",
         &view.full_terminal_use_model_dropdown,
     ));
-
-    if FeatureFlag::LocalComputerUse.is_enabled() {
-        column.add_child(render_filterable_dropdown_row(
-            appearance,
-            "Computer use model",
-            "The model used when the agent takes control of your computer to interact with graphical applications through mouse movements, clicks, and keyboard input.",
-            &view.computer_use_model_dropdown,
-        ));
-    }
 
     Container::new(column.finish())
         .with_margin_bottom(12.)
@@ -423,21 +402,12 @@ fn render_context_window_row(
         .with_child(input_box)
         .finish();
 
-    let mut column = Flex::column()
+    let column = Flex::column()
         .with_child(Container::new(label_desc).with_margin_bottom(4.).finish())
-        .with_child(slider_row);
-    if BlocklistAIPermissions::as_ref(app)
-        .permissions_profile_for_id(app, view.profile_id())
-        .should_show_long_context_pricing_warning(view.dragged_context_window_value, app)
-    {
-        column.add_child(render_long_context_pricing_warning(appearance));
-    }
+        .with_child(slider_row)
+        .finish();
 
-    Some(
-        Container::new(column.finish())
-            .with_margin_bottom(12.)
-            .finish(),
-    )
+    Some(Container::new(column).with_margin_bottom(12.).finish())
 }
 
 pub fn render_permissions_section(
@@ -533,20 +503,6 @@ pub fn render_permissions_section(
             .write_to_pty_tooltip_mouse_state
             .clone(),
     ));
-
-    if FeatureFlag::LocalComputerUse.is_enabled() {
-        column.add_child(render_permission_row(
-            appearance,
-            Icon::Laptop,
-            "Computer use",
-            &view.computer_use_dropdown,
-            profile_data.computer_use.description(),
-            !ai_settings.is_computer_use_permissions_editable(app),
-            view.tooltip_mouse_state_handles
-                .computer_use_tooltip_mouse_state
-                .clone(),
-        ));
-    }
 
     column.add_child(render_permission_row(
         appearance,

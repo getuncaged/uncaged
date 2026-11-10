@@ -16,7 +16,6 @@ use chrono::{DateTime, Local, TimeZone};
 use uncaged_agent_api as api;
 use uncaged_agent_api::ask_user_question_result::answer_item::Answer as AskUserQuestionAnswer;
 use uncaged_core::command::ExitCode;
-use uncaged_core::features::FeatureFlag;
 
 use crate::ai::agent::api::convert_from::{
     convert_user_query_mode, ConversionParams, ConvertAPIMessageToClientOutputMessage,
@@ -1650,19 +1649,15 @@ fn create_exchange_from_messages(
     // byte-stable, and conversation-namespaced because forks copy message ids
     // verbatim -- an un-namespaced derivation would let a fork clobber the
     // source's ai_queries rows through the global exchange_id unique index.
-    let exchange_id = if FeatureFlag::OneHistory.is_enabled() {
-        first_message_id
-            .map(|message_id| {
-                let namespace = uuid::Uuid::new_v5(
-                    &uuid::Uuid::NAMESPACE_OID,
-                    conversation_id.to_string().as_bytes(),
-                );
-                AIAgentExchangeId::from(uuid::Uuid::new_v5(&namespace, message_id.as_bytes()))
-            })
-            .unwrap_or_default()
-    } else {
-        AIAgentExchangeId::new()
-    };
+    let exchange_id = first_message_id
+        .map(|message_id| {
+            let namespace = uuid::Uuid::new_v5(
+                &uuid::Uuid::NAMESPACE_OID,
+                conversation_id.to_string().as_bytes(),
+            );
+            AIAgentExchangeId::from(uuid::Uuid::new_v5(&namespace, message_id.as_bytes()))
+        })
+        .unwrap_or_default();
 
     // get the exchange's start time from the latest input's context
     let start_time = inputs
@@ -1733,10 +1728,6 @@ fn create_exchange_from_messages(
             model_id: model.model_id.clone().into(),
             display_name: model.model_display_name.clone(),
             is_fallback: model.is_fallback,
-            prompt_cache_expires_at: model
-                .prompt_cache_expires_at
-                .as_ref()
-                .map(|ts| proto_timestamp_to_local_datetime(ts.seconds, ts.nanos)),
         }),
         request_cost: None,
     };

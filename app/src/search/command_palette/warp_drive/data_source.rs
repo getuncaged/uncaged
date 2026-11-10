@@ -31,11 +31,7 @@ pub struct DataSource {
 impl DataSource {
     #[cfg(not(target_family = "wasm"))]
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        if uncaged_core::features::FeatureFlag::UseTantivySearch.is_enabled() {
-            Self::new_full_text(ctx)
-        } else {
-            Self::new_fuzzy(ctx)
-        }
+        Self::new_full_text(ctx)
     }
 
     #[cfg(target_family = "wasm")]

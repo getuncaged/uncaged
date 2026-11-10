@@ -907,17 +907,6 @@ impl View {
                     line_and_column_arg: None,
                 });
             }
-            CommandPaletteItemAction::NewConversationInProject {
-                path: _,
-                project_name,
-            } => {
-                // AcceptProject is handled by the welcome palette, not the regular command palette.
-                // This case should not normally be reached in the command palette context, but we
-                // include it for completeness. If this somehow gets executed, we'll just log it.
-                log::warn!(
-                    "OpenProjectConvo action unexpectedly handled in command palette for project: {project_name}"
-                );
-            }
             CommandPaletteItemAction::NewConversation => {
                 let window_id = match self.binding_source.as_ref(ctx) {
                     BindingSource::View { window_id, .. } => *window_id,

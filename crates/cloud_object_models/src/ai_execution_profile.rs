@@ -11,7 +11,6 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use uncaged_core::channel::ChannelState;
-use uncaged_core::features::FeatureFlag;
 
 use crate::{JsonModel, JsonSerializer};
 
@@ -548,7 +547,7 @@ impl AIExecutionProfile {
 
         let computer_use_permission = match computer_use_override {
             Some(true) => {
-                if is_sandboxed || FeatureFlag::LocalComputerUse.is_enabled() {
+                if is_sandboxed {
                     ComputerUsePermission::AlwaysAllow
                 } else {
                     ComputerUsePermission::Never
