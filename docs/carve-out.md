@@ -107,7 +107,7 @@ Still open:
 - The run-agents "Cloud" execution mode is still offered but cannot run (no parent run_id
   without Warp's server); removing it takes the remote orchestration paths with it.
 - Bundled agent skills under `resources/bundled/skills` still describe Warp (and `oz-platform`
-  only Warp's cloud). A few links still point at `github.com/uncaged-terminal/uncaged`.
+  only Warp's cloud).
 - The Linux secure-storage key seed string that names `releases.warp.dev` must stay (changing
   it would make stored secrets unreadable).
 

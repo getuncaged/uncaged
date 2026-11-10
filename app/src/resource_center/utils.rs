@@ -1,5 +1,5 @@
 // Hard coded constants to divide keybindings into their respective categories/sections.
-// This should always align with documentation: https://github.com/uncaged-terminal/uncaged#readme
+// This should always align with documentation: https://github.com/getuncaged/uncaged#readme
 use uncaged_ui::keymap::Keystroke;
 
 use crate::util::bindings::CommandBinding;

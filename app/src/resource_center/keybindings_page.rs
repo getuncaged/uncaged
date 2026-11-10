@@ -56,7 +56,7 @@ pub struct KeybindingsView {
 
 /// Keybindings are sorted into these sections,
 /// where "Fundamentals" is the default for any remaining non-categorized ones.
-/// This should always align with documentation: https://github.com/uncaged-terminal/uncaged#readme
+/// This should always align with documentation: https://github.com/getuncaged/uncaged#readme
 #[derive(Clone, Eq, PartialEq, Sequence)]
 pub enum KeybindingSection {
     Essentials,

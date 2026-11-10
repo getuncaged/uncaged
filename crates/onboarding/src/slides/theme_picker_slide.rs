@@ -38,7 +38,7 @@ pub enum ThemePickerSlideAction {
     NextClicked,
 }
 
-const TOS_URL: &str = "https://github.com/uncaged-terminal/uncaged";
+const TOS_URL: &str = "https://github.com/getuncaged/uncaged";
 
 #[derive(Debug, Clone)]
 struct ThemeOption {

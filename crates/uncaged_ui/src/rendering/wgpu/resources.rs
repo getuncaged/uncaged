@@ -758,7 +758,7 @@ fn adapter_stability_sort_func(
         log::warn!(
             "Deprioritizing Vulkan-backed Nvidia adapter due to version < {} (unsupported).\nSee \
             the \"Graphics\" secion of our docs here: \
-            https://github.com/uncaged-terminal/uncaged",
+            https://github.com/getuncaged/uncaged",
             *MIN_SUPPORTED_NVIDIA_VERSION
         );
         AdapterSupport::Unsupported
