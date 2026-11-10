@@ -1,5 +1,4 @@
 use pathfinder_geometry::vector::vec2f;
-use uncaged_core::features::FeatureFlag;
 use uncaged_core::ui::appearance::Appearance;
 use uncaged_ui::elements::{
     ChildAnchor, ChildView, Clipped, ConstrainedBox, Container, Empty, Fill, MainAxisAlignment,
@@ -16,7 +15,6 @@ use uncaged_ui::{Element, ViewContext};
 use super::env_var_collection::{
     EnvVarCollectionAction, EnvVarCollectionView, VariableRowIndex, CORE_MAX_WIDTH, ROW_SPACING,
 };
-use crate::drive::sharing::ContentEditability;
 use crate::env_vars::active_env_var_collection_data::SavingStatus;
 use crate::env_vars::EnvVarValue;
 use crate::external_secrets::{ExternalSecretManager, SecretManager};
@@ -138,7 +136,6 @@ impl EnvVarCollectionView {
         menu_button_mouse_state: MouseStateHandle,
         row_index: usize,
         is_focused: bool,
-        editability: ContentEditability,
     ) -> Box<dyn Element> {
         let (display_name, action, menu, icon) = match secret {
             EnvVarValue::Secret(sec) => (
@@ -195,16 +192,12 @@ impl EnvVarCollectionView {
             ..default_button_styles
         };
 
-        let mut button = appearance
+        let button = appearance
             .ui_builder()
             .button(ButtonVariant::Outlined, menu_button_mouse_state)
             .with_style(default_button_styles)
             .with_hovered_styles(hovered_styles)
             .with_text_and_icon_label(text_and_icon);
-
-        if FeatureFlag::SharedWithMe.is_enabled() && !editability.can_edit() {
-            button = button.disabled();
-        }
 
         let button = button
             .build()

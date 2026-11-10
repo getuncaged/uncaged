@@ -13,9 +13,8 @@ fn local_user_owner_round_trips_through_personal_space() {
 }
 
 #[test]
-fn team_owner_maps_to_team_space_without_shared_with_me() {
+fn team_owner_maps_to_team_space() {
     let team_uid = ServerId::from(7);
-    let _flag = FeatureFlag::SharedWithMe.override_enabled(false);
     assert_eq!(
         Space::from_owner(Owner::Team { team_uid }),
         Space::Team { team_uid }
@@ -25,20 +24,4 @@ fn team_owner_maps_to_team_space_without_shared_with_me() {
         Some(Owner::Team { team_uid })
     );
     assert_eq!(Space::Shared.owner(), None);
-}
-
-#[test]
-fn foreign_owners_are_shared_with_shared_with_me() {
-    let _flag = FeatureFlag::SharedWithMe.override_enabled(true);
-    let other_user = Owner::User {
-        user_uid: UserUid::new("someone_else"),
-    };
-    assert_eq!(Space::from_owner(other_user), Space::Shared);
-    assert_eq!(Space::from_owner(Owner::local_user()), Space::Personal);
-    assert_eq!(
-        Space::from_owner(Owner::Team {
-            team_uid: ServerId::from(7)
-        }),
-        Space::Shared
-    );
 }

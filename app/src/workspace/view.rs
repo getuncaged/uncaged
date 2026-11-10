@@ -18472,12 +18472,6 @@ impl Workspace {
             context.set.insert(flags::CODE_SUGGESTIONS_FLAG);
         }
 
-        if ai_settings.is_shared_block_title_generation_enabled(app) {
-            context
-                .set
-                .insert(flags::SHARED_BLOCK_TITLE_GENERATION_FLAG);
-        }
-
         if *ai_settings.include_agent_commands_in_history.value() {
             context
                 .set

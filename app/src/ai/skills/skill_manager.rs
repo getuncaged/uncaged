@@ -11,10 +11,7 @@ use uncaged_ui::{AppContext, Entity, ModelContext, ModelHandle, SingletonEntity}
 use uncaged_util::local_or_remote_path::LocalOrRemotePath;
 
 #[cfg(test)]
-use super::bundled::{
-    activation_for_bundled_skill, build_bundled_skill_context, read_bundled_skills,
-    BundledSkillActivation,
-};
+use super::bundled::{build_bundled_skill_context, read_bundled_skills, BundledSkillActivation};
 use super::bundled::{BundledSkill, BundledSkills};
 use super::{ActiveSkillLookupError, SkillDescriptor, SkillManagerEvent, SkillPathQuery};
 use crate::ai::skills::skill_utils::SkillDeduplicator;

@@ -5,7 +5,7 @@ use crate::cloud_object::breadcrumbs::ContainingObject;
 use crate::cloud_object::model::persistence::CloudModelEvent;
 use crate::cloud_object::model::view::CloudViewModel;
 use crate::cloud_object::{CloudObject, Owner, Space};
-use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
+use crate::drive::sharing::ContentEditability;
 use crate::env_vars::CloudEnvVarCollection;
 use crate::server::cloud_objects::update_manager::{ObjectOperation, UpdateManagerEvent};
 use crate::server::ids::{ClientId, SyncId};
@@ -150,18 +150,6 @@ impl ActiveEnvVarCollectionData {
             ActiveEnvVarCollection::CommittedEnvVarCollection(id) => Some(*id),
             ActiveEnvVarCollection::NewEnvVarCollection(env_var_collection) => {
                 Some(env_var_collection.id)
-            }
-        }
-    }
-
-    /// The current user's access level on this env var collection.
-    pub fn access_level(&self, app: &AppContext) -> SharingAccessLevel {
-        match &self.active_env_var_collection {
-            ActiveEnvVarCollection::CommittedEnvVarCollection(sync_id) => {
-                CloudViewModel::as_ref(app).access_level(&sync_id.uid(), app)
-            }
-            ActiveEnvVarCollection::None | ActiveEnvVarCollection::NewEnvVarCollection(_) => {
-                SharingAccessLevel::Full
             }
         }
     }

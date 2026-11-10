@@ -393,7 +393,6 @@ default = [
     # Uncaged: codebase indexing runs on-device (ai::index::full_source_code_embedding::LocalStoreClient).
     "full_source_code_embedding",
     "render_continuous_block_selections_with_single_border",
-    # "shared_with_me",  # Uncaged: needs Warp servers
     "external_agent_mode_context",
     "shell_selector",
     "minimalist_ui",
@@ -405,7 +404,6 @@ default = [
     "rect_selection",
     "reload_stale_conversation_files",
     # "loginless_conversion",  # Uncaged: needs Warp servers
-    # "warp_packs",  # Uncaged: needs Warp servers
     "ai_rules",
     "suggested_rules",
     "default_waterfall_mode",
@@ -424,7 +422,6 @@ default = [
     "fast_forward_autoexecute_button",
     "image_as_context",
     "command_palette_file_search",
-    # "usage_based_pricing",  # Uncaged: needs Warp servers
     "ai_context_menu",
     "at_menu_outside_of_ai_mode",
     "agent_management_view",
@@ -456,7 +453,6 @@ default = [
     "mcp_oauth",
     "expand_edit_to_pane",
     "fallback_model_load_output_messaging",
-    # "api_key_management",  # Uncaged: needs Warp servers
     "summarization_cancellation_confirmation",
     "ui_zoom",
     "discard_per_file_and_all_changes",
@@ -468,35 +464,22 @@ default = [
     "integration_command",
     "artifact_command",
     "conversation_api",
-    # "cloud_environments",  # Uncaged: needs Warp servers
     "create_environment_slash_command",
     "code_review_find",
     "mcp_grouped_server_context",
     "fork_from_command",
     "context_window_usage_v2",
-    # "ambient_agents_command_line",  # Uncaged: needs Warp servers
-    # "ambient_agents_image_upload",  # Uncaged: needs Warp servers
-    # "scheduled_ambient_agents",  # Uncaged: needs Warp servers
     "v4a_file_diffs",
     "classic_completions",
     "force_classic_completions",
-    # "team_api_keys",  # Uncaged: needs Warp servers
     "named_agents",
     "agent_tips",
     "pluggable_notifications",
     "agent_onboarding",
     "global_search",
-    # "cloud_conversations",  # Uncaged: needs Warp servers
     "list_skills",
     "ask_user_question",
     "bundled_skills",
-    # Uncaged: cloud-agent modes disabled (no account, no Warp cloud).
-    # "cloud_mode",
-    # "cloud_mode_from_local_session",
-    # "cloud_mode_image_context",
-    # "oz_platform_skills",  # Uncaged: needs Warp servers
-    # "oz_identity_federation",  # Uncaged: needs Warp servers
-    # "sync_ambient_plans",  # Uncaged: needs Warp servers
     "conversation_artifacts",
     "agent_view",
     "agent_view_block_context",
@@ -508,7 +491,6 @@ default = [
     "richtext_multiselect",
     "inline_profile_selector",
     "web_fetch_ui",
-    # "oz_changelog_updates",  # Uncaged: needs Warp servers
     "skill_arguments",
     "incremental_auto_reload",
     "active_conversation_requires_interaction",
@@ -545,19 +527,12 @@ default = [
     "settings_file",
     "directory_tab_colors",
     "git_credential_refresh",
-    # Uncaged: hand-off-to-cloud disabled (no account/cloud).
-    # "oz_handoff",
-    # "handoff_local_cloud",
     "run_agents_tool",
     "pending_user_query_indicator",
     "queue_slash_command",
     "queued_prompts_v2",
-    # Uncaged: cloud-mode input/setup + cloud handoff disabled.
-    # "cloud_mode_setup_v2",
-    # "handoff_cloud_cloud",
     "custom_model_routers",
     "supergrok",
-    # "billing_and_usage_page_v2",  # Uncaged: needs Warp servers
     "git_operations_in_code_review",
     # Uncaged: the local engine now handles GeneratePassiveSuggestions and emits
     # SuggestPrompt chips, so turn on passive prompt suggestions by default.
@@ -609,9 +584,6 @@ agent_mode_evals = [
     "rust-embed/debug-embed",
     "uncaged_logging/agent_mode_evals",
 ]
-ambient_agents_command_line = []
-ambient_agents_image_upload = []
-scheduled_ambient_agents = []
 allow_ignoring_input_suggestions = []
 inline_slash_commands = ["agent_view"]
 
@@ -654,7 +626,6 @@ mcp_server = []
 mcp_oauth = []
 mcp_debugging_ids = []
 notebook_parameter = []
-oz_changelog_updates = []
 personal_cloud_objects = []
 # Fix for cursor reflow bug during window resize, from Alacritty resizing logic.
 resize_fix = []
@@ -703,7 +674,6 @@ traces = []
 workflow_aliases = []
 rect_selection = []
 alacritty_settings_import = []
-shared_with_me = []
 ai_rules = []
 am_workflows = []
 shell_selector = []
@@ -716,24 +686,19 @@ avatar_in_tab_bar = []
 ssh_drag_and_drop = []
 permanent_autosuggestion_hint = []
 cycle_next_command_suggestion = []
-multi_workspace = []
 ime_marked_text = []
 partial_next_command_suggestions = []
 drive_objects_as_context = []
 iterm_images = []
 validate_autosuggestions = []
 autoupdate_ui_revamp = []
-warp_packs = []
 suggested_rules = []
 command_correction_key = []
 full_source_code_embedding = []
 use_tantivy_search = []
 agent_management_popup = []
-simulate_github_unauthed = []
 reload_stale_conversation_files = []
-shared_block_title_generation = []
 retry_truncated_code_responses = []
-usage_based_pricing = []
 ai_context_menu = []
 at_menu_outside_of_ai_mode = []
 agent_decides_command_execution = []
@@ -757,7 +722,6 @@ pr_comments_skill = []
 conversation_artifacts = []
 conversations_as_context = []
 conversation_api = []
-sync_ambient_plans = []
 projects = []
 vim_code_editor = []
 allow_opening_file_links_using_editor_env = []
@@ -766,7 +730,6 @@ revert_diff_hunk = []
 code_review_save_changes = []
 file_tree = []
 code_launch_modal = []
-api_key_management = []
 diff_set_as_context = []
 discard_per_file_and_all_changes = []
 ui_zoom = []
@@ -776,8 +739,6 @@ auto_open_code_review_pane = []
 inline_code_review = []
 integration_command = []
 artifact_command = []
-cloud_environments = []
-cloud_runners = []
 create_environment_slash_command = []
 summarize_conversation_command = []
 mcp_grouped_server_context = []
@@ -795,25 +756,17 @@ agent_view_block_context = ["agent_view"]
 v4a_file_diffs = []
 agent_tips = []
 agent_toolbar_editor = ["agent_view"]
-cloud_conversations = []
 agent_view_prompt_chip = ["agent_view"]
-team_api_keys = []
 named_agents = []
 classic_completions = []
-cloud_mode = []
-cloud_mode_from_local_session = []
-cloud_mode_image_context = []
 force_classic_completions = []
 agent_view_conversation_list_view = ["agent_view"]
 inline_history_menu = ["agent_view"]
 inline_repo_menu = ["agent_view"]
-summarization_via_message_replacement = []
 lsp_as_a_tool = []
 inline_model_selector = ["agent_view"]
 inline_profile_selector = ["agent_view"]
 restore_prompt_on_inline_model_selector_search = []
-oz_platform_skills = []
-oz_identity_federation = []
 new_tab_styling = []
 file_based_mcp = []
 skill_arguments = []
@@ -833,19 +786,14 @@ tab_configs = []
 grouped_tabs = []
 pinned_tabs = []
 agent_harness = []
-oz_handoff = []
-handoff_local_cloud = []
 hoa_notifications = []
 transfer_control_tool = []
 custom_model_routers = []
-billing_and_usage_page_v2 = []
 gpt_configurable_context_window = []
 configurable_toolbar = []
 warpify_footer = []
 git_operations_in_code_review = []
 codex_plugin = []
-cloud_mode_setup_v2 = ["cloud_mode"]
-handoff_cloud_cloud = ["cloud_mode_setup_v2"]
 git_credential_refresh = []
 prompt_cache_expiry_warning = []
 

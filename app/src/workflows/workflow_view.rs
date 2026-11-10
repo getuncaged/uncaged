@@ -42,7 +42,7 @@ use crate::cloud_object::model::view::CloudViewModel;
 use crate::cloud_object::{CloudObject, ObjectType, Owner, Space};
 use crate::drive::cloud_object_styling::warp_drive_icon_color;
 use crate::drive::items::WarpDriveItemId;
-use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
+use crate::drive::sharing::ContentEditability;
 use crate::drive::workflows::arguments::ArgumentsState;
 use crate::drive::workflows::enum_creation_dialog::{
     EnumCreationDialog, EnumCreationDialogEvent, WorkflowEnumData,
@@ -584,15 +584,9 @@ impl WorkflowView {
         }
 
         self.workflow_view_mode = match mode {
-            // Force view mode if the user is not allowed to edit the workflow.
-            WorkflowViewMode::Edit => {
-                WorkflowViewMode::supported_edit_mode(Some(self.workflow_id), ctx)
-            }
             // Force edit mode if we are in a context where we can run workflows and we try to use view
             // mode
-            WorkflowViewMode::View => {
-                WorkflowViewMode::supported_view_mode(Some(self.workflow_id), ctx)
-            }
+            WorkflowViewMode::View => WorkflowViewMode::supported_view_mode(),
             mode => mode,
         };
 
@@ -737,16 +731,6 @@ impl WorkflowView {
 
     pub fn is_team_workflow(&self) -> bool {
         matches!(self.owner, Some(Owner::Team { .. }))
-    }
-
-    /// The current user's access level for this workflow.
-    fn access_level(&self, app: &AppContext) -> SharingAccessLevel {
-        CloudViewModel::as_ref(app).access_level(&self.workflow_id.uid(), app)
-    }
-
-    /// Whether or not the current user is allowed to edit this workflow.
-    fn editability(&self, app: &AppContext) -> ContentEditability {
-        CloudViewModel::as_ref(app).object_editability(&self.workflow_id.uid(), app)
     }
 
     pub fn pane_configuration(&self) -> &ModelHandle<PaneConfiguration> {
@@ -1236,8 +1220,7 @@ impl WorkflowView {
     }
 
     fn try_set_view_mode(&mut self, ctx: &mut ViewContext<Self>) {
-        self.workflow_view_mode =
-            WorkflowViewMode::supported_view_mode(Some(self.workflow_id), ctx);
+        self.workflow_view_mode = WorkflowViewMode::supported_view_mode();
         // always reset with the cloudmodel version whether or not we successfully
         // transition to the view mode.
         self.reset(ctx);
@@ -1275,13 +1258,9 @@ impl WorkflowView {
         }
 
         self.workflow_view_mode = match self.workflow_view_mode {
-            WorkflowViewMode::View => {
-                WorkflowViewMode::supported_edit_mode(Some(self.workflow_id), ctx)
-            }
+            WorkflowViewMode::View => WorkflowViewMode::Edit,
             // Attempt to toggle to view mode only if it is allowed in this context
-            WorkflowViewMode::Edit => {
-                WorkflowViewMode::supported_view_mode(Some(self.workflow_id), ctx)
-            }
+            WorkflowViewMode::Edit => WorkflowViewMode::supported_view_mode(),
             // NOTE: prevent transition from create to any other mode
             // we also shouldn't be showing the toggle button in create view
             WorkflowViewMode::Create => WorkflowViewMode::Create,
@@ -2516,22 +2495,10 @@ impl View for WorkflowView {
             .finish(),
         );
 
-        let editability = if FeatureFlag::SharedWithMe.is_enabled() {
-            self.editability(app)
-        } else {
-            ContentEditability::Editable
-        };
-        let mode_toggleable = match (ContextFlag::RunWorkflow.is_enabled(), editability) {
-            // If logging in would allow editing, show the toggle for discoverability.
-            (_, ContentEditability::RequiresLogin) => true,
-            // If workflows aren't runnable (so view mode is enabled) AND the user can edit the
-            // workflow, both view and edit modes are allowed.
-            (false, ContentEditability::Editable) => true,
-            // Otherwise, only one of view and edit mode is allowed.
-            (_, _) => false,
-        };
-
-        if mode_toggleable {
+        let editability = ContentEditability::Editable;
+        // If workflows aren't runnable (so view mode is enabled), both view and edit modes are
+        // allowed; otherwise only one of them is.
+        if !ContextFlag::RunWorkflow.is_enabled() {
             row.add_child(
                 Shrinkable::new(
                     1.,
@@ -2741,15 +2708,12 @@ impl BackingView for WorkflowView {
         }
 
         // Add "Trash" to menu
-        let access_level = self.access_level(ctx);
-        if !FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash() {
-            menu_items.push(
-                MenuItemFields::new("Trash")
-                    .with_on_select_action(WorkflowAction::Trash)
-                    .with_icon(Icon::Trash)
-                    .into_item(),
-            );
-        }
+        menu_items.push(
+            MenuItemFields::new("Trash")
+                .with_on_select_action(WorkflowAction::Trash)
+                .with_icon(Icon::Trash)
+                .into_item(),
+        );
 
         menu_items
     }

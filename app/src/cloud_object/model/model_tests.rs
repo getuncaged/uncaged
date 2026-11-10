@@ -17,11 +17,9 @@ use crate::cloud_object::{
 };
 use crate::drive::folders::CloudFolderModel;
 use crate::drive::DriveIndexVariant;
-use crate::features::FeatureFlag;
 use crate::notebooks::CloudNotebookModel;
 use crate::server::ids::{ClientId, ServerId};
 use crate::server::shared_http_client::SharedHttpClient;
-use crate::settings::init_and_register_user_preferences;
 use crate::system::SystemStats;
 use crate::workflows::workflow::Workflow;
 use crate::workflows::CloudWorkflowModel;
@@ -742,47 +740,7 @@ fn test_update_folder_timestamp_from_child_trash() {
 }
 
 #[test]
-fn test_shared_personal_object() {
-    let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
-    App::test((), |mut app| async move {
-        initialize_app(&mut app, Vec::new());
-
-        let other_user = UserUid::new("other_user");
-        let shared_notebook_id = SyncId::ServerId(123.into());
-        let shared_notebook = CloudNotebook::new(
-            shared_notebook_id,
-            CloudNotebookModel {
-                title: "Shared Notebook".to_string(),
-                data: "Hello".to_string(),
-                ai_document_id: None,
-                conversation_id: None,
-            },
-            CloudObjectMetadata::new_from_server(mock_server_metadata()),
-            CloudObjectPermissions {
-                owner: Owner::User {
-                    user_uid: other_user,
-                },
-                guests: Vec::new(),
-                permissions_last_updated_ts: None,
-                anyone_with_link: None,
-            },
-        );
-
-        CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
-            cloud_model.add_object(shared_notebook_id, shared_notebook);
-
-            let space = cloud_model
-                .get_notebook(&shared_notebook_id)
-                .expect("Notebook is in CloudModel")
-                .space();
-            assert_eq!(space, Space::Shared);
-        });
-    });
-}
-
-#[test]
 fn test_unshared_personal_object() {
-    let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
     App::test((), |mut app| async move {
         initialize_app(&mut app, Vec::new());
 
@@ -814,136 +772,6 @@ fn test_unshared_personal_object() {
                 .expect("Notebook is in CloudModel")
                 .space();
             assert_eq!(space, Space::Personal);
-        });
-    });
-}
-
-#[test]
-fn test_shared_team_object() {
-    let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
-    App::test((), |mut app| async move {
-        initialize_app(&mut app, Vec::new());
-
-        // The user is not on this team.
-        let team_uid = ServerId::from(456);
-
-        let shared_notebook_id = SyncId::ServerId(123.into());
-        let shared_notebook = CloudNotebook::new(
-            shared_notebook_id,
-            CloudNotebookModel {
-                title: "Shared Notebook".to_string(),
-                data: "Hello".to_string(),
-                ai_document_id: None,
-                conversation_id: None,
-            },
-            CloudObjectMetadata::new_from_server(mock_server_metadata()),
-            CloudObjectPermissions {
-                owner: Owner::Team { team_uid },
-                guests: Vec::new(),
-                permissions_last_updated_ts: None,
-                anyone_with_link: None,
-            },
-        );
-
-        CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
-            cloud_model.add_object(shared_notebook_id, shared_notebook);
-
-            let space = cloud_model
-                .get_notebook(&shared_notebook_id)
-                .expect("Notebook is in CloudModel")
-                .space();
-            assert_eq!(space, Space::Shared);
-        });
-    });
-}
-
-#[test]
-fn test_shared_object_in_unshared_folder() {
-    let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
-    App::test((), |mut app| async move {
-        app.update(init_and_register_user_preferences);
-        initialize_app(&mut app, Vec::new());
-
-        let other_user = UserUid::new("other_user");
-        let unshared_folder_id = SyncId::ServerId(567.into());
-        let shared_notebook_id = SyncId::ServerId(123.into());
-        let mut shared_notebook = CloudNotebook::new(
-            shared_notebook_id,
-            CloudNotebookModel {
-                title: "Shared Notebook".to_string(),
-                data: "Hello".to_string(),
-                ai_document_id: None,
-                conversation_id: None,
-            },
-            CloudObjectMetadata::new_from_server(mock_server_metadata()),
-            CloudObjectPermissions {
-                owner: Owner::User {
-                    user_uid: other_user,
-                },
-                guests: Vec::new(),
-                permissions_last_updated_ts: None,
-                anyone_with_link: None,
-            },
-        );
-        shared_notebook.metadata_mut().folder_id = Some(unshared_folder_id);
-
-        CloudModel::handle(&app).update(&mut app, |cloud_model, _| {
-            cloud_model.add_object(shared_notebook_id, shared_notebook);
-            let notebook = cloud_model
-                .get_notebook(&shared_notebook_id)
-                .expect("Notebook is in CloudModel");
-
-            // Check space-based APIs.
-            assert_eq!(notebook.space(), Space::Shared);
-            assert!(notebook.is_in_space(Space::Shared));
-
-            // Check location-based APIs.
-            assert_eq!(
-                notebook.location(cloud_model),
-                CloudObjectLocation::Space(Space::Shared)
-            );
-            assert!(notebook.metadata.folder_id.is_some());
-
-            // Despite the missing parent folder, the notebook is not trashed.
-            assert!(!notebook.is_trashed(cloud_model));
-
-            // Check that iteration APIs include the notebook where it's expected.
-            assert!(cloud_model
-                .active_cloud_objects_in_space(Space::Shared)
-                .any(|obj| obj.uid() == notebook.uid()));
-            assert!(cloud_model
-                .active_cloud_objects_in_location_without_descendents(CloudObjectLocation::Space(
-                    Space::Shared
-                ))
-                .any(|obj| obj.uid() == notebook.uid()));
-            assert_eq!(
-                cloud_model
-                    .trashed_cloud_objects_in_space(Space::Shared)
-                    .count(),
-                0
-            );
-            assert_eq!(
-                cloud_model
-                    .trashed_cloud_objects_in_location_without_descendents(
-                        CloudObjectLocation::Space(Space::Shared)
-                    )
-                    .count(),
-                0
-            );
-
-            let folder_location = CloudObjectLocation::Folder(unshared_folder_id);
-            assert_eq!(
-                cloud_model
-                    .active_cloud_objects_in_location_without_descendents(folder_location)
-                    .count(),
-                0
-            );
-            assert_eq!(
-                cloud_model
-                    .trashed_cloud_objects_in_location_without_descendents(folder_location)
-                    .count(),
-                0
-            );
         });
     });
 }

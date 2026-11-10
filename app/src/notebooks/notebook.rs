@@ -53,7 +53,6 @@ use crate::editor::{
     EditOrigin, EditorView, Event as EditorEvent, InteractionState, PropagateAndNoOpNavigationKeys,
     SingleLineEditorOptions, TextColors, TextOptions,
 };
-use crate::features::FeatureFlag;
 use crate::menu::{MenuItem, MenuItemFields};
 use crate::notebooks::editor::model::NotebooksEditorModel;
 use crate::notebooks::editor::rich_text_styles;
@@ -867,9 +866,6 @@ impl NotebookView {
             // Do not allow grabbing edit access if the notebook is trashed or feature flag is turned off.
             return;
         }
-        if FeatureFlag::SharedWithMe.is_enabled() && !active_notebook.editability(ctx).can_edit() {
-            return;
-        }
 
         let id = active_notebook.id();
         UpdateManager::handle(ctx).update(ctx, |update_manager, ctx| {
@@ -1086,7 +1082,6 @@ impl NotebookView {
     /// Items to show in the pane header overflow menu.
     fn overflow_menu_items(&self, ctx: &AppContext) -> Vec<MenuItem<NotebookAction>> {
         let active_notebook_data = self.active_notebook_data.as_ref(ctx);
-        let access_level = active_notebook_data.access_level(ctx);
         let mut menu_items = Vec::new();
 
         if !active_notebook_data.is_on_server()
@@ -1144,14 +1139,12 @@ impl NotebookView {
         }
 
         // Add "Trash" to menu
-        if !FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash() {
-            menu_items.push(
-                MenuItemFields::new("Trash")
-                    .with_on_select_action(NotebookAction::Trash)
-                    .with_icon(icons::Icon::Trash)
-                    .into_item(),
-            );
-        }
+        menu_items.push(
+            MenuItemFields::new("Trash")
+                .with_on_select_action(NotebookAction::Trash)
+                .with_icon(icons::Icon::Trash)
+                .into_item(),
+        );
 
         menu_items
     }
@@ -1219,43 +1212,39 @@ impl NotebookView {
         let baton_future = ctx.spawn(has_metadata, |me, _, ctx| {
             let active_notebook_data = me.active_notebook_data.as_ref(ctx);
 
-            if FeatureFlag::SharedWithMe.is_enabled() && !active_notebook_data.editability(ctx).can_edit() {
-                log::debug!("Notebook is view-only, opening in view mode");
-            } else {
-                let current_editor = active_notebook_data.current_editor(ctx);
+            let current_editor = active_notebook_data.current_editor(ctx);
 
-                // If there's not currently an editor or the current editor has been idle, we want to automatically
-                // switch the user into edit mode.
-                match current_editor {
-                    Some(editor) => {
-                        let email = editor.email.unwrap_or_default();
-                        match editor.state {
-                            EditorState::None => {
-                                log::info!("Optimistically grabbing edit access, no notebook editor");
-                                me.grab_edit_access(true, ctx);
-                            }
-                            EditorState::CurrentUser => {
+            // If there's not currently an editor or the current editor has been idle, we want to automatically
+            // switch the user into edit mode.
+            match current_editor {
+                Some(editor) => {
+                    let email = editor.email.unwrap_or_default();
+                    match editor.state {
+                        EditorState::None => {
+                            log::info!("Optimistically grabbing edit access, no notebook editor");
+                            me.grab_edit_access(true, ctx);
+                        }
+                        EditorState::CurrentUser => {
+                            safe_info!(
+                                safe: ("Optimistically grabbing edit access, already the editor"),
+                                full: ("Optmisitically grabbing edit access, user {email} is already the editor")
+                            );
+                            me.grab_edit_access(true, ctx);
+                        }
+                        EditorState::OtherUserIdle => {
                                 safe_info!(
-                                    safe: ("Optimistically grabbing edit access, already the editor"),
-                                    full: ("Optmisitically grabbing edit access, user {email} is already the editor")
+                                    safe: ("Optimistically grabbing edit access, editor is idle"),
+                                    full: ("Optmisitically grabbing edit access, editor {email} is idle")
                                 );
                                 me.grab_edit_access(true, ctx);
                             }
-                            EditorState::OtherUserIdle => {
-                                    safe_info!(
-                                        safe: ("Optimistically grabbing edit access, editor is idle"),
-                                        full: ("Optmisitically grabbing edit access, editor {email} is idle")
-                                    );
-                                    me.grab_edit_access(true, ctx);
-                                }
-                            EditorState::OtherUserActive => {
-                                log::info!("Opening in view mode, notebook is being edited")
-                            }
+                        EditorState::OtherUserActive => {
+                            log::info!("Opening in view mode, notebook is being edited")
                         }
                     }
-                    None => {
-                        log::info!("Opening in view mode, unknown editor");
-                    }
+                }
+                None => {
+                    log::info!("Opening in view mode, unknown editor");
                 }
             }
         });
@@ -1520,34 +1509,28 @@ impl NotebookView {
 
             let active_notebook_data = self.active_notebook_data.as_ref(app);
 
-            if !FeatureFlag::SharedWithMe.is_enabled()
-                || active_notebook_data.access_level(app).can_trash()
-            {
-                let ui_builder = appearance.ui_builder().clone();
-                action_row.add_child(
-                    Align::new(
-                        appearance
-                            .ui_builder()
-                            .button(
-                                ButtonVariant::Basic,
-                                self.button_mouse_states.restore_from_trash_button.clone(),
-                            )
-                            .with_tooltip(move || {
-                                ui_builder
-                                    .tool_tip("Restore notebook from trash".to_string())
-                                    .build()
-                                    .finish()
-                            })
-                            .with_text_label("Restore".to_string())
-                            .build()
-                            .on_click(|ctx, _, _| {
-                                ctx.dispatch_typed_action(NotebookAction::Untrash)
-                            })
-                            .finish(),
-                    )
-                    .finish(),
-                );
-            }
+            let ui_builder = appearance.ui_builder().clone();
+            action_row.add_child(
+                Align::new(
+                    appearance
+                        .ui_builder()
+                        .button(
+                            ButtonVariant::Basic,
+                            self.button_mouse_states.restore_from_trash_button.clone(),
+                        )
+                        .with_tooltip(move || {
+                            ui_builder
+                                .tool_tip("Restore notebook from trash".to_string())
+                                .build()
+                                .finish()
+                        })
+                        .with_text_label("Restore".to_string())
+                        .build()
+                        .on_click(|ctx, _, _| ctx.dispatch_typed_action(NotebookAction::Untrash))
+                        .finish(),
+                )
+                .finish(),
+            );
 
             if active_notebook_data.space(app) != Some(Space::Personal) {
                 let ui_builder = appearance.ui_builder().clone();
@@ -1678,15 +1661,7 @@ impl View for NotebookView {
             Mode::View => context.set.insert("NotebookViewing"),
         };
 
-        if !FeatureFlag::SharedWithMe.is_enabled()
-            || self
-                .active_notebook_data
-                .as_ref(app)
-                .editability(app)
-                .can_edit()
-        {
-            context.set.insert("NotebookIsEditable");
-        }
+        context.set.insert("NotebookIsEditable");
 
         let font_settings = FontSettings::as_ref(app);
         if !font_settings.match_notebook_to_monospace_font_size.value() {

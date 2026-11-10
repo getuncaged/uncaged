@@ -4,9 +4,8 @@
 //! the settings file and through these palette entries.
 
 use settings::{Setting as _, ToggleableSetting as _};
-use uncaged_core::features::FeatureFlag;
 use uncaged_ui::keymap::ContextPredicate;
-use uncaged_ui::{id, Action, AppContext, SingletonEntity};
+use uncaged_ui::{Action, AppContext, SingletonEntity};
 
 use super::{flags, SettingsAction, ToggleSettingActionPair};
 use crate::report_if_error;
@@ -28,23 +27,12 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
 ) {
     let toggle = |action| builder(SettingsAction::ToggleSetting(action));
 
-    let mut toggle_binding_pairs = vec![
-        ToggleSettingActionPair::new(
-            "secret redaction",
-            toggle(SettingToggleAction::SecretRedaction),
-            context,
-            flags::SAFE_MODE_FLAG,
-        ),
-        ToggleSettingActionPair::new(
-            "cloud AI conversation storage",
-            toggle(SettingToggleAction::CloudConversationStorage),
-            &(context.clone()
-                & id!(flags::IS_ANY_AI_ENABLED)
-                & id!(flags::CLOUD_CONVERSATION_STORAGE_EDITABLE_FLAG)),
-            flags::CLOUD_CONVERSATION_STORAGE_FLAG,
-        )
-        .with_enabled(|| FeatureFlag::CloudConversations.is_enabled()),
-    ];
+    let mut toggle_binding_pairs = vec![ToggleSettingActionPair::new(
+        "secret redaction",
+        toggle(SettingToggleAction::SecretRedaction),
+        context,
+        flags::SAFE_MODE_FLAG,
+    )];
 
     if WarpifySettings::as_ref(app)
         .enable_ssh_warpification

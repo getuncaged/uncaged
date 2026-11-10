@@ -45,15 +45,15 @@ fn test_roundtrip_guests() {
         },
     ];
 
-    let encoded = super::encode_guests(&guests).expect("encode should succeed");
-    let decoded = super::decode_guests(&encoded).expect("decode should succeed");
+    let encoded = crate::encode_guests(&guests).expect("encode should succeed");
+    let decoded = crate::decode_guests(&encoded).expect("decode should succeed");
 
     assert_eq!(guests, decoded);
 }
 
 #[test]
 fn test_fail_unsupported_subjects() {
-    let result = super::encode_guests(&[CloudObjectGuest {
+    let result = crate::encode_guests(&[CloudObjectGuest {
         subject: Subject::AnyoneWithLink(LinkSharingSubjectType::Anyone),
         access_level: SharingAccessLevel::View,
         source: None,

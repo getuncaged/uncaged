@@ -16,7 +16,7 @@ use crate::ui_components::icons::Icon;
 use crate::util::bindings::{
     keybinding_name_to_display_string, trigger_to_keystroke, CustomAction,
 };
-use crate::{AppContext, FeatureFlag};
+use crate::AppContext;
 
 const PANE_MENU_WIDTH: f32 = 200.;
 
@@ -359,7 +359,6 @@ impl EnvVarCollectionView {
         let mut menu_items = Vec::new();
 
         let active_collection_data = self.active_env_var_collection_data.as_ref(ctx);
-        let access_level = active_collection_data.access_level(ctx);
         let space = active_collection_data.space(ctx);
 
         if !active_collection_data.is_on_server()
@@ -379,14 +378,12 @@ impl EnvVarCollectionView {
         }
 
         // Add "Trash" to menu
-        if !FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash() {
-            menu_items.push(
-                MenuItemFields::new("Trash")
-                    .with_on_select_action(EnvVarCollectionAction::Trash)
-                    .with_icon(Icon::Trash)
-                    .into_item(),
-            );
-        }
+        menu_items.push(
+            MenuItemFields::new("Trash")
+                .with_on_select_action(EnvVarCollectionAction::Trash)
+                .with_icon(Icon::Trash)
+                .into_item(),
+        );
 
         #[cfg(feature = "local_fs")]
         menu_items.push(

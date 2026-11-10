@@ -1,12 +1,10 @@
 use std::path::PathBuf;
 #[cfg(not(target_family = "wasm"))]
 use std::process::Stdio;
-use std::sync::Arc;
 use std::time::Duration;
 
 #[cfg(not(target_family = "wasm"))]
 use command::r#async::Command;
-use parking_lot::FairMutex;
 use serde_json::json;
 use uncaged_core::features::FeatureFlag;
 use uncaged_ui::r#async::{FutureExt as AsyncFutureExt, SpawnedFutureHandle, Timer};
@@ -26,7 +24,6 @@ use crate::terminal::event::{BlockType, UserBlockCompleted};
 use crate::terminal::model::block::BlockId;
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model::session::SessionType;
-use crate::terminal::model::terminal_model::TerminalModel;
 use crate::terminal::model_events::{ModelEvent, ModelEventDispatcher};
 use crate::terminal::view::AgentModePromptSuggestion;
 
@@ -48,7 +45,6 @@ pub enum PassiveSuggestionsEvent {
 
 pub struct PassiveSuggestionsModel {
     active_session: ModelHandle<ActiveSession>,
-    terminal_model: Arc<FairMutex<TerminalModel>>,
     ai_controller: ModelHandle<BlocklistAIController>,
     terminal_view_id: EntityId,
     unit_test_generation_future_handle: Option<SpawnedFutureHandle>,
@@ -61,7 +57,6 @@ pub struct PassiveSuggestionsModel {
 impl PassiveSuggestionsModel {
     pub fn new(
         active_session: ModelHandle<ActiveSession>,
-        terminal_model: Arc<FairMutex<TerminalModel>>,
         ai_controller: ModelHandle<BlocklistAIController>,
         model_event_dispatcher: &ModelHandle<ModelEventDispatcher>,
         terminal_view_id: EntityId,
@@ -76,7 +71,6 @@ impl PassiveSuggestionsModel {
 
         Self {
             active_session,
-            terminal_model,
             ai_controller,
             terminal_view_id,
             unit_test_generation_future_handle: None,
@@ -197,19 +191,6 @@ impl PassiveSuggestionsModel {
         }
 
         self.abort_pending_requests(ctx);
-
-        // Startup commands run while bootstrapping an Oz cloud environment, so we skip
-        // passive prompt suggestion generation for them to avoid unnecessary requests.
-        let is_oz_environment_startup_command = FeatureFlag::CloudModeSetupV2.is_enabled()
-            && self
-                .terminal_model
-                .lock()
-                .block_list()
-                .block_at(block_completed.index)
-                .is_some_and(|block| block.is_oz_environment_startup_command());
-        if is_oz_environment_startup_command {
-            return;
-        }
 
         if should_generate_unit_test_suggestion(block_completed, ctx) {
             self.generate_unit_test_suggestion(block_completed.clone(), ctx);

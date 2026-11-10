@@ -21,7 +21,6 @@ use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 
 use crate::report_if_error;
-use crate::settings::PrivacySettings;
 use crate::terminal::CLIAgent;
 
 pub enum FocusedTerminalInfoEvent {
@@ -656,9 +655,8 @@ define_settings_group!(AISettings, settings: [
         toml_path: "agents.warp_agent.active_ai.code_suggestions_enabled",
         description: "Controls whether AI code suggestions are enabled.",
     }
-    // This field should not be referenced directly to lookup shared block title generations
-    // enablement -- use the `is_shared_block_title_generation_enabled()` getter.
-    // This feature refers to the auto title generation when the user opens the shared block dialog.
+    // Auto title generation for the shared block dialog. Shared blocks need Warp's server, so
+    // nothing reads this; it stays so existing settings files keep the key.
     shared_block_title_generation_enabled_internal: SharedBlockTitleGenerationEnabled {
         type: bool,
         default: true,
@@ -1258,10 +1256,6 @@ impl AISettings {
         self.is_active_ai_enabled(app) && *self.code_suggestions_enabled_internal
     }
 
-    pub fn is_shared_block_title_generation_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
-        self.is_active_ai_enabled(app) && *self.shared_block_title_generation_enabled_internal
-    }
-
     pub fn is_intelligent_autosuggestions_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_active_ai_enabled(app) && *self.intelligent_autosuggestions_enabled_internal
     }
@@ -1308,33 +1302,6 @@ impl AISettings {
 
     pub fn is_orchestration_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
         self.is_any_ai_enabled(app)
-    }
-
-    /// Returns true when local-to-cloud handoff is effectively enabled.
-    /// False when the user/org has disabled it, cloud conversations are off,
-    /// or AI is globally off.
-    pub fn is_cloud_handoff_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
-        if !self.is_any_ai_enabled(app) || *self.should_force_disable_cloud_handoff {
-            return false;
-        }
-        if !FeatureFlag::OzHandoff.is_enabled()
-            || !FeatureFlag::HandoffLocalCloud.is_enabled()
-            || !cfg!(all(feature = "local_fs", not(target_family = "wasm")))
-        {
-            return false;
-        }
-        PrivacySettings::as_ref(app).is_cloud_conversation_storage_enabled
-    }
-    pub fn is_ampersand_handoff_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
-        self.is_cloud_handoff_enabled(app) && !*self.should_force_disable_ampersand_handoff
-    }
-
-    pub fn is_auto_handoff_on_sleep_enabled(&self, app: &uncaged_ui::AppContext) -> bool {
-        self.is_cloud_handoff_enabled(app)
-            && self
-                .auto_handoff_on_sleep_enabled
-                .is_supported_on_current_platform()
-            && *self.auto_handoff_on_sleep_enabled
     }
 
     pub fn is_command_denylist_editable(&self, app: &AppContext) -> bool {

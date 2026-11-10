@@ -58,7 +58,7 @@ impl WorkflowPane {
             manager.create_pane(
                 &source,
                 &settings,
-                WorkflowViewMode::supported_view_mode(workflow_id, ctx),
+                WorkflowViewMode::supported_view_mode(),
                 window_id,
                 ctx,
             )

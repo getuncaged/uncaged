@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use cloud_objects::UserUid;
 use uncaged_cli::agent::Harness;
-use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{AppContext, SingletonEntity};
 
 use super::{
@@ -298,14 +297,6 @@ pub(super) fn task_creator_uid(task: &AmbientAgentTask) -> Option<String> {
 }
 
 fn task_session_status(task: &AmbientAgentTask) -> SessionStatus {
-    if FeatureFlag::CloudConversations.is_enabled() {
-        return if task.active_run_execution().session_link.is_some() {
-            SessionStatus::Available
-        } else {
-            SessionStatus::Unavailable
-        };
-    }
-
     if task.active_run_execution().session_id.is_some() {
         SessionStatus::Available
     } else if (Utc::now() - task.created_at) > SESSION_EXPIRATION_TIME {

@@ -2,7 +2,6 @@ use chrono::{DateTime, Utc};
 use cloud_object_models::ServerAIExecutionProfile;
 use cloud_objects::drive::sharing::SharingAccessLevel;
 use cloud_objects::UserUid;
-use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{App, SingletonEntity};
 
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
@@ -202,8 +201,6 @@ fn adopts_default_profile_saved_in_drive_at_startup() {
 
 #[test]
 fn ignores_shared_default_profile_created_from_cloud() {
-    let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
-
     App::test((), |mut app| async move {
         install_singletons(&mut app);
         let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);
@@ -242,8 +239,6 @@ fn ignores_shared_default_profile_created_from_cloud() {
 
 #[test]
 fn ignores_shared_default_profile_saved_in_drive_at_startup() {
-    let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
-
     App::test((), |mut app| async move {
         install_singletons(&mut app);
 
@@ -277,8 +272,6 @@ fn ignores_shared_default_profile_saved_in_drive_at_startup() {
 
 #[test]
 fn filters_non_owned_non_default_profile_from_list() {
-    let _guard = FeatureFlag::SharedWithMe.override_enabled(true);
-
     App::test((), |mut app| async move {
         install_singletons(&mut app);
         let profile_model = app.add_singleton_model(AIExecutionProfilesModel::new);

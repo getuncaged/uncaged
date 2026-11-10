@@ -6,7 +6,6 @@ use crate::cloud_object::breadcrumbs::ContainingObject;
 use crate::cloud_object::model::persistence::{CloudModel, CloudModelEvent};
 use crate::cloud_object::model::view::{CloudViewModel, Editor};
 use crate::cloud_object::{CloudObject, Owner, Space};
-use crate::drive::sharing::{ContentEditability, SharingAccessLevel};
 use crate::notebooks::CloudNotebook;
 use crate::server::cloud_objects::update_manager::{
     ObjectOperation, UpdateManager, UpdateManagerEvent,
@@ -245,26 +244,6 @@ impl ActiveNotebookData {
                     None => TrashStatus::Deleted,
                 }
             }
-        }
-    }
-
-    /// The current user's access level on the notebook.
-    pub fn access_level(&self, app: &AppContext) -> SharingAccessLevel {
-        match &self.active_notebook {
-            ActiveNotebook::CommittedNotebook(object_id) => {
-                CloudViewModel::as_ref(app).access_level(&object_id.uid(), app)
-            }
-            ActiveNotebook::None | ActiveNotebook::NewNotebook(_) => SharingAccessLevel::Full,
-        }
-    }
-
-    /// Whether or not the current user can edit the notebook.
-    pub fn editability(&self, app: &AppContext) -> ContentEditability {
-        match &self.active_notebook {
-            ActiveNotebook::CommittedNotebook(object_id) => {
-                CloudViewModel::as_ref(app).object_editability(&object_id.uid(), app)
-            }
-            ActiveNotebook::None | ActiveNotebook::NewNotebook(_) => ContentEditability::Editable,
         }
     }
 }

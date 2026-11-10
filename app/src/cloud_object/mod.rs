@@ -9,7 +9,6 @@ use derivative::Derivative;
 use lazy_static::lazy_static;
 use regex::Regex;
 use uncaged_core::channel::Channel;
-use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{AppContext, SingletonEntity};
 
 use self::breadcrumbs::ContainingObject;
@@ -233,10 +232,10 @@ pub trait CloudObject: Debug {
                 match cloud_model.get_by_uid(&hashed_parent_id) {
                     Some(parent) => parent.is_trashed_internal(cloud_model, ancestors),
                     None => {
-                        // If the object has a parent, but the parent is not in CloudModel, assume
-                        // the object is shared, but not its parent. For backwards compatibility,
-                        // if sharing is disabled, default to trashed rather than untrashed.
-                        !FeatureFlag::SharedWithMe.is_enabled()
+                        // If the object has a parent, but the parent is not in CloudModel,
+                        // treat it as trashed (Uncaged has no sharing, so the parent can't be
+                        // a folder that wasn't shared with us).
+                        true
                     }
                 }
             }
@@ -710,25 +709,12 @@ impl Space {
         }
     }
 
-    /// The space an object owned by `owner` shows in. Uncaged has no teams, so
-    /// with Shared with me on, a team owner is a drive the user isn't on.
+    /// The space an object owned by `owner` shows in. Uncaged has no sharing, so
+    /// every user-owned object is Personal.
     pub fn from_owner(owner: Owner) -> Space {
-        let shared_with_me = FeatureFlag::SharedWithMe.is_enabled();
         match owner {
-            Owner::User { user_uid } => {
-                if !shared_with_me || user_uid == UserUid::new(LOCAL_USER_UID) {
-                    Space::Personal
-                } else {
-                    Space::Shared
-                }
-            }
-            Owner::Team { team_uid } => {
-                if shared_with_me {
-                    Space::Shared
-                } else {
-                    Space::Team { team_uid }
-                }
-            }
+            Owner::User { .. } => Space::Personal,
+            Owner::Team { team_uid } => Space::Team { team_uid },
         }
     }
 

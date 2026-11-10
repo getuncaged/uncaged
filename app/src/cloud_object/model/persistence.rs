@@ -3,7 +3,6 @@ use std::future::Future;
 use std::sync::mpsc::SyncSender;
 
 use itertools::Itertools;
-use uncaged_core::features::FeatureFlag;
 use uncaged_ui::{AppContext, Entity, ModelContext, SingletonEntity};
 use uncaged_util::sync::Condition;
 
@@ -858,7 +857,7 @@ impl CloudModel {
                     }
                 }
             }
-            None => !FeatureFlag::SharedWithMe.is_enabled(),
+            None => true,
         };
 
         cache.insert(uid.to_owned(), result);

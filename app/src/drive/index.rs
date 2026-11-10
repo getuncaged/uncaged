@@ -39,7 +39,6 @@ use super::items::item::{tools_panel_menu_direction, ItemStates, WarpDriveRow};
 use super::items::mcp_server_collection::WarpDriveMCPServerCollection;
 use super::items::WarpDriveItemId;
 use super::settings::WarpDriveSettings;
-use super::sharing::ContentEditability;
 use super::{CloudObjectTypeAndId, DriveObjectType, DriveSortOrder};
 use crate::ai::document::ai_document_model::AIDocumentId;
 use crate::ai::facts::{AIFact, AIMemory};
@@ -3018,9 +3017,6 @@ impl DriveIndex {
             return menu_items;
         };
         let can_move_or_trash = self.online_only_operation_allowed(cloud_object_type_and_id, app);
-        let cloud_view_model = CloudViewModel::as_ref(app);
-        let access_level = cloud_view_model.access_level(&cloud_object_type_and_id.uid(), app);
-        let editability = cloud_view_model.object_editability(&cloud_object_type_and_id.uid(), app);
         let object = CloudModel::as_ref(app).get_by_uid(&cloud_object_type_and_id.uid());
 
         if let CloudObjectTypeAndId::Folder(folder_id) = cloud_object_type_and_id {
@@ -3033,92 +3029,86 @@ impl DriveIndex {
                 uncaged_core::channel::Channel::Oss
             ) || matches!(folder_id, SyncId::ServerId(_));
             if folder_actions_allowed {
-                if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
+                menu_items.push(
+                    MenuItemFields::new(INDEX_FOLDER_LABEL)
+                        .with_on_select_action(DriveIndexAction::create_object(
+                            DriveObjectType::Folder,
+                            *space,
+                            Some(*folder_id),
+                        ))
+                        .with_icon(Icon::Folder)
+                        .into_item(),
+                );
+                menu_items.push(
+                    MenuItemFields::new(INDEX_WORKFLOW_LABEL)
+                        .with_on_select_action(DriveIndexAction::create_object(
+                            DriveObjectType::Workflow,
+                            *space,
+                            Some(*folder_id),
+                        ))
+                        .with_icon(Icon::Workflow)
+                        .into_item(),
+                );
+
+                if FeatureFlag::AgentModeWorkflows.is_enabled() {
                     menu_items.push(
-                        MenuItemFields::new(INDEX_FOLDER_LABEL)
+                        MenuItemFields::new(INDEX_AGENT_MODE_WORKFLOW_LABEL)
                             .with_on_select_action(DriveIndexAction::create_object(
-                                DriveObjectType::Folder,
+                                DriveObjectType::AgentModeWorkflow,
                                 *space,
                                 Some(*folder_id),
                             ))
-                            .with_icon(Icon::Folder)
-                            .into_item(),
-                    );
-                    menu_items.push(
-                        MenuItemFields::new(INDEX_WORKFLOW_LABEL)
-                            .with_on_select_action(DriveIndexAction::create_object(
-                                DriveObjectType::Workflow,
-                                *space,
-                                Some(*folder_id),
-                            ))
-                            .with_icon(Icon::Workflow)
-                            .into_item(),
-                    );
-
-                    if FeatureFlag::AgentModeWorkflows.is_enabled() {
-                        menu_items.push(
-                            MenuItemFields::new(INDEX_AGENT_MODE_WORKFLOW_LABEL)
-                                .with_on_select_action(DriveIndexAction::create_object(
-                                    DriveObjectType::AgentModeWorkflow,
-                                    *space,
-                                    Some(*folder_id),
-                                ))
-                                .with_icon(Icon::Prompt)
-                                .into_item(),
-                        );
-                    }
-
-                    menu_items.push(
-                        MenuItemFields::new(INDEX_NOTEBOOK_LABEL)
-                            .with_on_select_action(DriveIndexAction::create_object(
-                                DriveObjectType::Notebook {
-                                    is_ai_document: false,
-                                },
-                                *space,
-                                Some(*folder_id),
-                            ))
-                            .with_icon(Icon::Notebook)
-                            .into_item(),
-                    );
-
-                    menu_items.push(
-                        MenuItemFields::new(INDEX_ENV_VAR_COLLECTION_LABEL)
-                            .with_on_select_action(DriveIndexAction::create_object(
-                                DriveObjectType::EnvVarCollection,
-                                *space,
-                                Some(*folder_id),
-                            ))
-                            .with_icon(Icon::EnvVarCollection)
-                            .into_item(),
-                    );
-
-                    menu_items.push(MenuItem::Separator);
-                }
-                if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
-                    menu_items.push(
-                        MenuItemFields::new("Rename")
-                            .with_on_select_action(DriveIndexAction::OpenCloudObjectNamingDialog {
-                                space: *space,
-                                object_type: DriveObjectType::Folder,
-                                initial_folder_id: Some(*folder_id),
-                                cloud_object_type_and_id: Some(*cloud_object_type_and_id),
-                            })
-                            .with_icon(Icon::Rename)
+                            .with_icon(Icon::Prompt)
                             .into_item(),
                     );
                 }
 
-                if !FeatureFlag::SharedWithMe.is_enabled() || editability.can_edit() {
-                    menu_items.push(
-                        MenuItemFields::new(IMPORT_LABEL)
-                            .with_on_select_action(DriveIndexAction::OpenImportModal {
-                                space: *space,
-                                initial_folder_id: Some(*folder_id),
-                            })
-                            .with_icon(Icon::Import)
-                            .into_item(),
-                    );
-                }
+                menu_items.push(
+                    MenuItemFields::new(INDEX_NOTEBOOK_LABEL)
+                        .with_on_select_action(DriveIndexAction::create_object(
+                            DriveObjectType::Notebook {
+                                is_ai_document: false,
+                            },
+                            *space,
+                            Some(*folder_id),
+                        ))
+                        .with_icon(Icon::Notebook)
+                        .into_item(),
+                );
+
+                menu_items.push(
+                    MenuItemFields::new(INDEX_ENV_VAR_COLLECTION_LABEL)
+                        .with_on_select_action(DriveIndexAction::create_object(
+                            DriveObjectType::EnvVarCollection,
+                            *space,
+                            Some(*folder_id),
+                        ))
+                        .with_icon(Icon::EnvVarCollection)
+                        .into_item(),
+                );
+
+                menu_items.push(MenuItem::Separator);
+                menu_items.push(
+                    MenuItemFields::new("Rename")
+                        .with_on_select_action(DriveIndexAction::OpenCloudObjectNamingDialog {
+                            space: *space,
+                            object_type: DriveObjectType::Folder,
+                            initial_folder_id: Some(*folder_id),
+                            cloud_object_type_and_id: Some(*cloud_object_type_and_id),
+                        })
+                        .with_icon(Icon::Rename)
+                        .into_item(),
+                );
+
+                menu_items.push(
+                    MenuItemFields::new(IMPORT_LABEL)
+                        .with_on_select_action(DriveIndexAction::OpenImportModal {
+                            space: *space,
+                            initial_folder_id: Some(*folder_id),
+                        })
+                        .with_icon(Icon::Import)
+                        .into_item(),
+                );
                 menu_items.push(
                     MenuItemFields::new("Collapse all")
                         .with_on_select_action(DriveIndexAction::CollapseAllInLocation(
@@ -3152,13 +3142,10 @@ impl DriveIndex {
                 }
                 if let Some(_workflow) = workflow {
                     menu_items.push(
-                        Self::pane_menu_item(editability, !ContextFlag::RunWorkflow.is_enabled())
+                        Self::pane_menu_item(!ContextFlag::RunWorkflow.is_enabled())
                             .with_on_select_action(DriveIndexAction::OpenWorkflowInPane {
                                 cloud_object_type_and_id: object.cloud_object_type_and_id(),
-                                open_mode: if (FeatureFlag::SharedWithMe.is_enabled()
-                                    && !editability.can_edit())
-                                    || !ContextFlag::RunWorkflow.is_enabled()
-                                {
+                                open_mode: if !ContextFlag::RunWorkflow.is_enabled() {
                                     WorkflowViewMode::View
                                 } else {
                                     WorkflowViewMode::Edit
@@ -3168,7 +3155,7 @@ impl DriveIndex {
                     );
                 } else if env_var_collection.is_some() {
                     menu_items.push(
-                        Self::pane_menu_item(editability, false)
+                        Self::pane_menu_item(false)
                             .with_on_select_action(DriveIndexAction::OpenObject(
                                 object.cloud_object_type_and_id(),
                             ))
@@ -3311,9 +3298,7 @@ impl DriveIndex {
             }
         }
 
-        if can_move_or_trash
-            && (!FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash())
-        {
+        if can_move_or_trash {
             menu_items.push(
                 MenuItemFields::new("Trash")
                     .with_on_select_action(DriveIndexAction::TrashObject {
@@ -3327,15 +3312,11 @@ impl DriveIndex {
         menu_items
     }
 
-    /// Builder for a menu item to open a Warp Drive object in a pane. The icon and label depend
-    /// on whether the object is editable or not.
+    /// Builder for a menu item to open a Warp Drive object in a pane.
     ///
     /// If `prefer_open` is `true`, the item defaults to view/open mode rather than edit mode.
-    fn pane_menu_item(
-        editability: ContentEditability,
-        prefer_open: bool,
-    ) -> MenuItemFields<DriveIndexAction> {
-        if (FeatureFlag::SharedWithMe.is_enabled() && !editability.can_edit()) || prefer_open {
+    fn pane_menu_item(prefer_open: bool) -> MenuItemFields<DriveIndexAction> {
+        if prefer_open {
             MenuItemFields::new("Open").with_icon(Icon::Eye)
         } else {
             MenuItemFields::new("Edit").with_icon(Icon::Rename)
@@ -3353,29 +3334,23 @@ impl DriveIndex {
             return menu_items;
         };
 
-        let access_level =
-            CloudViewModel::as_ref(app).access_level(&cloud_object_type_and_id.uid(), app);
         if self.online_only_operation_allowed(cloud_object_type_and_id, app) {
-            if !FeatureFlag::SharedWithMe.is_enabled() || access_level.can_trash() {
-                menu_items.push(
-                    MenuItemFields::new("Restore")
-                        .with_on_select_action(DriveIndexAction::UntrashObject {
-                            cloud_object_type_and_id: *cloud_object_type_and_id,
-                        })
-                        .with_icon(Icon::ReverseLeft)
-                        .into_item(),
-                );
-            }
-            if !FeatureFlag::SharedWithMe.is_enabled() || access_level.can_delete() {
-                menu_items.push(
-                    MenuItemFields::new("Delete forever")
-                        .with_on_select_action(DriveIndexAction::DeleteObject {
-                            cloud_object_type_and_id: *cloud_object_type_and_id,
-                        })
-                        .with_icon(Icon::AlertTriangle)
-                        .into_item(),
-                );
-            }
+            menu_items.push(
+                MenuItemFields::new("Restore")
+                    .with_on_select_action(DriveIndexAction::UntrashObject {
+                        cloud_object_type_and_id: *cloud_object_type_and_id,
+                    })
+                    .with_icon(Icon::ReverseLeft)
+                    .into_item(),
+            );
+            menu_items.push(
+                MenuItemFields::new("Delete forever")
+                    .with_on_select_action(DriveIndexAction::DeleteObject {
+                        cloud_object_type_and_id: *cloud_object_type_and_id,
+                    })
+                    .with_icon(Icon::AlertTriangle)
+                    .into_item(),
+            );
         }
 
         menu_items

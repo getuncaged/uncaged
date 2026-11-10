@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use ai::skills::{parse_bundled_skill, ParsedSkill, SkillPathOrigin, SkillReference};
 use futures::TryStreamExt;
 use uncaged_core::channel::ChannelState;
-use uncaged_core::features::FeatureFlag;
 use uncaged_core::ui::icons::Icon;
 use uncaged_core::{report_error, safe_warn};
 use uncaged_ui::{AppContext, SingletonEntity};
@@ -22,8 +21,6 @@ use crate::settings::user_preferences_toml_file_path;
 pub enum BundledSkillActivation {
     /// Always active.
     Always,
-    /// Active only when a specific Warp feature is enabled.
-    RequiresFeature(FeatureFlag),
     /// Active only when a specific MCP server is running.
     RequiresMcp(McpIntegration),
     /// Active only when a specific file exists on disk.
@@ -34,7 +31,6 @@ impl BundledSkillActivation {
     pub fn is_enabled(&self, ctx: &AppContext) -> bool {
         match self {
             Self::Always => true,
-            Self::RequiresFeature(feature) => feature.is_enabled(),
             Self::RequiresMcp(integration) => {
                 TemplatableMCPServerManager::as_ref(ctx).is_mcp_server_running(*integration)
             }
@@ -371,8 +367,6 @@ pub(crate) async fn read_bundled_skills(
 /// Supported variables:
 /// - `{{warp_server_url}}` - The server root URL (e.g., `https://api.warp.dev`)
 /// - `{{warp_cli_binary_name}}` - The CLI binary name (e.g., `warp` or `warp-cli`)
-/// - `{{warpctrl_binary_name}}` - The channel-specific Warp Control command name
-/// - `{{warpctrl_wrapper_path}}` - Path to the bundled Warp Control wrapper
 /// - `{{warp_url_scheme}}` - The URL scheme (e.g., `warp`, `warpdev`, `warppreview`)
 /// - `{{settings_schema_path}}` - Path to the bundled JSON settings schema
 /// - `{{skill_dir}}` - Path to the bundled skill's directory
@@ -390,18 +384,6 @@ pub(crate) fn build_bundled_skill_context(
         (
             "warp_cli_binary_name".to_owned(),
             ChannelState::channel().cli_command_name().to_owned(),
-        ),
-        (
-            "warpctrl_binary_name".to_owned(),
-            ChannelState::channel().warpctrl_command_name().to_owned(),
-        ),
-        (
-            "warpctrl_wrapper_path".to_owned(),
-            resources_dir
-                .join("bin")
-                .join(ChannelState::channel().warpctrl_command_name())
-                .display()
-                .to_string(),
         ),
         (
             "warp_url_scheme".to_owned(),
@@ -450,7 +432,6 @@ pub(crate) fn activation_for_bundled_skill(
         "modify-settings" => {
             BundledSkillActivation::RequiresFile(resources_dir.join("settings_schema.json"))
         }
-        "warpctrl" => BundledSkillActivation::RequiresFeature(FeatureFlag::WarpControlCli),
         _ => BundledSkillActivation::Always,
     }
 }

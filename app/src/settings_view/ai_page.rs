@@ -135,9 +135,6 @@ const CONTEXT_WINDOW_INPUT_BOX_WIDTH: f32 = 120.;
 const NEXT_COMMAND_DESCRIPTION: &str = "Let AI suggest the next command to run based on your command history, outputs, and common workflows.";
 const PROMPT_SUGGESTIONS_DESCRIPTION: &str = "Let AI suggest natural language prompts, as inline banners in the input, based on recent commands and their outputs.";
 const SUGGESTED_CODE_BANNERS_DESCRIPTION: &str = "Let AI suggest code diffs and queries as inline banners in the blocklist, based on recent commands and their outputs.";
-const SHARED_BLOCK_TITLE_GENERATION_DESCRIPTION: &str =
-    "Let AI generate a title for your shared block based on the command and output.";
-
 pub fn init_actions_from_parent_view<T: Action + Clone>(
     app: &mut AppContext,
     context: &ContextPredicate,
@@ -353,19 +350,6 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
             .collect();
         app.register_fixed_bindings(lrc_mode_bindings);
     }
-    ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
-        vec![ToggleSettingActionPair::new(
-            "shared block title generation",
-            builder(SettingsAction::AI(
-                AISettingsPageAction::ToggleSharedTitleGeneration,
-            )),
-            &(context.clone() & id!(flags::IS_ACTIVE_AI_ENABLED)),
-            flags::SHARED_BLOCK_TITLE_GENERATION_FLAG,
-        )
-        .with_group(bindings::BindingGroup::WarpAi)
-        .with_enabled(|| FeatureFlag::SharedBlockTitleGeneration.is_enabled())],
-        app,
-    );
     ToggleSettingActionPair::add_toggle_setting_action_pairs_as_bindings(
         vec![ToggleSettingActionPair::custom(
             SettingActionPairDescriptions::new(
@@ -2190,10 +2174,6 @@ impl AISettingsPageView {
                     || ai_settings
                         .prompt_suggestions_enabled_internal
                         .is_supported_on_current_platform()
-                    || (FeatureFlag::SharedBlockTitleGeneration.is_enabled()
-                        && ai_settings
-                            .shared_block_title_generation_enabled_internal
-                            .is_supported_on_current_platform())
                 {
                     widgets.push(Box::new(ActiveAIWidget::default()));
                 }
@@ -2205,7 +2185,6 @@ impl AISettingsPageView {
                 if FeatureFlag::AIRules.is_enabled() {
                     widgets.push(Box::new(AIFactWidget::default()));
                 }
-                widgets.push(Box::new(CloudHandoffWidget::default()));
                 widgets.push(Box::new(CLIAgentWidget::default()));
                 // Uncaged: keys are entered under "Connect a model"; these account-gated
                 // fields could only render greyed out.
@@ -2232,15 +2211,10 @@ impl AISettingsPageView {
                     || ai_settings
                         .prompt_suggestions_enabled_internal
                         .is_supported_on_current_platform()
-                    || (FeatureFlag::SharedBlockTitleGeneration.is_enabled()
-                        && ai_settings
-                            .shared_block_title_generation_enabled_internal
-                            .is_supported_on_current_platform())
                 {
                     widgets.push(Box::new(ActiveAIWidget::default()));
                 }
                 widgets.push(Box::new(AIInputWidget::default()));
-                widgets.push(Box::new(CloudHandoffWidget::default()));
                 // Uncaged: keys are entered under "Connect a model"; these account-gated
                 // fields could only render greyed out.
                 if FeatureFlag::CustomModelRouters.is_enabled() {
@@ -2983,7 +2957,6 @@ pub enum AISettingsPageAction {
     ToggleIntelligentAutosuggestions,
     TogglePromptSuggestions,
     ToggleCodeSuggestions,
-    ToggleSharedTitleGeneration,
     ToggleAIInputAutoDetection,
     TogglePreferShellForKnownCommands,
     ToggleNLDInTerminal,
@@ -3121,18 +3094,6 @@ impl TypedActionView for AISettingsPageView {
                         .toggle_and_save_value(ctx)
                 }) {
                     log::warn!("Failed to set value for Code Suggestions setting: {e:?}");
-                }
-                ctx.notify();
-            }
-            AISettingsPageAction::ToggleSharedTitleGeneration => {
-                if let Err(e) = AISettings::handle(ctx).update(ctx, |settings, ctx| {
-                    settings
-                        .shared_block_title_generation_enabled_internal
-                        .toggle_and_save_value(ctx)
-                }) {
-                    log::warn!(
-                        "Failed to set value for Shared Block Title Generation setting: {e:?}"
-                    );
                 }
                 ctx.notify();
             }
@@ -3894,7 +3855,6 @@ struct ActiveAIWidget {
     intelligent_autosuggestions_toggle: SwitchStateHandle,
     prompt_suggestions_toggle: SwitchStateHandle,
     code_suggestions_toggle: SwitchStateHandle,
-    shared_block_title_generation_toggle: SwitchStateHandle,
 }
 
 impl ActiveAIWidget {
@@ -3914,14 +3874,6 @@ impl ActiveAIWidget {
         AISettings::as_ref(app)
             .code_suggestions_enabled_internal
             .is_supported_on_current_platform()
-    }
-
-    // TODO: Check if the user's enterprise billing policy allows toggling this feature.
-    fn is_shared_block_title_generation_toggleable(&self, app: &AppContext) -> bool {
-        FeatureFlag::SharedBlockTitleGeneration.is_enabled()
-            && AISettings::as_ref(app)
-                .shared_block_title_generation_enabled_internal
-                .is_supported_on_current_platform()
     }
 
     fn render_next_command_section(
@@ -3993,29 +3945,6 @@ impl ActiveAIWidget {
             ))
             .finish()
     }
-
-    fn render_shared_block_title_generation_section(
-        &self,
-        app: &uncaged_ui::AppContext,
-    ) -> Box<dyn uncaged_ui::Element> {
-        let ai_settings = AISettings::as_ref(app);
-        let is_toggleable = ai_settings.is_active_ai_enabled(app);
-        Flex::column()
-            .with_child(render_ai_setting_toggle(
-                "Shared Block Title Generation",
-                AISettingsPageAction::ToggleSharedTitleGeneration,
-                *ai_settings.shared_block_title_generation_enabled_internal,
-                is_toggleable,
-                self.shared_block_title_generation_toggle.clone(),
-                app,
-            ))
-            .with_child(render_ai_setting_description(
-                SHARED_BLOCK_TITLE_GENERATION_DESCRIPTION,
-                is_toggleable,
-                app,
-            ))
-            .finish()
-    }
 }
 
 impl SettingsWidget for ActiveAIWidget {
@@ -4029,7 +3958,6 @@ impl SettingsWidget for ActiveAIWidget {
         self.is_next_command_toggleable(app)
             || self.is_prompt_suggestions_toggleable(app)
             || self.is_suggested_code_banners_toggleable(app)
-            || self.is_shared_block_title_generation_toggleable(app)
     }
 
     fn render(
@@ -4082,10 +4010,6 @@ impl SettingsWidget for ActiveAIWidget {
 
         if self.is_suggested_code_banners_toggleable(app) {
             column.add_child(self.render_suggested_code_banners_section(app));
-        }
-
-        if self.is_shared_block_title_generation_toggleable(app) {
-            column.add_child(self.render_shared_block_title_generation_section(app));
         }
 
         column.finish()
@@ -6367,164 +6291,6 @@ impl SettingsWidget for CloudAgentComputerUseWidget {
                 app,
             ))
             .finish()
-    }
-}
-
-#[derive(Default)]
-struct CloudHandoffWidget {
-    handoff_toggle: SwitchStateHandle,
-    auto_handoff_on_sleep_toggle: SwitchStateHandle,
-    ampersand_toggle: SwitchStateHandle,
-}
-
-impl SettingsWidget for CloudHandoffWidget {
-    type View = AISettingsPageView;
-
-    fn search_terms(&self) -> &str {
-        "cloud handoff auto sleep ampersand & move to cloud local"
-    }
-
-    fn should_render(&self, _app: &AppContext) -> bool {
-        FeatureFlag::OzHandoff.is_enabled() && FeatureFlag::HandoffLocalCloud.is_enabled()
-    }
-
-    fn render(
-        &self,
-        _view: &Self::View,
-        appearance: &Appearance,
-        app: &AppContext,
-    ) -> Box<dyn Element> {
-        use crate::settings::PrivacySettings;
-
-        let ai_settings = AISettings::as_ref(app);
-        let is_any_ai_enabled = ai_settings.is_any_ai_enabled(app);
-
-        let privacy = PrivacySettings::as_ref(app);
-        let cloud_convos_off = !privacy.is_cloud_conversation_storage_enabled;
-        let is_force_disabled = !is_any_ai_enabled || cloud_convos_off;
-
-        let tooltip_text = if cloud_convos_off {
-            "Cloud handoff requires cloud conversations to be enabled."
-        } else {
-            ""
-        };
-
-        let ui_builder = appearance.ui_builder();
-
-        let handoff_toggle = if is_force_disabled {
-            let mut builder = ui_builder.switch(self.handoff_toggle.clone()).check(false);
-            if !tooltip_text.is_empty() {
-                builder = builder.with_tooltip(TooltipConfig {
-                    text: tooltip_text.to_string(),
-                    styles: ui_builder.default_tool_tip_styles(),
-                });
-            }
-            builder.disable().build().finish()
-        } else {
-            ui_builder
-                .switch(self.handoff_toggle.clone())
-                .check(!*ai_settings.should_force_disable_cloud_handoff)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AISettingsPageAction::ToggleCloudHandoff);
-                })
-                .finish()
-        };
-
-        let handoff_row = build_toggle_element(
-            render_body_item_label::<AISettingsPageAction>(
-                "Cloud handoff".to_string(),
-                Some(styles::header_font_color(!is_force_disabled, app)),
-                None,
-                ToggleState::Enabled,
-                appearance,
-            ),
-            handoff_toggle,
-            appearance,
-            None,
-        );
-
-        let mut column = Flex::column()
-            .with_child(render_separator(appearance))
-            .with_child(
-                build_sub_header(
-                    appearance,
-                    "Cloud Handoff",
-                    Some(styles::header_font_color(is_any_ai_enabled, app)),
-                )
-                .with_padding_bottom(HEADER_PADDING)
-                .finish(),
-            )
-            .with_child(handoff_row)
-            .with_child(render_ai_setting_description(
-                "Hand off local agent conversations to a cloud agent.",
-                !is_force_disabled,
-                app,
-            ));
-
-        if ai_settings.is_cloud_handoff_enabled(app) {
-            if ai_settings
-                .auto_handoff_on_sleep_enabled
-                .is_supported_on_current_platform()
-            {
-                let auto_handoff_on_sleep_toggle = ui_builder
-                    .switch(self.auto_handoff_on_sleep_toggle.clone())
-                    .check(*ai_settings.auto_handoff_on_sleep_enabled)
-                    .build()
-                    .on_click(move |ctx, _, _| {
-                        ctx.dispatch_typed_action(AISettingsPageAction::ToggleAutoHandoffOnSleep);
-                    })
-                    .finish();
-                let auto_handoff_on_sleep_row = build_toggle_element(
-                    render_body_item_label::<AISettingsPageAction>(
-                        "Auto-handoff before sleep".to_string(),
-                        Some(styles::header_font_color(true, app)),
-                        None,
-                        ToggleState::Enabled,
-                        appearance,
-                    ),
-                    auto_handoff_on_sleep_toggle,
-                    appearance,
-                    None,
-                );
-                column.add_child(auto_handoff_on_sleep_row);
-                column.add_child(render_ai_setting_description(
-                    "When macOS is about to sleep, automatically moves the most recently focused running local agent conversation to Cloud Mode so it can keep working.",
-                    true,
-                    app,
-                ));
-            }
-            let ampersand_toggle = ui_builder
-                .switch(self.ampersand_toggle.clone())
-                .check(!*ai_settings.should_force_disable_ampersand_handoff)
-                .build()
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(AISettingsPageAction::ToggleAmpersandHandoff);
-                })
-                .finish();
-
-            let ampersand_row = build_toggle_element(
-                render_body_item_label::<AISettingsPageAction>(
-                    "Use & to trigger handoff".to_string(),
-                    Some(styles::header_font_color(true, app)),
-                    None,
-                    ToggleState::Enabled,
-                    appearance,
-                ),
-                ampersand_toggle,
-                appearance,
-                None,
-            );
-
-            column.add_child(ampersand_row);
-            column.add_child(render_ai_setting_description(
-                "Type & as the first character to enter cloud handoff compose mode.",
-                true,
-                app,
-            ));
-        }
-
-        column.finish()
     }
 }
 
