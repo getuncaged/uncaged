@@ -680,7 +680,6 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::ImeMarkedText,
     FeatureFlag::MSYS2Shells,
     FeatureFlag::RetryTruncatedCodeResponses,
-    FeatureFlag::ContextLineReviewComments,
     FeatureFlag::RunGeneratorsWithCmdExe,
     FeatureFlag::Projects,
     FeatureFlag::MarkdownImages,
@@ -694,24 +693,17 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::FullSourceCodeEmbedding,
     FeatureFlag::CodebaseIndexSpeedbump,
     // End manually enabled Code features.
-    FeatureFlag::EditableMarkdownMermaid,
-    FeatureFlag::CodeReviewScrollPreservation,
     FeatureFlag::RememberFastForwardState,
     FeatureFlag::LocalDockerSandbox,
     FeatureFlag::GPTConfigurableContextWindow,
     FeatureFlag::RestorePromptOnInlineModelSelectorSearch,
     FeatureFlag::PromptCacheExpiryWarning,
-    FeatureFlag::PinnedTabs,
     FeatureFlag::ContextWindowUsageBreakdown,
 ];
 
 /// Features enabled for feature preview build users (e.g.: Friends of Warp).
 /// All PREVIEW_FLAGS are also automatically added to dogfood builds (WarpDev).
-pub const PREVIEW_FLAGS: &[FeatureFlag] = &[
-    #[cfg(target_os = "macos")]
-    FeatureFlag::GroupedTabs,
-    FeatureFlag::AsyncFind,
-];
+pub const PREVIEW_FLAGS: &[FeatureFlag] = &[FeatureFlag::AsyncFind];
 
 /// Features enabled for all release builds (i.e.: everything but WarpLocal).
 /// NOTE: if you are promoting a feature from Preview to launch, you'll likely

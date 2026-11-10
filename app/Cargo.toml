@@ -386,6 +386,7 @@ cloud_object_initial_load = ["enforce_revisions_to_cloud_objects"]
 codebase_index_speedbump = []
 command_predictor = []
 context_line_review_comments = []
+code_review_scroll_preservation = []
 cross_repo_context = []
 codebase_index_persistence = ["full_source_code_embedding"]
 default = [
@@ -536,6 +537,13 @@ default = [
     # Uncaged: the local engine now handles GeneratePassiveSuggestions and emits
     # SuggestPrompt chips, so turn on passive prompt suggestions by default.
     "prompt_suggestions_via_maa",
+    # Uncaged: features Warp left in staff/preview builds, tried by hand on macOS and
+    # turned on for everyone. Grouped tabs stays macOS-only (see features.rs).
+    "grouped_tabs",
+    "pinned_tabs",
+    "editable_markdown_mermaid",
+    "code_review_scroll_preservation",
+    "context_line_review_comments",
 ]
 # Enable this feature to automatically perform heap profiling.  NOTE: This will
 # substantially slow down program execution.

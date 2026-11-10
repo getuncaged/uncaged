@@ -157,6 +157,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::CodebaseIndexSpeedbump,
         #[cfg(feature = "context_line_review_comments")]
         FeatureFlag::ContextLineReviewComments,
+        #[cfg(feature = "code_review_scroll_preservation")]
+        FeatureFlag::CodeReviewScrollPreservation,
         #[cfg(feature = "fast_forward_autoexecute_button")]
         FeatureFlag::FastForwardAutoexecuteButton,
         #[cfg(feature = "code_find_replace")]
@@ -349,7 +351,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::VerticalTabsSummaryMode,
         #[cfg(feature = "tab_configs")]
         FeatureFlag::TabConfigs,
-        #[cfg(feature = "grouped_tabs")]
+        // Warp only previewed grouped tabs on macOS.
+        #[cfg(all(target_os = "macos", feature = "grouped_tabs"))]
         FeatureFlag::GroupedTabs,
         #[cfg(feature = "pinned_tabs")]
         FeatureFlag::PinnedTabs,
