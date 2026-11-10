@@ -267,7 +267,8 @@ use crate::shell_indicator::ShellIndicatorType;
 use crate::tab::{
     color_picker_menu_items, tab_position_id, uses_vertical_tabs, ColorPickerTarget,
     NewSessionMenuItem, PaneNameMenuTarget, SelectedTabColor, TabBarState, TabComponent, TabData,
-    MOVE_TO_GROUP_LABEL, TAB_BAR_BORDER_HEIGHT, TAB_PIN_INDICATOR_ICON_SIZE,
+    GROUP_UNDERLINE_BAND, MOVE_TO_GROUP_LABEL, TAB_BAR_BORDER_HEIGHT, TAB_HORIZONTAL_INSET,
+    TAB_PIN_INDICATOR_ICON_SIZE,
 };
 use crate::tab_configs::action_sidecar::SidecarItemKind;
 use crate::tab_configs::remove_confirmation_dialog::{
@@ -15337,16 +15338,21 @@ impl Workspace {
         // Uncaged: the header is a small label chip sized to the group name (like
         // browser tab groups), not a tab-wide slot.
         // A tab whose width the chip freezes while hovered, so collapsing or
-        // expanding doesn't slide the chip out from under the pointer.
-        let width_probe_index = if is_collapsed {
-            self.tabs.iter().position(|tab| {
-                tab.group_id
-                    .and_then(|gid| self.tab_groups.get(&gid))
-                    .is_none_or(|g| !g.collapsed)
-            })
-        } else {
-            Some(first_index)
-        };
+        // expanding doesn't slide the chip out from under the pointer. Prefer an
+        // ungrouped tab: group members are a little narrower (they share their
+        // slots with the chip), and freezing at their width would shift the tabs
+        // before the chip the moment the pointer arrives.
+        let width_probe_index = self
+            .tabs
+            .iter()
+            .position(|tab| tab.group_id.is_none())
+            .or_else(|| {
+                self.tabs.iter().position(|tab| {
+                    tab.group_id
+                        .and_then(|gid| self.tab_groups.get(&gid))
+                        .is_none_or(|g| !g.collapsed)
+                })
+            });
         row.add_child(self.render_horizontal_tab_group_header(
             group,
             &mouse_states,
@@ -15407,36 +15413,65 @@ impl Workspace {
             row.add_child(render_horizontal_group_pin_indicator(appearance));
         }
 
-        if !is_collapsed {
-            // Matching edge spacer after the last member. The trailing divider
-            // lives inside this spacer's own flex slot (drawn at its right edge,
-            // which is the group's far edge), so it doesn't steal width from the
-            // members the way a border on the group container would. Same loose
-            // flex cap as the leading spacer so the group shrink-wraps instead
-            // of this spacer ballooning out toward the bar's trailing edge.
-            row.add_child(
-                Shrinkable::new(
-                    Self::GROUP_EDGE_SPACER_FLEX,
-                    ConstrainedBox::new(Empty::new().finish())
-                        .with_max_width(Self::GROUP_EDGE_SPACER_MAX_WIDTH)
-                        .finish(),
-                )
-                .finish(),
-            );
-        }
-
-        // An expanded group is tied together by a thin line in the group's color
-        // under its label and tabs; a collapsed group is just its label.
-        let mut container = Container::new(row.finish());
-        if !is_collapsed {
+        // An expanded group is tied together by a thin rounded line in the
+        // group's color, running from the label to the last member's edge just
+        // under the tab highlights; a collapsed group is just its label.
+        let content: Box<dyn Element> = if is_collapsed {
+            // Keep the underline's band so the chip doesn't hop vertically when
+            // the group collapses or expands.
+            Container::new(row.finish())
+                .with_padding_bottom(GROUP_UNDERLINE_BAND)
+                .finish()
+        } else {
             let line_fill: ElementFill = match group_color {
                 Some(color) => color.into(),
                 None => internal_colors::fg_overlay_4(theme).into(),
             };
-            container = container
-                .with_border(Border::bottom(GROUP_UNDERLINE_HEIGHT).with_border_fill(line_fill));
-        }
-        let container = container.finish();
+            let line = Container::new(
+                ConstrainedBox::new(Empty::new().finish())
+                    .with_height(GROUP_UNDERLINE_HEIGHT)
+                    .finish(),
+            )
+            .with_background(line_fill)
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(
+                GROUP_UNDERLINE_HEIGHT / 2.,
+            )))
+            .finish();
+            let underline_gap = (GROUP_UNDERLINE_BAND - GROUP_UNDERLINE_HEIGHT) / 2.;
+            let underlined = Flex::column()
+                .with_main_axis_size(MainAxisSize::Max)
+                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                .with_child(Shrinkable::new(1.0, row.finish()).finish())
+                .with_child(
+                    Container::new(line)
+                        .with_margin_top(underline_gap)
+                        .with_margin_bottom(underline_gap)
+                        .with_margin_left(GROUP_CHIP_LEADING_INSET)
+                        .with_margin_right(TAB_HORIZONTAL_INSET)
+                        .finish(),
+                )
+                .finish();
+            // Matching edge spacer after the last member, outside the line. Same
+            // loose flex cap as the leading spacer so the group shrink-wraps
+            // instead of this spacer ballooning toward the bar's trailing edge.
+            Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+                .with_child(
+                    Shrinkable::new(run_len as f32 + Self::GROUP_EDGE_SPACER_FLEX, underlined)
+                        .finish(),
+                )
+                .with_child(
+                    Shrinkable::new(
+                        Self::GROUP_EDGE_SPACER_FLEX,
+                        ConstrainedBox::new(Empty::new().finish())
+                            .with_max_width(Self::GROUP_EDGE_SPACER_MAX_WIDTH)
+                            .finish(),
+                    )
+                    .finish(),
+                )
+                .finish()
+        };
+        let container = Container::new(content).finish();
         // While dragging, back the floating chip with an opaque color so it
         // doesn't render translucently like the resting group background.
         let container: Box<dyn Element> = if group.draggable_state.is_dragging() {
@@ -15499,12 +15534,7 @@ impl Workspace {
         let theme = appearance.theme();
         let group_id = group.id;
         let font_family = appearance.ui_font_family();
-        // Dark text on a colored chip, regular text on the neutral one.
-        let text_color: ColorU = if group_color.is_some() {
-            theme.background().into_solid()
-        } else {
-            theme.main_text_color(theme.background()).into()
-        };
+        let text_color: ColorU = theme.main_text_color(theme.background()).into();
 
         // When collapsed with an active hidden member, strengthen the chip so
         // the active state stays visible.
@@ -15539,11 +15569,20 @@ impl Workspace {
             .with_max_width(GROUP_LABEL_MAX_WIDTH)
             .finish()
         } else {
-            // Unnamed: the chip shrinks to a colored dot.
-            ConstrainedBox::new(Empty::new().finish())
-                .with_width(GROUP_DOT_SIZE)
-                .with_height(GROUP_DOT_SIZE)
-                .finish()
+            // Unnamed: the chip holds just a dot in the group's color.
+            let dot_fill: ElementFill = match group_color {
+                Some(color) => color.into(),
+                None => internal_colors::fg_overlay_5(theme).into(),
+            };
+            Container::new(
+                ConstrainedBox::new(Empty::new().finish())
+                    .with_width(GROUP_DOT_SIZE)
+                    .with_height(GROUP_DOT_SIZE)
+                    .finish(),
+            )
+            .with_background(dot_fill)
+            .with_corner_radius(CornerRadius::with_all(Radius::Percentage(50.)))
+            .finish()
         };
 
         let mut chip_row = Flex::row()
@@ -15562,16 +15601,24 @@ impl Workspace {
         let neutral_selected = internal_colors::fg_overlay_4(theme);
         let mut header = Hoverable::new(mouse_states.header.clone(), move |state| {
             let hovered = state.is_hovered();
+            // A soft tint of the group's color, like a tab's highlight, rather
+            // than a solid swatch.
             let bg: ElementFill = match group_color {
                 Some(color) => {
-                    let opacity = if header_selected || hovered { 100 } else { 85 };
+                    let opacity = if header_selected {
+                        55
+                    } else if hovered {
+                        42
+                    } else {
+                        30
+                    };
                     coloru_with_opacity(color, opacity).into()
                 }
                 None if header_selected => neutral_selected.into(),
                 None if hovered => neutral_hover.into(),
                 None => neutral_idle.into(),
             };
-            let (horizontal, vertical) = if has_label { (8., 2.) } else { (3., 3.) };
+            let (horizontal, vertical) = if has_label { (8., 3.) } else { (6., 6.) };
             let chip = Container::new(chip_content)
                 .with_horizontal_padding(horizontal)
                 .with_vertical_padding(vertical)
@@ -15581,7 +15628,7 @@ impl Workspace {
                 )))
                 .finish();
             Container::new(chip)
-                .with_padding_left(6.)
+                .with_padding_left(GROUP_CHIP_LEADING_INSET)
                 .with_padding_right(2.)
                 .finish()
         })
@@ -23104,8 +23151,11 @@ fn should_reserve_traffic_light_space_in_tab_bar(side: TrafficLightSide) -> bool
 }
 
 /// Total width/height of the collage area in the group header.
-/// Height of the line under an expanded horizontal tab group.
+/// Height of the line under an expanded horizontal tab group. It sits in the
+/// `GROUP_UNDERLINE_BAND` that member tabs give up below their highlight.
 const GROUP_UNDERLINE_HEIGHT: f32 = 2.0;
+/// Gap before a horizontal group's chip; the underline starts at the same edge.
+const GROUP_CHIP_LEADING_INSET: f32 = 6.0;
 /// Widest a horizontal group's name chip grows before the name fades out.
 const GROUP_LABEL_MAX_WIDTH: f32 = 140.0;
 /// Size of the dot an unnamed horizontal group shows instead of a name.

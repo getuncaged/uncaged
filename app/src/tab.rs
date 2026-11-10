@@ -81,9 +81,11 @@ pub(crate) const COMPACT_TAB_WIDTH_THRESHOLD: f32 = 42.0;
 const TAB_CLOSE_BUTTON_HORIZONTAL_INSET: f32 = 2.0;
 /// Uncaged: the inset and rounding of a tab's highlight inside the tab bar.
 const TAB_VERTICAL_INSET: f32 = 4.0;
-/// Height of the line drawn under an expanded horizontal tab group.
-const GROUPED_MEMBER_UNDERLINE_HEIGHT: f32 = 2.0;
-const TAB_HORIZONTAL_INSET: f32 = 2.0;
+/// Vertical band under an expanded horizontal tab group's members that holds
+/// the group's underline. Members give it up from their bottom inset so their
+/// highlights line up with ungrouped tabs.
+pub(crate) const GROUP_UNDERLINE_BAND: f32 = TAB_VERTICAL_INSET;
+pub(crate) const TAB_HORIZONTAL_INSET: f32 = 2.0;
 const TAB_CORNER_RADIUS: f32 = uncaged_core::ui::radius::MEDIUM;
 
 /// Represents the user's manual tab-color selection state.
@@ -1683,8 +1685,8 @@ impl<'a> TabComponent<'a> {
         .finish();
 
         // Grouped member: same inset rounded highlight as an ordinary tab, no
-        // drop target (members can't be dragged currently). The vertical inset
-        // gives up the group underline's height so members line up with
+        // drop target (members can't be dragged currently). The bottom inset
+        // is given to the group's underline band, so members line up with
         // ungrouped tabs.
         if self.grouped_member {
             let highlight = Container::new(stack)
@@ -1693,7 +1695,7 @@ impl<'a> TabComponent<'a> {
                 .finish();
             return Container::new(highlight)
                 .with_padding_top(TAB_VERTICAL_INSET)
-                .with_padding_bottom(TAB_VERTICAL_INSET - GROUPED_MEMBER_UNDERLINE_HEIGHT)
+                .with_padding_bottom(TAB_VERTICAL_INSET - GROUP_UNDERLINE_BAND)
                 .with_horizontal_padding(TAB_HORIZONTAL_INSET)
                 .finish();
         }
