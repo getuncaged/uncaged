@@ -216,9 +216,16 @@ where
                     // to the event loop.
                     break;
                 }
-                // Otherwise, track how many additional bytes we read and move
-                // on to byte processing.
-                Ok(got) => bytes_in_buffer += got,
+                // Otherwise, track how many additional bytes we read. Keep reading
+                // until the PTY is drained or a full batch is buffered before parsing:
+                // macOS PTY reads return about 1 KB at a time, and every parse ends with
+                // a block-height update that costs as much as parsing a small read.
+                Ok(got) => {
+                    bytes_in_buffer += got;
+                    if got > 0 && bytes_in_buffer < MAX_LOCKED_READ {
+                        continue;
+                    }
+                }
                 Err(err) => match err.kind() {
                     ErrorKind::Interrupted | ErrorKind::WouldBlock => {
                         if err.kind() == ErrorKind::WouldBlock {
