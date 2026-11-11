@@ -34,7 +34,7 @@ The version lives in two places — keep them in sync:
 
 Then tag the release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
-Current version: **0.3.4**.
+Current version: **0.3.5**.
 
 ## 2. Build the app + DMG
 

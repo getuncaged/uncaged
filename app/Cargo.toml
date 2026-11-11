@@ -5,7 +5,7 @@ description = "The account-free, bring-your-own-model terminal."
 edition = "2021"
 autobins = false
 name = "uncaged"
-version = "0.3.4"
+version = "0.3.5"
 publish.workspace = true
 license.workspace = true
 

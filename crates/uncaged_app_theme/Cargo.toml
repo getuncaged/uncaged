@@ -1,7 +1,7 @@
 [package]
 name = "uncaged_app_theme"
 # Kept equal to `app/Cargo.toml`: `brand::HTTP_USER_AGENT` embeds this crate's version.
-version = "0.3.4"
+version = "0.3.5"
 edition = "2021"
 authors.workspace = true
 publish.workspace = true
