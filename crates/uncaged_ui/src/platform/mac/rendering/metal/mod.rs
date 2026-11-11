@@ -4,6 +4,7 @@ use objc2_metal::MTLDevice;
 pub mod frame_capture;
 mod renderer;
 mod renderer_manager;
+mod upload_pool;
 
 pub use renderer_manager::RendererManager;
 

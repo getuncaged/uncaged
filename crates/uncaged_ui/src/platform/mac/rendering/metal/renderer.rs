@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::fs::File;
@@ -29,6 +30,7 @@ use uncaged_ui_core::rendering::{self};
 use uncaged_ui_core::scene::{CornerRadius, GlyphFade, GlyphKey, Icon, Image, Layer, Scene};
 
 use super::frame_capture::capture_frame;
+use super::upload_pool::UploadPool;
 use crate::platform::mac::rendering::renderer::Device;
 use crate::platform::mac::window::WindowState;
 use crate::rendering::atlas::{AllocatedRegion, TextureId};
@@ -144,6 +146,9 @@ struct Resources {
     quad_indices: Retained<ProtocolObject<dyn MTLBuffer>>,
     glyph_cache: GlyphCache<Retained<ProtocolObject<dyn MTLTexture>>>,
     texture_cache: TextureCache<Retained<ProtocolObject<dyn MTLTexture>>>,
+    /// Reused upload memory for per-frame instance data. A `RefCell` because the draw helpers
+    /// only borrow the resources immutably.
+    uploads: RefCell<UploadPool>,
 }
 
 /// A structure that manages rendering scenes using a particular hardware
@@ -249,6 +254,7 @@ impl Renderer {
                 quad_indices,
                 glyph_cache,
                 texture_cache: TextureCache::new(),
+                uploads: RefCell::default(),
             },
             command_queue: device
                 .newCommandQueue()
@@ -296,11 +302,17 @@ impl Renderer {
 
         Frame::new(scene, &render_pass.encoder, &mut self.resources, ctx).draw();
 
-        render_pass.finish_with_capture(
+        let command_buffer = render_pass.buffer.clone();
+        let captured = render_pass.finish_with_capture(
             ctx.drawable_size,
             should_capture,
             presents_with_transaction,
-        )
+        );
+        self.resources
+            .uploads
+            .borrow_mut()
+            .end_frame(command_buffer);
+        captured
     }
 }
 
@@ -433,11 +445,11 @@ impl<'a> Frame<'a> {
             0.,
             vec2f(0.0, 0.0).into(),
         ));
-        let per_rect_uniforms_buffer = new_metal_buffer(
-            self.ctx.device,
-            &per_rect_uniforms,
-            MTLResourceOptions::StorageModeManaged,
-        );
+        let (per_rect_uniforms_buffer, per_rect_uniforms_offset) = self
+            .resources
+            .uploads
+            .borrow_mut()
+            .upload(self.ctx.device, &per_rect_uniforms);
 
         let uniforms = shader::Uniforms::new(self.ctx.drawable_size.into());
         let uniforms_ptr = NonNull::from(&uniforms).cast::<c_void>();
@@ -448,7 +460,7 @@ impl<'a> Frame<'a> {
         unsafe {
             self.command_encoder.setVertexBuffer_offset_atIndex(
                 Some(&per_rect_uniforms_buffer),
-                0,
+                per_rect_uniforms_offset,
                 1,
             );
             self.command_encoder
@@ -658,11 +670,11 @@ impl<'a> Frame<'a> {
                 gap_lengths.into(),
             ));
         }
-        let per_rect_uniforms_buffer = new_metal_buffer(
-            self.ctx.device,
-            &per_rect_uniforms,
-            MTLResourceOptions::StorageModeManaged,
-        );
+        let (per_rect_uniforms_buffer, per_rect_uniforms_offset) = self
+            .resources
+            .uploads
+            .borrow_mut()
+            .upload(self.ctx.device, &per_rect_uniforms);
 
         let uniforms = shader::Uniforms::new(self.ctx.drawable_size.into());
         let uniforms_ptr = NonNull::from(&uniforms).cast::<c_void>();
@@ -673,7 +685,7 @@ impl<'a> Frame<'a> {
         unsafe {
             self.command_encoder.setVertexBuffer_offset_atIndex(
                 Some(&per_rect_uniforms_buffer),
-                0,
+                per_rect_uniforms_offset,
                 1,
             );
             self.command_encoder
@@ -788,11 +800,11 @@ impl<'a> Frame<'a> {
         }
 
         for (texture_id, per_glyph_uniforms) in texture_to_glyph {
-            let per_glyph_uniforms_buffer = new_metal_buffer(
-                self.ctx.device,
-                &per_glyph_uniforms,
-                MTLResourceOptions::StorageModeManaged,
-            );
+            let (per_glyph_uniforms_buffer, per_glyph_uniforms_offset) = self
+                .resources
+                .uploads
+                .borrow_mut()
+                .upload(self.ctx.device, &per_glyph_uniforms);
 
             let uniforms = shader::Uniforms::new(self.ctx.drawable_size.into());
             let uniforms_ptr = NonNull::from(&uniforms).cast::<c_void>();
@@ -810,7 +822,7 @@ impl<'a> Frame<'a> {
             unsafe {
                 self.command_encoder.setVertexBuffer_offset_atIndex(
                     Some(&per_glyph_uniforms_buffer),
-                    0,
+                    per_glyph_uniforms_offset,
                     1,
                 );
                 self.command_encoder
