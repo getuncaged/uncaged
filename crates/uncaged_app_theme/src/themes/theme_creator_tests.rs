@@ -1,19 +1,13 @@
+use uncaged_core::ui::color::OPAQUE;
+
 use super::*;
-use crate::util::color::OPAQUE;
+use crate::async_jpg;
 
 // TODO(CORE-3626): figure out why the colors returned on Windows are slightly different.
 #[test]
 #[cfg(all(not(target_family = "wasm"), not(windows)))]
 fn top_colors_jellyfish_test() {
-    let jellyfish_bg_path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "assets",
-        "async",
-        "jpg",
-        "jellyfish_bg.jpg",
-    ]
-    .iter()
-    .collect();
+    let jellyfish_bg_path: PathBuf = async_jpg("jellyfish_bg.jpg");
 
     let colors = top_colors_for_image(jellyfish_bg_path)
         .expect("should be able to get colors from jellyfish bg");
@@ -28,15 +22,7 @@ fn top_colors_jellyfish_test() {
 #[test]
 #[cfg(not(target_family = "wasm"))]
 fn top_colors_invalid_image_test() {
-    let invalid_image_path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "assets",
-        "async",
-        "jpg",
-        "this_doesnt_exist.jpg",
-    ]
-    .iter()
-    .collect();
+    let invalid_image_path: PathBuf = async_jpg("this_doesnt_exist.jpg");
 
     let colors = top_colors_for_image(invalid_image_path);
     assert!(colors.is_err());

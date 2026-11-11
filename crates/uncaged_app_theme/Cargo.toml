@@ -1,0 +1,41 @@
+[package]
+name = "uncaged_app_theme"
+# Kept equal to `app/Cargo.toml`: `brand::HTTP_USER_AGENT` embeds this crate's version.
+version = "0.3.4"
+edition = "2021"
+authors.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[features]
+test-util = []
+
+[dependencies]
+anyhow.workspace = true
+asset_macro.workspace = true
+deltae = "0.3.1"
+image.workspace = true
+kmeans_colors = { version = "0.5", default-features = false, features = [
+    "palette_color",
+] }
+log.workspace = true
+palette = { version = "0.6.0", default-features = false, features = ["std"] }
+pathfinder_color = "0.5.0"
+reqwest.workspace = true
+schemars = "1"
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+settings_value = { workspace = true, features = ["derive"] }
+uncaged_core.workspace = true
+uncaged_ui = { workspace = true, features = ["schema_gen", "settings_value"] }
+uncaged_ui_core.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+uncaged_core = { workspace = true, features = ["test-util"] }
+
+# `bundled_or_fetched_asset!` expands to these paths on wasm.
+[target.'cfg(target_family = "wasm")'.dependencies]
+asset_cache.workspace = true
+uncaged_util.workspace = true

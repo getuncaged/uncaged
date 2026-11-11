@@ -29,6 +29,7 @@ and in the README).
 The version lives in two places — keep them in sync:
 
 - `app/Cargo.toml` → `[package] version = "X.Y.Z"`
+- `crates/uncaged_app_theme/Cargo.toml` → same version (it feeds `brand::HTTP_USER_AGENT`)
 - `app/src/bin/oss.rs` → `CFBundleShortVersionString` string
 
 Then tag the release: `git tag vX.Y.Z && git push origin vX.Y.Z`.

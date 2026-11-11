@@ -190,7 +190,7 @@ impl ThemeKind {
             _ => return ThemeGroup::System,
         };
 
-        let community_dir = crate::user_config::themes_dir().join(COMMUNITY_SUBFOLDER);
+        let community_dir = uncaged_core::paths::themes_dir().join(COMMUNITY_SUBFOLDER);
         if path.starts_with(&community_dir) {
             ThemeGroup::Community
         } else {
@@ -223,7 +223,7 @@ impl settings_value::SettingsValue for CustomTheme {
     fn to_file_value(&self) -> serde_json::Value {
         serde_json::json!({
             "name": &self.name,
-            "path": custom_theme_path_storage_value(&self.path, &crate::user_config::themes_dir()),
+            "path": custom_theme_path_storage_value(&self.path, &uncaged_core::paths::themes_dir()),
         })
     }
 
@@ -239,7 +239,7 @@ impl settings_value::SettingsValue for CustomTheme {
             name: value.name,
             path: portable_custom_theme_path_from_stored_raw(
                 &value.path,
-                &crate::user_config::themes_dir(),
+                &uncaged_core::paths::themes_dir(),
             ),
         })
     }
@@ -250,7 +250,7 @@ where
     S: Serializer,
 {
     if let Some(path) =
-        portable_custom_theme_storage_string(path, &crate::user_config::themes_dir())
+        portable_custom_theme_storage_string(path, &uncaged_core::paths::themes_dir())
     {
         path.serialize(serializer)
     } else {
@@ -265,7 +265,7 @@ where
     let path = String::deserialize(deserializer)?;
     Ok(portable_custom_theme_path_from_stored_raw(
         &path,
-        &crate::user_config::themes_dir(),
+        &uncaged_core::paths::themes_dir(),
     ))
 }
 
@@ -407,7 +407,7 @@ impl InMemoryThemeOptions {
     }
 
     /// Options with an already-extracted palette, so tests needn't decode an image.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-util"))]
     pub fn new_for_test(name: String, path: PathBuf, possible_bg_colors: Vec<ColorU>) -> Self {
         InMemoryThemeOptions {
             name,

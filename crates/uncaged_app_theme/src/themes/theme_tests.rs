@@ -1,8 +1,8 @@
 use settings_value::SettingsValue as _;
+use uncaged_core::ui::color::OPAQUE;
 
 use super::*;
-use crate::user_config;
-use crate::util::color::OPAQUE;
+use crate::async_jpg;
 
 fn custom_theme_json(path: &str) -> serde_json::Value {
     serde_json::json!({
@@ -204,7 +204,7 @@ fn custom_theme_serde_reads_portable_raw_path_under_theme_root() {
 
     assert_eq!(
         custom.path(),
-        user_config::themes_dir()
+        uncaged_core::paths::themes_dir()
             .join("catppuccin")
             .join("mocha.yml")
     );
@@ -234,7 +234,7 @@ fn custom_theme_settings_value_reads_portable_raw_path_under_theme_root() {
 
     assert_eq!(
         custom.path(),
-        user_config::themes_dir()
+        uncaged_core::paths::themes_dir()
             .join("catppuccin")
             .join("mocha.yml")
     );
@@ -260,7 +260,7 @@ fn custom_theme_settings_value_preserves_unportable_raw_paths() {
 
 #[test]
 fn custom_theme_settings_value_writes_portable_path_for_theme_root_file() {
-    let root_path = user_config::themes_dir().join("my_theme.yml");
+    let root_path = uncaged_core::paths::themes_dir().join("my_theme.yml");
     let custom = CustomTheme::new("My Theme".to_string(), root_path);
 
     let value = custom.to_file_value();
@@ -271,7 +271,7 @@ fn custom_theme_settings_value_writes_portable_path_for_theme_root_file() {
 
 #[test]
 fn custom_theme_serde_writes_portable_path_for_theme_root_file() {
-    let root_path = user_config::themes_dir().join("my_theme.yml");
+    let root_path = uncaged_core::paths::themes_dir().join("my_theme.yml");
     let custom = CustomTheme::new("My Theme".to_string(), root_path);
 
     let value = serde_json::to_value(custom).unwrap();
@@ -282,7 +282,7 @@ fn custom_theme_serde_writes_portable_path_for_theme_root_file() {
 
 #[test]
 fn custom_base16_theme_kind_uses_custom_theme_settings_value_path_rules() {
-    let root_path = user_config::themes_dir().join("base16/ocean.yml");
+    let root_path = uncaged_core::paths::themes_dir().join("base16/ocean.yml");
     let kind = ThemeKind::CustomBase16(CustomTheme::new("Base16 Ocean".to_string(), root_path));
 
     assert_eq!(
@@ -352,7 +352,7 @@ mod windows_custom_theme_path_tests {
 
     #[test]
     fn custom_theme_windows_settings_value_serializes_theme_root_file_with_slashes() {
-        let root_path = user_config::themes_dir()
+        let root_path = uncaged_core::paths::themes_dir()
             .join("catppuccin")
             .join("mocha.yml");
         let custom = CustomTheme::new("Mocha".to_string(), root_path);
@@ -364,7 +364,7 @@ mod windows_custom_theme_path_tests {
 
     #[test]
     fn custom_theme_windows_serde_serializes_theme_root_file_with_slashes() {
-        let root_path = user_config::themes_dir()
+        let root_path = uncaged_core::paths::themes_dir()
             .join("catppuccin")
             .join("mocha.yml");
         let custom = CustomTheme::new("Mocha".to_string(), root_path);
@@ -378,15 +378,7 @@ mod windows_custom_theme_path_tests {
 #[test]
 #[cfg(not(target_family = "wasm"))]
 fn in_memory_theme_generation_test() {
-    let mountains_bg_path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "assets",
-        "async",
-        "jpg",
-        "mountains.jpg",
-    ]
-    .iter()
-    .collect();
+    let mountains_bg_path: PathBuf = async_jpg("mountains.jpg");
 
     let mut in_memory_theme = uncaged_ui::r#async::block_on(InMemoryThemeOptions::new(
         "mountains".to_string(),

@@ -11209,6 +11209,7 @@ dependencies = [
  "typed-path 0.10.0",
  "ui_components",
  "uncaged_agent_api",
+ "uncaged_app_theme",
  "uncaged_assets",
  "uncaged_cli",
  "uncaged_completer",
@@ -11263,6 +11264,32 @@ version = "0.0.0"
 dependencies = [
  "prost",
  "prost-types",
+]
+
+[[package]]
+name = "uncaged_app_theme"
+version = "0.3.4"
+dependencies = [
+ "anyhow",
+ "asset_cache",
+ "asset_macro",
+ "deltae",
+ "image",
+ "kmeans_colors",
+ "log",
+ "palette 0.6.1",
+ "pathfinder_color",
+ "reqwest",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "settings_value",
+ "tempfile",
+ "uncaged_core",
+ "uncaged_ui",
+ "uncaged_ui_core",
+ "uncaged_util",
 ]
 
 [[package]]

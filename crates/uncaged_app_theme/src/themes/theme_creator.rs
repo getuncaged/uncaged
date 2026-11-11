@@ -5,8 +5,7 @@ use deltae::*;
 use kmeans_colors::{get_kmeans_hamerly, Calculate, CentroidData, Sort};
 use palette::{FromColor, IntoColor, Lab, Pixel, Srgb, Srgba};
 use pathfinder_color::ColorU;
-
-use crate::util::color::hex_color::coloru_from_hex_string;
+use uncaged_core::ui::color::hex_color::coloru_from_hex_string;
 
 /// Uses a k-means algorithm to identify the 5 most average colors in an image.
 pub fn top_colors_for_image(image_path: PathBuf) -> Result<Vec<ColorU>> {

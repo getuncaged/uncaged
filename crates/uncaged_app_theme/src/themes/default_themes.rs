@@ -780,7 +780,7 @@ pub fn preview_source(source: AssetSource) -> AssetSource {
     // touched — a theme may point at a wallpaper elsewhere, which is not ours to look beside.
     if let AssetSource::LocalFile { path, .. } = &source {
         let full = std::path::Path::new(path);
-        if full.starts_with(crate::user_config::themes_dir()) {
+        if full.starts_with(uncaged_core::paths::themes_dir()) {
             let thumb = crate::themes::theme_background_image::thumbnail_path(full);
             if thumb.exists() {
                 return AssetSource::LocalFile {

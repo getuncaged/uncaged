@@ -68,7 +68,7 @@ pub fn thumbnail_path(full_image: &Path) -> PathBuf {
 /// Reads the image header and, when a thumbnail is missing, decodes the whole image — keep it off
 /// the main thread.
 pub fn preview_thumbnail(full_image: &Path) -> Result<PathBuf> {
-    let thumbnail = if full_image.starts_with(crate::user_config::themes_dir()) {
+    let thumbnail = if full_image.starts_with(uncaged_core::paths::themes_dir()) {
         thumbnail_path(full_image)
     } else {
         cached_thumbnail_path(full_image)?

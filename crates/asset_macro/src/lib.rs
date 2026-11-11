@@ -137,13 +137,17 @@ pub fn bundled_or_fetched_asset(input: TokenStream) -> TokenStream {
 fn full_asset_path(asset_name: &str, asset_dir: &str) -> PathBuf {
     // The working directory when running a proc macro is not guaranteed, so we base relative paths
     // off the location of the cargo manifest.
-    let crate_root =
-        env::var("CARGO_MANIFEST_DIR").expect("missing basic cargo environment variable");
+    let crate_root = PathBuf::from(
+        env::var("CARGO_MANIFEST_DIR").expect("missing basic cargo environment variable"),
+    );
 
-    PathBuf::from(crate_root)
-        .join(ASSETS_DIR)
-        .join(asset_dir)
-        .join(asset_name)
+    // Crates split out of `app/` don't have their own assets directory; they share the app's.
+    let mut assets_root = crate_root.join(ASSETS_DIR);
+    if !assets_root.is_dir() {
+        assets_root = crate_root.join("../../app").join(ASSETS_DIR);
+    }
+
+    assets_root.join(asset_dir).join(asset_name)
 }
 
 fn format_error(asset_name: &str, asset_dir: &str, error_string: String) -> TokenStream2 {

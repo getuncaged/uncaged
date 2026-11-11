@@ -8,9 +8,9 @@ mod app_services;
 mod app_state;
 mod autoupdate;
 mod banner;
-/// Uncaged brand — the single source of truth for name, palette, and logo
-/// paths. See `brand.rs`.
-mod brand;
+// Uncaged brand — the single source of truth for name, palette, and logo
+// paths. See `crates/uncaged_app_theme/src/brand.rs`.
+use uncaged_app_theme::brand;
 mod chip_configurator;
 mod cloud_object;
 mod code;
