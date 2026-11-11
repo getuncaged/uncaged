@@ -59,7 +59,9 @@ source "$WORKSPACE_ROOT_DIR/script/linux/bundle_install" "$STAGE_DIR"
 
 # Modify the "Exec=" line in the .desktop file to use the name of the installed
 # binary and not our /usr/bin symlink (which doesn't exist in an AppImage).
-sed -i -E 's/Exec=warp-terminal/Exec=warp/' "$STAGE_DIR/usr/share/applications/$BUNDLE_ID.desktop"
+# Uncaged: the oss package is still `warp-terminal-oss` but its binary is
+# `uncaged`, so derive the name from BINARY_NAME rather than the package name.
+sed -i -E "s/^Exec=warp-terminal[^ ]*/Exec=$BINARY_NAME/" "$STAGE_DIR/usr/share/applications/$BUNDLE_ID.desktop"
 
 # Find all icon files from inside the package staging directory.
 ICON_FILES=( $(find "$STAGE_DIR/usr/share/icons" -name "*.png") )
