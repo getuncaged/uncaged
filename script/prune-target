@@ -3,11 +3,12 @@
 # Trims stale build output from `target/` so it doesn't slowly eat the disk.
 #
 # Removes:
-#   * incremental compilation caches for the `uncaged` crate (and the other
-#     workspace crates) that haven't been touched in 3 days,
+#   * all but the newest incremental compilation cache of each crate (each
+#     feature set or command gets its own cache, 1-3 GB for `uncaged`),
 #   * `target/*/examples` (example binaries are never needed for normal work),
-#   * stale duplicate rlibs/rmetas/dylibs in each `target/*/deps`: when the same
-#     crate was built under several metadata hashes, only the newest hash is kept.
+#   * stale duplicate rlibs/rmetas/dylibs and test executables in each
+#     `target/*/deps`: when the same crate was built under several metadata
+#     hashes, only the newest hash is kept.
 #
 # Usage: script/prune-target [--dry-run]
 
@@ -41,10 +42,28 @@ before=$(du -sk "$TARGET_DIR" | cut -f1)
 
 while IFS= read -r profile_dir; do
   # Incremental caches: one directory per crate+hash, e.g. `uncaged-1a2b3c`.
+  # Every feature set or command (build, check, clippy, test) gets its own
+  # 1-3 GB cache for `uncaged`, so keep only the newest one per crate.
   if [ -d "$profile_dir/incremental" ]; then
-    find "$profile_dir/incremental" -mindepth 1 -maxdepth 1 -type d -mtime +3 | while IFS= read -r dir; do
-      remove "$dir"
-    done
+    python3 -I - "$profile_dir/incremental" "$DRY_RUN" <<'PY'
+import collections, os, re, shutil, sys
+
+inc, dry = sys.argv[1], sys.argv[2] == "1"
+pat = re.compile(r"^(.+)-([0-9a-z]{10,16})$")
+groups = collections.defaultdict(list)
+for name in os.listdir(inc):
+    path = os.path.join(inc, name)
+    m = pat.match(name)
+    if m and os.path.isdir(path):
+        groups[m.group(1)].append(path)
+for paths in groups.values():
+    paths.sort(key=lambda p: os.lstat(p).st_mtime, reverse=True)
+    for p in paths[1:]:
+        if dry:
+            print("would remove", p)
+        else:
+            shutil.rmtree(p, ignore_errors=True)
+PY
   fi
 
   # Example binaries.
@@ -52,18 +71,19 @@ while IFS= read -r profile_dir; do
     remove "$profile_dir/examples"
   fi
 
-  # Stale duplicate rlibs: group `deps/lib<name>-<hash>.{rlib,rmeta,...}` by
-  # crate name and keep only the most recently written hash.
+  # Stale duplicates: group `deps/<name>-<hash>[.rlib|.rmeta|...]` (libraries
+  # and test executables) by name and keep only the most recently written hash.
   if [ -d "$profile_dir/deps" ]; then
     python3 -I - "$profile_dir/deps" "$DRY_RUN" <<'PY'
 import collections, os, re, shutil, sys
 
 deps, dry = sys.argv[1], sys.argv[2] == "1"
-pat = re.compile(r"^(lib.+?)-([0-9a-f]{16})\.(rlib|rmeta|dylib|so|a)$")
+# Libraries, plus test/bin executables (no extension) and their `.d` files.
+pat = re.compile(r"^(.+?)-([0-9a-f]{16})(?:\.(rlib|rmeta|dylib|so|a|d))?$")
 groups = collections.defaultdict(lambda: collections.defaultdict(list))
 for name in os.listdir(deps):
     m = pat.match(name)
-    if m:
+    if m and os.path.isfile(os.path.join(deps, name)):
         groups[(m.group(1), m.group(3))][m.group(2)].append(os.path.join(deps, name))
 for hashes in groups.values():
     newest = max(hashes, key=lambda h: max(os.lstat(p).st_mtime for p in hashes[h]))
