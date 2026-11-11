@@ -327,10 +327,9 @@ warp-command-signatures = { path = "third_party/command-signatures/command-signa
 winit = { path = "third_party/winit" }
 x11rb = "0.13.0"
 mockito = "1.7.0"
-sysinfo = { version = "0.37.0", default-features = false, features = [
-  "system",
-  "multithread",
-] }
+# No "multithread": it refreshes process lists on rayon's global pool, which then keeps a thread
+# per core alive for the life of the app just for occasional one-off process scans.
+sysinfo = { version = "0.37.0", default-features = false, features = ["system"] }
 windows = { version = "0.62.2", features = [
   "Win32",
   "Win32_System",

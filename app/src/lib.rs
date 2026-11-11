@@ -1203,7 +1203,7 @@ pub(crate) fn initialize_app(
     #[cfg(all(not(target_family = "wasm"), feature = "local_tty"))]
     {
         ctx.add_singleton_model(LocalShellState::new);
-        ctx.add_singleton_model(system::SystemInfo::new);
+        ctx.add_singleton_model(|_| system::SystemInfo::new());
     }
 
     // Add a singleton model that holds the current prompt configuration.

@@ -122,6 +122,10 @@ use crate::vim_registers::{RegisterContent, VimRegisters};
 use crate::RangeExt;
 
 const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);
+/// How many times the cursor toggles after the last input before it stops blinking and stays
+/// visible (20 toggles of 500ms = 10s). Every blink re-renders the window, so a cursor that blinks
+/// forever keeps an idle terminal waking up twice a second.
+const CURSOR_BLINK_TOGGLES_BEFORE_IDLE: usize = 20;
 const DEFAULT_TAB_SIZE: usize = 4;
 
 pub const ACCEPT_AUTOSUGGESTION_KEYBINDING_NAME: &str = "editor_view:insert_autosuggestion";
@@ -1718,6 +1722,8 @@ pub struct EditorView {
     get_cursor_colors_fn: CursorColorsFn,
     cursors_visible: bool,
     blink_epoch: usize,
+    /// Blink toggles left before the cursor goes idle; reset by input and focus.
+    blink_toggles_left: usize,
     single_line: bool,
     /// A cache for text that is cut within the input using ctrl-k/u. This text is not copied to clipboard.
     internal_clipboard: String,
@@ -2974,6 +2980,7 @@ impl EditorView {
             focused: false,
             cursors_visible: false,
             blink_epoch: 0,
+            blink_toggles_left: CURSOR_BLINK_TOGGLES_BEFORE_IDLE,
             single_line: options.single_line,
             internal_clipboard: "".to_string(),
             propagate_vertical_navigation_keys: options
@@ -7162,6 +7169,7 @@ ctx,
     /// Mark the cursor as visible and schedule the next cursor blink at the right interval.
     fn reset_cursor_blink_timer(&mut self, ctx: &mut ViewContext<Self>) {
         self.cursors_visible = true;
+        self.blink_toggles_left = CURSOR_BLINK_TOGGLES_BEFORE_IDLE;
         ctx.notify();
 
         let epoch = self.next_blink_epoch();
@@ -7190,10 +7198,14 @@ ctx,
                 // to make the cursor visible again and remain that way. We need
                 // to allow that in case blinking gets disabled while
                 // cursors_visible is false
-                cursor_blink.value() == &CursorBlink::Enabled || !self.cursors_visible
+                // Blinking also stops (with the cursor left visible) once the editor has been
+                // idle for CURSOR_BLINK_TOGGLES_BEFORE_IDLE toggles.
+                (cursor_blink.value() == &CursorBlink::Enabled && self.blink_toggles_left > 0)
+                    || !self.cursors_visible
             )
         {
             self.cursors_visible = !self.cursors_visible;
+            self.blink_toggles_left = self.blink_toggles_left.saturating_sub(1);
             ctx.notify();
 
             let epoch = self.next_blink_epoch();
@@ -8423,6 +8435,7 @@ impl View for EditorView {
     fn on_focus(&mut self, focus_ctx: &FocusContext, ctx: &mut ViewContext<Self>) {
         if focus_ctx.is_self_focused() {
             self.focused = true;
+            self.blink_toggles_left = CURSOR_BLINK_TOGGLES_BEFORE_IDLE;
             self.blink_cursors(self.blink_epoch, ctx);
             if self.select_all_on_focus {
                 self.select_all(ctx);

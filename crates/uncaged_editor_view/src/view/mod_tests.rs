@@ -3930,6 +3930,42 @@ fn test_cursor_blink() {
 }
 
 #[test]
+fn test_cursor_blink_stops_when_idle() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let (window_id, editor_handle) = app.add_window(WindowStyle::NotStealFocus, |ctx| {
+            let mut editor = EditorView::single_line(Default::default(), ctx);
+            editor.on_focus(&FocusContext::SelfFocused, ctx);
+            editor
+        });
+        let windowing_state = app.get_singleton_model_handle::<WindowManager>();
+        app.update_model(&windowing_state, |state, ctx| {
+            state.overwrite_for_test(state.stage(), Some(window_id));
+            ctx.notify();
+        });
+        app.update_view(&editor_handle, |editor, ctx| {
+            editor.reset_cursor_blink_timer(ctx);
+            for _ in 0..CURSOR_BLINK_TOGGLES_BEFORE_IDLE {
+                let epoch = editor.next_blink_epoch();
+                editor.blink_cursors(epoch, ctx);
+            }
+            // Idle long enough: the cursor stays visible and no longer toggles.
+            assert!(editor.cursors_visible);
+            let epoch = editor.next_blink_epoch();
+            editor.blink_cursors(epoch, ctx);
+            assert!(editor.cursors_visible);
+
+            // Input restarts blinking.
+            editor.reset_cursor_blink_timer(ctx);
+            let epoch = editor.next_blink_epoch();
+            editor.blink_cursors(epoch, ctx);
+            assert!(!editor.cursors_visible);
+        });
+    });
+}
+
+#[test]
 fn test_interaction_state() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);

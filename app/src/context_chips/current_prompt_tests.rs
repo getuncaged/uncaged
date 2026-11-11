@@ -256,7 +256,7 @@ fn test_shell_chip_is_disabled_when_required_executable_is_missing() {
         crate::settings::InputSettings::register(&mut app);
         app.update(crate::settings::AISettings::register_and_subscribe_to_events);
         #[cfg(windows)]
-        app.add_singleton_model(SystemInfo::new);
+        app.add_singleton_model(|_| SystemInfo::new());
 
         let executor = Arc::new(RecordingCommandExecutor::default());
         let sessions = app.add_model(|ctx| {
@@ -403,7 +403,7 @@ fn test_disabling_chips() {
         crate::settings::InputSettings::register(&mut app);
         app.update(crate::settings::AISettings::register_and_subscribe_to_events);
         #[cfg(windows)]
-        app.add_singleton_model(SystemInfo::new);
+        app.add_singleton_model(|_| SystemInfo::new());
 
         let executor = Arc::new(RecordingCommandExecutor::default());
 

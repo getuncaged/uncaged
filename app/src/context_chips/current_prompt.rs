@@ -929,22 +929,39 @@ impl CurrentPrompt {
                 allow_fingerprint_skip,
                 ctx,
             );
-            let interval = *interval;
-            let chip_kind_clone = chip_kind.clone();
-            let future = ctx.spawn(
-                async move {
-                    Timer::after(interval).await;
-                    chip_kind_clone
-                },
-                |me, chip_kind, ctx| {
-                    me.fetch_chip_value_at_interval(&chip_kind, None, None, true, ctx);
-                },
-            );
+            self.schedule_periodic_refresh(chip_kind, *interval, ctx);
+        }
+    }
 
-            match self.states.get_mut(chip_kind) {
-                Some(state) => state.refresh_handle = Some(future),
-                None => log::warn!("Missing state for {chip_kind:?}"),
-            }
+    /// Schedules the next refresh of a periodically-updated chip.
+    ///
+    /// While Uncaged is in the background nobody is looking at the prompt, so a tick then only
+    /// schedules the next one instead of refreshing: git chips spawn a `git` process per tick and
+    /// session, which kept a backgrounded app working every 30 seconds.
+    fn schedule_periodic_refresh(
+        &mut self,
+        chip_kind: &ContextChipKind,
+        interval: Duration,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let chip_kind_clone = chip_kind.clone();
+        let future = ctx.spawn(
+            async move {
+                Timer::after(interval).await;
+                chip_kind_clone
+            },
+            move |me, chip_kind, ctx| {
+                if ctx.windows().app_is_active() {
+                    me.fetch_chip_value_at_interval(&chip_kind, None, None, true, ctx);
+                } else if me.active(ctx) {
+                    me.schedule_periodic_refresh(&chip_kind, interval, ctx);
+                }
+            },
+        );
+
+        match self.states.get_mut(chip_kind) {
+            Some(state) => state.refresh_handle = Some(future),
+            None => log::warn!("Missing state for {chip_kind:?}"),
         }
     }
 

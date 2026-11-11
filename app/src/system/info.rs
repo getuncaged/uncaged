@@ -1,125 +1,27 @@
 use std::ffi::OsStr;
 
 use sysinfo::ProcessesToUpdate;
-use uncaged_ui::{Entity, ModelContext, SingletonEntity};
+use uncaged_ui::{Entity, SingletonEntity};
 
-use crate::system::memory_footprint;
-
-/// The threshold at which we emit a memory usage warning: 10 GB, in bytes.
-const MEMORY_USAGE_WARNING_THRESHOLD: u64 = 10 * 1_000_000_000;
-
-/// The refresh interval for system information, in seconds.
-const REFRESH_INTERVAL_S: usize = 5;
-/// The refresh interval for system information.
-const REFRESH_INTERVAL: std::time::Duration =
-    std::time::Duration::from_secs(REFRESH_INTERVAL_S as u64);
-
-pub enum SystemInfoEvent {
-    /// There is new system info available for consumers to query.
-    Refreshed,
-    /// The application is using a large quantity of memory.
-    MemoryUsageHigh,
-}
-
+/// On-demand access to process information.
+///
+/// Nothing is refreshed in the background: an earlier version polled the current process every
+/// 5 seconds for heap-usage tracking that nothing consumed, which kept an idle app waking up.
+/// Callers refresh what they need right before reading it.
 pub struct SystemInfo {
     /// A structure we can use to efficiently query system information.
     system: sysinfo::System,
-    /// Whether or not we've already emitted an event due to high memory usage.
-    has_emitted_memory_warning_event: bool,
 }
 
 impl SystemInfo {
-    /// Creates a new [`SystemInfo`] model and begins periodic fetching of
-    /// system information.
-    ///
-    /// Currently only retrieves and exposes memory usage information for the
-    /// current process.
-    pub fn new(ctx: &mut ModelContext<Self>) -> Self {
-        let mut me = Self {
+    pub fn new() -> Self {
+        Self {
             system: sysinfo::System::new(),
-            has_emitted_memory_warning_event: false,
-        };
-
-        // Initialize the underlying system info.  This is necessary in order
-        // for our first read of CPU stats to be accurate, as they are computed
-        // as a delta between the previous refresh and now.
-        me.system.refresh_processes_specifics(
-            ProcessesToUpdate::Some(&[Self::current_pid()]),
-            false, /* refresh_dead_processes */
-            Self::refresh_kind(),
-        );
-
-        // If we're doing automated heap usage tracking, set up periodic
-        // refreshes of the memory usage data.
-        Self::schedule_refresh(ctx);
-
-        me
-    }
-
-    /// Returns the full memory footprint of the current process, in bytes.
-    ///
-    /// Unlike [`used_memory`] (RSS), this includes memory that has been
-    /// swapped out or compressed by the OS.  On macOS this matches the value
-    /// shown by Activity Monitor.
-    pub fn memory_footprint(&self) -> u64 {
-        memory_footprint::memory_footprint_bytes()
-    }
-
-    fn schedule_refresh(ctx: &mut ModelContext<Self>) {
-        ctx.spawn(
-            async {
-                uncaged_ui::r#async::Timer::after(REFRESH_INTERVAL).await;
-            },
-            |me, _, ctx| {
-                me.refresh(ctx);
-                Self::schedule_refresh(ctx);
-            },
-        );
-    }
-
-    fn refresh(&mut self, ctx: &mut ModelContext<Self>) {
-        self.system.refresh_processes_specifics(
-            ProcessesToUpdate::Some(&[Self::current_pid()]),
-            false, /* refresh_dead_processes */
-            Self::refresh_kind(),
-        );
-        ctx.emit(SystemInfoEvent::Refreshed);
-
-        let footprint = self.memory_footprint();
-        self.check_for_excessive_memory_usage(footprint, ctx);
-    }
-
-    /// Checks for excessive memory usage and emits
-    /// [`SystemInfoEvent::MemoryUsageHigh`] the first time it is detected.
-    ///
-    /// The threshold check uses `memory_footprint` (which includes swapped
-    /// and compressed pages) so we actually detect high memory situations.
-    fn check_for_excessive_memory_usage(
-        &mut self,
-        memory_footprint: u64,
-        ctx: &mut ModelContext<Self>,
-    ) {
-        if self.has_emitted_memory_warning_event {
-            return;
         }
-
-        // Use footprint (not RSS) for the threshold so we catch memory
-        // that has been swapped out or compressed by the OS.
-        if memory_footprint < MEMORY_USAGE_WARNING_THRESHOLD {
-            return;
-        }
-
-        ctx.emit(SystemInfoEvent::MemoryUsageHigh);
-        self.has_emitted_memory_warning_event = true;
     }
 
-    /// Returns the pid of the current process.
-    fn current_pid() -> sysinfo::Pid {
-        sysinfo::get_current_pid().expect("Platform should support process IDs")
-    }
-
-    /// Returns the [`sysinfo::ProcessRefreshKind`] that should be used when
-    /// retrieving information about the current process.
+    /// Returns the [`sysinfo::ProcessRefreshKind`] used when refreshing processes.
+    #[cfg_attr(not(windows), allow(dead_code))]
     fn refresh_kind() -> sysinfo::ProcessRefreshKind {
         sysinfo::ProcessRefreshKind::nothing()
             .with_memory()
@@ -145,7 +47,7 @@ impl SystemInfo {
 }
 
 impl Entity for SystemInfo {
-    type Event = SystemInfoEvent;
+    type Event = ();
 }
 
 impl SingletonEntity for SystemInfo {}

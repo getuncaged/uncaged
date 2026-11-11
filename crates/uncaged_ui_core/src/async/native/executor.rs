@@ -149,9 +149,11 @@ impl Default for Background {
             // test.
             1
         } else {
-            // In production, create a thread for each logical CPU core,
-            // maximizing our possible parallelism.
-            num_cpus::get()
+            // In production, use half the logical cores, between 2 and 6 threads. The
+            // background executor mostly waits on I/O and child processes; CPU-heavy work
+            // (search, indexing) runs on its own pools. A thread per core (14+ on Apple
+            // Silicon) only added idle threads and their stacks.
+            (num_cpus::get() / 2).clamp(2, 6)
         };
 
         Self::new(num_threads, |i| format!("background-executor-{i}"))

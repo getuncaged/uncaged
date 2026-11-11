@@ -120,7 +120,7 @@ pub fn initialize_app_for_terminal_view(app: &mut App) {
     app.add_singleton_model(AIExecutionProfilesModel::new);
 
     #[cfg(not(target_family = "wasm"))]
-    app.add_singleton_model(SystemInfo::new);
+    app.add_singleton_model(|_| SystemInfo::new());
 
     app.add_singleton_model(|_| RestoredAgentConversations::new(vec![]));
     app.add_singleton_model(|_| OneTimeModalModel::new());

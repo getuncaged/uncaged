@@ -10073,7 +10073,6 @@ dependencies = [
  "ntapi",
  "objc2-core-foundation",
  "objc2-io-kit",
- "rayon",
  "windows 0.61.3",
 ]
 
