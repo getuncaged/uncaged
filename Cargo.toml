@@ -375,11 +375,12 @@ strip = "debuginfo"
 debug = 0
 
 [profile.dev]
-# Incremental caches for this workspace repeatedly grew past 16 GB per feature
-# combination and filled development disks, so incremental compilation is off
-# by default and enabled only for the `uncaged` app crate (below), the one that
-# is edited on nearly every iteration. `script/prune-target` trims its cache.
-incremental = false
+# Workspace crates build incrementally; third-party dependencies don't (see
+# `[profile.dev.package."*"]` below), since they never change between builds.
+# Incremental caches for every dependency once grew past 16 GB per feature
+# combination and filled development disks. `script/prune-target` keeps only
+# the newest cache per crate.
+incremental = true
 # Use line-tables-only to speed up dev builds. Change to `debug = true` if you
 # need full debuginfo for step-through debugging (gdb/lldb).
 debug = "line-tables-only"
@@ -391,8 +392,6 @@ debug = "line-tables-only"
 split-debuginfo = "unpacked"
 
 [profile.dev.package]
-# The app crate is the hot edit-build loop: keep its incremental cache.
-uncaged.incremental = true
 # Improve the performance of core terminal logic.
 uncaged_terminal.opt-level = 3
 # Minimize the runtime overhead of CPU profiling at the cost of a small
@@ -423,9 +422,11 @@ png.opt-level = 3
 miniz_oxide.opt-level = 3
 
 [profile.dev.package."*"]
-# Third-party (non-workspace) dependencies get no debuginfo in dev builds:
-# nobody steps through them and it speeds up compile and link. Workspace
-# crates keep line tables via `debug = "line-tables-only"` above.
+# Third-party (non-workspace) dependencies get no debuginfo and no incremental
+# cache in dev builds: nobody steps through or edits them, and it speeds up
+# compile and link. Workspace crates keep line tables and incremental builds
+# via the `[profile.dev]` settings above.
+incremental = false
 debug = 0
 
 # A profile that behaves like release but enables ThinLTO, which should produce
