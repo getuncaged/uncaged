@@ -11271,6 +11271,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "rust-embed",
+ "uncaged_core",
  "uncaged_ui_core",
 ]
 

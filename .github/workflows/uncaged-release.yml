@@ -265,6 +265,10 @@ jobs:
             || cp target/release/uncaged stage/Uncaged-linux-x86_64/uncaged
           [ -f README.md ] && cp README.md stage/Uncaged-linux-x86_64/ || true
           [ -f LICENSE ] && cp LICENSE stage/Uncaged-linux-x86_64/ || true
+          # The onboarding/theme images are read from `resources/async` next to the
+          # executable (they are not embedded in the binary).
+          mkdir -p stage/Uncaged-linux-x86_64/resources
+          cp -R app/assets/async stage/Uncaged-linux-x86_64/resources/async
           tar -C stage -czf dist/Uncaged-linux-x86_64.tar.gz Uncaged-linux-x86_64
 
           echo "Staged Linux assets:"
@@ -378,6 +382,10 @@ jobs:
             || cp target/release/uncaged stage/Uncaged-linux-aarch64/uncaged
           [ -f README.md ] && cp README.md stage/Uncaged-linux-aarch64/ || true
           [ -f LICENSE ] && cp LICENSE stage/Uncaged-linux-aarch64/ || true
+          # The onboarding/theme images are read from `resources/async` next to the
+          # executable (they are not embedded in the binary).
+          mkdir -p stage/Uncaged-linux-aarch64/resources
+          cp -R app/assets/async stage/Uncaged-linux-aarch64/resources/async
           tar -C stage -czf dist/Uncaged-linux-aarch64.tar.gz Uncaged-linux-aarch64
           echo "Staged Linux assets:"
           ls -la dist/ || true
@@ -463,6 +471,10 @@ jobs:
             Copy-Item $bin stage/Uncaged-windows-x86_64/uncaged.exe
             if (Test-Path README.md) { Copy-Item README.md stage/Uncaged-windows-x86_64/ }
             if (Test-Path LICENSE)   { Copy-Item LICENSE   stage/Uncaged-windows-x86_64/ }
+            # The onboarding/theme images are read from `resources\async` next to the
+            # executable (they are not embedded in the binary).
+            New-Item -ItemType Directory -Force -Path stage/Uncaged-windows-x86_64/resources | Out-Null
+            Copy-Item -Recurse app/assets/async stage/Uncaged-windows-x86_64/resources/async
             Compress-Archive -Path stage/Uncaged-windows-x86_64 -DestinationPath dist/Uncaged-windows-x86_64.zip -Force
           } else {
             Write-Output "binary not found at $bin; skipping zip"

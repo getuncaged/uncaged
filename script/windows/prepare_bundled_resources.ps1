@@ -40,6 +40,22 @@ if (-Not (Test-Path $DestinationDir)) {
     New-Item -ItemType Directory -Path $DestinationDir -Force | Out-Null
 }
 
+# Copy the large onboarding/theme imagery (app/assets/async). It is not embedded
+# in the binary: crates/uncaged_assets reads `async/...` from this resources
+# directory at runtime (the installer copies the whole resources directory).
+$AsyncAssetsSource = Join-Path $RepoRoot 'app\assets\async'
+if (Test-Path $AsyncAssetsSource -PathType Container) {
+    $AsyncAssetsDestination = Join-Path $DestinationDir 'async'
+    Write-Output "Copying async assets to $AsyncAssetsDestination"
+    if (Test-Path $AsyncAssetsDestination -PathType Container) {
+        Remove-Item -Path $AsyncAssetsDestination -Recurse -Force
+    }
+    Copy-Item -Path $AsyncAssetsSource -Destination $AsyncAssetsDestination -Recurse -Force
+} else {
+    Write-Error "Async assets directory not found at $AsyncAssetsSource"
+    exit 1
+}
+
 # Copy bundled resources
 $BundledSource = Join-Path $ResourcesSource 'bundled'
 if (Test-Path $BundledSource -PathType Container) {

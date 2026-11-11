@@ -14,6 +14,9 @@ anyhow.workspace = true
 rust-embed.workspace = true
 uncaged_ui_core.workspace = true
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+uncaged_core.workspace = true
+
 [target.'cfg(target_family = "wasm")'.dependencies]
 # Make sure we embed the data into the wasm binary even when running in debug
 # mode, as it cannot be read directly from the filesystem.

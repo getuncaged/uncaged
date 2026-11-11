@@ -19,6 +19,9 @@
 #                           profile as the main build avoids recompiling deps.
 #
 # Environment variables:
+#   SKIP_ASYNC_ASSETS:    Set to "1" to skip copying app/assets/async (the
+#                         onboarding/theme images the GUI app loads from disk).
+#                         Used for headless CLI bundles.
 #   SKIP_SETTINGS_SCHEMA: Set to "1" to skip generating the JSON settings
 #                         schema. By default the schema is always generated
 #                         so that production bundles never accidentally omit it.
@@ -52,6 +55,21 @@ fi
 
 # Create the destination directory if it doesn't exist
 mkdir -p "$DEST_DIR"
+
+# Copy the large onboarding/theme imagery (app/assets/async). It is not embedded
+# in the binary: crates/uncaged_assets reads `async/...` from this resources
+# directory at runtime. Headless CLI bundles skip it.
+ASYNC_ASSETS_SRC="$REPO_ROOT/app/assets/async"
+if [ "${SKIP_ASYNC_ASSETS:-}" = "1" ]; then
+  echo "Skipping async assets (SKIP_ASYNC_ASSETS=1)"
+elif [ -d "$ASYNC_ASSETS_SRC" ]; then
+  echo "Copying async assets to $DEST_DIR/async"
+  rm -rf "$DEST_DIR/async"
+  cp -R "$ASYNC_ASSETS_SRC" "$DEST_DIR/async"
+else
+  echo "Error: async assets directory not found at $ASYNC_ASSETS_SRC" >&2
+  exit 1
+fi
 
 # Copy bundled resources
 if [ -d "$RESOURCES_SRC/bundled" ]; then
