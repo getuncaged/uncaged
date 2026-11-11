@@ -2,15 +2,14 @@ use std::borrow::Cow;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use wgpu::util::BufferInitDescriptor;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupLayout, ColorTargetState, Device, Extent3d,
-    FilterMode, RenderPass, RenderPipeline, Sampler, TextureDescriptor, TextureFormat,
+    FilterMode, Queue, RenderPass, RenderPipeline, Sampler, TextureDescriptor, TextureFormat,
     TextureUsages,
 };
 
 use self::shaders::{ColorModifier, ImageInstanceData};
-use super::util::create_buffer_init;
+use super::util::InstanceBuffer;
 use super::WGPUContext;
 use crate::image_cache::StaticImage;
 use crate::rendering::texture_cache::{TextureCache, TextureCacheIndex};
@@ -181,19 +180,20 @@ impl Pipeline {
 
     pub(super) fn finalize_per_frame_state(
         per_frame_state: &mut PerFrameState,
+        instances: &mut InstanceBuffer,
         device: &Device,
+        queue: &Queue,
         device_lost: &Arc<AtomicBool>,
     ) {
-        per_frame_state.buffer = create_buffer_init(
-            device,
-            device_lost,
-            &BufferInitDescriptor {
-                label: Some("Image instance buffer"),
-                contents: bytemuck::cast_slice(&per_frame_state.image_data),
-                usage: wgpu::BufferUsages::VERTEX,
-            },
-        )
-        .ok();
+        per_frame_state.buffer = instances
+            .upload(
+                device,
+                queue,
+                device_lost,
+                "Image instance buffer",
+                bytemuck::cast_slice(&per_frame_state.image_data),
+            )
+            .ok();
     }
 
     pub(super) fn draw<'a>(

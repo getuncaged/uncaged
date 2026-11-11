@@ -5,10 +5,9 @@ use std::sync::Arc;
 use pathfinder_color::ColorU;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::vec2f;
-use wgpu::util::BufferInitDescriptor;
-use wgpu::{BindGroupLayout, ColorTargetState, Device, RenderPass, RenderPipeline};
+use wgpu::{BindGroupLayout, ColorTargetState, Device, Queue, RenderPass, RenderPipeline};
 
-use super::util::create_buffer_init;
+use super::util::InstanceBuffer;
 use crate::rendering::get_best_dash_gap;
 use crate::rendering::wgpu::shader_types::BorderWidth;
 use crate::rendering::wgpu::{resources, shader_types};
@@ -195,19 +194,20 @@ impl Pipeline {
 
     pub(super) fn finalize_per_frame_state(
         per_frame_state: &mut PerFrameState,
+        instances: &mut InstanceBuffer,
         device: &Device,
+        queue: &Queue,
         device_lost: &Arc<AtomicBool>,
     ) {
-        per_frame_state.buffer = create_buffer_init(
-            device,
-            device_lost,
-            &BufferInitDescriptor {
-                label: Some("Rect instance buffer"),
-                contents: bytemuck::cast_slice(&per_frame_state.rect_data),
-                usage: wgpu::BufferUsages::VERTEX,
-            },
-        )
-        .ok();
+        per_frame_state.buffer = instances
+            .upload(
+                device,
+                queue,
+                device_lost,
+                "Rect instance buffer",
+                bytemuck::cast_slice(&per_frame_state.rect_data),
+            )
+            .ok();
     }
 
     pub(super) fn draw<'a>(

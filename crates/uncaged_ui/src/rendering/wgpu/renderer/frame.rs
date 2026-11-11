@@ -2,10 +2,19 @@ use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
 use wgpu::{CommandEncoder, RenderPass, SurfaceTexture};
 
+use crate::rendering::wgpu::renderer::util::InstanceBuffer;
 use crate::rendering::wgpu::renderer::{glyph, image, rect, WGPUContext};
 use crate::rendering::wgpu::Resources;
 use crate::scene::Layer;
 use crate::Scene;
+
+/// Instance buffers reused across frames, one per pipeline.
+#[derive(Default)]
+pub(super) struct InstanceBuffers {
+    rect: InstanceBuffer,
+    glyph: InstanceBuffer,
+    image: InstanceBuffer,
+}
 
 #[derive(Default)]
 struct PerFrameState {
@@ -31,6 +40,7 @@ impl<'a> Frame<'a> {
         rect_pipeline: &'a rect::Pipeline,
         glyph_pipeline: &'a mut glyph::Pipeline,
         image_pipeline: &'a mut image::Pipeline,
+        instance_buffers: &mut InstanceBuffers,
     ) -> Self {
         glyph_pipeline.update_config(&scene.rendering_config().glyphs);
 
@@ -54,17 +64,23 @@ impl<'a> Frame<'a> {
 
         rect::Pipeline::finalize_per_frame_state(
             &mut per_frame_state.rect,
+            &mut instance_buffers.rect,
             &ctx.resources.device,
+            &ctx.resources.queue,
             &ctx.resources.device_lost,
         );
         glyph::Pipeline::finalize_per_frame_state(
             &mut per_frame_state.glyph,
+            &mut instance_buffers.glyph,
             &ctx.resources.device,
+            &ctx.resources.queue,
             &ctx.resources.device_lost,
         );
         image::Pipeline::finalize_per_frame_state(
             &mut per_frame_state.image,
+            &mut instance_buffers.image,
             &ctx.resources.device,
+            &ctx.resources.queue,
             &ctx.resources.device_lost,
         );
 

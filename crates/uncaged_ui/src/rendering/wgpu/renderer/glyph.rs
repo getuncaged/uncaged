@@ -4,13 +4,12 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use pathfinder_geometry::rect::RectF;
-use wgpu::util::BufferInitDescriptor;
 use wgpu::{
-    BindGroupLayout, BufferUsages, ColorTargetState, Device, FilterMode, RenderPass,
-    RenderPipeline, Sampler,
+    BindGroupLayout, ColorTargetState, Device, FilterMode, Queue, RenderPass, RenderPipeline,
+    Sampler,
 };
 
-use super::util::create_buffer_init;
+use super::util::InstanceBuffer;
 use crate::fonts::SubpixelAlignment;
 use crate::rendering::atlas::TextureId;
 use crate::rendering::wgpu::renderer::WGPUContext;
@@ -248,19 +247,20 @@ impl Pipeline {
 
     pub(super) fn finalize_per_frame_state(
         per_frame_state: &mut PerFrameState,
+        instances: &mut InstanceBuffer,
         device: &Device,
+        queue: &Queue,
         device_lost: &Arc<AtomicBool>,
     ) {
-        per_frame_state.buffer = create_buffer_init(
-            device,
-            device_lost,
-            &BufferInitDescriptor {
-                label: Some("Glyph instance buffer"),
-                contents: bytemuck::cast_slice(&per_frame_state.glyph_data),
-                usage: BufferUsages::VERTEX,
-            },
-        )
-        .ok();
+        per_frame_state.buffer = instances
+            .upload(
+                device,
+                queue,
+                device_lost,
+                "Glyph instance buffer",
+                bytemuck::cast_slice(&per_frame_state.glyph_data),
+            )
+            .ok();
     }
 
     pub(super) fn draw<'a>(

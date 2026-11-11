@@ -4,7 +4,7 @@ mod image;
 mod rect;
 mod util;
 
-use frame::Frame;
+use frame::{Frame, InstanceBuffers};
 use pathfinder_geometry::vector::Vector2F;
 use uncaged_ui_core::platform::CapturedFrame;
 use util::with_error_scope;
@@ -25,6 +25,7 @@ pub struct Renderer {
     rect_pipeline: rect::Pipeline,
     glyph_pipeline: glyph::Pipeline,
     image_pipeline: image::Pipeline,
+    instance_buffers: InstanceBuffers,
 }
 
 impl Renderer {
@@ -58,6 +59,7 @@ impl Renderer {
             rect_pipeline,
             glyph_pipeline,
             image_pipeline,
+            instance_buffers: InstanceBuffers::default(),
         }
     }
 
@@ -93,6 +95,7 @@ impl Renderer {
                 &self.rect_pipeline,
                 &mut self.glyph_pipeline,
                 &mut self.image_pipeline,
+                &mut self.instance_buffers,
             )
         }) {
             (_, Some(error)) => return Err(error),

@@ -1,8 +1,9 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use wgpu::util::BufferInitDescriptor;
-use wgpu::{Buffer, BufferAddress, BufferDescriptor, Device, COPY_BUFFER_ALIGNMENT};
+use wgpu::{
+    Buffer, BufferAddress, BufferDescriptor, BufferUsages, Device, Queue, COPY_BUFFER_ALIGNMENT,
+};
 
 use super::Error;
 
@@ -30,56 +31,68 @@ pub fn with_error_scope<T>(
     (ret, error.map(Into::into))
 }
 
-/// Creates a buffer and initializes it with data, synchronously returning an
-/// error if the buffer could not be created successfully.
+/// The smallest instance buffer allocated; grown in powers of two from here.
+const MIN_INSTANCE_BUFFER_SIZE: BufferAddress = 64 * 1024;
+
+/// A vertex buffer for per-frame instance data that is kept across frames and refilled with
+/// [`wgpu::Queue::write_buffer`].
 ///
-/// This is adapted from [`wgpu::util::DeviceExt::create_buffer_init`], with
-/// added logic to check for and return errors from the underlying buffer
-/// creation.
-pub fn create_buffer_init(
-    device: &Device,
-    device_lost: &Arc<AtomicBool>,
-    descriptor: &BufferInitDescriptor<'_>,
-) -> Result<Buffer, super::Error> {
-    // Skip mapping if the buffer is zero sized
-    if descriptor.contents.is_empty() {
-        let wgt_descriptor = BufferDescriptor {
-            label: descriptor.label,
-            size: 0,
-            usage: descriptor.usage,
-            mapped_at_creation: false,
-        };
+/// Creating a fresh, mapped buffer for every frame made each frame allocate and free GPU memory,
+/// which drivers pool and keep charging to the app. wgpu orders a `write_buffer` after earlier
+/// submissions that read the buffer, so a single buffer per pipeline is enough.
+#[derive(Default)]
+pub struct InstanceBuffer {
+    buffer: Option<Buffer>,
+}
 
-        create_buffer(device, &wgt_descriptor)
-    } else {
-        let unpadded_size = descriptor.contents.len() as BufferAddress;
-        // Valid vulkan usage is
-        // 1. buffer size must be a multiple of COPY_BUFFER_ALIGNMENT.
-        // 2. buffer size must be greater than 0.
-        // Therefore we round the value up to the nearest multiple, and ensure it's at least COPY_BUFFER_ALIGNMENT.
+impl InstanceBuffer {
+    /// Uploads `contents`, growing the buffer if needed, and returns the buffer to bind.
+    pub fn upload(
+        &mut self,
+        device: &Device,
+        queue: &Queue,
+        device_lost: &Arc<AtomicBool>,
+        label: &'static str,
+        contents: &[u8],
+    ) -> Result<Buffer, Error> {
+        // Copies must be a multiple of COPY_BUFFER_ALIGNMENT.
         let align_mask = COPY_BUFFER_ALIGNMENT - 1;
-        let padded_size = ((unpadded_size + align_mask) & !align_mask).max(COPY_BUFFER_ALIGNMENT);
+        let padded_size = (contents.len() as BufferAddress + align_mask) & !align_mask;
 
-        let wgt_descriptor = BufferDescriptor {
-            label: descriptor.label,
-            size: padded_size,
-            usage: descriptor.usage,
-            mapped_at_creation: true,
-        };
-
-        let buffer = create_buffer(device, &wgt_descriptor)?;
-
-        if device_lost.load(Ordering::SeqCst) {
-            return Err(super::Error::DeviceLost);
+        if self
+            .buffer
+            .as_ref()
+            .is_none_or(|buffer| buffer.size() < padded_size)
+        {
+            self.buffer = None;
+            let size = padded_size
+                .max(MIN_INSTANCE_BUFFER_SIZE)
+                .next_power_of_two();
+            self.buffer = Some(create_buffer(
+                device,
+                &BufferDescriptor {
+                    label: Some(label),
+                    size,
+                    usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                },
+            )?);
         }
 
-        buffer
-            .slice(..)
-            .get_mapped_range_mut()
-            .slice(..unpadded_size as usize)
-            .copy_from_slice(descriptor.contents);
-        buffer.unmap();
+        if device_lost.load(Ordering::SeqCst) {
+            return Err(Error::DeviceLost);
+        }
 
+        let buffer = self.buffer.clone().expect("buffer was just ensured");
+        if contents.len() as BufferAddress == padded_size {
+            if !contents.is_empty() {
+                queue.write_buffer(&buffer, 0, contents);
+            }
+        } else {
+            let mut padded = contents.to_vec();
+            padded.resize(padded_size as usize, 0);
+            queue.write_buffer(&buffer, 0, &padded);
+        }
         Ok(buffer)
     }
 }
