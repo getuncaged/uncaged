@@ -399,9 +399,20 @@ fn wait_for_parent_crash(args: &uncaged_cli::AppArgs) {
         .map(|pid| Pid::from_raw(pid as i32))
         .unwrap_or_else(|| panic!("--parent-pid must be set if {RECOVERY_MECHANISM_ARG} is set"));
 
-    // Wait until our parent process ID doesn't match our expected
-    // parent process ID, performing the check once per second.
     log::debug!("Waiting for parent with pid {parent_pid} to crash...");
+
+    // On Linux, block on a pidfd, which becomes readable when the parent exits, instead of
+    // waking up every second for the lifetime of the app.
+    #[cfg(target_os = "linux")]
+    {
+        if Pid::parent() == parent_pid && wait_for_exit_with_pidfd(parent_pid) {
+            log::info!("Parent has crashed; continuing execution.");
+            return;
+        }
+    }
+
+    // Otherwise wait until our parent process ID doesn't match our expected
+    // parent process ID, performing the check once per second.
     loop {
         if Pid::parent() != parent_pid {
             log::info!("Parent has crashed; continuing execution.");
@@ -409,6 +420,44 @@ fn wait_for_parent_crash(args: &uncaged_cli::AppArgs) {
         }
         std::thread::sleep(instant::Duration::from_secs(1));
     }
+}
+
+/// Blocks until the process `pid` exits, using a pidfd (Linux 5.3+).
+///
+/// Returns false if pidfds aren't available or polling fails, so the caller can fall back to
+/// polling the parent pid.
+#[cfg(target_os = "linux")]
+fn wait_for_exit_with_pidfd(pid: nix::unistd::Pid) -> bool {
+    // SAFETY: pidfd_open takes a pid and a flags word and returns a new file descriptor or -1.
+    let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid.as_raw(), 0) };
+    if fd < 0 {
+        return false;
+    }
+    let fd = fd as libc::c_int;
+    // The pidfd was opened while `pid` was still our parent (the caller checked before calling),
+    // so it can't refer to a different process that reused the pid.
+    let exited = if nix::unistd::Pid::parent() == pid {
+        let mut poll_fd = libc::pollfd {
+            fd,
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        loop {
+            // SAFETY: `poll_fd` is a valid pollfd for an open descriptor; a timeout of -1 blocks.
+            let result = unsafe { libc::poll(&mut poll_fd, 1, -1) };
+            if result > 0 {
+                break true;
+            }
+            if result < 0 && nix::errno::Errno::last() != nix::errno::Errno::EINTR {
+                break false;
+            }
+        }
+    } else {
+        true
+    };
+    // SAFETY: `fd` is a descriptor this function opened and hasn't closed.
+    unsafe { libc::close(fd) };
+    exited
 }
 
 /// Handles a crash in the parent process by using the given recovery mechanism.
