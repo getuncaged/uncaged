@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+#
+# Trims stale build output from `target/` so it doesn't slowly eat the disk.
+#
+# Removes:
+#   * incremental compilation caches for the `uncaged` crate (and the other
+#     workspace crates) that haven't been touched in 3 days,
+#   * `target/*/examples` (example binaries are never needed for normal work),
+#   * stale duplicate rlibs/rmetas/dylibs in each `target/*/deps`: when the same
+#     crate was built under several metadata hashes, only the newest hash is kept.
+#
+# Usage: script/prune-target [--dry-run]
+
+set -euo pipefail
+
+DRY_RUN=0
+[ "${1:-}" = "--dry-run" ] && DRY_RUN=1
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TARGET_DIR="${CARGO_TARGET_DIR:-$SCRIPT_DIR/../target}"
+
+if [ ! -d "$TARGET_DIR" ]; then
+  echo "No target directory at $TARGET_DIR; nothing to do."
+  exit 0
+fi
+
+remove() {
+  if [ "$DRY_RUN" = 1 ]; then
+    echo "would remove $1"
+  else
+    rm -rf "$1"
+  fi
+}
+
+# Every profile directory, both `target/<profile>` and `target/<triple>/<profile>`.
+profile_dirs() {
+  find "$TARGET_DIR" -mindepth 1 -maxdepth 2 -type d \( -name deps -o -name incremental -o -name examples \) -exec dirname {} \; | sort -u
+}
+
+before=$(du -sk "$TARGET_DIR" | cut -f1)
+
+while IFS= read -r profile_dir; do
+  # Incremental caches: one directory per crate+hash, e.g. `uncaged-1a2b3c`.
+  if [ -d "$profile_dir/incremental" ]; then
+    find "$profile_dir/incremental" -mindepth 1 -maxdepth 1 -type d -mtime +3 | while IFS= read -r dir; do
+      remove "$dir"
+    done
+  fi
+
+  # Example binaries.
+  if [ -d "$profile_dir/examples" ]; then
+    remove "$profile_dir/examples"
+  fi
+
+  # Stale duplicate rlibs: group `deps/lib<name>-<hash>.{rlib,rmeta,...}` by
+  # crate name and keep only the most recently written hash.
+  if [ -d "$profile_dir/deps" ]; then
+    python3 -I - "$profile_dir/deps" "$DRY_RUN" <<'PY'
+import collections, os, re, shutil, sys
+
+deps, dry = sys.argv[1], sys.argv[2] == "1"
+pat = re.compile(r"^(lib.+?)-([0-9a-f]{16})\.(rlib|rmeta|dylib|so|a)$")
+groups = collections.defaultdict(lambda: collections.defaultdict(list))
+for name in os.listdir(deps):
+    m = pat.match(name)
+    if m:
+        groups[(m.group(1), m.group(3))][m.group(2)].append(os.path.join(deps, name))
+for hashes in groups.values():
+    newest = max(hashes, key=lambda h: max(os.lstat(p).st_mtime for p in hashes[h]))
+    for h, paths in hashes.items():
+        if h == newest:
+            continue
+        for p in paths:
+            if dry:
+                print("would remove", p)
+            else:
+                try:
+                    os.remove(p)
+                except FileNotFoundError:
+                    pass
+PY
+  fi
+done < <(profile_dirs)
+
+after=$(du -sk "$TARGET_DIR" | cut -f1)
+echo "target/: $((before / 1024)) MB -> $((after / 1024)) MB"

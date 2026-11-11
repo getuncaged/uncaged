@@ -7,6 +7,7 @@ This file provides guidance when working with code in this repository.
 ### Build and Run
 - `cargo run` - Build and run Uncaged locally (the `uncaged` binary)
 - `./script/bundle app --channel oss --selfsign --debug --arch aarch64` - Bundle a local macOS debug app
+- `./script/prune-target` - Trim stale incremental caches, example binaries and duplicate rlibs from `target/` (`--dry-run` to preview)
 
 ### Testing
 - `cargo nextest run --no-fail-fast --workspace` - Run tests with nextest
