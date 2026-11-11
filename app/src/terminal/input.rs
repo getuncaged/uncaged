@@ -179,6 +179,7 @@ use crate::editor::{
     PropagateAndNoOpNavigationKeys, PropagateHorizontalNavigationKeys, TextColors, TextRun,
     MAX_IMAGES_PER_CONVERSATION,
 };
+use crate::editor_host::{self, EditorViewAIContextMenuExt as _};
 use crate::env_vars::EnvVarCollectionExt;
 use crate::features::FeatureFlag;
 use crate::input_suggestions::{
@@ -329,7 +330,7 @@ pub fn get_input_box_top_border_width() -> f32 {
 }
 
 pub const COMPLETIONS_MENU_WIDTH: f32 = 330.;
-pub const OPEN_COMPLETIONS_KEYBINDING_NAME: &str = "input:open_completion_suggestions";
+pub use uncaged_editor_view::accept_autosuggestion_keybinding_view::OPEN_COMPLETIONS_KEYBINDING_NAME;
 pub const INPUT_A11Y_LABEL: &str = "Command Input.";
 pub const INPUT_A11Y_HELPER: &str = "Input your shell command, press enter to execute. Press cmd-up to navigate to output of previously executed commands. Press cmd-l to re-focus command input.";
 pub const AI_COMMAND_SEARCH_HINT_TEXT: &str = "Type '#' for AI command suggestions";
@@ -2093,8 +2094,10 @@ impl Input {
                     ..Default::default()
                 };
                 EditorView::new(options, ctx)
-                    .with_next_command_model(next_command_model.clone())
-                    .with_context_model(ai_context_model.clone())
+                    .with_next_command_source(editor_host::next_command_source(
+                        next_command_model.clone(),
+                    ))
+                    .with_attachment_sink(editor_host::attachment_sink(ai_context_model.clone()))
             })
         };
 
@@ -8654,6 +8657,9 @@ impl Input {
                 }
             }
             EditorEvent::AcceptAIContextMenuItem(action) => {
+                let Some(action) = action.downcast_ref::<AIContextMenuSearchableAction>() else {
+                    return;
+                };
                 // Handle different action types
                 match action {
                     AIContextMenuSearchableAction::InsertText { text } => {

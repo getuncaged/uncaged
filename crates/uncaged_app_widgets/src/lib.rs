@@ -3,6 +3,9 @@
 //! `view_components` views (action buttons, alerts, toasts, ...). The app re-exports these at
 //! their old `crate::util` / `crate::ui_components` / `crate::view_components` paths.
 
+pub mod flags;
+pub mod menu;
+pub mod safe_triangle;
 pub mod spacing;
 pub mod ui_components;
 pub mod util;

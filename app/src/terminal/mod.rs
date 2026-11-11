@@ -40,7 +40,7 @@ pub mod find;
 pub(crate) mod focus_env;
 pub mod general_settings;
 pub mod grid_renderer;
-pub mod grid_size_util;
+pub use uncaged_editor_view::grid_size_util;
 pub mod history;
 pub mod input;
 pub mod keys;

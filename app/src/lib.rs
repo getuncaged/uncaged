@@ -11,6 +11,8 @@ mod banner;
 // Uncaged brand — the single source of truth for name, palette, and logo
 // paths. See `crates/uncaged_app_theme/src/brand.rs`.
 use uncaged_app_theme::brand;
+use uncaged_app_widgets::{menu, safe_triangle};
+use uncaged_editor_view::vim_registers;
 mod chip_configurator;
 mod cloud_object;
 mod code;
@@ -41,7 +43,6 @@ mod launch_splash;
 mod linear;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod login_item;
-mod menu;
 mod modal;
 mod network;
 mod notebooks;
@@ -57,7 +58,6 @@ mod projects;
 mod prompt;
 mod quit_warning;
 mod resource_limits;
-mod safe_triangle;
 mod search_bar;
 mod server;
 mod session_management;
@@ -79,7 +79,6 @@ mod uri;
 mod user_config;
 pub mod util;
 mod view_components;
-mod vim_registers;
 mod voltron;
 mod warp_managed_paths_watcher;
 mod window_settings;
@@ -100,7 +99,15 @@ mod workspaces;
 pub mod ai_assistant;
 pub mod appearance;
 pub mod channel;
-pub mod editor;
+mod editor_host;
+
+/// The editor view lives in `uncaged_editor_view`; the app wires it up through
+/// [`editor_host::AppEditorHost`] and re-exports it here at its old path.
+pub mod editor {
+    pub use uncaged_editor_view::*;
+
+    pub use crate::code::editor::model::{CodeEditorModel, CodeEditorModelEvent};
+}
 pub mod features;
 pub mod input_suggestions;
 #[cfg(feature = "integration_tests")]
@@ -1028,6 +1035,7 @@ pub(crate) fn initialize_app(
     mark_startup_sub_interval("init_terminal");
     input::init(ctx);
     mark_startup_sub_interval("init_input");
+    editor_host::register();
     editor::init(ctx);
     mark_startup_sub_interval("init_editor");
     onboarding::init(ctx);

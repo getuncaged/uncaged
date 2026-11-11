@@ -1,0 +1,65 @@
+[package]
+name = "uncaged_editor_view"
+version = "0.1.0"
+edition = "2021"
+authors.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[features]
+# Forwarded from `uncaged`: the settings macros emit cfgs on it.
+integration_tests = []
+# Test helpers that the `uncaged` app's own tests use.
+test-util = []
+
+[dependencies]
+anyhow.workspace = true
+arrayvec.workspace = true
+async-fs.workspace = true
+base64.workspace = true
+bounded-vec-deque.workspace = true
+concat-idents.workspace = true
+enclose = "1.1.8"
+enum-iterator.workspace = true
+futures.workspace = true
+input_classifier.workspace = true
+instant.workspace = true
+itertools.workspace = true
+lazy_static.workspace = true
+log.workspace = true
+mime_guess = "2.0"
+num-traits.workspace = true
+parking_lot = { version = "0.12.1", features = ["serde"] }
+pathfinder_color = "0.5.0"
+pathfinder_geometry.workspace = true
+rand.workspace = true
+rayon.workspace = true
+schemars = "1"
+serde.workspace = true
+serde_json.workspace = true
+settings.workspace = true
+settings_value = { workspace = true, features = ["derive"] }
+smallvec.workspace = true
+string-offset.workspace = true
+sum_tree.workspace = true
+uncaged_app_theme.workspace = true
+uncaged_app_widgets.workspace = true
+uncaged_completer.workspace = true
+uncaged_core.workspace = true
+uncaged_editor.workspace = true
+uncaged_terminal.workspace = true
+uncaged_ui = { workspace = true, features = ["schema_gen", "settings_value"] }
+uncaged_util.workspace = true
+uuid.workspace = true
+vec1.workspace = true
+vim.workspace = true
+
+[dev-dependencies]
+async-channel.workspace = true
+sum_tree = { workspace = true, features = ["test-util"] }
+uncaged_app_widgets = { workspace = true, features = ["test-util"] }
+uncaged_core = { workspace = true, features = ["test-util"] }
+uncaged_editor = { workspace = true, features = ["test-util"] }
+uncaged_ui = { workspace = true, features = ["test-util"] }
+unindent = "0.1.7"
+uncaged_ui_extras = { workspace = true, features = ["user_preferences"] }
