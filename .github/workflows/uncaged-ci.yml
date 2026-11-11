@@ -20,23 +20,24 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # Keep debug info minimal to speed up compilation and shrink target/.
-  RUSTFLAGS: -C debuginfo=line-tables-only
+  # No RUSTFLAGS here: setting it would replace the rustflags in
+  # .cargo/config.toml. The dev profile already uses line-tables-only debug info.
 
 jobs:
-  # --- Primary gating job: macOS ------------------------------------------
+  # --- Primary gating jobs: macOS -----------------------------------------
   # The Uncaged GUI (uncaged) needs Apple's Metal toolchain (shipped with
   # Xcode) to compile its shaders, so macOS is the reference platform.
-  macos:
-    name: Build & lint (macOS)
+  #
+  # The two clippy passes run as parallel jobs, each with its own cargo cache.
+  # Clippy compiles the whole tree, so there is no separate `cargo build` step:
+  # nothing downstream used its output.
+  #
+  # The advisory unit tests live in their own non-blocking job so a slow or
+  # flaky test never holds up (or, by hitting the job ceiling, cancels) a lint.
+  macos-clippy-default:
+    name: Lint (macOS, default features)
     runs-on: macos-latest
-    # A cold LTO-free debug build of this large workspace is slow; give it room.
-    #
-    # The advisory steps below carry their own, smaller budgets. Without those, a
-    # slow clippy or test step ran the whole job into this ceiling and GitHub
-    # cancelled it -- reported as a failed check even though fmt and the build had
-    # already passed. That cancelled every PR's macOS check and blocked merges.
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -44,16 +45,6 @@ jobs:
           # The repo tracks some assets (input-classifier models, *.pdb) via
           # Git LFS — fetch them so the build has its resources.
           lfs: true
-
-      # The all-features clippy run below enables the `nld_classifier_*`
-      # features, whose `candle-onnx` build script runs prost-build and so
-      # needs protoc; the macOS runner doesn't ship it. Default-feature and
-      # release builds (Linux/Windows jobs, bundles) don't need it.
-      - name: Install protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          version: "25.x"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       # rust-toolchain.toml pins the exact channel (1.92.0 + rustfmt/clippy);
       # actions/checkout + the default toolchain honor it automatically, but we
@@ -66,39 +57,88 @@ jobs:
       - name: Cache cargo & target
         uses: Swatinem/rust-cache@v2
         with:
-          key: macos-uncaged
+          key: macos-clippy-default
 
-      # Cheap checks first so obvious problems fail fast before the long build.
+      # Cheap check first so obvious problems fail fast before the long lint.
       - name: cargo fmt --check
         run: cargo fmt --all --check
 
-      - name: Build uncaged (GUI binary)
-        run: cargo build --bin uncaged
-
-      # The tree is clippy-clean, so lints gate the job. Two runs, because each
-      # feature set compiles code the other doesn't (cloud_environments
-      # tests, release_bundle). dead_code is
-      # allowed: features removed in the account-free fork leave plenty behind.
+      # The tree is clippy-clean, so lints gate the job. Two feature sets, as
+      # two parallel jobs, because each compiles code the other doesn't
+      # (cloud_environments tests, release_bundle). dead_code is allowed:
+      # features removed in the account-free fork leave plenty behind.
       - name: cargo clippy (default features)
-        timeout-minutes: 40
         run: >-
           cargo clippy -p uncaged -p uncaged_engine
           --all-targets --tests -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
+  macos-clippy-all-features:
+    name: Lint (macOS, all features)
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      # The all-features clippy run enables the `nld_classifier_*` features,
+      # whose `candle-onnx` build script runs prost-build and so needs protoc;
+      # the macOS runner doesn't ship it.
+      - name: Install protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "25.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup component add rustfmt clippy
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-clippy-all-features
+
       - name: cargo clippy (all features)
-        timeout-minutes: 40
         run: >-
           cargo clippy -p uncaged -p uncaged_engine
           --all-targets --all-features --tests -- -D warnings
           -A dead_code -A clippy::doc_lazy_continuation -A clippy::useless_conversion
 
-      # Run the fast, default-member unit tests. The heavy integration crate is
-      # excluded from default members, so this stays reasonable.
-      - name: cargo test (workspace, default members)
-        continue-on-error: true
-        timeout-minutes: 40
-        run: cargo test --bins --lib || true
+  # Advisory: never fails the check (continue-on-error). nextest runs each test
+  # in its own process, in parallel; installed from a prebuilt binary.
+  macos-tests:
+    name: Unit tests (macOS, advisory)
+    runs-on: macos-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+
+      - name: Cache cargo & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-tests
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: cargo nextest (uncaged lib)
+        env:
+          DISABLE_AUTO_UPDATE: "true"
+        run: cargo nextest run -p uncaged --lib --no-fail-fast
 
   # --- Best-effort cross-platform builds ----------------------------------
   # Cross-platform GUI builds may need extra system libraries and are NOT yet
@@ -137,10 +177,8 @@ jobs:
         with:
           key: linux-uncaged
 
-      - name: Build uncaged (GUI binary)
-        run: cargo build --bin uncaged
-
-      # Catches code only this platform compiles, which the macOS lint never sees.
+      # Catches code only this platform compiles, which the macOS lint never
+      # sees. Clippy compiles everything, so no separate build step.
       - name: cargo clippy (uncaged)
         run: >-
           cargo clippy -p uncaged --lib --tests --bin uncaged -- -D warnings
@@ -169,10 +207,8 @@ jobs:
         with:
           key: windows-uncaged
 
-      - name: Build uncaged (GUI binary)
-        run: cargo build --bin uncaged
-
-      # Catches code only this platform compiles, which the macOS lint never sees.
+      # Catches code only this platform compiles, which the macOS lint never
+      # sees. Clippy compiles everything, so no separate build step.
       - name: cargo clippy (uncaged)
         run: >-
           cargo clippy -p uncaged --lib --tests --bin uncaged -- -D warnings

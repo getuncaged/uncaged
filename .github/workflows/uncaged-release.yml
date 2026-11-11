@@ -107,7 +107,18 @@ jobs:
       # script/macos/bundle runs `cargo bundle` (the .app) and, via
       # script/prepare_bundled_resources, `cargo about` (third-party license
       # file). Neither ships with the runner, so install both up front.
+      # Cache the installed binaries so cargo-bundle/cargo-about are not rebuilt
+      # on every run (key pins both versions).
+      - name: Cache cargo-bundle + cargo-about binaries
+        id: cache-cargo-tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-bundle
+            ~/.cargo/bin/cargo-about
+          key: cargo-tools-bundle-ae4c76e-about-0.8.4-${{ runner.os }}-${{ runner.arch }}
       - name: Install cargo-bundle + cargo-about
+        if: steps.cache-cargo-tools.outputs.cache-hit != 'true'
         run: |
           cargo install cargo-bundle --git https://github.com/burtonageo/cargo-bundle --rev ae4c76e92c08774bf54ff077b1c52e3d1cd6c16d
           cargo install --locked cargo-about@0.8.4
@@ -195,7 +206,15 @@ jobs:
 
       # The bundle scripts generate the third-party license file via
       # script/prepare_bundled_resources -> `cargo about`, which isn't on the runner.
+      # Cache the installed binary so cargo-about is not rebuilt on every run.
+      - name: Cache cargo-about binary
+        id: cache-cargo-about
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-about*
+          key: cargo-about-0.8.4-ubuntu-latest-${{ runner.arch }}
       - name: Install cargo-about
+        if: steps.cache-cargo-about.outputs.cache-hit != 'true'
         run: cargo install --locked cargo-about@0.8.4
 
       # Build the native binary once (the bundle script re-uses it) and produce
@@ -311,7 +330,15 @@ jobs:
         with:
           key: linux-arm64-release-uncaged
 
+      # Cache the installed binary so cargo-about is not rebuilt on every run.
+      - name: Cache cargo-about binary
+        id: cache-cargo-about
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-about*
+          key: cargo-about-0.8.4-ubuntu-24.04-arm-${{ runner.arch }}
       - name: Install cargo-about
+        if: steps.cache-cargo-about.outputs.cache-hit != 'true'
         run: cargo install --locked cargo-about@0.8.4
 
       # Native arm64 build (no cross sysroot, no QEMU): the runner IS aarch64, so
@@ -397,7 +424,15 @@ jobs:
 
       # bundle.ps1 builds the binary + Inno Setup installer for the given arch.
       # $env:GIT_RELEASE_TAG is read for the installer version.
+      # Cache the installed binary so cargo-about is not rebuilt on every run.
+      - name: Cache cargo-about binary
+        id: cache-cargo-about
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-about*
+          key: cargo-about-0.8.4-windows-latest-${{ runner.arch }}
       - name: Install cargo-about
+        if: steps.cache-cargo-about.outputs.cache-hit != 'true'
         run: cargo install --locked cargo-about@0.8.4
 
       - name: Build Windows installer (x86_64)
@@ -472,7 +507,15 @@ jobs:
         with:
           key: windows-release-uncaged-arm64
 
+      # Cache the installed binary so cargo-about is not rebuilt on every run.
+      - name: Cache cargo-about binary
+        id: cache-cargo-about
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-about*
+          key: cargo-about-0.8.4-windows-latest-${{ runner.arch }}
       - name: Install cargo-about
+        if: steps.cache-cargo-about.outputs.cache-hit != 'true'
         run: cargo install --locked cargo-about@0.8.4
 
       - name: Build Windows installer (aarch64)
