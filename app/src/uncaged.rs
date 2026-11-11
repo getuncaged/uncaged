@@ -141,12 +141,14 @@ pub fn active_provider_icon() -> Option<Icon> {
 
 #[cfg(test)]
 thread_local! {
-    static ENGINE_ACTIVE_OVERRIDE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+    static ENGINE_ACTIVE_OVERRIDE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(Some(true)) };
 }
 
-/// Test-only: pins [`engine_active`] for the current thread. Without this,
-/// unit tests read the developer's real `~/.uncaged/engine.json` (or
-/// `UNCAGED_*` env), so results depend on the machine running them.
+/// Test-only: pins [`engine_active`] for the current thread. Unit tests default
+/// to an active engine (the state the AI-surface tests assume) instead of
+/// reading the developer's real `~/.uncaged/engine.json` (or `UNCAGED_*` env),
+/// which made results depend on the machine: green on a configured laptop, red
+/// on a clean CI runner. Pass `None` to read the real config.
 #[cfg(test)]
 pub fn set_engine_active_for_test(active: Option<bool>) {
     ENGINE_ACTIVE_OVERRIDE.with(|cell| cell.set(active));
