@@ -15,7 +15,7 @@ lazy_static! {
 }
 
 use cfg_if::cfg_if;
-use derivative::Derivative;
+use derive_where::derive_where;
 use serde_json::json;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -125,17 +125,17 @@ impl DiffType {
     }
 }
 
-#[derive(Debug, Clone, Derivative)]
-#[derivative(Eq, PartialEq)]
+#[derive_where(Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct AIRequestedCodeDiff {
     pub file_name: String,
     pub diff_type: DiffType,
     /// Types of failures to create the diff that we want to capture via telemetry.
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip(EqHashOrd))]
     pub failures: Option<DiffMatchFailures>,
     /// Original file content read during diff matching.
     /// Populated for edits and deletes; empty for new file creation.
-    #[derivative(PartialEq = "ignore")]
+    #[derive_where(skip(EqHashOrd))]
     pub original_content: String,
 }
 

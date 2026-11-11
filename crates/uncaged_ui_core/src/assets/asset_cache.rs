@@ -10,7 +10,7 @@ use std::time::SystemTime;
 use anyhow::{anyhow, Error, Result};
 use async_channel::{self, Receiver, Sender};
 use bytes::Bytes;
-use derivative::Derivative;
+use derive_where::derive_where;
 use futures::future::BoxFuture;
 use futures::{Future, FutureExt as _};
 
@@ -101,8 +101,8 @@ impl LocalFileContentVersion {
 }
 
 /// A "URI" for some data file. In other words, the location of an asset.
-#[derive(Derivative)]
-#[derivative(Clone, Hash, PartialEq, Eq, Debug)]
+#[derive_where(Hash, PartialEq, Eq, Debug)]
+#[derive(Clone)]
 pub enum AssetSource {
     /// Loaded from an arbitrary asynchronous source (e.g. a URL fetch).
     Async {
@@ -111,7 +111,7 @@ pub enum AssetSource {
         /// A factory that produces the future to fetch the asset bytes.
         /// Called at most once per unique `id` — only when the asset is
         /// not already loaded or loading.
-        #[derivative(Hash = "ignore", PartialEq = "ignore", Debug = "ignore")]
+        #[derive_where(skip(Debug, EqHashOrd))]
         fetch: Arc<dyn Fn() -> Pin<Box<dyn FetchAsset>> + Send + Sync>,
     },
     /// Included in the app bundle.

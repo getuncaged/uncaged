@@ -5,7 +5,6 @@ use std::fmt::Debug;
 use chrono::{Duration, Utc};
 use cloud_objects::time::ServerTimestamp;
 use cloud_objects::UserUid;
-use derivative::Derivative;
 use lazy_static::lazy_static;
 use regex::Regex;
 use uncaged_core::channel::Channel;
@@ -688,8 +687,7 @@ fn get_top_folder_trashed_ts(
     None
 }
 
-#[derive(Default, Clone, Copy, Debug, Eq, Derivative)]
-#[derivative(PartialEq, Hash)]
+#[derive(Default, Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Space {
     /// The current user's personal drive.
     #[default]

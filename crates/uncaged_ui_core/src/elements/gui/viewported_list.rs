@@ -6,7 +6,6 @@ use std::ops::{AddAssign, Range};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use derivative::Derivative;
 use ordered_float::OrderedFloat;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::{vec2f, Vector2F};
@@ -476,8 +475,7 @@ impl<T: 'static> NewScrollableElement for List<T> {
     }
 }
 
-#[derive(Clone, Derivative)]
-#[derivative(Debug)]
+#[derive(Clone, Debug)]
 struct ListItem {
     /// Whether this element has been laid out and painted.
     height: Option<Pixels>,

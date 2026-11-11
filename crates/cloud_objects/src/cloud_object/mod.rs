@@ -4,7 +4,6 @@ use std::str::FromStr;
 
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
-use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::UserUid;
@@ -259,8 +258,7 @@ impl From<DateTime<Utc>> for Revision {
 pub const LOCAL_USER_UID: &str = "test_user_uid";
 
 /// The owner for a given object.
-#[derive(Copy, Clone, Debug, Eq, Serialize, Deserialize, Derivative)]
-#[derivative(PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Owner {
     /// The owner of the object is a user (the object is in their personal drive).
     User { user_uid: UserUid },

@@ -26,7 +26,6 @@ pub use ai::agent::{AIAgentCitation, FileLocations};
 use ai::skills::ParsedSkill;
 use chrono::{DateTime, Local, TimeDelta};
 use comment::ReviewComment;
-use derivative::Derivative;
 pub use identifiers::AIIdentifiers;
 use markdown_parser::{parse_markdown, FormattedTable, FormattedText, FormattedTextInline};
 use parking_lot::RwLock;
@@ -344,9 +343,11 @@ impl AIAgentOutputStatus {
 
 // This value is the cost of a single request.
 // It is returned as part of the final response chunk from the agent.
-#[derive(Clone, Copy, Default, Deserialize, Serialize, PartialOrd, Derivative)]
-#[derivative(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, Deserialize, Serialize, PartialOrd, Debug, PartialEq)]
 pub struct RequestCost(f64);
+
+// `f64` is only `PartialEq`; request costs are never NaN, so equality is total.
+impl Eq for RequestCost {}
 
 impl RequestCost {
     pub fn new(value: f64) -> Self {
@@ -385,8 +386,7 @@ impl std::fmt::Display for RequestCost {
 }
 
 /// The AI output received in response to a user prompt/query.
-#[derive(Clone, Default, Derivative)]
-#[derivative(Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub struct AIAgentOutput {
     pub messages: Vec<AIAgentOutputMessage>,
 
@@ -411,6 +411,9 @@ pub struct AIAgentOutput {
     /// The number of requests that the request cost.
     pub request_cost: Option<RequestCost>,
 }
+
+// `request_cost` wraps an `f64`, so `Eq` can't be derived; see `RequestCost`.
+impl Eq for AIAgentOutput {}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OutputModelInfo {

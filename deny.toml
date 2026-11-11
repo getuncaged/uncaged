@@ -2,7 +2,6 @@
 git-fetch-with-cli = true
 ignore = [
     { id = "RUSTSEC-2025-0141", reason = "bincode is unmaintained, but considered to be complete." },
-    { id = "RUSTSEC-2024-0388", reason = "derivative is unmaintained; we should try to find an alternative." },
     { id = "RUSTSEC-2024-0425", reason = "get-size is unmaintained; we should try to find an alternative." },
     { id = "RUSTSEC-2024-0427", reason = "get-size-derive is an unmaintained dependency of get-size." },
     { id = "RUSTSEC-2024-0370", reason = "proc-macro-error is a unmaintained dependency of get-size-derive." },

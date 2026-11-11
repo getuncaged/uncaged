@@ -12,7 +12,7 @@ test-util = []
 [dependencies]
 anyhow.workspace = true
 chrono.workspace = true
-derivative.workspace = true
+derive-where.workspace = true
 itertools.workspace = true
 lasso.workspace = true
 schemars = { version = "1", features = ["uuid1"] }

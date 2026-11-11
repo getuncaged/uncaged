@@ -108,7 +108,7 @@ dependencies = [
  "bytes",
  "cfg-if",
  "chrono",
- "derivative",
+ "derive-where",
  "dirs 6.0.0",
  "dunce",
  "filetime",
@@ -1935,7 +1935,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "derivative",
+ "derive-where",
  "itertools 0.14.0",
  "lasso",
  "schemars",
@@ -2730,17 +2730,6 @@ checksum = "ececcb659e7ba858fb4f10388c250a7252eb0a27373f1a72b8748afdd248e587"
 dependencies = [
  "powerfmt",
  "serde_core",
-]
-
-[[package]]
-name = "derivative"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -6124,7 +6113,7 @@ dependencies = [
  "petgraph",
  "regex",
  "serde_yaml 0.9.34+deprecated",
- "thiserror 1.0.63",
+ "thiserror 2.0.17",
  "unicode-segmentation",
 ]
 
@@ -10030,7 +10019,6 @@ dependencies = [
  "flate2",
  "fnv",
  "once_cell",
- "onig",
  "plist",
  "regex-syntax",
  "serde",
@@ -11094,7 +11082,7 @@ dependencies = [
  "cvt",
  "dashmap",
  "deltae",
- "derivative",
+ "derive-where",
  "dhat",
  "diesel",
  "diesel_migrations",
@@ -11613,7 +11601,7 @@ dependencies = [
  "cosmic-text",
  "ctrlc",
  "dashmap",
- "derivative",
+ "derive-where",
  "dirs 6.0.0",
  "dispatch",
  "dispatch2",
@@ -11702,7 +11690,7 @@ dependencies = [
  "ctor",
  "ctrlc",
  "dashmap",
- "derivative",
+ "derive-where",
  "dirs 6.0.0",
  "enum-iterator",
  "float-cmp",

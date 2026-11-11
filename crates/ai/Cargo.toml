@@ -48,7 +48,7 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["rt"] }
 futures.workspace = true
 generic-array = "0.14.7"
-derivative.workspace = true
+derive-where.workspace = true
 uncaged_core.workspace = true
 uncaged_terminal.workspace = true
 uncaged_util.workspace = true

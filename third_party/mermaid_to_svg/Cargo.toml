@@ -10,7 +10,7 @@ license = "MIT"
 
 [dependencies]
 regex = "1"
-thiserror = "1.0"
+thiserror = "2.0.17"
 dagre_rust = { path = "crates/dagre_rust" }  # vendored from 0.0.5 with fixes
 graphlib_rust = "0.0.2"
 petgraph = "0.8.3"

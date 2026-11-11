@@ -67,7 +67,7 @@ concat-idents.workspace = true
 csv = "1.3.1"
 dashmap.workspace = true
 deltae = "0.3.1"
-derivative.workspace = true
+derive-where.workspace = true
 dhat = { version = "0.3.2", optional = true }
 diesel.workspace = true
 difflib = "0.4.0"
@@ -252,7 +252,9 @@ mio = { version = "1.1.1", features = ["os-poll", "os-ext"] }
 tokio.workspace = true
 
 notify-debouncer-full.workspace = true
-syntect = "5.0"
+# Pure-Rust regex engine (fancy-regex) instead of oniguruma: drops a C build and
+# a couple of crates; the notebook highlighter only uses the bundled defaults.
+syntect = { version = "5.0", default-features = false, features = ["default-fancy"] }
 sysinfo.workspace = true
 warp-command-signatures = { workspace = true, features = ["embed-signatures"] }
 is_executable = "1.0.1"

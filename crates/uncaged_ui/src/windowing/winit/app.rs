@@ -2,7 +2,7 @@ use std::mem::ManuallyDrop;
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use std::sync::OnceLock;
 
-use derivative::Derivative;
+use derive_where::derive_where;
 use futures_util::future::LocalBoxFuture;
 
 use super::window::{IntegrationTestWindowManager, WindowManager};
@@ -18,8 +18,7 @@ pub static WINDOWING_SYSTEM: OnceLock<WindowingSystem> = OnceLock::new();
 pub type RequestPermissionsCallback =
     Box<dyn FnOnce(RequestPermissionsOutcome, &mut AppContext) + Send + Sync>;
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive_where(Debug)]
 pub enum CustomEvent {
     /// Open a window with the given window ID and options.
     OpenWindow {
@@ -48,7 +47,7 @@ pub enum CustomEvent {
     /// [`winit::event_loop::EventLoop`].
     ActiveWindowChanged,
     /// Update the UI App using the given closure.
-    UpdateUIApp(#[derivative(Debug = "ignore")] Box<dyn FnOnce(&mut AppContext) + Send + Sync>),
+    UpdateUIApp(#[derive_where(skip)] Box<dyn FnOnce(&mut AppContext) + Send + Sync>),
     RequestUserAttention {
         window_id: WindowId,
     },
@@ -83,7 +82,7 @@ pub enum CustomEvent {
     FocusWindow {
         window_id: WindowId,
     },
-    RequestNotificationPermissions(#[derivative(Debug = "ignore")] RequestPermissionsCallback),
+    RequestNotificationPermissions(#[derive_where(skip)] RequestPermissionsCallback),
     /// Fire a debounced drag-and-drop files event.
     DragAndDropFilesDebounced {
         window_id: winit::window::WindowId,

@@ -20,7 +20,7 @@ pub use action::*;
 use anyhow::Error;
 pub use app::*;
 pub use autotracking::Tracked;
-use derivative::Derivative;
+use derive_where::derive_where;
 pub use entity::*;
 use futures_util::future::BoxFuture;
 pub use model::*;
@@ -156,8 +156,8 @@ struct GlobalShortcut {
     args: Box<dyn Any>,
 }
 
-#[derive(Default, Derivative)]
-#[derivative(Debug)]
+#[derive_where(Debug)]
+#[derive(Default)]
 pub struct AddWindowOptions {
     pub background_blur_radius_pixels: Option<u8>,
     pub background_blur_texture: bool,
@@ -170,7 +170,7 @@ pub struct AddWindowOptions {
     /// will have the same position and size as this window.
     pub anchor_new_windows_from_closed_position: NextNewWindowsHasThisWindowsBoundsUponClose,
     /// The callback to be called when the GPU driver this window will render to is selected.
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip)]
     pub on_gpu_driver_selected: Option<Box<OnGPUDeviceSelected>>,
     /// This is a name to distinguish different windows among one application. It is a no-op on all
     /// platforms except X11 Linux. See docs on the "WM_CLASS" property:

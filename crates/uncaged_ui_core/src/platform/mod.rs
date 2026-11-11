@@ -17,7 +17,7 @@ use std::sync::Arc;
 use anyhow::Result;
 pub use app::AppCallbacks;
 use async_task::Runnable;
-use derivative::Derivative;
+use derive_where::derive_where;
 pub use file_picker::{
     FilePickerCallback, FilePickerConfiguration, FileType, SaveFilePickerCallback,
     SaveFilePickerConfiguration,
@@ -64,11 +64,10 @@ pub type SendNotificationErrorCallback =
     Box<dyn FnOnce(NotificationSendError, &mut AppContext) + Send + Sync>;
 
 /// The information needed to send a notification.
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive_where(Debug)]
 pub struct NotificationInfo {
     pub notification_content: UserNotification,
-    #[derivative(Debug = "ignore")]
+    #[derive_where(skip)]
     pub on_error: SendNotificationErrorCallback,
 }
 
