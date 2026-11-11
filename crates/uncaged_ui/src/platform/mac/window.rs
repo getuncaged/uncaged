@@ -34,7 +34,9 @@ use uncaged_ui_core::platform::{
 use uncaged_ui_core::r#async::{executor, Timer};
 use uncaged_ui_core::rendering::GPUPowerPreference;
 use uncaged_ui_core::windowing::WindowCallbacks;
-use uncaged_ui_core::{DisplayId, DisplayIdx, Event, OptionalPlatformWindow, Scene, WindowId};
+use uncaged_ui_core::{
+    frame_stats, DisplayId, DisplayIdx, Event, OptionalPlatformWindow, Scene, WindowId,
+};
 
 use super::delegate::DispatchDelegate;
 use super::rendering::{self, is_integrated_gpu, Device, RendererManager};
@@ -1449,9 +1451,13 @@ extern "C-unwind" fn warp_update_layer(this: &Object) {
             .borrow_mut();
         let renderer = renderer_manager.renderer_for_device(device, window.physical_size());
 
+        let started = frame_stats::enabled().then(Instant::now);
         app::callback_dispatcher().with_mutable_app_context(|ctx| {
             renderer.render(&scene, window.as_ref(), ctx.font_cache());
         });
+        if let Some(started) = started {
+            frame_stats::record_render(started.elapsed());
+        }
 
         app::callback_dispatcher()
             .for_window(&Window(window.clone()))

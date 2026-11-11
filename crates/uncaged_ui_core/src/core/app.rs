@@ -2907,12 +2907,16 @@ impl AppContext {
                 // In the future, we should separate out position computation from
                 // scene building, as we don't need to do the latter on each
                 // iteration of this loop.
+                let started = crate::frame_stats::enabled().then(instant::Instant::now);
                 scene = presenter.build_scene(
                     size,
                     window.backing_scale_factor(),
                     window.max_texture_dimension_2d(),
                     self,
                 );
+                if let Some(started) = started {
+                    crate::frame_stats::record_scene(started.elapsed());
+                }
 
                 // Cache the last position cache after rendering.
                 self.last_frame_position_cache

@@ -12,6 +12,7 @@ mod debug;
 pub mod elements;
 pub mod event;
 pub mod fonts;
+pub mod frame_stats;
 pub mod image_cache;
 pub mod integration;
 pub mod keymap;
