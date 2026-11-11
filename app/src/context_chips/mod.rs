@@ -13,14 +13,13 @@ pub mod prompt;
 pub mod prompt_snapshot;
 pub mod prompt_type;
 pub mod renderer;
-pub mod spacing;
-
 use std::collections::HashMap;
 use std::time::Duration;
 
 use context_chip::PromptGenerator;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
+pub use uncaged_app_widgets::spacing;
 use uncaged_ui::color::ColorU;
 use uncaged_ui::elements::Text;
 use uncaged_ui::fonts::{Properties, Weight};

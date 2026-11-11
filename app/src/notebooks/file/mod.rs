@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use pathfinder_geometry::vector::vec2f;
+pub use uncaged_app_widgets::view_components::markdown_toggle_view::MarkdownDisplayMode;
 use uncaged_core::ui::icons::ICON_DIMENSIONS;
 use uncaged_editor::model::CoreEditorModel;
 #[cfg(feature = "local_fs")]
@@ -56,13 +57,6 @@ use crate::view_components::{MarkdownToggleEvent, MarkdownToggleView};
 use crate::workflows::{WorkflowSource, WorkflowType};
 use crate::workspace::ActiveSession;
 use crate::{cmd_or_ctrl_shift, safe_warn};
-
-/// Display mode for markdown files shown via the header segmented control.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MarkdownDisplayMode {
-    Rendered,
-    Raw,
-}
 
 /// View for a read-only notebook backed by a file, rather than Warp Drive.
 pub struct FileNotebookView {

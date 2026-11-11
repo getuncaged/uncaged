@@ -2,6 +2,7 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use ui_components::tooltip::{Params as TooltipParams, Tooltip as TooltipComponent};
 use ui_components::{Component as _, Options as ComponentOptions};
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_core::ui::theme::{AnsiColorIdentifier, Fill as ThemeFill};
 use uncaged_ui::elements::{
     Border, ChildAnchor, ConstrainedBox, Container, CornerRadius, Element, Hoverable,
@@ -10,12 +11,11 @@ use uncaged_ui::elements::{
 };
 use uncaged_ui::platform::Cursor;
 
-use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
 
 const COLOR_DOT_SIZE: f32 = 16.;
 
-pub(crate) const TAB_COLOR_OPTIONS: [AnsiColorIdentifier; 6] = [
+pub const TAB_COLOR_OPTIONS: [AnsiColorIdentifier; 6] = [
     AnsiColorIdentifier::Red,
     AnsiColorIdentifier::Green,
     AnsiColorIdentifier::Yellow,
@@ -28,7 +28,7 @@ pub(crate) const TAB_COLOR_OPTIONS: [AnsiColorIdentifier; 6] = [
 /// For the no-color option, pass `is_no_color: true` to show a slash overlay.
 /// Returns a `Hoverable` so callers can chain `.on_click(...)` before `.finish()`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn render_color_dot(
+pub fn render_color_dot(
     mouse_state: MouseStateHandle,
     dot_color: ColorU,
     is_selected: bool,

@@ -1,29 +1,24 @@
-//! This module is meant to house the app's reusable Views
+//! This module is meant to house the app's reusable Views. The ones that don't need the rest of
+//! the app live in `uncaged_app_widgets`.
 
-pub mod action_button;
 mod agent_toast;
-pub mod alert;
-pub mod callout_bubble;
 mod compact_dropdown;
-pub mod compactible_action_button;
-pub mod compactible_split_action_button;
-pub mod copyable_text_field;
-mod dismissible_toast;
 pub mod dropdown;
-mod feature_popup;
 mod filterable_dropdown;
 pub mod find;
-mod markdown_toggle_view;
 mod submittable_text_input;
 
 pub use agent_toast::*;
-pub use alert::Alert;
 pub use compact_dropdown::{CompactDropdown, CompactDropdownEvent, CompactDropdownItem};
-pub use dismissible_toast::*;
 pub use dropdown::{Dropdown, DropdownItem, DropdownItemAction};
-pub use feature_popup::*;
 pub use filterable_dropdown::{
     FilterableDropdown, FilterableDropdownEvent, FilterableDropdownOrientation,
 };
-pub use markdown_toggle_view::{MarkdownToggleEvent, MarkdownToggleView};
 pub use submittable_text_input::*;
+pub use uncaged_app_widgets::view_components::dismissible_toast::*;
+pub use uncaged_app_widgets::view_components::feature_popup::*;
+pub use uncaged_app_widgets::view_components::{
+    action_button, alert, callout_bubble, compactible_action_button,
+    compactible_split_action_button, copyable_text_field, Alert, MarkdownToggleEvent,
+    MarkdownToggleView,
+};

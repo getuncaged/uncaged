@@ -1,4 +1,5 @@
 use pathfinder_geometry::vector::vec2f;
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_core::ui::theme::AnsiColorIdentifier;
 use uncaged_ui::elements::{
     ChildAnchor, ConstrainedBox, Container, CornerRadius, Empty, Fill, OffsetPositioning,
@@ -6,8 +7,6 @@ use uncaged_ui::elements::{
 };
 use uncaged_ui::ui_components::components::UiComponentStyles;
 use uncaged_ui::Element;
-
-use crate::appearance::Appearance;
 
 pub struct RedNotificationDot {}
 

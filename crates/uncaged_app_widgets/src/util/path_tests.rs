@@ -31,20 +31,20 @@ fn test_resolve_command() {
         &resolve_executable("env").unwrap(),
         Path::new("/usr/bin/env")
     );
-    // This path exists in the Warp repo, so it should resolve. The `../`
-    // is because Rust unit tests run from the root of the crate (`app` in
-    // this case).
+    // This path exists in the Warp repo, so it should resolve. The `../../`
+    // is because Rust unit tests run from the root of the crate
+    // (`crates/uncaged_app_widgets` in this case).
     assert_eq!(
-        &resolve_executable("../script/run").unwrap(),
-        Path::new("../script/run")
+        &resolve_executable("../../script/run").unwrap(),
+        Path::new("../../script/run")
     );
     // `pwd` should always exist (it's also a shell builtin), but we won't
     // assume a specific location.
     assert!(resolve_executable("pwd").is_some());
     assert!(resolve_executable("unlikely-command").is_none());
     assert!(resolve_executable("nonexistent/relative/path").is_none());
-    // src/main.rs does exist, but is not executable.
-    assert!(resolve_executable("src/main.rs").is_none());
+    // src/lib.rs does exist, but is not executable.
+    assert!(resolve_executable("src/lib.rs").is_none());
     // Note the trailing space.
     assert!(resolve_executable("zsh ").is_none());
 }

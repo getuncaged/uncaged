@@ -1,4 +1,5 @@
 use pathfinder_geometry::vector::{vec2f, Vector2F};
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_ui::elements::{
     ChildAnchor, ChildView, MouseStateHandle, OffsetPositioning, ParentAnchor, ParentElement,
     ParentOffsetBounds, Stack,
@@ -9,7 +10,6 @@ use uncaged_ui::{AppContext, Element, EventContext, View, ViewHandle};
 
 use super::buttons::{highlight, icon_button};
 use super::icons::Icon;
-use crate::appearance::Appearance;
 
 #[derive(Clone, Copy)]
 pub enum MenuDirection {

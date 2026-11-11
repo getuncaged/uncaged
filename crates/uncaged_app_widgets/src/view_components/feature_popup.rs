@@ -1,3 +1,4 @@
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_ui::elements::{
     ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Hoverable, MouseStateHandle,
     ParentElement, Radius, Text,
@@ -7,7 +8,6 @@ use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext,
 };
 
-use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
 
 /// A dismissable popup that displays a label indicating that a new feature is available.

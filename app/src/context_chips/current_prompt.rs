@@ -24,7 +24,7 @@ use super::prompt::Prompt;
 use super::{chips_to_string, ChipResult, ChipValue, ContextChipKind};
 use crate::code_review::git_repo_model::{GitRepoStatusEvent, GitRepoStatusModel};
 use crate::code_review::github_repo_model::{GitHubRepoEvent, GitHubRepoModel};
-use crate::context_chips::display_chip::GitLineChanges;
+use crate::context_chips::display_chip::git_line_changes_from_diff_stats;
 use crate::editor::EditorView;
 use crate::features::FeatureFlag;
 use crate::menu::{MenuItem, MenuItemFields};
@@ -1510,7 +1510,7 @@ impl CurrentPrompt {
         }
 
         // Update GitDiffStats with structured data directly.
-        let new_diff_stats = ChipValue::GitDiffStats(GitLineChanges::from_diff_stats(
+        let new_diff_stats = ChipValue::GitDiffStats(git_line_changes_from_diff_stats(
             &metadata.stats_against_head,
         ));
         let current_diff_stats = self

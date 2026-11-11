@@ -9,16 +9,6 @@ use crate::workspace::WorkspaceAction;
 #[derive(Copy, Clone, Debug)]
 pub struct ToastStack;
 
-impl From<ToastType> for DismissibleToast<WorkspaceAction> {
-    fn from(value: ToastType) -> Self {
-        match value {
-            ToastType::CloudObjectNotFound => {
-                DismissibleToast::error(String::from("Resource not found or access denied"))
-            }
-        }
-    }
-}
-
 impl ToastStack {
     /// Adds an ephemeral toast to the Workspace in the window identified by `window_id`.
     pub fn add_ephemeral_toast(

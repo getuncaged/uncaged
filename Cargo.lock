@@ -11210,6 +11210,7 @@ dependencies = [
  "ui_components",
  "uncaged_agent_api",
  "uncaged_app_theme",
+ "uncaged_app_widgets",
  "uncaged_assets",
  "uncaged_cli",
  "uncaged_completer",
@@ -11290,6 +11291,46 @@ dependencies = [
  "uncaged_ui",
  "uncaged_ui_core",
  "uncaged_util",
+]
+
+[[package]]
+name = "uncaged_app_widgets"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "asset_cache",
+ "bytecount",
+ "chrono",
+ "command",
+ "dirs 6.0.0",
+ "enum-iterator",
+ "futures",
+ "fuzzy_match",
+ "image",
+ "infer",
+ "instant",
+ "is_executable",
+ "itertools 0.14.0",
+ "lazy_static",
+ "log",
+ "mime_guess",
+ "os_info",
+ "pathfinder_color",
+ "pathfinder_geometry",
+ "regex",
+ "repo_metadata",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "ui_components",
+ "uncaged_app_theme",
+ "uncaged_core",
+ "uncaged_ui",
+ "uncaged_util",
+ "url",
+ "uuid",
+ "winreg",
 ]
 
 [[package]]

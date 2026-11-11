@@ -25,10 +25,10 @@ use uncaged_ui::{
     SingletonEntity as _, TypedActionView, View, ViewContext,
 };
 
-use crate::settings_view::keybindings::{KeybindingChangedEvent, KeybindingChangedNotifier};
-use crate::terminal::input::{MenuPositioning, MenuPositioningProvider};
 use crate::ui_components::icons::Icon;
 use crate::util::bindings::keybinding_name_to_keystroke;
+use crate::util::keybinding_events::{KeybindingChangedEvent, KeybindingChangedNotifier};
+use crate::view_components::menu_positioning::{MenuPositioning, MenuPositioningProvider};
 
 /// Maximum width of a tooltip before it soft-wraps.
 const TOOLTIP_MAX_WIDTH: f32 = 300.;
@@ -1462,14 +1462,12 @@ impl ButtonSize {
             ButtonSize::UDIButton => 6. + appearance.monospace_font_size(),
             ButtonSize::UDIPromptChip => {
                 // Add 1 to the vertical padding to account for the border.
-                let vertical_padding =
-                    1. + crate::context_chips::spacing::UDI_CHIP_VERTICAL_PADDING;
+                let vertical_padding = 1. + crate::spacing::UDI_CHIP_VERTICAL_PADDING;
                 2. * vertical_padding + self.font_size(appearance)
             }
             ButtonSize::AgentInputButton => {
                 // Add 1 to the vertical padding to account for the border.
-                let vertical_padding =
-                    1. + crate::context_chips::spacing::UDI_CHIP_VERTICAL_PADDING;
+                let vertical_padding = 1. + crate::spacing::UDI_CHIP_VERTICAL_PADDING;
                 let line_height = app
                     .font_cache()
                     .line_height(self.font_size(appearance), appearance.line_height_ratio());
@@ -1502,7 +1500,7 @@ impl ButtonSize {
             ButtonSize::InputPrompt => 4.,
             ButtonSize::UDIButton => 4.,
             ButtonSize::UDIPromptChip | ButtonSize::AgentInputButton => {
-                crate::context_chips::spacing::UDI_CHIP_HORIZONTAL_PADDING
+                crate::spacing::UDI_CHIP_HORIZONTAL_PADDING
             }
         }
     }

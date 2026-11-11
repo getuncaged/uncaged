@@ -1,4 +1,6 @@
 use pathfinder_color::ColorU;
+use uncaged_app_theme::themes::theme::Fill;
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_core::ui::theme::color::internal_colors;
 use uncaged_ui::elements::{
     Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Flex, Icon, MainAxisSize,
@@ -6,9 +8,6 @@ use uncaged_ui::elements::{
 };
 use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
 use uncaged_ui::Element;
-
-use crate::appearance::Appearance;
-use crate::themes::theme::Fill;
 
 const ALERT_CORNER_RADIUS: f32 = uncaged_core::ui::radius::MEDIUM;
 const ALERT_VERTICAL_PADDING: f32 = 8.;

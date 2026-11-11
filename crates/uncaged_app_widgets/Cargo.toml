@@ -1,0 +1,58 @@
+[package]
+name = "uncaged_app_widgets"
+version = "0.1.0"
+edition = "2021"
+authors.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[features]
+# Enabled in build.rs on non-wasm targets (same convention as `lsp`).
+local_fs = []
+test-util = []
+
+[build-dependencies]
+anyhow.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+asset_cache.workspace = true
+bytecount = "0.6.9"
+chrono.workspace = true
+command.workspace = true
+dirs.workspace = true
+enum-iterator.workspace = true
+futures.workspace = true
+fuzzy_match.workspace = true
+image.workspace = true
+infer = "0.19.0"
+instant.workspace = true
+itertools.workspace = true
+lazy_static.workspace = true
+log.workspace = true
+mime_guess = "2.0"
+os_info = { version = "3.7.0", default-features = false }
+pathfinder_color = "0.5.0"
+pathfinder_geometry.workspace = true
+regex.workspace = true
+repo_metadata.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ui_components.workspace = true
+uncaged_app_theme.workspace = true
+uncaged_core.workspace = true
+uncaged_ui = { workspace = true, features = ["schema_gen", "settings_value"] }
+uncaged_util.workspace = true
+url = { workspace = true, features = ["serde"] }
+uuid.workspace = true
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+is_executable = "1.0.1"
+
+[target.'cfg(windows)'.dependencies]
+winreg.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+uncaged_core = { workspace = true, features = ["test-util"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "process", "time"] }

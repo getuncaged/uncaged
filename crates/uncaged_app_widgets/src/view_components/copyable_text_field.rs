@@ -4,6 +4,7 @@
 use std::time::Duration;
 
 use instant::Instant;
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_ui::color::ColorU;
 use uncaged_ui::elements::{
     ConstrainedBox, Container, CrossAxisAlignment, Element, Expanded, Flex, MouseStateHandle,
@@ -13,7 +14,6 @@ use uncaged_ui::text_layout::ClipConfig;
 use uncaged_ui::ui_components::components::UiComponent;
 use uncaged_ui::{AppContext, SingletonEntity};
 
-use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
 
 /// Duration to show the checkmark after copying.

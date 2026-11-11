@@ -1,11 +1,11 @@
+use uncaged_app_theme::themes::theme::{Fill, WarpTheme};
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_ui::elements::{CornerRadius, MouseStateHandle, Radius};
 use uncaged_ui::ui_components::button::Button;
 use uncaged_ui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 
 use super::icons::{Icon, ICON_DIMENSIONS};
 use super::{blended_colors, BORDER_RADIUS};
-use crate::appearance::Appearance;
-use crate::themes::theme::{Fill, WarpTheme};
 
 const ICON_BUTTON_PADDING: f32 = 4.;
 

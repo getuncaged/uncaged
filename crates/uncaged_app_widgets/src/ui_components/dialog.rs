@@ -1,3 +1,4 @@
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_ui::elements::{
     Border, ConstrainedBox, Container, CrossAxisAlignment, Dismiss, Element, Flex,
     MainAxisAlignment, MainAxisSize, ParentElement, Shrinkable, Text,
@@ -6,7 +7,6 @@ use uncaged_ui::fonts::{Properties, Weight};
 use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
 
 use super::blended_colors;
-use crate::appearance::Appearance;
 
 const DIALOG_PADDING: f32 = 20.;
 

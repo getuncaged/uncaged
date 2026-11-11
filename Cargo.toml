@@ -80,6 +80,7 @@ uncaged_ripgrep = { path = "crates/uncaged_ripgrep" }
 uncaged_search_core = { path = "crates/uncaged_search_core" }
 uncaged_terminal = { path = "crates/uncaged_terminal" }
 uncaged_app_theme = { path = "crates/uncaged_app_theme" }
+uncaged_app_widgets = { path = "crates/uncaged_app_widgets" }
 uncaged_util = { path = "crates/uncaged_util" }
 uncaged_web_event_bus = { path = "crates/uncaged_web_event_bus" }
 uncaged_ui = { path = "crates/uncaged_ui" }

@@ -3,6 +3,8 @@ use std::time::Duration;
 
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
+use uncaged_app_theme::themes::theme::Fill;
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_core::ui::builder::UiBuilder;
 use uncaged_core::ui::theme::color::internal_colors;
 use uncaged_ui::elements::{
@@ -22,8 +24,6 @@ use uncaged_ui::{
 use uuid::Uuid;
 
 use super::action_button::ActionButton;
-use crate::appearance::Appearance;
-use crate::themes::theme::Fill;
 
 const TOAST_WIDTH: f32 = 464.;
 const TOAST_CORNER_RADIUS: f32 = uncaged_core::ui::radius::MEDIUM;
@@ -320,11 +320,21 @@ pub struct DismissibleToast<A: Action + Clone> {
     object_id: Option<String>,
     action_button: Option<ViewHandle<ActionButton>>,
     /// Optional callback invoked when the toast body is clicked.
-    pub(crate) on_body_click: Option<OnBodyClickCallback<A>>,
+    pub on_body_click: Option<OnBodyClickCallback<A>>,
 }
 
 pub enum ToastType {
     CloudObjectNotFound,
+}
+
+impl<A: Action + Clone> From<ToastType> for DismissibleToast<A> {
+    fn from(value: ToastType) -> Self {
+        match value {
+            ToastType::CloudObjectNotFound => {
+                DismissibleToast::error(String::from("Resource not found or access denied"))
+            }
+        }
+    }
 }
 
 impl<A: Action + Clone> DismissibleToast<A> {

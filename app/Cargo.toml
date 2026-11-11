@@ -183,6 +183,7 @@ warp-workflows.workspace = true
 uncaged_assets.workspace = true
 uncaged_completer.workspace = true
 uncaged_app_theme.workspace = true
+uncaged_app_widgets.workspace = true
 uncaged_core.workspace = true
 uncaged_editor.workspace = true
 uncaged_search_core.workspace = true
@@ -346,6 +347,7 @@ serial_test = "0.8.0"
 sum_tree = { workspace = true, features = ["test-util"] }
 virtual-fs.workspace = true
 uncaged_app_theme = { workspace = true, features = ["test-util"] }
+uncaged_app_widgets = { workspace = true, features = ["test-util"] }
 uncaged_completer = { workspace = true, features = ["test-util"] }
 uncaged_core = { workspace = true, features = ["test-util"] }
 uncaged_editor = { workspace = true, features = ["test-util"] }
@@ -632,6 +634,7 @@ local_fs = [
     "persistence/local_fs",
     "repo_metadata/local_fs",
     "uncaged_core/local_fs",
+    "uncaged_app_widgets/local_fs",
 ]
 markdown_tables = []
 markdown_mermaid = []

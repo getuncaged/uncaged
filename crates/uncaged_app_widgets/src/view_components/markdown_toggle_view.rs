@@ -1,3 +1,4 @@
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_ui::elements::{CornerRadius, Fill as UiFill, Radius};
 use uncaged_ui::presenter::ChildView;
 use uncaged_ui::ui_components::components::UiComponentStyles;
@@ -7,9 +8,6 @@ use uncaged_ui::ui_components::segmented_control::{
 use uncaged_ui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
-
-use crate::appearance::Appearance;
-use crate::notebooks::file::MarkdownDisplayMode;
 
 #[derive(Debug, Clone)]
 pub enum MarkdownToggleEvent {
@@ -125,4 +123,11 @@ fn markdown_toggle_styles(app: &AppContext) -> UiComponentStyles {
         }),
         ..Default::default()
     }
+}
+
+/// Display mode for markdown files shown via the header segmented control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarkdownDisplayMode {
+    Rendered,
+    Raw,
 }

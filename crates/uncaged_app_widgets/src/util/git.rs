@@ -11,6 +11,50 @@ use uncaged_util::git::run_git_command_with_env;
 #[path = "git_tests.rs"]
 mod tests;
 
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct GitLineChanges {
+    pub files_changed: u32,
+    pub lines_added: u32,
+    pub lines_removed: u32,
+}
+
+impl GitLineChanges {
+    /// Parse git diff --shortstat output into GitLineChanges struct
+    /// Input example: " 1 file changed, 2 insertions(+), 17 deletions(-)"
+    pub fn parse_from_git_output(raw_output: &str) -> Option<Self> {
+        let line = raw_output.trim();
+
+        if line.is_empty() {
+            return None;
+        }
+
+        let mut files_changed = 0;
+        let mut lines_added = 0;
+        let mut lines_removed = 0;
+
+        let words: Vec<&str> = line.split_whitespace().collect();
+        for (i, word) in words.iter().enumerate() {
+            if let Ok(num) = word.parse::<u32>() {
+                if let Some(next_word) = words.get(i + 1) {
+                    if next_word.starts_with("file") {
+                        files_changed = num;
+                    } else if next_word.starts_with("insertion") {
+                        lines_added = num;
+                    } else if next_word.starts_with("deletion") {
+                        lines_removed = num;
+                    }
+                }
+            }
+        }
+
+        Some(Self {
+            files_changed,
+            lines_added,
+            lines_removed,
+        })
+    }
+}
+
 /// Returns the set of local branch names for the repo at `repo_path`.
 /// Uses a synchronous subprocess call — suitable for call sites in
 /// synchronous view handlers where the result is needed immediately.
@@ -193,8 +237,6 @@ pub struct RepoGitSummary {
 /// Returns None if not a git repo or git is unavailable.
 #[cfg(feature = "local_fs")]
 pub async fn get_repo_git_summary(repo_root: &Path) -> Option<RepoGitSummary> {
-    use crate::context_chips::display_chip::GitLineChanges;
-
     let branch = {
         log::debug!("[GIT OPERATION] git.rs get_repo_git_summary git symbolic-ref --short HEAD");
         let result = run_git_command(repo_root, &["symbolic-ref", "--short", "HEAD"]).await;
@@ -975,7 +1017,7 @@ pub struct UnifiedDiffHeader {
 }
 
 /// Parses a range string like "1,5" or "1" into (start, count).
-pub(crate) fn parse_range(range_str: &str) -> Result<(usize, usize)> {
+pub fn parse_range(range_str: &str) -> Result<(usize, usize)> {
     if let Some(comma_pos) = range_str.find(',') {
         let start: usize = range_str[..comma_pos]
             .parse()
@@ -994,7 +1036,7 @@ pub(crate) fn parse_range(range_str: &str) -> Result<(usize, usize)> {
 
 /// Parses a unified diff header line.
 /// Format: `@@ -old_start,old_count +new_start,new_count @@ [optional context]`
-pub(crate) fn parse_unified_diff_header(header_line: &str) -> Result<UnifiedDiffHeader> {
+pub fn parse_unified_diff_header(header_line: &str) -> Result<UnifiedDiffHeader> {
     if !header_line.starts_with("@@") {
         return Err(anyhow!("Invalid unified diff header: {header_line}"));
     }

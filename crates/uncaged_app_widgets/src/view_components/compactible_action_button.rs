@@ -7,7 +7,7 @@ use uncaged_ui::elements::{
 };
 use uncaged_ui::{Action, AppContext, Element, TypedActionView, View, ViewContext, ViewHandle};
 
-use crate::ai::blocklist::inline_action::inline_action_icons::icon_size;
+use crate::ui_components::icon_size::icon_size;
 use crate::ui_components::icons::Icon;
 use crate::view_components::action_button::{
     ActionButton, ActionButtonTheme, AdjoinedSide, ButtonSize, KeystrokeSource,

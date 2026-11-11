@@ -1,13 +1,12 @@
 use std::fmt::Debug;
 
 use itertools::{Itertools, Position};
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_ui::elements::{
     CrossAxisAlignment, Flex, Hoverable, MainAxisSize, MouseStateHandle, ParentElement, Shrinkable,
 };
 use uncaged_ui::ui_components::components::{UiComponent, UiComponentStyles};
 use uncaged_ui::{AppContext, Element, EventContext};
-
-use crate::appearance::Appearance;
 
 /// A value which may be rendered as a breadcrumb.
 pub trait Breadcrumb: Debug + 'static {

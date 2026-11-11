@@ -50,35 +50,9 @@ const CANCEL_BUTTON_TEXT: &str = "Cancel";
 const CLEAR_BUTTON_TEXT: &str = "Clear";
 const SAVE_BUTTON_TEXT: &str = "Save";
 
-/// Notifier for custom keybinding changed. Views could subscribe to this for
-/// KeybindingChangedEvent.
-#[derive(Default)]
-pub struct KeybindingChangedNotifier {}
-
-impl KeybindingChangedNotifier {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    #[cfg(test)]
-    pub fn mock() -> Self {
-        Self::new()
-    }
-}
-
-pub enum KeybindingChangedEvent {
-    BindingChanged {
-        /// Name of the keybinding that is being changed.
-        binding_name: String,
-        new_trigger: Option<Keystroke>,
-    },
-}
-
-impl Entity for KeybindingChangedNotifier {
-    type Event = KeybindingChangedEvent;
-}
-
-impl SingletonEntity for KeybindingChangedNotifier {}
+pub use uncaged_app_widgets::util::keybinding_events::{
+    KeybindingChangedEvent, KeybindingChangedNotifier,
+};
 
 #[derive(Clone, Debug)]
 pub struct KeyBindingModifyingState {

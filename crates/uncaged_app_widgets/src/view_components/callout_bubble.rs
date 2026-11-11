@@ -1,4 +1,5 @@
 use pathfinder_color::ColorU;
+use uncaged_core::ui::appearance::Appearance;
 use uncaged_core::ui::theme::phenomenon::PhenomenonStyle;
 use uncaged_core::ui::theme::Fill;
 use uncaged_ui::elements::{
@@ -9,7 +10,6 @@ use uncaged_ui::ui_components::checkbox::Checkbox;
 use uncaged_ui::ui_components::components::UiComponentStyles;
 use uncaged_ui::Element;
 
-use crate::appearance::Appearance;
 use crate::ui_components::icons::Icon;
 
 /// Which direction the callout arrow points.
