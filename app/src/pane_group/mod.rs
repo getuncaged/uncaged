@@ -72,6 +72,7 @@ use crate::drive::items::WarpDriveItemId;
 use crate::drive::CloudObjectTypeAndId;
 use crate::env_vars::EnvVarCollectionType;
 use crate::features::FeatureFlag;
+use crate::interval_timer::mark_startup_sub_interval;
 use crate::launch_configs::launch_config::{self, PaneMode, PaneTemplateType};
 use crate::notebooks::file::FileNotebookView;
 use crate::palette::PaletteMode;
@@ -1413,6 +1414,22 @@ impl PaneGroup {
         #[cfg_attr(not(feature = "local_fs"), allow(unused_variables, clippy::ptr_arg))]
         deferred_panes: &mut Vec<(PaneId, LeafSnapshot)>,
     ) -> anyhow::Result<(PaneData, InitialFocus)> {
+        let restore_mark = match &leaf.contents {
+            LeafContents::Terminal(_) => "restore_terminal_pane",
+            LeafContents::Notebook(_) => "restore_notebook_pane",
+            LeafContents::AIDocument(_) => "restore_ai_document_pane",
+            LeafContents::Code(_) => "restore_code_pane",
+            LeafContents::EnvVarCollection(_) => "restore_env_var_pane",
+            LeafContents::Workflow(_) => "restore_workflow_pane",
+            LeafContents::Settings(_) => "restore_settings_pane",
+            LeafContents::AIFact(_) => "restore_ai_fact_pane",
+            LeafContents::CustomRouterEditor
+            | LeafContents::ExecutionProfileEditor
+            | LeafContents::CodeReview(_)
+            | LeafContents::AmbientAgent(_)
+            | LeafContents::NetworkLog => "restore_unsupported_pane",
+            LeafContents::GetStarted => "restore_get_started_pane",
+        };
         let custom_vertical_tabs_title = leaf.custom_vertical_tabs_title.clone();
         let result = match leaf.contents {
             LeafContents::AIDocument(_) => {
@@ -1754,6 +1771,7 @@ impl PaneGroup {
             }
         }
 
+        mark_startup_sub_interval(restore_mark);
         result
     }
 

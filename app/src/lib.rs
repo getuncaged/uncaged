@@ -1016,21 +1016,27 @@ pub(crate) fn initialize_app(
     mark_startup_sub_interval("history");
     // Register initial keybindings prior to creating menus
     ai::init(ctx);
+    mark_startup_sub_interval("init_ai");
     app_services::init(ctx);
     // // TODO: Temporarily disabling keybindings for WASM builds. Will be implemented in future WASM support.
     #[cfg(not(target_family = "wasm"))]
     code::editor::find::view::init(ctx);
     workspace::init(ctx);
+    mark_startup_sub_interval("init_workspace");
     pane_group::init(ctx);
     terminal::init(ctx);
+    mark_startup_sub_interval("init_terminal");
     input::init(ctx);
+    mark_startup_sub_interval("init_input");
     editor::init(ctx);
+    mark_startup_sub_interval("init_editor");
     onboarding::init(ctx);
     menu::init(ctx);
     tips::tip_view::init(ctx);
     launch_configs::init(ctx);
     workflows::init(ctx);
     root_view::init(ctx);
+    mark_startup_sub_interval("init_root_view");
     voltron::init(ctx);
     crate::view_components::find::init(ctx);
     prompt::editor_modal::init(ctx);
@@ -1039,6 +1045,7 @@ pub(crate) fn initialize_app(
     tab_configs::new_worktree_modal::init(ctx);
     tab_configs::params_modal::init(ctx);
     ai::blocklist::init(ctx);
+    mark_startup_sub_interval("init_ai_blocklist");
     ai::blocklist::block::status_bar::init(ctx);
     drive::index::init(ctx);
     env_vars::env_var_collection_block::init(ctx);
