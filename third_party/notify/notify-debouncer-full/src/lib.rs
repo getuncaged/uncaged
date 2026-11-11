@@ -72,7 +72,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc, Condvar, Mutex,
     },
     time::{Duration, Instant},
 };
@@ -248,6 +248,11 @@ impl<T: FileIdCache> DebounceDataInner<T> {
         self.queues = queues_remaining;
 
         sort_events(events_expired)
+    }
+
+    /// Whether there is nothing waiting to be debounced or reported.
+    fn is_idle(&self) -> bool {
+        self.queues.is_empty() && self.rescan_event.is_none() && self.errors.is_empty()
     }
 
     /// Returns all currently stored errors
@@ -526,6 +531,8 @@ pub struct Debouncer<T: Watcher, C: FileIdCache> {
     debouncer_thread: Option<std::thread::JoinHandle<()>>,
     data: DebounceData<C>,
     stop: Arc<AtomicBool>,
+    /// Wakes the debouncer thread when events arrive or the debouncer stops.
+    wake: Arc<Condvar>,
 }
 
 impl<T: Watcher, C: FileIdCache> Debouncer<T, C> {
@@ -544,7 +551,11 @@ impl<T: Watcher, C: FileIdCache> Debouncer<T, C> {
     }
 
     fn set_stop(&self) {
-        self.stop.store(true, Ordering::Relaxed);
+        self.stop.store(true, Ordering::Release);
+        // Notify while holding the data lock so the wakeup can't land between the debouncer
+        // thread's stop check and its wait.
+        let _guard = self.data.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.wake.notify_all();
     }
 
     #[deprecated = "`Debouncer` provides all methods from `Watcher` itself now. Remove `.watcher()` and use those methods directly."]
@@ -654,11 +665,23 @@ pub fn new_debouncer_opt<F: DebounceEventHandler, T: Watcher, C: FileIdCache + S
         })?,
     };
 
+    let wake = Arc::new(Condvar::new());
+
     let data_c = data.clone();
     let stop_c = stop.clone();
+    let wake_c = wake.clone();
     let thread = std::thread::Builder::new()
         .name("notify-rs debouncer loop".to_string())
         .spawn(move || loop {
+            // Uncaged: block until there is something to debounce instead of waking every
+            // `tick` forever. Watchers sit idle almost all the time, and each one used to wake
+            // the process every 500 ms (a 2 s timeout ticks at a quarter of it).
+            {
+                let mut lock = data_c.lock().unwrap();
+                while lock.is_idle() && !stop_c.load(Ordering::Acquire) {
+                    lock = wake_c.wait(lock).unwrap();
+                }
+            }
             if stop_c.load(Ordering::Acquire) {
                 break;
             }
@@ -679,6 +702,7 @@ pub fn new_debouncer_opt<F: DebounceEventHandler, T: Watcher, C: FileIdCache + S
         })?;
 
     let data_c = data.clone();
+    let wake_c = wake.clone();
     let watcher = T::new(
         move |e: Result<Event, Error>| {
             let mut lock = data_c.lock().unwrap();
@@ -688,6 +712,7 @@ pub fn new_debouncer_opt<F: DebounceEventHandler, T: Watcher, C: FileIdCache + S
                 // can't have multiple TX, so we need to pipe that through our debouncer
                 Err(e) => lock.add_error(e),
             }
+            wake_c.notify_one();
         },
         config,
     )?;
@@ -697,6 +722,7 @@ pub fn new_debouncer_opt<F: DebounceEventHandler, T: Watcher, C: FileIdCache + S
         debouncer_thread: Some(thread),
         data,
         stop,
+        wake,
     };
 
     Ok(guard)
