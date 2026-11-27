@@ -68,6 +68,7 @@ pub use connections::UpdateOutcome;
 pub use connections::add as add_connection;
 pub use connections::claim_draft;
 pub use connections::connect_or_focus;
+pub use connections::discard_draft;
 pub use connections::is_draft;
 pub use connections::load as load_roster;
 pub use connections::load_or_seed as roster;

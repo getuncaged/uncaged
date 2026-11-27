@@ -734,6 +734,11 @@ pub struct AISettingsPageView {
     // the draft again, so two editors handed the same draft (two windows) save
     // to separate rows, and Remove never deletes a row another window saved.
     pending_uncaged_draft: Option<PendingUncagedDraft>,
+    // Set when Connect opened the editor on a row that click created (or on an
+    // untouched draft it handed out): cancelling the editor removes that row
+    // again if it's still untouched, so a dismissed Connect leaves nothing
+    // behind.
+    discard_uncaged_on_cancel: bool,
 
     // Prompt offering to switch the default Agent Mode model after a BYO key or
     // custom endpoint is saved while the default isn't backed by a credential.
@@ -2020,6 +2025,7 @@ impl AISettingsPageView {
             uncaged_edit_buttons,
             pending_uncaged_connection_id: None,
             pending_uncaged_draft: None,
+            discard_uncaged_on_cancel: false,
             set_default_model_modal,
             last_seen_provider_keys,
             #[cfg(not(target_family = "wasm"))]
@@ -2402,6 +2408,10 @@ impl AISettingsPageView {
     /// Connect a catalog preset. No-key local models and CLI agents go live
     /// immediately; anything that needs a key opens the editor to collect it.
     fn uncaged_connect_preset(&mut self, preset_id: &str, ctx: &mut ViewContext<Self>) {
+        let existing: Vec<String> = crate::uncaged::connections()
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
         let result = crate::uncaged::connect(preset_id);
         self.ensure_uncaged_row_buttons(ctx);
         match result {
@@ -2414,7 +2424,15 @@ impl AISettingsPageView {
                     self.uncaged_toast(format!("Connected {} — ready to use.", conn.label), ctx);
                     ctx.notify();
                 }
-                Some(conn) => self.open_uncaged_connection_editor(&conn, ctx),
+                Some(conn) => {
+                    // A row this click created, or a blank draft it reused, is
+                    // only kept if the editor is saved. A row that was already
+                    // there (Connect just focuses it) is never discarded.
+                    let discard_on_cancel =
+                        !existing.contains(&conn.id) || crate::uncaged::is_draft(&conn.id);
+                    self.open_uncaged_connection_editor(&conn, ctx);
+                    self.discard_uncaged_on_cancel = discard_on_cancel;
+                }
                 None => ctx.notify(),
             },
             Err(err) => self.uncaged_toast(err, ctx),
@@ -2454,6 +2472,7 @@ impl AISettingsPageView {
         ctx: &mut ViewContext<Self>,
     ) {
         self.pending_uncaged_connection_id = Some(conn.id.clone());
+        self.discard_uncaged_on_cancel = false;
         self.pending_uncaged_draft =
             crate::uncaged::is_draft(&conn.id).then(|| PendingUncagedDraft {
                 preset: conn.preset.clone(),
@@ -2639,7 +2658,8 @@ impl AISettingsPageView {
             .pending_uncaged_draft
             .as_ref()
             .is_some_and(|draft| !draft.claimed);
-        if stale && !crate::uncaged::is_draft(id) {
+        let exists = crate::uncaged::connections().iter().any(|c| c.id == id);
+        if stale && exists && !crate::uncaged::is_draft(id) {
             self.hide_custom_endpoint_modal(ctx);
             self.uncaged_toast(
                 "Nothing was removed: this connection was set up in another window.".to_string(),
@@ -2721,9 +2741,28 @@ impl AISettingsPageView {
         // Closing the modal ends any in-progress Uncaged connection edit.
         self.pending_uncaged_connection_id = None;
         self.pending_uncaged_draft = None;
+        self.discard_uncaged_on_cancel = false;
         self.custom_endpoint_modal_state.close(ctx);
         ctx.emit(AISettingsPageEvent::HideModal);
         ctx.notify();
+    }
+
+    /// Dismiss the endpoint modal without saving (Cancel, Esc or a click
+    /// outside). If Connect opened it on a row that click created, remove that
+    /// row again — unless it has been configured since (a failed save already
+    /// wrote to it, or another window saved it), which keeps it.
+    fn cancel_custom_endpoint_modal(&mut self, ctx: &mut ViewContext<Self>) {
+        let discard = self
+            .discard_uncaged_on_cancel
+            .then(|| self.pending_uncaged_connection_id.clone())
+            .flatten();
+        self.hide_custom_endpoint_modal(ctx);
+        if let Some(id) = discard {
+            if let Err(err) = crate::uncaged::discard_draft(&id) {
+                self.uncaged_toast(err, ctx);
+            }
+            ctx.notify();
+        }
     }
 
     fn handle_custom_endpoint_modal_close_event(
@@ -2733,7 +2772,7 @@ impl AISettingsPageView {
     ) {
         match event {
             ModalEvent::Close => {
-                self.hide_custom_endpoint_modal(ctx);
+                self.cancel_custom_endpoint_modal(ctx);
             }
         }
     }
@@ -2745,7 +2784,7 @@ impl AISettingsPageView {
     ) {
         match event {
             CustomEndpointModalEvent::Close => {
-                self.hide_custom_endpoint_modal(ctx);
+                self.cancel_custom_endpoint_modal(ctx);
             }
             CustomEndpointModalEvent::AddEndpoint {
                 name,

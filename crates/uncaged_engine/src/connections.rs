@@ -170,6 +170,20 @@ impl Roster {
         self.connections.iter().find(|c| c.id == id)
     }
 
+    /// Drop `id`. If it was active, the first remaining usable connection (or
+    /// the first remaining, or none) becomes active.
+    fn remove_and_repoint(&mut self, id: &str) {
+        self.connections.retain(|c| c.id != id);
+        if self.active_id.as_deref() == Some(id) {
+            self.active_id = self
+                .connections
+                .iter()
+                .find(|c| c.usable())
+                .or_else(|| self.connections.first())
+                .map(|c| c.id.clone());
+        }
+    }
+
     /// A readable, unique id for a new connection seeded from `base`:
     /// "custom", "custom-2", "custom-3", ...
     fn unique_id(&self, base: &str) -> String {
@@ -247,7 +261,7 @@ fn first_free(base: &str, sep: &str, taken: impl Fn(&str) -> bool) -> String {
 }
 
 /// Whether `conn` is still exactly what [`add`] seeds from `preset` — the row a
-/// Connect click leaves behind when its editor is dismissed. Any edit (a URL,
+/// Connect click creates before its editor is saved. Any edit (a URL,
 /// model, key, command or different wire) makes it a real connection that must
 /// never be handed out as a blank draft. The label and id are ignored: `add`
 /// already makes those unique.
@@ -430,6 +444,14 @@ pub fn update(
 ) -> anyhow::Result<UpdateOutcome> {
     let mut roster = load_or_seed();
     let mut outcome = UpdateOutcome::default();
+    // A row removed since its editor opened (e.g. its draft was discarded or it
+    // was removed in another window) can't be saved onto: say so rather than
+    // report success for an edit that went nowhere.
+    if roster.get(id).is_none() {
+        anyhow::bail!(
+            "This connection no longer exists. It may have been removed in another window."
+        );
+    }
     if let Some(conn) = roster.connections.iter_mut().find(|c| c.id == id) {
         conn.label = label;
         conn.model = model;
@@ -489,18 +511,29 @@ pub fn update(
 /// (or the first remaining, or none) becomes active.
 pub fn remove(id: &str) -> anyhow::Result<()> {
     let mut roster = load_or_seed();
-    roster.connections.retain(|c| c.id != id);
-    if roster.active_id.as_deref() == Some(id) {
-        roster.active_id = roster
-            .connections
-            .iter()
-            .find(|c| c.usable())
-            .or_else(|| roster.connections.first())
-            .map(|c| c.id.clone());
-    }
+    roster.remove_and_repoint(id);
     write(&roster)?;
     project(&roster)?;
     Ok(())
+}
+
+/// Remove `id` only if it is still an untouched draft of its preset (see
+/// [`is_unedited_draft`]) — what cancelling the editor that Connect opened
+/// does, so the click leaves nothing behind. A row that has been configured
+/// since (e.g. saved from another window) is kept. Returns whether a row was
+/// removed; nothing is written when none was.
+pub fn discard_draft(id: &str) -> anyhow::Result<bool> {
+    let mut roster = load_or_seed();
+    let untouched = roster
+        .get(id)
+        .is_some_and(|c| is_unedited_draft(c, catalog::preset_by_id(&c.preset)));
+    if !untouched {
+        return Ok(false);
+    }
+    roster.remove_and_repoint(id);
+    write(&roster)?;
+    project(&roster)?;
+    Ok(true)
 }
 
 /// Make a connection the active one and project it into `engine.json`.

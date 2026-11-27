@@ -307,6 +307,15 @@ mod imp {
     pub fn claim_draft(id: &str, preset_id: &str) -> Result<String, String> {
         uncaged_engine::claim_draft(id, preset_id).map_err(|e| e.to_string())
     }
+
+    /// Remove a connection only if it is still exactly what Connect created
+    /// (for cancelling the editor Connect opened). Returns whether it was
+    /// removed; one configured since is kept.
+    pub fn discard_draft(id: &str) -> Result<bool, String> {
+        let result = uncaged_engine::discard_draft(id).map_err(|e| e.to_string());
+        super::invalidate_active_provider_icon();
+        result
+    }
 }
 
 // ── wasm stubs (no local engine on the web build) ───────────────────────────
@@ -349,6 +358,9 @@ mod imp {
     pub fn claim_draft(_id: &str, _preset_id: &str) -> Result<String, String> {
         Err("The local engine is not available on this build.".to_string())
     }
+    pub fn discard_draft(_id: &str) -> Result<bool, String> {
+        Ok(false)
+    }
 }
 
 pub use imp::activate;
@@ -356,6 +368,7 @@ pub use imp::catalog_sections;
 pub use imp::claim_draft;
 pub use imp::connect;
 pub use imp::connections;
+pub use imp::discard_draft;
 pub use imp::engine_active;
 pub use imp::is_draft;
 pub use imp::remove;
