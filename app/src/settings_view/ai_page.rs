@@ -2411,7 +2411,7 @@ impl AISettingsPageView {
     /// on a new connection, which is only added to the roster on Save.
     fn uncaged_connect_preset(&mut self, preset_id: &str, ctx: &mut ViewContext<Self>) {
         let Some(seed) = crate::uncaged::preset_seed(preset_id) else {
-            self.uncaged_toast(
+            self.uncaged_error_toast(
                 "The local engine is not available on this build.".to_string(),
                 ctx,
             );
@@ -2438,7 +2438,7 @@ impl AISettingsPageView {
                 Some(conn) => self.open_uncaged_connection_editor(&conn, ctx),
                 None => ctx.notify(),
             },
-            Err(err) => self.uncaged_toast(err, ctx),
+            Err(err) => self.uncaged_error_toast(err, ctx),
         }
     }
 
@@ -2453,7 +2453,7 @@ impl AISettingsPageView {
                 self.uncaged_toast(format!("Now using {}.", conn.label), ctx);
                 ctx.notify();
             }
-            Err(err) => self.uncaged_toast(err, ctx),
+            Err(err) => self.uncaged_error_toast(err, ctx),
         }
     }
 
@@ -2603,7 +2603,7 @@ impl AISettingsPageView {
                     (claimed, name)
                 }
                 Err(err) => {
-                    self.uncaged_toast(err, ctx);
+                    self.uncaged_error_toast(err, ctx);
                     ctx.notify();
                     return false;
                 }
@@ -2645,14 +2645,14 @@ impl AISettingsPageView {
                 let after = Self::uncaged_row_snapshot(id);
                 if let Some(saved) = after.filter(|after| Some(after) != before.as_ref()) {
                     self.hide_custom_endpoint_modal(ctx);
-                    self.uncaged_toast(format!("Saved {}, but: {err}", saved.0), ctx);
+                    self.uncaged_error_toast(format!("Saved {}, but: {err}", saved.0), ctx);
                     ctx.notify();
                     return true;
                 }
                 // Nothing was written (e.g. a new server needs its key, the
                 // roster couldn't be read or written, or the row was removed in
                 // another window): keep the editor open with the user's input.
-                self.uncaged_toast(err, ctx);
+                self.uncaged_error_toast(err, ctx);
                 ctx.notify();
                 return false;
             }
@@ -2673,7 +2673,7 @@ impl AISettingsPageView {
         match saved {
             Some(conn) if conn.usable => match crate::uncaged::activate(id) {
                 Ok(()) => self.uncaged_toast(format!("Model connected.{key_note}"), ctx),
-                Err(err) => self.uncaged_toast(err, ctx),
+                Err(err) => self.uncaged_error_toast(err, ctx),
             },
             Some(conn) if conn.needs_key && !conn.has_key => self.uncaged_toast(
                 format!("Saved {}. Add an API key to use it.{key_note}", conn.label),
@@ -2716,7 +2716,7 @@ impl AISettingsPageView {
         let (id, created) = match crate::uncaged::claim_for_preset(&new.preset) {
             Ok(claimed) => claimed,
             Err(err) => {
-                self.uncaged_toast(err, ctx);
+                self.uncaged_error_toast(err, ctx);
                 ctx.notify();
                 return;
             }
@@ -2752,7 +2752,7 @@ impl AISettingsPageView {
                 self.pending_uncaged_new = Some(new);
             }
             Ok(false) => {}
-            Err(err) => self.uncaged_toast(err, ctx),
+            Err(err) => self.uncaged_error_toast(err, ctx),
         }
         ctx.notify();
     }
@@ -2769,7 +2769,7 @@ impl AISettingsPageView {
         let exists = crate::uncaged::connections().iter().any(|c| c.id == id);
         if stale && exists && !crate::uncaged::is_draft(id) {
             self.hide_custom_endpoint_modal(ctx);
-            self.uncaged_toast(
+            self.uncaged_error_toast(
                 "Nothing was removed: this connection was set up in another window.".to_string(),
                 ctx,
             );
@@ -2780,15 +2780,29 @@ impl AISettingsPageView {
         self.hide_custom_endpoint_modal(ctx);
         match result {
             Ok(()) => self.uncaged_toast("Model removed.".to_string(), ctx),
-            Err(err) => self.uncaged_toast(err, ctx),
+            Err(err) => self.uncaged_error_toast(err, ctx),
         }
         ctx.notify();
     }
 
     fn uncaged_toast(&mut self, message: String, ctx: &mut ViewContext<Self>) {
+        let toast = crate::view_components::DismissibleToast::success(message);
+        Self::show_uncaged_toast(toast, ctx);
+    }
+
+    /// Like `uncaged_toast`, styled as an error: for a failed or refused action,
+    /// or a save that only partly went through.
+    fn uncaged_error_toast(&mut self, message: String, ctx: &mut ViewContext<Self>) {
+        let toast = crate::view_components::DismissibleToast::error(message);
+        Self::show_uncaged_toast(toast, ctx);
+    }
+
+    fn show_uncaged_toast(
+        toast: crate::view_components::DismissibleToast<crate::workspace::WorkspaceAction>,
+        ctx: &mut ViewContext<Self>,
+    ) {
         let window_id = ctx.window_id();
         crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-            let toast = crate::view_components::DismissibleToast::success(message);
             toast_stack.add_ephemeral_toast(toast, window_id, ctx);
         });
     }
