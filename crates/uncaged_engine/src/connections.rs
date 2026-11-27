@@ -379,7 +379,47 @@ pub fn connect_or_focus(preset_id: &str) -> anyhow::Result<String> {
     add(preset_id)
 }
 
+/// Whether `id` is an untouched draft (see [`is_unedited_draft`]) of a preset
+/// that [allows multiple](catalog::allows_multiple) connections — i.e. a row
+/// another Connect click could also hand out.
+pub fn is_draft(id: &str) -> bool {
+    load_or_seed().get(id).is_some_and(|c| {
+        catalog::allows_multiple(&c.preset)
+            && is_unedited_draft(c, catalog::preset_by_id(&c.preset))
+    })
+}
+
+/// For an editor that was opened on a draft of `preset_id`: return `id` if it
+/// is still an untouched draft, otherwise add a fresh connection from the same
+/// preset and return that. Two editors handed the same draft (e.g. Connect
+/// clicked in two windows) therefore save to separate rows instead of the
+/// second overwriting the first.
+pub fn claim_draft(id: &str, preset_id: &str) -> anyhow::Result<String> {
+    let roster = load_or_seed();
+    let still_draft = roster
+        .get(id)
+        .is_some_and(|c| is_unedited_draft(c, catalog::preset_by_id(preset_id)));
+    if still_draft {
+        Ok(id.to_string())
+    } else {
+        add(preset_id)
+    }
+}
+
+/// What [`update`] did besides writing the given fields.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct UpdateOutcome {
+    /// The stored API key was cleared because the URL moved to a different
+    /// server and no new key was entered.
+    pub key_cleared: bool,
+}
+
 /// Overwrite the editable fields of a connection.
+///
+/// Refuses (writing nothing) to move a connection whose provider needs a key
+/// to a different server without a new key: the stored key isn't carried
+/// over, so the result couldn't run — and if it is the active connection,
+/// writing it would stop the running model.
 pub fn update(
     id: &str,
     label: String,
@@ -387,8 +427,9 @@ pub fn update(
     model: String,
     api_key: Option<String>,
     cli_command: Vec<String>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<UpdateOutcome> {
     let mut roster = load_or_seed();
+    let mut outcome = UpdateOutcome::default();
     if let Some(conn) = roster.connections.iter_mut().find(|c| c.id == id) {
         conn.label = label;
         conn.model = model;
@@ -411,8 +452,23 @@ pub fn update(
                 }
             };
             let base_url = base_url.trim().to_string();
-            if !same_server(&effective(&conn.base_url), &effective(&base_url)) {
+            let keep_stored_key = matches!(&api_key, Some(k) if k.trim().is_empty());
+            // An unchanged URL is always the same server, even one that doesn't
+            // parse; only an edited URL is compared by origin.
+            let key_cleared = keep_stored_key
+                && conn.api_key.is_some()
+                && base_url != conn.base_url.trim()
+                && !same_server(&effective(&conn.base_url), &effective(&base_url));
+            if key_cleared && conn.needs_key {
+                // Nothing has been written yet; bail before the roster is saved.
+                anyhow::bail!(
+                    "Enter the API key for the new server. A saved key is only sent to the \
+                     server it was entered for."
+                );
+            }
+            if key_cleared {
                 conn.api_key = None;
+                outcome.key_cleared = true;
             }
             conn.base_url = base_url;
             // A `Some("")` from a cleared field means "leave the stored key"; only
@@ -426,7 +482,7 @@ pub fn update(
     }
     write(&roster)?;
     project(&roster)?;
-    Ok(())
+    Ok(outcome)
 }
 
 /// Remove a connection. If it was active, the first remaining usable connection

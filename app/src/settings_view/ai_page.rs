@@ -730,6 +730,10 @@ pub struct AISettingsPageView {
     uncaged_use_buttons: Vec<ViewHandle<ActionButton>>,
     uncaged_edit_buttons: Vec<ViewHandle<ActionButton>>,
     pending_uncaged_connection_id: Option<String>,
+    // The preset of the connection being edited, when the editor was opened on
+    // an untouched draft. Saving then claims the draft again, so two editors
+    // handed the same draft (two windows) save to separate rows.
+    pending_uncaged_draft_preset: Option<String>,
 
     // Prompt offering to switch the default Agent Mode model after a BYO key or
     // custom endpoint is saved while the default isn't backed by a credential.
@@ -2015,6 +2019,7 @@ impl AISettingsPageView {
             uncaged_use_buttons,
             uncaged_edit_buttons,
             pending_uncaged_connection_id: None,
+            pending_uncaged_draft_preset: None,
             set_default_model_modal,
             last_seen_provider_keys,
             #[cfg(not(target_family = "wasm"))]
@@ -2449,6 +2454,8 @@ impl AISettingsPageView {
         ctx: &mut ViewContext<Self>,
     ) {
         self.pending_uncaged_connection_id = Some(conn.id.clone());
+        self.pending_uncaged_draft_preset =
+            crate::uncaged::is_draft(&conn.id).then(|| conn.preset.clone());
         // A CLI agent has no URL/key — its lever is the command line, so put the
         // command into the field the modal shows (relabeled "Command" below) and
         // tell the modal it's a CLI so it hides the key and skips URL validation.
@@ -2503,6 +2510,23 @@ impl AISettingsPageView {
             .first()
             .map(|(n, _, _)| n.clone())
             .unwrap_or_default();
+        // If the editor was opened on a draft, something else (another window's
+        // editor) may have configured that row since. Claim it again: that
+        // returns a fresh row in that case, so this save doesn't overwrite it.
+        let id = match self.pending_uncaged_draft_preset.clone() {
+            Some(preset) => match crate::uncaged::claim_draft(id, &preset) {
+                Ok(claimed) => claimed,
+                Err(err) => {
+                    self.uncaged_toast(err, ctx);
+                    ctx.notify();
+                    return;
+                }
+            },
+            None => id.to_string(),
+        };
+        let id = id.as_str();
+        // Keep later saves from this editor (after an error below) on that row.
+        self.pending_uncaged_connection_id = Some(id.to_string());
         // For a CLI connection the modal's URL field actually holds the command
         // line, so split it into argv and store it as the command (leaving the
         // base_url empty); for an API connection the URL is the base_url as before.
@@ -2523,12 +2547,22 @@ impl AISettingsPageView {
         let key = Some(api_key.to_string());
         let result =
             crate::uncaged::update(id, name.to_string(), base_url, model, key, cli_command);
+        // On an error nothing was saved: keep the editor open so the user can fix
+        // it (e.g. enter the key for a new server) instead of losing their input.
+        let key_cleared = match result {
+            Ok(key_cleared) => key_cleared,
+            Err(err) => {
+                self.uncaged_toast(err, ctx);
+                ctx.notify();
+                return;
+            }
+        };
         self.hide_custom_endpoint_modal(ctx);
-        if let Err(err) = result {
-            self.uncaged_toast(err, ctx);
-            ctx.notify();
-            return;
-        }
+        let key_note = if key_cleared {
+            " Its saved API key was cleared because the server changed."
+        } else {
+            ""
+        };
         // Only switch to the connection once it can actually run: activating an
         // unusable one would put the engine to sleep and stop whatever model is
         // running now. (A saved key is dropped if the URL moved to another
@@ -2538,16 +2572,16 @@ impl AISettingsPageView {
             .find(|c| c.id == id);
         match saved {
             Some(conn) if conn.usable => match crate::uncaged::activate(id) {
-                Ok(()) => self.uncaged_toast("Model connected.".to_string(), ctx),
+                Ok(()) => self.uncaged_toast(format!("Model connected.{key_note}"), ctx),
                 Err(err) => self.uncaged_toast(err, ctx),
             },
             Some(conn) if conn.needs_key && !conn.has_key => self.uncaged_toast(
-                format!("Saved {}. Add an API key to use it.", conn.label),
+                format!("Saved {}. Add an API key to use it.{key_note}", conn.label),
                 ctx,
             ),
             Some(conn) => self.uncaged_toast(
                 format!(
-                    "Saved {}. Add its endpoint and model to use it.",
+                    "Saved {}. Add its endpoint and model to use it.{key_note}",
                     conn.label
                 ),
                 ctx,
@@ -2631,6 +2665,7 @@ impl AISettingsPageView {
     fn hide_custom_endpoint_modal(&mut self, ctx: &mut ViewContext<Self>) {
         // Closing the modal ends any in-progress Uncaged connection edit.
         self.pending_uncaged_connection_id = None;
+        self.pending_uncaged_draft_preset = None;
         self.custom_endpoint_modal_state.close(ctx);
         ctx.emit(AISettingsPageEvent::HideModal);
         ctx.notify();

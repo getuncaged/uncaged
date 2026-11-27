@@ -481,7 +481,7 @@ fn changing_the_server_drops_the_stored_key_unless_a_new_one_is_given() {
             key.map(str::to_string),
             Vec::new(),
         )
-        .unwrap();
+        .unwrap()
     };
     let stored_key = || {
         connections::load()
@@ -499,8 +499,10 @@ fn changing_the_server_drops_the_stored_key_unless_a_new_one_is_given() {
     update("https://proxy.example.com/v2", Some(""));
     assert_eq!(stored_key().as_deref(), Some("secret"));
 
-    // A different server with a blank key field: the old key is not carried over.
-    update("http://192.168.1.50:8000/v1", Some(""));
+    // A different server with a blank key field: the old key is not carried
+    // over, and the caller is told so.
+    let outcome = update("http://192.168.1.50:8000/v1", Some(""));
+    assert!(outcome.key_cleared);
     assert_eq!(stored_key(), None);
 
     // A different server with a new key: the new key is stored.
@@ -526,10 +528,17 @@ fn changing_the_server_drops_the_stored_key_unless_a_new_one_is_given() {
     update("https:///attacker.example.com/v1", Some(""));
     assert_eq!(stored_key(), None);
 
-    // A URL that doesn't parse never keeps a key.
+    // A URL that doesn't parse never keeps a key...
     update("https://other.example.com/v1", Some("other-secret"));
     update("not a url", Some(""));
     assert_eq!(stored_key(), None);
+
+    // ...but re-saving an unchanged URL (e.g. only the model changed, as the
+    // model picker does) keeps the key even if that URL doesn't parse.
+    update("not a url", Some("kept-secret"));
+    let outcome = update("not a url", Some(""));
+    assert!(!outcome.key_cleared);
+    assert_eq!(stored_key().as_deref(), Some("kept-secret"));
 }
 
 #[test]
@@ -566,4 +575,116 @@ fn dedupe_collapses_existing_duplicate_roster() {
             .iter()
             .any(|c| c.id == "lmstudio" || c.id == "lmstudio-2")
     );
+}
+
+#[test]
+fn moving_a_key_required_connection_to_another_server_needs_a_new_key() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    // A working OpenAI connection, running.
+    let id = connections::connect_or_focus("openai").unwrap();
+    connections::update(
+        &id,
+        "OpenAI".to_string(),
+        "https://api.openai.com/v1".to_string(),
+        "gpt-4o".to_string(),
+        Some("sk-original".to_string()),
+        Vec::new(),
+    )
+    .unwrap();
+    connections::set_active(&id).unwrap();
+    let roster_before = std::fs::read_to_string(connections::roster_path()).unwrap();
+    let engine_before = std::fs::read_to_string(config::config_path()).unwrap();
+
+    // Pointing it at another server with a blank key field is refused, and
+    // nothing is written: the running model keeps running.
+    let err = connections::update(
+        &id,
+        "OpenAI".to_string(),
+        "https://proxy.example.com/v1".to_string(),
+        "gpt-4o".to_string(),
+        Some(String::new()),
+        Vec::new(),
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("API key"), "{err}");
+    assert_eq!(
+        std::fs::read_to_string(connections::roster_path()).unwrap(),
+        roster_before
+    );
+    assert_eq!(
+        std::fs::read_to_string(config::config_path()).unwrap(),
+        engine_before
+    );
+    assert!(config::read_persisted().unwrap().enabled);
+
+    // With a new key the move goes through.
+    let outcome = connections::update(
+        &id,
+        "OpenAI".to_string(),
+        "https://proxy.example.com/v1".to_string(),
+        "gpt-4o".to_string(),
+        Some("sk-proxy".to_string()),
+        Vec::new(),
+    )
+    .unwrap();
+    assert!(!outcome.key_cleared);
+    let conn = connections::load()
+        .connections
+        .into_iter()
+        .find(|c| c.id == id)
+        .unwrap();
+    assert_eq!(conn.api_key.as_deref(), Some("sk-proxy"));
+    assert!(conn.usable());
+}
+
+#[test]
+fn a_draft_claimed_twice_saves_to_separate_rows() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    // Connect clicked in two windows: both editors get the same blank draft.
+    let draft = connections::connect_or_focus("custom").unwrap();
+    assert_eq!(connections::connect_or_focus("custom").unwrap(), draft);
+    assert!(connections::is_draft(&draft));
+
+    // Window A saves first: the draft is still untouched, so A keeps it.
+    let a = connections::claim_draft(&draft, "custom").unwrap();
+    assert_eq!(a, draft);
+    configure_custom(&a, "http://localhost:8000/v1", "model-a");
+    assert!(!connections::is_draft(&a));
+
+    // Window B saves next: the draft has been configured, so B gets a new row
+    // and A's endpoint survives.
+    let b = connections::claim_draft(&draft, "custom").unwrap();
+    assert_ne!(b, a);
+    configure_custom(&b, "http://192.168.1.50:8000/v1", "model-b");
+
+    let r = connections::load();
+    let url_of = |id: &str| {
+        r.connections
+            .iter()
+            .find(|c| c.id == id)
+            .unwrap()
+            .base_url
+            .clone()
+    };
+    assert_eq!(url_of(&a), "http://localhost:8000/v1");
+    assert_eq!(url_of(&b), "http://192.168.1.50:8000/v1");
+
+    // A draft removed in the meantime is also replaced by a fresh row.
+    let gone = connections::connect_or_focus("custom").unwrap();
+    connections::remove(&gone).unwrap();
+    let fresh = connections::claim_draft(&gone, "custom").unwrap();
+    assert!(
+        connections::load()
+            .connections
+            .iter()
+            .any(|c| c.id == fresh)
+    );
+
+    // Only drafts of repeatable presets count.
+    let lmstudio = connections::connect_or_focus("lmstudio").unwrap();
+    assert!(!connections::is_draft(&lmstudio));
 }
