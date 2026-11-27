@@ -41,9 +41,6 @@ pub struct ConnectPresetView {
     /// "anthropic" | "openai_compatible" | "cli".
     pub wire: String,
     pub icon: Icon,
-    /// Whether this preset can back several saved connections (custom
-    /// endpoints), so the tile keeps offering "Connect" once one exists.
-    pub allows_multiple: bool,
 }
 
 /// A gallery section grouping presets that connect the same way.
@@ -499,12 +496,8 @@ impl AiAccessSlide {
             for preset in &section.presets {
                 let idx = button_index;
                 button_index += 1;
-                // A preset that allows multiple connections (custom endpoints)
-                // keeps offering Connect; the roster above shows which is in use.
-                let is_active =
-                    !preset.allows_multiple && active_preset == Some(preset.id.as_str());
-                let is_connected =
-                    !preset.allows_multiple && connected.contains(preset.id.as_str());
+                let is_active = active_preset == Some(preset.id.as_str());
+                let is_connected = connected.contains(preset.id.as_str());
                 column = column.with_child(self.render_preset_tile(
                     appearance,
                     idx,

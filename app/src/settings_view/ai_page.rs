@@ -168,10 +168,10 @@ use crate::{
 const CONTENT_FONT_SIZE: f32 = 12.;
 const PRIMARY_HEADER_FONT_SIZE: f32 = 24.;
 
-/// Upper bound on how many saved Uncaged connections get pre-allocated
-/// per-row action buttons (Use / Edit). Rows beyond this render without those
-/// buttons — a roster that large is effectively never hit in practice.
-const UNCAGED_MAX_CONN_ROWS: usize = 16;
+/// How many per-row action buttons (Use / Edit) are pre-allocated for saved
+/// Uncaged connections. The pools grow past this whenever the roster does (see
+/// `ensure_uncaged_row_buttons`), so every row keeps its actions.
+const UNCAGED_INITIAL_CONN_ROWS: usize = 16;
 
 /// Leading brand-icon size for connection rows and gallery tiles (kept
 /// identical so the same provider mark never renders at two sizes on one page).
@@ -2342,36 +2342,60 @@ impl AISettingsPageView {
             .collect()
     }
 
-    /// A fixed pool of per-row buttons ("Use" when `is_use`, else "Edit"),
+    /// The initial pool of per-row buttons ("Use" when `is_use`, else "Edit"),
     /// indexed against the live roster at click time.
     fn create_uncaged_row_buttons(
         is_use: bool,
         ctx: &mut ViewContext<Self>,
     ) -> Vec<ViewHandle<ActionButton>> {
-        (0..UNCAGED_MAX_CONN_ROWS)
-            .map(|index| {
-                ctx.add_typed_action_view(move |_| {
-                    let button = if is_use {
-                        ActionButton::new("Use", SecondaryTheme)
-                    } else {
-                        ActionButton::new("Edit", SecondaryTheme).with_icon(Icon::Pencil)
-                    };
-                    button.with_size(ButtonSize::Small).on_click(move |ctx| {
-                        ctx.dispatch_typed_action(if is_use {
-                            AISettingsPageAction::UncagedUseConnection(index)
-                        } else {
-                            AISettingsPageAction::UncagedConfigureConnection(index)
-                        });
-                    })
-                })
-            })
+        (0..UNCAGED_INITIAL_CONN_ROWS)
+            .map(|index| Self::create_uncaged_row_button(is_use, index, ctx))
             .collect()
+    }
+
+    fn create_uncaged_row_button(
+        is_use: bool,
+        index: usize,
+        ctx: &mut ViewContext<Self>,
+    ) -> ViewHandle<ActionButton> {
+        ctx.add_typed_action_view(move |_| {
+            let button = if is_use {
+                ActionButton::new("Use", SecondaryTheme)
+            } else {
+                ActionButton::new("Edit", SecondaryTheme).with_icon(Icon::Pencil)
+            };
+            button.with_size(ButtonSize::Small).on_click(move |ctx| {
+                ctx.dispatch_typed_action(if is_use {
+                    AISettingsPageAction::UncagedUseConnection(index)
+                } else {
+                    AISettingsPageAction::UncagedConfigureConnection(index)
+                });
+            })
+        })
+    }
+
+    /// Grow the per-row Use / Edit button pools to cover every saved
+    /// connection. Render can't create views, so call this whenever the roster
+    /// may have grown: after a Connect and when the page is shown (the roster
+    /// can also change from onboarding or by hand).
+    fn ensure_uncaged_row_buttons(&mut self, ctx: &mut ViewContext<Self>) {
+        let needed = crate::uncaged::connections().len();
+        for index in self.uncaged_use_buttons.len()..needed {
+            let button = Self::create_uncaged_row_button(true, index, ctx);
+            self.uncaged_use_buttons.push(button);
+        }
+        for index in self.uncaged_edit_buttons.len()..needed {
+            let button = Self::create_uncaged_row_button(false, index, ctx);
+            self.uncaged_edit_buttons.push(button);
+        }
     }
 
     /// Connect a catalog preset. No-key local models and CLI agents go live
     /// immediately; anything that needs a key opens the editor to collect it.
     fn uncaged_connect_preset(&mut self, preset_id: &str, ctx: &mut ViewContext<Self>) {
-        match crate::uncaged::connect(preset_id) {
+        let result = crate::uncaged::connect(preset_id);
+        self.ensure_uncaged_row_buttons(ctx);
+        match result {
             Ok(id) => match crate::uncaged::connections()
                 .into_iter()
                 .find(|c| c.id == id)
@@ -2425,10 +2449,12 @@ impl AISettingsPageView {
         // command into the field the modal shows (relabeled "Command" below) and
         // tell the modal it's a CLI so it hides the key and skips URL validation.
         let is_cli = conn.wire == "cli";
+        // An HTTP connection is called by the local engine, not Warp's servers,
+        // so it gets the relaxed rules (http://, localhost, optional key).
         let kind = if is_cli {
             EndpointKind::Cli
         } else {
-            EndpointKind::Api
+            EndpointKind::DirectApi
         };
         let synthetic = ::ai::api_keys::CustomEndpoint {
             name: conn.label.clone(),
@@ -4827,6 +4853,7 @@ impl SettingsPageMeta for AISettingsPageView {
         AIRequestUsageModel::handle(ctx).update(ctx, |ai_request_usage_model, ctx| {
             ai_request_usage_model.refresh_request_usage_async(ctx)
         });
+        self.ensure_uncaged_row_buttons(ctx);
     }
 
     fn update_filter(&mut self, query: &str, ctx: &mut ViewContext<Self>) -> MatchData {

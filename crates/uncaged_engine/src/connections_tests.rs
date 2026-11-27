@@ -414,6 +414,101 @@ fn connecting_custom_reuses_an_unfinished_custom_connection() {
 }
 
 #[test]
+fn reusing_a_custom_draft_leaves_the_running_connection_active() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    let lmstudio = connections::connect_or_focus("lmstudio").unwrap();
+    connections::set_active(&lmstudio).unwrap();
+    let engine_before = std::fs::read_to_string(config::config_path()).unwrap();
+
+    let draft = connections::connect_or_focus("custom").unwrap();
+    let again = connections::connect_or_focus("custom").unwrap();
+    assert_eq!(draft, again, "the blank custom draft was reused");
+
+    let r = connections::load();
+    assert_eq!(r.active_id.as_deref(), Some(lmstudio.as_str()));
+    assert_eq!(
+        std::fs::read_to_string(config::config_path()).unwrap(),
+        engine_before,
+        "engine.json still points at the running connection"
+    );
+}
+
+#[test]
+fn partially_configured_custom_rows_are_not_treated_as_drafts() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let dir = isolate();
+
+    // A custom endpoint with a URL + key but no model (e.g. seeded from a
+    // hand-written engine.json), and an unrecognised CLI command, which is
+    // stored under the `custom` fallback preset. Neither is usable, and neither
+    // is a blank draft: Connect must add a fresh row, never hand these out.
+    let roster = r#"{
+      "active_id": null,
+      "connections": [
+        {"id":"custom","preset":"custom","label":"Company proxy","wire":"openai_compatible","base_url":"https://proxy.example.com/v1","api_key":"secret","model":"","max_tokens":8192,"needs_key":false,"local":false},
+        {"id":"cli-agent","preset":"custom","label":"my-agent","wire":"cli","base_url":"","model":"","cli_command":[],"max_tokens":8192,"needs_key":false,"local":true}
+      ]
+    }"#;
+    std::fs::write(dir.join("connections.json"), roster).unwrap();
+
+    let id = connections::connect_or_focus("custom").unwrap();
+    assert_ne!(id, "custom");
+    assert_ne!(id, "cli-agent");
+    let r = connections::load();
+    assert_eq!(r.connections.len(), 3, "a new custom row was added");
+    let added = r.connections.iter().find(|c| c.id == id).unwrap();
+    assert_eq!(added.wire, "openai_compatible");
+    assert!(added.api_key.is_none(), "the new row carries no credential");
+    let proxy = r.connections.iter().find(|c| c.id == "custom").unwrap();
+    assert_eq!(proxy.base_url, "https://proxy.example.com/v1");
+    assert_eq!(proxy.api_key.as_deref(), Some("secret"));
+}
+
+#[test]
+fn changing_the_server_drops_the_stored_key_unless_a_new_one_is_given() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    let id = connections::connect_or_focus("custom").unwrap();
+    let update = |url: &str, key: Option<&str>| {
+        connections::update(
+            &id,
+            "Proxy".to_string(),
+            url.to_string(),
+            "model-a".to_string(),
+            key.map(str::to_string),
+            Vec::new(),
+        )
+        .unwrap();
+    };
+    let stored_key = || {
+        connections::load()
+            .connections
+            .into_iter()
+            .find(|c| c.id == id)
+            .unwrap()
+            .api_key
+    };
+
+    update("https://proxy.example.com/v1", Some("secret"));
+    assert_eq!(stored_key().as_deref(), Some("secret"));
+
+    // Same server, different path, blank key field: the key is kept.
+    update("https://proxy.example.com/v2", Some(""));
+    assert_eq!(stored_key().as_deref(), Some("secret"));
+
+    // A different server with a blank key field: the old key is not carried over.
+    update("http://192.168.1.50:8000/v1", Some(""));
+    assert_eq!(stored_key(), None);
+
+    // A different server with a new key: the new key is stored.
+    update("https://other.example.com/v1", Some("other-secret"));
+    assert_eq!(stored_key().as_deref(), Some("other-secret"));
+}
+
+#[test]
 fn dedupe_collapses_existing_duplicate_roster() {
     let _guard = ENV_LOCK.lock().unwrap();
     let dir = isolate();

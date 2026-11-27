@@ -98,3 +98,71 @@ fn endpoint_form_valid_accepts_complete_valid_form() {
         true
     ));
 }
+
+#[test]
+fn direct_url_accepts_http_and_local_hosts() {
+    // Local model servers usually listen on plain HTTP on this machine or the LAN.
+    assert!(validate_direct_url("http://localhost:11434/v1").is_ok());
+    assert!(validate_direct_url("http://127.0.0.1:1234/v1").is_ok());
+    assert!(validate_direct_url("http://192.168.1.50:8000/v1").is_ok());
+    assert!(validate_direct_url("http://10.0.0.5/v1").is_ok());
+    assert!(validate_direct_url("http://[::1]:8000/v1").is_ok());
+    assert!(validate_direct_url("http://gpu-box.local:8000/v1").is_ok());
+    assert!(validate_direct_url("https://api.example.com/v1").is_ok());
+    assert!(validate_direct_url("  http://localhost:8000/v1  ").is_ok());
+}
+
+#[test]
+fn direct_url_rejects_other_schemes_and_malformed_urls() {
+    let scheme_error = Err("URL must start with http:// or https://");
+    assert_eq!(validate_direct_url("ftp://files.example.com"), scheme_error);
+    assert_eq!(validate_direct_url("file:///etc/passwd"), scheme_error);
+    assert_eq!(validate_direct_url("ws://localhost:8000"), scheme_error);
+    assert_eq!(validate_direct_url("not a url"), Err("Invalid URL"));
+    assert_eq!(validate_direct_url("http://"), Err("Invalid URL"));
+}
+
+#[test]
+fn direct_url_allows_empty_string() {
+    assert!(validate_direct_url("").is_ok());
+    assert!(validate_direct_url("   ").is_ok());
+}
+
+#[test]
+fn direct_endpoint_form_does_not_require_an_api_key() {
+    assert!(is_direct_endpoint_form_valid(
+        "Local vLLM",
+        "http://localhost:8000/v1",
+        true
+    ));
+    assert!(!is_direct_endpoint_form_valid(
+        "",
+        "http://localhost:8000/v1",
+        true
+    ));
+    assert!(!is_direct_endpoint_form_valid("Local vLLM", "", true));
+    assert!(!is_direct_endpoint_form_valid(
+        "Local vLLM",
+        "http://localhost:8000/v1",
+        false
+    ));
+    assert!(!is_direct_endpoint_form_valid(
+        "Local vLLM",
+        "ftp://localhost",
+        true
+    ));
+}
+
+#[test]
+fn endpoint_kind_routes_url_validation() {
+    // Warp custom endpoints keep the strict rules; Uncaged connections don't.
+    assert!(EndpointKind::Api
+        .validate_url("http://localhost:8000/v1")
+        .is_err());
+    assert!(EndpointKind::DirectApi
+        .validate_url("http://localhost:8000/v1")
+        .is_ok());
+    assert!(EndpointKind::Cli
+        .validate_url("claude-code-acp --model opus")
+        .is_ok());
+}

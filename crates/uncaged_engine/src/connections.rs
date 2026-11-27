@@ -170,20 +170,15 @@ impl Roster {
         self.connections.iter().find(|c| c.id == id)
     }
 
-    /// A readable, unique id for a new connection seeded from `base`.
+    /// A readable, unique id for a new connection seeded from `base`:
+    /// "custom", "custom-2", "custom-3", ...
     fn unique_id(&self, base: &str) -> String {
         let base = if base.trim().is_empty() {
             "model"
         } else {
             base
         };
-        if self.get(base).is_none() {
-            return base.to_string();
-        }
-        (2..)
-            .map(|n| format!("{base}-{n}"))
-            .find(|candidate| self.get(candidate).is_none())
-            .unwrap_or_else(|| base.to_string())
+        first_free(base, "-", |candidate| self.get(candidate).is_some())
     }
 
     /// The first connection created from a given preset, if any.
@@ -195,14 +190,9 @@ impl Roster {
     /// repeated presets (e.g. several custom endpoints) stay distinguishable:
     /// "Custom", "Custom 2", "Custom 3", ...
     fn unique_label(&self, base: &str) -> String {
-        let taken = |label: &str| self.connections.iter().any(|c| c.label == label);
-        if !taken(base) {
-            return base.to_string();
-        }
-        (2..)
-            .map(|n| format!("{base} {n}"))
-            .find(|candidate| !taken(candidate))
-            .unwrap_or_else(|| base.to_string())
+        first_free(base, " ", |candidate| {
+            self.connections.iter().any(|c| c.label == candidate)
+        })
     }
 
     /// Collapse duplicate connections that share a preset — the active one wins,
@@ -243,6 +233,41 @@ impl Roster {
         }
         self.connections.len() != before
     }
+}
+
+/// `base` if it isn't `taken`, else the first free `{base}{sep}{n}` for n >= 2.
+fn first_free(base: &str, sep: &str, taken: impl Fn(&str) -> bool) -> String {
+    if !taken(base) {
+        return base.to_string();
+    }
+    (2..)
+        .map(|n| format!("{base}{sep}{n}"))
+        .find(|candidate| !taken(candidate))
+        .expect("an unbounded range always has a free candidate")
+}
+
+/// Whether `conn` is still exactly what [`add`] seeds from `preset` — the row a
+/// Connect click leaves behind when its editor is dismissed. Any edit (a URL,
+/// model, key, command or different wire) makes it a real connection that must
+/// never be handed out as a blank draft. The label and id are ignored: `add`
+/// already makes those unique.
+fn is_unedited_draft(conn: &Connection, preset: &Preset) -> bool {
+    let seed = Connection::from_preset(preset, String::new());
+    conn.preset == seed.preset
+        && conn.wire == seed.wire
+        && conn.base_url == seed.base_url
+        && conn.model == seed.model
+        && conn.api_key.is_none()
+        && conn.cli_command == seed.cli_command
+}
+
+/// The `scheme://host[:port]` part of a URL, lowercased, for comparing which
+/// server a connection talks to.
+fn url_origin(url: &str) -> String {
+    let url = url.trim();
+    let (scheme, rest) = url.split_once("://").unwrap_or(("", url));
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    format!("{scheme}://{authority}").to_ascii_lowercase()
 }
 
 /// The on-disk roster path (`$UNCAGED_CONNECTIONS` or
@@ -329,19 +354,20 @@ pub fn add(preset_id: &str) -> anyhow::Result<String> {
 /// already-connected preset simply switches to it.
 ///
 /// Presets that [allow multiple](catalog::allows_multiple) connections
-/// (`custom`) add a new connection each time — except that an existing one
-/// that isn't configured yet is returned (without activating it) so the caller
-/// can finish setting it up, rather than piling up blank rows when the editor
-/// is dismissed and Connect is clicked again.
+/// (`custom`) add a new connection each time — except that an untouched draft
+/// (see [`is_unedited_draft`]) is returned, without activating it, so the
+/// caller can finish setting it up rather than piling up blank rows when the
+/// editor is dismissed and Connect is clicked again.
 pub fn connect_or_focus(preset_id: &str) -> anyhow::Result<String> {
     let roster = load_or_seed();
     if catalog::allows_multiple(preset_id) {
-        if let Some(unfinished) = roster
+        let preset = catalog::preset_by_id(preset_id);
+        if let Some(draft) = roster
             .connections
             .iter()
-            .find(|c| c.preset == preset_id && !c.usable())
+            .find(|c| is_unedited_draft(c, preset))
         {
-            return Ok(unfinished.id.clone());
+            return Ok(draft.id.clone());
         }
     } else if let Some(existing) = roster.find_by_preset(preset_id).map(|c| c.id.clone()) {
         set_active(&existing)?;
@@ -371,6 +397,19 @@ pub fn update(
         if conn.wire == "cli" {
             conn.cli_command = cli_command;
         } else {
+            // A stored key belongs to the server it was entered for. If the URL
+            // now points at a different server, drop it rather than send it
+            // there; a key typed alongside the new URL is still kept below.
+            let effective = |url: &str| {
+                if url.trim().is_empty() && conn.wire == "anthropic" {
+                    config::ANTHROPIC_DEFAULT_BASE_URL.to_string()
+                } else {
+                    url.to_string()
+                }
+            };
+            if url_origin(&effective(&conn.base_url)) != url_origin(&effective(&base_url)) {
+                conn.api_key = None;
+            }
             conn.base_url = base_url;
             // A `Some("")` from a cleared field means "leave the stored key"; only
             // a non-empty value replaces it, and `None` is an explicit clear.

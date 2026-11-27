@@ -2029,7 +2029,6 @@ impl RootView {
                         local: preset.local,
                         needs_key: preset.needs_key,
                         wire: preset.wire,
-                        allows_multiple: preset.allows_multiple,
                     })
                     .collect(),
             })
