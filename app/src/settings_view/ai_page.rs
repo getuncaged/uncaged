@@ -2487,8 +2487,8 @@ impl AISettingsPageView {
 
     /// Open the editor on a new connection from a preset (`seed`, see
     /// `crate::uncaged::preset_seed`) without adding anything to the roster:
-    /// Save adds it (`commit_new_uncaged_connection`); dismissing the editor any
-    /// other way leaves the roster untouched.
+    /// Save picks the row, adding one if needed (`commit_new_uncaged_connection`);
+    /// dismissing the editor any other way leaves the roster untouched.
     fn open_new_uncaged_connection_editor(
         &mut self,
         seed: &crate::uncaged::ConnectionView,
@@ -2564,8 +2564,9 @@ impl AISettingsPageView {
     }
 
     /// Persist edits from the modal back onto a roster connection and activate
-    /// it. A blank key means "keep whatever is stored". Returns whether the save
-    /// went through (and the editor closed); on an error the editor stays open.
+    /// it. A blank key means "keep whatever is stored". Returns whether the edit
+    /// was saved (and the editor closed). When nothing was written the editor
+    /// stays open with the error, so the user can fix it without losing input.
     fn commit_uncaged_connection(
         &mut self,
         id: &str,
@@ -2582,7 +2583,8 @@ impl AISettingsPageView {
         // If the editor was opened on a draft, something else (another window's
         // editor) may have configured that row since. Claim it again: that
         // returns a fresh row in that case, so this save doesn't overwrite it.
-        // A row this editor already wrote to is its own and isn't re-claimed.
+        // A row this editor's save already picked (a new connection's) is its
+        // own and isn't re-claimed.
         let (id, name) = match self.pending_uncaged_draft.clone() {
             Some(draft) => match Self::claim_uncaged_draft(id, &draft) {
                 Ok(claimed) => {
@@ -2629,27 +2631,27 @@ impl AISettingsPageView {
         };
         // `Some("")` is the roster's "keep the stored key" sentinel (unused for CLI).
         let key = Some(api_key.to_string());
+        let before = Self::uncaged_row_snapshot(id);
         let result = crate::uncaged::update(id, name, base_url, model, key, cli_command);
-        // On an error keep the editor open so the user can fix it (e.g. enter the
-        // key for a new server) instead of losing their input.
         let key_cleared = match result {
             Ok(key_cleared) => key_cleared,
             Err(err) => {
-                // The roster write may have landed before a later step failed
-                // (e.g. engine.json is read-only). Then the row is no longer a
-                // draft and is this editor's own: a retry must update it rather
-                // than claim yet another row. (Single UI thread: nothing else can
-                // have touched it since the update above.)
-                if let Some(draft) = self.pending_uncaged_draft.as_mut() {
-                    if !draft.claimed && !crate::uncaged::is_draft(id) {
-                        draft.claimed = true;
-                    }
-                }
-                // A row removed meanwhile (e.g. in another window) can never be
-                // saved onto, so retrying is pointless: close the editor.
-                if !crate::uncaged::connections().iter().any(|c| c.id == id) {
+                // If the roster write landed and only a later step failed (e.g.
+                // engine.json couldn't be written), the edit is saved: close the
+                // editor and say what failed. Keeping it open for a retry would
+                // hold this row's id while another window could remove the row
+                // and re-create one with the same id. (Single UI thread: nothing
+                // else can have changed the row since `before`.)
+                let after = Self::uncaged_row_snapshot(id);
+                if let Some(saved) = after.filter(|after| Some(after) != before.as_ref()) {
                     self.hide_custom_endpoint_modal(ctx);
+                    self.uncaged_toast(format!("Saved {}, but: {err}", saved.0), ctx);
+                    ctx.notify();
+                    return true;
                 }
+                // Nothing was written (e.g. a new server needs its key, the
+                // roster couldn't be read or written, or the row was removed in
+                // another window): keep the editor open with the user's input.
                 self.uncaged_toast(err, ctx);
                 ctx.notify();
                 return false;
@@ -2690,6 +2692,15 @@ impl AISettingsPageView {
         true
     }
 
+    /// The saved fields of a roster connection, for telling whether a failed
+    /// save still wrote to it.
+    fn uncaged_row_snapshot(id: &str) -> Option<(String, String, String, Vec<String>, bool)> {
+        crate::uncaged::connections()
+            .into_iter()
+            .find(|c| c.id == id)
+            .map(|c| (c.label, c.base_url, c.model, c.cli_command, c.has_key))
+    }
+
     /// Save a new connection's editor (see `open_new_uncaged_connection_editor`):
     /// pick the row to write to (`crate::uncaged::claim_for_preset`, which adds
     /// one if needed), then save onto it like any other connection.
@@ -2710,6 +2721,8 @@ impl AISettingsPageView {
                 return;
             }
         };
+        // The roster may have grown: make sure the new row gets Use/Edit buttons.
+        self.ensure_uncaged_row_buttons(ctx);
         // From here the editor edits that row, so a retry after an error updates
         // it rather than adding another. It's claimed: this save chose it, and
         // the prefilled-name rule keeps the row's own (unique) label.
@@ -2723,17 +2736,25 @@ impl AISettingsPageView {
         if self.commit_uncaged_connection(&id, name, url, api_key, models, ctx) {
             return;
         }
-        // The save failed and the editor is still open. If nothing reached the
-        // row this save added, take it back out and return to a new-connection
-        // editor, so Cancel still leaves the roster as it was. (Single UI
-        // thread: nothing else can have touched the row since it was added.)
-        let still_editing = self.pending_uncaged_connection_id.as_deref() == Some(id.as_str());
-        if still_editing && created && crate::uncaged::discard_draft(&id) == Ok(true) {
-            self.pending_uncaged_connection_id = None;
-            self.pending_uncaged_draft = None;
-            self.pending_uncaged_new = Some(new);
-            ctx.notify();
+        // Nothing was written and the editor is still open. Take back a row this
+        // save added, and return to a new-connection editor, so Cancel still
+        // leaves the roster as it was. (Single UI thread: nothing else can have
+        // touched the row since it was added.) If the row was reused instead,
+        // the editor stays on it: a retry updates it, although the modal still
+        // reads "Add connection".
+        if !created {
+            return;
         }
+        match crate::uncaged::discard_draft(&id) {
+            Ok(true) => {
+                self.pending_uncaged_connection_id = None;
+                self.pending_uncaged_draft = None;
+                self.pending_uncaged_new = Some(new);
+            }
+            Ok(false) => {}
+            Err(err) => self.uncaged_toast(err, ctx),
+        }
+        ctx.notify();
     }
 
     /// Remove the pending roster connection (from the editor's Remove button).
@@ -8765,11 +8786,9 @@ struct PendingUncagedDraft {
     preset: String,
     /// The label the editor's name field was prefilled with.
     opened_label: String,
-    /// Set once a save from this editor has reached the roster (a later step
-    /// failed, so the editor is still open), or when a new connection's save
-    /// picked this row: the row is now this editor's own, so retries update it
-    /// instead of claiming another, and Remove may delete it. The
-    /// prefilled-name rule still applies.
+    /// Set when a new connection's save picked this row: the row is this
+    /// editor's own, so a retry after an error updates it instead of claiming
+    /// another, and Remove may delete it. The prefilled-name rule still applies.
     claimed: bool,
 }
 

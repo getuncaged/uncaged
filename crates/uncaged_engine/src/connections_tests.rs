@@ -861,3 +861,36 @@ fn saving_onto_a_removed_connection_fails_and_writes_nothing() {
         before
     );
 }
+
+#[test]
+fn saving_the_first_connection_does_not_activate_its_blank_row() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    // A save on an empty roster adds a blank row that only becomes active once
+    // the save has made it usable (the caller activates it then). Until then
+    // engine.json isn't touched, so the engine never runs a blank connection.
+    let (openai, created) = connections::claim_for_preset("openai").unwrap();
+    assert!(created);
+    let r = connections::load();
+    assert_eq!(r.active_id, None);
+    assert!(in_roster(&openai));
+    assert!(!config::config_path().exists());
+
+    // So is a fresh row from re-claiming a draft another editor configured.
+    let custom = connections::connect_or_focus("custom").unwrap();
+    configure_custom(&custom, "http://localhost:8000/v1", "qwen");
+    let fresh = connections::claim_draft(&custom, "custom").unwrap();
+    assert_ne!(fresh, custom);
+    assert_eq!(connections::load().active_id, None);
+
+    // `add` itself still makes the first row of an empty roster active.
+    connections::remove(&openai).unwrap();
+    connections::remove(&custom).unwrap();
+    connections::remove(&fresh).unwrap();
+    let first = connections::add("lmstudio").unwrap();
+    assert_eq!(
+        connections::load().active_id.as_deref(),
+        Some(first.as_str())
+    );
+}

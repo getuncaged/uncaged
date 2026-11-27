@@ -350,21 +350,30 @@ pub fn load_or_seed() -> Roster {
 /// Add a new connection from a catalog preset. Becomes active if it's the first
 /// one. Returns the new connection's id once the roster is written.
 pub fn add(preset_id: &str) -> anyhow::Result<String> {
+    add_row(preset_id, true)
+}
+
+/// Append a fresh row seeded from `preset_id` and return its id. With
+/// `activate_first`, a row added to an empty roster becomes active (and is
+/// projected); without it the active connection is never touched and
+/// `engine.json` isn't rewritten — for rows a save is about to fill in, which
+/// the caller activates only once they can run.
+fn add_row(preset_id: &str, activate_first: bool) -> anyhow::Result<String> {
     let preset = catalog::preset_by_id(preset_id);
     let mut roster = load_or_seed();
     let id = roster.unique_id(preset.id);
     let mut conn = Connection::from_preset(preset, id.clone());
     conn.label = roster.unique_label(&conn.label);
-    let first = roster.connections.is_empty();
+    let activate = activate_first && roster.connections.is_empty();
     roster.connections.push(conn);
-    if first {
+    if activate {
         roster.active_id = Some(id.clone());
     }
     write(&roster)?;
     // `engine.json` only mirrors the active connection, so it only needs
     // rewriting when this row became active. (Otherwise a projection failure
     // would report an error for a row that was in fact added.)
-    if first {
+    if activate {
         project(&roster)?;
     }
     Ok(id)
@@ -372,14 +381,15 @@ pub fn add(preset_id: &str) -> anyhow::Result<String> {
 
 /// Connect a preset, but never create a duplicate: if a connection for that
 /// preset already exists, make it active and return its id instead of adding a
-/// second row. This is what the "Connect" buttons call, so re-clicking an
-/// already-connected preset simply switches to it.
+/// second row. Onboarding's Connect buttons call this, as does Settings'
+/// one-click Connect for presets that are ready as seeded (local runtimes, CLI
+/// agents); Settings' editor-based Connect adds nothing until Save (see
+/// [`claim_for_preset`]).
 ///
 /// Presets that [allow multiple](catalog::allows_multiple) connections
 /// (`custom`) add a new connection each time — except that an untouched draft
-/// (see [`is_unedited_draft`]) is returned, without activating it, so the
-/// caller can finish setting it up rather than piling up blank rows when the
-/// editor is dismissed and Connect is clicked again.
+/// (see [`is_unedited_draft`]) is returned, without activating it, so repeated
+/// Connect clicks in onboarding don't pile up blank rows.
 pub fn connect_or_focus(preset_id: &str) -> anyhow::Result<String> {
     let roster = load_or_seed();
     if catalog::allows_multiple(preset_id) {
@@ -400,7 +410,7 @@ pub fn connect_or_focus(preset_id: &str) -> anyhow::Result<String> {
 
 /// Whether `id` is an untouched draft (see [`is_unedited_draft`]) of a preset
 /// that [allows multiple](catalog::allows_multiple) connections — i.e. a row
-/// another Connect click could also hand out.
+/// another editor (or a new connection's save) could also pick up.
 pub fn is_draft(id: &str) -> bool {
     load_or_seed().get(id).is_some_and(|c| {
         catalog::allows_multiple(&c.preset)
@@ -410,9 +420,10 @@ pub fn is_draft(id: &str) -> bool {
 
 /// For an editor that was opened on a draft of `preset_id`: return `id` if it
 /// is still an untouched draft, otherwise add a fresh connection from the same
-/// preset and return that. Two editors handed the same draft (e.g. Connect
-/// clicked in two windows) therefore save to separate rows instead of the
-/// second overwriting the first.
+/// preset and return that. Two editors on the same draft (e.g. Edit on a blank
+/// row onboarding left, in two windows) therefore save to separate rows instead
+/// of the second overwriting the first. A fresh row isn't made active; the
+/// caller activates it once the save has made it usable.
 pub fn claim_draft(id: &str, preset_id: &str) -> anyhow::Result<String> {
     let roster = load_or_seed();
     let still_draft = roster
@@ -421,7 +432,7 @@ pub fn claim_draft(id: &str, preset_id: &str) -> anyhow::Result<String> {
     if still_draft {
         Ok(id.to_string())
     } else {
-        add(preset_id)
+        add_row(preset_id, false)
     }
 }
 
@@ -431,10 +442,12 @@ pub fn claim_draft(id: &str, preset_id: &str) -> anyhow::Result<String> {
 /// - a preset that [allows multiple](catalog::allows_multiple) connections
 ///   reuses an untouched draft (e.g. one onboarding left), else adds a row;
 /// - any other preset reuses its existing connection (another window may have
-///   connected it since), else adds one.
+///   connected it since), else adds one. The save then overwrites that row
+///   with what its form holds: last save wins, as with two Edit editors.
 ///
-/// Unlike [`connect_or_focus`] this never changes the active connection: the
-/// caller activates the row once the save has made it usable.
+/// Unlike [`connect_or_focus`] this never changes the active connection and
+/// never rewrites `engine.json`, even on an empty roster: the caller activates
+/// the row once the save has made it usable.
 pub fn claim_for_preset(preset_id: &str) -> anyhow::Result<(String, bool)> {
     let roster = load_or_seed();
     let existing = if catalog::allows_multiple(preset_id) {
@@ -448,7 +461,7 @@ pub fn claim_for_preset(preset_id: &str) -> anyhow::Result<(String, bool)> {
     };
     match existing {
         Some(conn) => Ok((conn.id.clone(), false)),
-        None => Ok((add(preset_id)?, true)),
+        None => Ok((add_row(preset_id, false)?, true)),
     }
 }
 
