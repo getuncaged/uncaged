@@ -695,7 +695,7 @@ fn in_roster(id: &str) -> bool {
 }
 
 #[test]
-fn cancelling_connect_discards_only_an_untouched_draft() {
+fn discard_draft_removes_only_an_untouched_row() {
     let _guard = ENV_LOCK.lock().unwrap();
     isolate();
 
@@ -706,8 +706,8 @@ fn cancelling_connect_discards_only_an_untouched_draft() {
         Some(lmstudio.as_str())
     );
 
-    // Connect on a key provider, then Cancel: the row goes away again and the
-    // running connection stays active.
+    // A blank row for a key provider (e.g. added by a save that then failed)
+    // is taken back out, and the running connection stays active.
     let openai = connections::connect_or_focus("openai").unwrap();
     assert!(connections::discard_draft(&openai).unwrap());
     assert!(!in_roster(&openai));
@@ -724,11 +724,16 @@ fn cancelling_connect_discards_only_an_untouched_draft() {
     assert!(!in_roster(&custom));
 
     // A row configured since (another window saved it, or a failed save had
-    // already written to it) is kept.
+    // already written to it) is kept, and nothing is written.
     let custom = connections::connect_or_focus("custom").unwrap();
     configure_custom(&custom, "http://localhost:8000/v1", "qwen");
+    let before = std::fs::read_to_string(connections::roster_path()).unwrap();
     assert!(!connections::discard_draft(&custom).unwrap());
     assert!(in_roster(&custom));
+    assert_eq!(
+        std::fs::read_to_string(connections::roster_path()).unwrap(),
+        before
+    );
 
     // So is a key provider whose key was entered.
     let openai = connections::connect_or_focus("openai").unwrap();
@@ -750,12 +755,13 @@ fn cancelling_connect_discards_only_an_untouched_draft() {
 }
 
 #[test]
-fn discarding_the_active_draft_leaves_no_active_connection() {
+fn discarding_the_active_draft_repoints_the_active_connection() {
     let _guard = ENV_LOCK.lock().unwrap();
     isolate();
 
-    // On an empty roster the first connection becomes active even unfinished.
-    let openai = connections::connect_or_focus("openai").unwrap();
+    // On an empty roster the first connection becomes active even unfinished;
+    // discarding it as the only row leaves none active.
+    let openai = connections::add("openai").unwrap();
     assert_eq!(
         connections::load().active_id.as_deref(),
         Some(openai.as_str())
@@ -764,6 +770,72 @@ fn discarding_the_active_draft_leaves_no_active_connection() {
     let r = connections::load();
     assert!(r.connections.is_empty());
     assert_eq!(r.active_id, None);
+
+    // With other rows, the first usable one takes over...
+    let openai = connections::add("openai").unwrap();
+    let custom = connections::add("custom").unwrap();
+    let lmstudio = connections::add("lmstudio").unwrap();
+    assert!(connections::discard_draft(&openai).unwrap());
+    assert_eq!(
+        connections::load().active_id.as_deref(),
+        Some(lmstudio.as_str())
+    );
+
+    // ...else the first remaining one.
+    connections::remove(&lmstudio).unwrap();
+    let openai = connections::add("openai").unwrap();
+    connections::set_active(&openai).unwrap();
+    assert!(connections::discard_draft(&openai).unwrap());
+    assert_eq!(
+        connections::load().active_id.as_deref(),
+        Some(custom.as_str())
+    );
+}
+
+#[test]
+fn saving_a_new_connection_picks_its_row_without_switching_the_active_one() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    let lmstudio = connections::connect_or_focus("lmstudio").unwrap();
+    let engine_before = std::fs::read_to_string(config::config_path()).unwrap();
+
+    // A key provider with no connection yet gets a new row; the running
+    // connection stays active and engine.json isn't rewritten.
+    let (openai, created) = connections::claim_for_preset("openai").unwrap();
+    assert!(created);
+    assert_eq!(
+        connections::load().active_id.as_deref(),
+        Some(lmstudio.as_str())
+    );
+    assert_eq!(
+        std::fs::read_to_string(config::config_path()).unwrap(),
+        engine_before
+    );
+
+    // Once it exists (e.g. another window saved it first), a save reuses it.
+    assert_eq!(
+        connections::claim_for_preset("openai").unwrap(),
+        (openai.clone(), false)
+    );
+
+    // Custom: an untouched draft (e.g. left by onboarding) is reused...
+    let draft = connections::connect_or_focus("custom").unwrap();
+    assert_eq!(
+        connections::claim_for_preset("custom").unwrap(),
+        (draft.clone(), false)
+    );
+    // ...but a configured custom endpoint never is: the next save adds a row.
+    configure_custom(&draft, "http://localhost:8000/v1", "qwen");
+    let (second, created) = connections::claim_for_preset("custom").unwrap();
+    assert!(created);
+    assert_ne!(second, draft);
+
+    // None of this switched the running connection.
+    assert_eq!(
+        connections::load().active_id.as_deref(),
+        Some(lmstudio.as_str())
+    );
 }
 
 #[test]

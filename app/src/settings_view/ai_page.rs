@@ -733,12 +733,13 @@ pub struct AISettingsPageView {
     // Set when the editor was opened on an untouched draft. Saving then claims
     // the draft again, so two editors handed the same draft (two windows) save
     // to separate rows, and Remove never deletes a row another window saved.
+    // Also set (already claimed) once a new connection's save has picked its
+    // row, so a retry after an error updates that row.
     pending_uncaged_draft: Option<PendingUncagedDraft>,
-    // Set when Connect opened the editor on a row that click created (or on an
-    // untouched draft it handed out): cancelling the editor removes that row
-    // again if it's still untouched, so a dismissed Connect leaves nothing
-    // behind.
-    discard_uncaged_on_cancel: bool,
+    // Set while the editor is open for a new connection that Connect started:
+    // nothing is in the roster until Save, so Cancel, Esc, closing the window
+    // or quitting leave nothing behind (see `commit_new_uncaged_connection`).
+    pending_uncaged_new: Option<PendingUncagedNew>,
 
     // Prompt offering to switch the default Agent Mode model after a BYO key or
     // custom endpoint is saved while the default isn't backed by a credential.
@@ -2025,7 +2026,7 @@ impl AISettingsPageView {
             uncaged_edit_buttons,
             pending_uncaged_connection_id: None,
             pending_uncaged_draft: None,
-            discard_uncaged_on_cancel: false,
+            pending_uncaged_new: None,
             set_default_model_modal,
             last_seen_provider_keys,
             #[cfg(not(target_family = "wasm"))]
@@ -2406,12 +2407,20 @@ impl AISettingsPageView {
     }
 
     /// Connect a catalog preset. No-key local models and CLI agents go live
-    /// immediately; anything that needs a key opens the editor to collect it.
+    /// immediately; anything that needs a key or an endpoint opens the editor
+    /// on a new connection, which is only added to the roster on Save.
     fn uncaged_connect_preset(&mut self, preset_id: &str, ctx: &mut ViewContext<Self>) {
-        let existing: Vec<String> = crate::uncaged::connections()
-            .into_iter()
-            .map(|c| c.id)
-            .collect();
+        let Some(seed) = crate::uncaged::preset_seed(preset_id) else {
+            self.uncaged_toast(
+                "The local engine is not available on this build.".to_string(),
+                ctx,
+            );
+            return;
+        };
+        if !seed.usable || seed.needs_key {
+            self.open_new_uncaged_connection_editor(&seed, ctx);
+            return;
+        }
         let result = crate::uncaged::connect(preset_id);
         self.ensure_uncaged_row_buttons(ctx);
         match result {
@@ -2424,15 +2433,9 @@ impl AISettingsPageView {
                     self.uncaged_toast(format!("Connected {} — ready to use.", conn.label), ctx);
                     ctx.notify();
                 }
-                Some(conn) => {
-                    // A row this click created, or a blank draft it reused, is
-                    // only kept if the editor is saved. A row that was already
-                    // there (Connect just focuses it) is never discarded.
-                    let discard_on_cancel =
-                        !existing.contains(&conn.id) || crate::uncaged::is_draft(&conn.id);
-                    self.open_uncaged_connection_editor(&conn, ctx);
-                    self.discard_uncaged_on_cancel = discard_on_cancel;
-                }
+                // An existing connection for this preset that was edited into
+                // an unusable state: finish it in the editor.
+                Some(conn) => self.open_uncaged_connection_editor(&conn, ctx),
                 None => ctx.notify(),
             },
             Err(err) => self.uncaged_toast(err, ctx),
@@ -2472,13 +2475,44 @@ impl AISettingsPageView {
         ctx: &mut ViewContext<Self>,
     ) {
         self.pending_uncaged_connection_id = Some(conn.id.clone());
-        self.discard_uncaged_on_cancel = false;
+        self.pending_uncaged_new = None;
         self.pending_uncaged_draft =
             crate::uncaged::is_draft(&conn.id).then(|| PendingUncagedDraft {
                 preset: conn.preset.clone(),
                 opened_label: conn.label.clone(),
                 claimed: false,
             });
+        self.show_uncaged_editor(conn, Some(0), ctx);
+    }
+
+    /// Open the editor on a new connection from a preset (`seed`, see
+    /// `crate::uncaged::preset_seed`) without adding anything to the roster:
+    /// Save adds it (`commit_new_uncaged_connection`); dismissing the editor any
+    /// other way leaves the roster untouched.
+    fn open_new_uncaged_connection_editor(
+        &mut self,
+        seed: &crate::uncaged::ConnectionView,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.pending_uncaged_connection_id = None;
+        self.pending_uncaged_draft = None;
+        self.pending_uncaged_new = Some(PendingUncagedNew {
+            preset: seed.preset.clone(),
+            opened_label: seed.label.clone(),
+        });
+        // No editing index: the modal shows "Add connection" and no Remove
+        // button, and saves as `AddEndpoint`.
+        self.show_uncaged_editor(seed, None, ctx);
+    }
+
+    /// Show the shared endpoint modal prefilled from `conn`. `editing_index` is
+    /// `Some` for an existing roster row, `None` for a new connection.
+    fn show_uncaged_editor(
+        &mut self,
+        conn: &crate::uncaged::ConnectionView,
+        editing_index: Option<usize>,
+        ctx: &mut ViewContext<Self>,
+    ) {
         // A CLI agent has no URL/key — its lever is the command line, so put the
         // command into the field the modal shows (relabeled "Command" below) and
         // tell the modal it's a CLI so it hides the key and skips URL validation.
@@ -2512,7 +2546,7 @@ impl AISettingsPageView {
         // Set the kind before prefilling so the URL placeholder/validation match.
         self.custom_endpoint_modal_state.set_kind(kind, ctx);
         self.custom_endpoint_modal_state
-            .prefill(Some(&synthetic), Some(0), ctx);
+            .prefill(Some(&synthetic), editing_index, ctx);
         self.custom_endpoint_modal_state.open(ctx);
         ctx.emit(AISettingsPageEvent::ShowModal);
         ctx.notify();
@@ -2530,7 +2564,8 @@ impl AISettingsPageView {
     }
 
     /// Persist edits from the modal back onto a roster connection and activate
-    /// it. A blank key means "keep whatever is stored".
+    /// it. A blank key means "keep whatever is stored". Returns whether the save
+    /// went through (and the editor closed); on an error the editor stays open.
     fn commit_uncaged_connection(
         &mut self,
         id: &str,
@@ -2539,7 +2574,7 @@ impl AISettingsPageView {
         api_key: &str,
         models: &[(String, Option<String>, Option<String>)],
         ctx: &mut ViewContext<Self>,
-    ) {
+    ) -> bool {
         let model = models
             .first()
             .map(|(n, _, _)| n.clone())
@@ -2568,7 +2603,7 @@ impl AISettingsPageView {
                 Err(err) => {
                     self.uncaged_toast(err, ctx);
                     ctx.notify();
-                    return;
+                    return false;
                 }
             },
             None => (id.to_string(), name.to_string()),
@@ -2610,9 +2645,14 @@ impl AISettingsPageView {
                         draft.claimed = true;
                     }
                 }
+                // A row removed meanwhile (e.g. in another window) can never be
+                // saved onto, so retrying is pointless: close the editor.
+                if !crate::uncaged::connections().iter().any(|c| c.id == id) {
+                    self.hide_custom_endpoint_modal(ctx);
+                }
                 self.uncaged_toast(err, ctx);
                 ctx.notify();
-                return;
+                return false;
             }
         };
         self.hide_custom_endpoint_modal(ctx);
@@ -2647,6 +2687,53 @@ impl AISettingsPageView {
             None => {}
         }
         ctx.notify();
+        true
+    }
+
+    /// Save a new connection's editor (see `open_new_uncaged_connection_editor`):
+    /// pick the row to write to (`crate::uncaged::claim_for_preset`, which adds
+    /// one if needed), then save onto it like any other connection.
+    fn commit_new_uncaged_connection(
+        &mut self,
+        new: PendingUncagedNew,
+        name: &str,
+        url: &str,
+        api_key: &str,
+        models: &[(String, Option<String>, Option<String>)],
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let (id, created) = match crate::uncaged::claim_for_preset(&new.preset) {
+            Ok(claimed) => claimed,
+            Err(err) => {
+                self.uncaged_toast(err, ctx);
+                ctx.notify();
+                return;
+            }
+        };
+        // From here the editor edits that row, so a retry after an error updates
+        // it rather than adding another. It's claimed: this save chose it, and
+        // the prefilled-name rule keeps the row's own (unique) label.
+        self.pending_uncaged_new = None;
+        self.pending_uncaged_connection_id = Some(id.clone());
+        self.pending_uncaged_draft = Some(PendingUncagedDraft {
+            preset: new.preset.clone(),
+            opened_label: new.opened_label.clone(),
+            claimed: true,
+        });
+        if self.commit_uncaged_connection(&id, name, url, api_key, models, ctx) {
+            return;
+        }
+        // The save failed and the editor is still open. If nothing reached the
+        // row this save added, take it back out and return to a new-connection
+        // editor, so Cancel still leaves the roster as it was. (Single UI
+        // thread: nothing else can have touched the row since it was added.)
+        let still_editing = self.pending_uncaged_connection_id.as_deref() == Some(id.as_str());
+        if still_editing && created && crate::uncaged::discard_draft(&id) == Ok(true) {
+            self.pending_uncaged_connection_id = None;
+            self.pending_uncaged_draft = None;
+            self.pending_uncaged_new = Some(new);
+            ctx.notify();
+        }
     }
 
     /// Remove the pending roster connection (from the editor's Remove button).
@@ -2741,28 +2828,10 @@ impl AISettingsPageView {
         // Closing the modal ends any in-progress Uncaged connection edit.
         self.pending_uncaged_connection_id = None;
         self.pending_uncaged_draft = None;
-        self.discard_uncaged_on_cancel = false;
+        self.pending_uncaged_new = None;
         self.custom_endpoint_modal_state.close(ctx);
         ctx.emit(AISettingsPageEvent::HideModal);
         ctx.notify();
-    }
-
-    /// Dismiss the endpoint modal without saving (Cancel, Esc or a click
-    /// outside). If Connect opened it on a row that click created, remove that
-    /// row again — unless it has been configured since (a failed save already
-    /// wrote to it, or another window saved it), which keeps it.
-    fn cancel_custom_endpoint_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        let discard = self
-            .discard_uncaged_on_cancel
-            .then(|| self.pending_uncaged_connection_id.clone())
-            .flatten();
-        self.hide_custom_endpoint_modal(ctx);
-        if let Some(id) = discard {
-            if let Err(err) = crate::uncaged::discard_draft(&id) {
-                self.uncaged_toast(err, ctx);
-            }
-            ctx.notify();
-        }
     }
 
     fn handle_custom_endpoint_modal_close_event(
@@ -2772,7 +2841,7 @@ impl AISettingsPageView {
     ) {
         match event {
             ModalEvent::Close => {
-                self.cancel_custom_endpoint_modal(ctx);
+                self.hide_custom_endpoint_modal(ctx);
             }
         }
     }
@@ -2784,7 +2853,7 @@ impl AISettingsPageView {
     ) {
         match event {
             CustomEndpointModalEvent::Close => {
-                self.cancel_custom_endpoint_modal(ctx);
+                self.hide_custom_endpoint_modal(ctx);
             }
             CustomEndpointModalEvent::AddEndpoint {
                 name,
@@ -2796,6 +2865,10 @@ impl AISettingsPageView {
                 // instead of Warp's custom endpoints.
                 if let Some(id) = self.pending_uncaged_connection_id.clone() {
                     self.commit_uncaged_connection(&id, name, url, api_key, models, ctx);
+                    return;
+                }
+                if let Some(new) = self.pending_uncaged_new.clone() {
+                    self.commit_new_uncaged_connection(new, name, url, api_key, models, ctx);
                     return;
                 }
                 if !Self::can_use_custom_inference_controls(ctx) {
@@ -8673,7 +8746,18 @@ impl SettingsWidget for CloudHandoffWidget {
     }
 }
 
-/// An Uncaged connection editor that was opened on an untouched draft (see
+/// An Uncaged connection editor for a new connection that isn't in the roster
+/// yet (see `AISettingsPageView::pending_uncaged_new`).
+#[derive(Clone, Debug)]
+struct PendingUncagedNew {
+    /// The preset Connect was clicked on.
+    preset: String,
+    /// The label the editor's name field was prefilled with.
+    opened_label: String,
+}
+
+/// An Uncaged connection editor that was opened on an untouched draft, or whose
+/// new connection a save has picked a row for (see
 /// `AISettingsPageView::pending_uncaged_draft`).
 #[derive(Clone, Debug)]
 struct PendingUncagedDraft {
@@ -8682,9 +8766,10 @@ struct PendingUncagedDraft {
     /// The label the editor's name field was prefilled with.
     opened_label: String,
     /// Set once a save from this editor has reached the roster (a later step
-    /// failed, so the editor is still open): the row is now this editor's own,
-    /// so retries update it instead of claiming another, and Remove may delete
-    /// it. The prefilled-name rule still applies.
+    /// failed, so the editor is still open), or when a new connection's save
+    /// picked this row: the row is now this editor's own, so retries update it
+    /// instead of claiming another, and Remove may delete it. The
+    /// prefilled-name rule still applies.
     claimed: bool,
 }
 

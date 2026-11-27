@@ -260,8 +260,8 @@ fn first_free(base: &str, sep: &str, taken: impl Fn(&str) -> bool) -> String {
         .expect("an unbounded range always has a free candidate")
 }
 
-/// Whether `conn` is still exactly what [`add`] seeds from `preset` — the row a
-/// Connect click creates before its editor is saved. Any edit (a URL,
+/// Whether `conn` is still exactly what [`add`] seeds from `preset` — e.g. the
+/// row onboarding's Connect leaves to be finished in Settings. Any edit (a URL,
 /// model, key, command or different wire) makes it a real connection that must
 /// never be handed out as a blank draft. The label and id are ignored: `add`
 /// already makes those unique.
@@ -348,7 +348,7 @@ pub fn load_or_seed() -> Roster {
 }
 
 /// Add a new connection from a catalog preset. Becomes active if it's the first
-/// one. Returns the new connection's id.
+/// one. Returns the new connection's id once the roster is written.
 pub fn add(preset_id: &str) -> anyhow::Result<String> {
     let preset = catalog::preset_by_id(preset_id);
     let mut roster = load_or_seed();
@@ -361,7 +361,12 @@ pub fn add(preset_id: &str) -> anyhow::Result<String> {
         roster.active_id = Some(id.clone());
     }
     write(&roster)?;
-    project(&roster)?;
+    // `engine.json` only mirrors the active connection, so it only needs
+    // rewriting when this row became active. (Otherwise a projection failure
+    // would report an error for a row that was in fact added.)
+    if first {
+        project(&roster)?;
+    }
     Ok(id)
 }
 
@@ -420,6 +425,33 @@ pub fn claim_draft(id: &str, preset_id: &str) -> anyhow::Result<String> {
     }
 }
 
+/// The row a save from a new-connection editor (opened by Connect, with nothing
+/// added to the roster yet) should write to, and whether it was just added:
+///
+/// - a preset that [allows multiple](catalog::allows_multiple) connections
+///   reuses an untouched draft (e.g. one onboarding left), else adds a row;
+/// - any other preset reuses its existing connection (another window may have
+///   connected it since), else adds one.
+///
+/// Unlike [`connect_or_focus`] this never changes the active connection: the
+/// caller activates the row once the save has made it usable.
+pub fn claim_for_preset(preset_id: &str) -> anyhow::Result<(String, bool)> {
+    let roster = load_or_seed();
+    let existing = if catalog::allows_multiple(preset_id) {
+        let preset = catalog::preset_by_id(preset_id);
+        roster
+            .connections
+            .iter()
+            .find(|c| is_unedited_draft(c, preset))
+    } else {
+        roster.find_by_preset(preset_id)
+    };
+    match existing {
+        Some(conn) => Ok((conn.id.clone(), false)),
+        None => Ok((add(preset_id)?, true)),
+    }
+}
+
 /// What [`update`] did besides writing the given fields.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct UpdateOutcome {
@@ -444,14 +476,6 @@ pub fn update(
 ) -> anyhow::Result<UpdateOutcome> {
     let mut roster = load_or_seed();
     let mut outcome = UpdateOutcome::default();
-    // A row removed since its editor opened (e.g. its draft was discarded or it
-    // was removed in another window) can't be saved onto: say so rather than
-    // report success for an edit that went nowhere.
-    if roster.get(id).is_none() {
-        anyhow::bail!(
-            "This connection no longer exists. It may have been removed in another window."
-        );
-    }
     if let Some(conn) = roster.connections.iter_mut().find(|c| c.id == id) {
         conn.label = label;
         conn.model = model;
@@ -501,6 +525,13 @@ pub fn update(
                 None => conn.api_key = None,
             }
         }
+    } else {
+        // A row removed since its editor opened (e.g. in another window) can't
+        // be saved onto: say so, writing nothing, rather than report success
+        // for an edit that went nowhere.
+        anyhow::bail!(
+            "This connection no longer exists. It may have been removed in another window."
+        );
     }
     write(&roster)?;
     project(&roster)?;
@@ -518,10 +549,11 @@ pub fn remove(id: &str) -> anyhow::Result<()> {
 }
 
 /// Remove `id` only if it is still an untouched draft of its preset (see
-/// [`is_unedited_draft`]) — what cancelling the editor that Connect opened
-/// does, so the click leaves nothing behind. A row that has been configured
-/// since (e.g. saved from another window) is kept. Returns whether a row was
-/// removed; nothing is written when none was.
+/// [`is_unedited_draft`]): used to take back a row that a save added (see
+/// [`claim_for_preset`]) when the save then failed before writing to it, so a
+/// cancelled editor leaves nothing behind. A row that has been configured
+/// (e.g. the save's write landed) is kept. Returns whether a row was removed;
+/// nothing is written when none was.
 pub fn discard_draft(id: &str) -> anyhow::Result<bool> {
     let mut roster = load_or_seed();
     let untouched = roster

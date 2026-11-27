@@ -308,8 +308,26 @@ mod imp {
         uncaged_engine::claim_draft(id, preset_id).map_err(|e| e.to_string())
     }
 
-    /// Remove a connection only if it is still exactly what Connect created
-    /// (for cancelling the editor Connect opened). Returns whether it was
+    /// What a new connection from `preset_id` would look like, before anything
+    /// is added to the roster: Connect uses it to decide whether the preset is
+    /// ready in one click or needs the editor, and to prefill that editor.
+    pub fn preset_seed(preset_id: &str) -> Option<ConnectionView> {
+        let preset = uncaged_engine::preset_by_id(preset_id);
+        let seed = uncaged_engine::Connection::from_preset(preset, String::new());
+        Some(connection_view(&seed, None))
+    }
+
+    /// For saving a new connection's editor: the row to write to and whether
+    /// it was just added (see `uncaged_engine::claim_for_preset`). Never
+    /// changes the active connection.
+    pub fn claim_for_preset(preset_id: &str) -> Result<(String, bool), String> {
+        let result = uncaged_engine::claim_for_preset(preset_id).map_err(|e| e.to_string());
+        super::invalidate_active_provider_icon();
+        result
+    }
+
+    /// Remove a connection only if it is still exactly what was added for it
+    /// (to take back a row a failed save added). Returns whether it was
     /// removed; one configured since is kept.
     pub fn discard_draft(id: &str) -> Result<bool, String> {
         let result = uncaged_engine::discard_draft(id).map_err(|e| e.to_string());
@@ -358,18 +376,26 @@ mod imp {
     pub fn claim_draft(_id: &str, _preset_id: &str) -> Result<String, String> {
         Err("The local engine is not available on this build.".to_string())
     }
+    pub fn preset_seed(_preset_id: &str) -> Option<ConnectionView> {
+        None
+    }
+    pub fn claim_for_preset(_preset_id: &str) -> Result<(String, bool), String> {
+        Err("The local engine is not available on this build.".to_string())
+    }
     pub fn discard_draft(_id: &str) -> Result<bool, String> {
-        Ok(false)
+        Err("The local engine is not available on this build.".to_string())
     }
 }
 
 pub use imp::activate;
 pub use imp::catalog_sections;
 pub use imp::claim_draft;
+pub use imp::claim_for_preset;
 pub use imp::connect;
 pub use imp::connections;
 pub use imp::discard_draft;
 pub use imp::engine_active;
 pub use imp::is_draft;
+pub use imp::preset_seed;
 pub use imp::remove;
 pub use imp::update;
