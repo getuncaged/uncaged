@@ -170,20 +170,15 @@ impl Roster {
         self.connections.iter().find(|c| c.id == id)
     }
 
-    /// A readable, unique id for a new connection seeded from `base`.
+    /// A readable, unique id for a new connection seeded from `base`:
+    /// "custom", "custom-2", "custom-3", ...
     fn unique_id(&self, base: &str) -> String {
         let base = if base.trim().is_empty() {
             "model"
         } else {
             base
         };
-        if self.get(base).is_none() {
-            return base.to_string();
-        }
-        (2..)
-            .map(|n| format!("{base}-{n}"))
-            .find(|candidate| self.get(candidate).is_none())
-            .unwrap_or_else(|| base.to_string())
+        first_free(base, "-", |candidate| self.get(candidate).is_some())
     }
 
     /// The first connection created from a given preset, if any.
@@ -191,10 +186,20 @@ impl Roster {
         self.connections.iter().find(|c| c.preset == preset_id)
     }
 
+    /// A unique default label for a new connection seeded from `base`, so
+    /// repeated presets (e.g. several custom endpoints) stay distinguishable:
+    /// "Custom", "Custom 2", "Custom 3", ...
+    fn unique_label(&self, base: &str) -> String {
+        first_free(base, " ", |candidate| {
+            self.connections.iter().any(|c| c.label == candidate)
+        })
+    }
+
     /// Collapse duplicate connections that share a preset — the active one wins,
-    /// else the first seen — preserving order and `active_id`. `custom` is exempt
-    /// (multiple distinct custom endpoints are legitimate). Returns whether any
-    /// duplicate was removed. This repairs rosters dirtied before the
+    /// else the first seen — preserving order and `active_id`. Presets that
+    /// [allow multiple](catalog::allows_multiple) connections (`custom`) are
+    /// exempt: multiple distinct custom endpoints are legitimate. Returns
+    /// whether any duplicate was removed. This repairs rosters dirtied before the
     /// one-connection-per-preset rule existed.
     fn dedupe_by_preset(&mut self) -> bool {
         use std::collections::HashMap;
@@ -202,7 +207,7 @@ impl Roster {
         // Decide which id to keep for each non-custom preset (active wins).
         let mut keep: HashMap<String, String> = HashMap::new();
         for c in &self.connections {
-            if c.preset == "custom" {
+            if catalog::allows_multiple(&c.preset) {
                 continue;
             }
             let is_active = active.as_deref() == Some(c.id.as_str());
@@ -212,7 +217,8 @@ impl Roster {
         }
         let before = self.connections.len();
         self.connections.retain(|c| {
-            c.preset == "custom" || keep.get(&c.preset).map(String::as_str) == Some(c.id.as_str())
+            catalog::allows_multiple(&c.preset)
+                || keep.get(&c.preset).map(String::as_str) == Some(c.id.as_str())
         });
         // Defensive: if the active id was somehow dropped, repoint to a survivor.
         if let Some(a) = &active {
@@ -226,6 +232,44 @@ impl Roster {
             }
         }
         self.connections.len() != before
+    }
+}
+
+/// `base` if it isn't `taken`, else the first free `{base}{sep}{n}` for n >= 2.
+fn first_free(base: &str, sep: &str, taken: impl Fn(&str) -> bool) -> String {
+    if !taken(base) {
+        return base.to_string();
+    }
+    (2..)
+        .map(|n| format!("{base}{sep}{n}"))
+        .find(|candidate| !taken(candidate))
+        .expect("an unbounded range always has a free candidate")
+}
+
+/// Whether `conn` is still exactly what [`add`] seeds from `preset` — the row a
+/// Connect click leaves behind when its editor is dismissed. Any edit (a URL,
+/// model, key, command or different wire) makes it a real connection that must
+/// never be handed out as a blank draft. The label and id are ignored: `add`
+/// already makes those unique.
+fn is_unedited_draft(conn: &Connection, preset: &Preset) -> bool {
+    let seed = Connection::from_preset(preset, String::new());
+    conn.preset == seed.preset
+        && conn.wire == seed.wire
+        && conn.base_url == seed.base_url
+        && conn.model == seed.model
+        && conn.api_key.is_none()
+        && conn.cli_command == seed.cli_command
+}
+
+/// Whether two base URLs point at the same server: equal parsed origins
+/// (scheme, host and port, with default ports normalized), using the same URL
+/// parser as the HTTP client. A URL that doesn't parse, or has no host-based
+/// origin, never matches — so a stored key is dropped rather than risked.
+fn same_server(a: &str, b: &str) -> bool {
+    let origin = |url: &str| reqwest::Url::parse(url.trim()).ok().map(|u| u.origin());
+    match (origin(a), origin(b)) {
+        (Some(a), Some(b)) => a.is_tuple() && a == b,
+        _ => false,
     }
 }
 
@@ -295,7 +339,8 @@ pub fn add(preset_id: &str) -> anyhow::Result<String> {
     let preset = catalog::preset_by_id(preset_id);
     let mut roster = load_or_seed();
     let id = roster.unique_id(preset.id);
-    let conn = Connection::from_preset(preset, id.clone());
+    let mut conn = Connection::from_preset(preset, id.clone());
+    conn.label = roster.unique_label(&conn.label);
     let first = roster.connections.is_empty();
     roster.connections.push(conn);
     if first {
@@ -308,21 +353,73 @@ pub fn add(preset_id: &str) -> anyhow::Result<String> {
 
 /// Connect a preset, but never create a duplicate: if a connection for that
 /// preset already exists, make it active and return its id instead of adding a
-/// second row. `custom` is exempt (each custom endpoint is distinct), so it
-/// always adds. This is what the "Connect" buttons call, so re-clicking an
+/// second row. This is what the "Connect" buttons call, so re-clicking an
 /// already-connected preset simply switches to it.
+///
+/// Presets that [allow multiple](catalog::allows_multiple) connections
+/// (`custom`) add a new connection each time — except that an untouched draft
+/// (see [`is_unedited_draft`]) is returned, without activating it, so the
+/// caller can finish setting it up rather than piling up blank rows when the
+/// editor is dismissed and Connect is clicked again.
 pub fn connect_or_focus(preset_id: &str) -> anyhow::Result<String> {
-    if preset_id != "custom" {
-        let roster = load_or_seed();
-        if let Some(existing) = roster.find_by_preset(preset_id).map(|c| c.id.clone()) {
-            set_active(&existing)?;
-            return Ok(existing);
+    let roster = load_or_seed();
+    if catalog::allows_multiple(preset_id) {
+        let preset = catalog::preset_by_id(preset_id);
+        if let Some(draft) = roster
+            .connections
+            .iter()
+            .find(|c| is_unedited_draft(c, preset))
+        {
+            return Ok(draft.id.clone());
         }
+    } else if let Some(existing) = roster.find_by_preset(preset_id).map(|c| c.id.clone()) {
+        set_active(&existing)?;
+        return Ok(existing);
     }
     add(preset_id)
 }
 
+/// Whether `id` is an untouched draft (see [`is_unedited_draft`]) of a preset
+/// that [allows multiple](catalog::allows_multiple) connections — i.e. a row
+/// another Connect click could also hand out.
+pub fn is_draft(id: &str) -> bool {
+    load_or_seed().get(id).is_some_and(|c| {
+        catalog::allows_multiple(&c.preset)
+            && is_unedited_draft(c, catalog::preset_by_id(&c.preset))
+    })
+}
+
+/// For an editor that was opened on a draft of `preset_id`: return `id` if it
+/// is still an untouched draft, otherwise add a fresh connection from the same
+/// preset and return that. Two editors handed the same draft (e.g. Connect
+/// clicked in two windows) therefore save to separate rows instead of the
+/// second overwriting the first.
+pub fn claim_draft(id: &str, preset_id: &str) -> anyhow::Result<String> {
+    let roster = load_or_seed();
+    let still_draft = roster
+        .get(id)
+        .is_some_and(|c| is_unedited_draft(c, catalog::preset_by_id(preset_id)));
+    if still_draft {
+        Ok(id.to_string())
+    } else {
+        add(preset_id)
+    }
+}
+
+/// What [`update`] did besides writing the given fields.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct UpdateOutcome {
+    /// The stored API key was cleared because the URL moved to a different
+    /// server and no new key was entered.
+    pub key_cleared: bool,
+}
+
 /// Overwrite the editable fields of a connection.
+///
+/// Refuses (writing nothing) to move a connection whose provider needs a key
+/// to a different server without a new key: the stored key isn't carried
+/// over, so the result couldn't run — and if it is the active connection,
+/// writing it would stop the running model.
 pub fn update(
     id: &str,
     label: String,
@@ -330,8 +427,9 @@ pub fn update(
     model: String,
     api_key: Option<String>,
     cli_command: Vec<String>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<UpdateOutcome> {
     let mut roster = load_or_seed();
+    let mut outcome = UpdateOutcome::default();
     if let Some(conn) = roster.connections.iter_mut().find(|c| c.id == id) {
         conn.label = label;
         conn.model = model;
@@ -343,6 +441,35 @@ pub fn update(
         if conn.wire == "cli" {
             conn.cli_command = cli_command;
         } else {
+            // A stored key belongs to the server it was entered for. If the URL
+            // now points at a different server, drop it rather than send it
+            // there; a key typed alongside the new URL is still kept below.
+            let effective = |url: &str| {
+                if url.trim().is_empty() && conn.wire == "anthropic" {
+                    config::ANTHROPIC_DEFAULT_BASE_URL.to_string()
+                } else {
+                    url.to_string()
+                }
+            };
+            let base_url = base_url.trim().to_string();
+            let keep_stored_key = matches!(&api_key, Some(k) if k.trim().is_empty());
+            // An unchanged URL is always the same server, even one that doesn't
+            // parse; only an edited URL is compared by origin.
+            let key_cleared = keep_stored_key
+                && conn.api_key.is_some()
+                && base_url != conn.base_url.trim()
+                && !same_server(&effective(&conn.base_url), &effective(&base_url));
+            if key_cleared && conn.needs_key {
+                // Nothing has been written yet; bail before the roster is saved.
+                anyhow::bail!(
+                    "Enter the API key for the new server. A saved key is only sent to the \
+                     server it was entered for."
+                );
+            }
+            if key_cleared {
+                conn.api_key = None;
+                outcome.key_cleared = true;
+            }
             conn.base_url = base_url;
             // A `Some("")` from a cleared field means "leave the stored key"; only
             // a non-empty value replaces it, and `None` is an explicit clear.
@@ -355,7 +482,7 @@ pub fn update(
     }
     write(&roster)?;
     project(&roster)?;
-    Ok(())
+    Ok(outcome)
 }
 
 /// Remove a connection. If it was active, the first remaining usable connection

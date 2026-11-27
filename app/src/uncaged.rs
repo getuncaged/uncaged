@@ -23,6 +23,9 @@ pub struct PresetView {
     pub local: bool,
     pub key_url: String,
     pub note: Option<String>,
+    /// Whether this preset can back several saved connections (custom
+    /// endpoints), so the gallery keeps offering "Connect" once one exists.
+    pub allows_multiple: bool,
 }
 
 /// A gallery section grouping presets that connect the same way.
@@ -164,6 +167,7 @@ mod imp {
             local: p.local,
             key_url: p.key_url.to_string(),
             note: p.note.map(str::to_string),
+            allows_multiple: uncaged_engine::preset_allows_multiple(p.id),
         }
     }
 
@@ -271,7 +275,10 @@ mod imp {
     }
 
     /// Overwrite a connection's editable fields. For `api_key`, a
-    /// `Some(non-empty)` replaces the stored key and `Some("")` keeps it.
+    /// `Some(non-empty)` replaces the stored key and `Some("")` keeps it —
+    /// unless the URL moved to a different server, in which case the stored key
+    /// is cleared and this returns `Ok(true)` (or, for a provider that needs a
+    /// key, the edit is refused with an error and nothing is written).
     pub fn update(
         id: &str,
         label: String,
@@ -279,12 +286,26 @@ mod imp {
         model: String,
         api_key: Option<String>,
         cli_command: Vec<String>,
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
         let result =
             uncaged_engine::update_connection(id, label, base_url, model, api_key, cli_command)
+                .map(|outcome| outcome.key_cleared)
                 .map_err(|e| e.to_string());
         super::invalidate_active_provider_icon();
         result
+    }
+
+    /// Whether a saved connection is still an untouched draft that another
+    /// Connect click could also hand out.
+    pub fn is_draft(id: &str) -> bool {
+        uncaged_engine::is_draft(id)
+    }
+
+    /// For an editor opened on a draft: the draft's id if it's still untouched,
+    /// else a fresh connection from the same preset (so two editors never save
+    /// onto one row).
+    pub fn claim_draft(id: &str, preset_id: &str) -> Result<String, String> {
+        uncaged_engine::claim_draft(id, preset_id).map_err(|e| e.to_string())
     }
 }
 
@@ -319,15 +340,23 @@ mod imp {
         _model: String,
         _api_key: Option<String>,
         _cli_command: Vec<String>,
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
+        Err("The local engine is not available on this build.".to_string())
+    }
+    pub fn is_draft(_id: &str) -> bool {
+        false
+    }
+    pub fn claim_draft(_id: &str, _preset_id: &str) -> Result<String, String> {
         Err("The local engine is not available on this build.".to_string())
     }
 }
 
 pub use imp::activate;
 pub use imp::catalog_sections;
+pub use imp::claim_draft;
 pub use imp::connect;
 pub use imp::connections;
 pub use imp::engine_active;
+pub use imp::is_draft;
 pub use imp::remove;
 pub use imp::update;

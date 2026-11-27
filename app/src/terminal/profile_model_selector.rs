@@ -2332,7 +2332,8 @@ impl TypedActionView for ProfileModelSelector {
                         Some(String::new()),
                         c.cli_command.clone(),
                     )
-                    .and_then(|()| crate::uncaged::activate(&c.id))
+                    // The URL is unchanged, so the stored key is always kept.
+                    .and_then(|_key_cleared| crate::uncaged::activate(&c.id))
                 } else {
                     Err("connection no longer exists".to_string())
                 };
