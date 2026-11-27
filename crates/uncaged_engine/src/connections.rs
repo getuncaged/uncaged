@@ -11,6 +11,7 @@
 //! has to know the roster exists — it just reads the single active provider as
 //! before. Nothing here talks to the network; keys stay on the user's machine.
 
+use std::path::Path;
 use std::path::PathBuf;
 
 use serde::Deserialize;
@@ -316,13 +317,32 @@ pub fn load() -> Roster {
     }
 }
 
+/// Write the roster atomically: the new contents go to a temporary file next
+/// to it, which is then renamed over it. A write that fails part-way leaves the
+/// previous roster intact instead of a truncated one.
 fn write(roster: &Roster) -> anyhow::Result<()> {
     let path = roster_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::write(&path, serde_json::to_string_pretty(roster)?)?;
+    let json = serde_json::to_string_pretty(roster)?;
+    let tmp = roster_temp_path(&path);
+    if let Err(err) = std::fs::write(&tmp, json).and_then(|()| std::fs::rename(&tmp, &path)) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(err.into());
+    }
     Ok(())
+}
+
+/// The temporary file [`write`] stages the roster in: same directory (so the
+/// rename stays on one filesystem), named per process so two app instances
+/// saving at once don't share it.
+pub(crate) fn roster_temp_path(path: &Path) -> PathBuf {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "connections.json".to_string());
+    path.with_file_name(format!(".{name}.{}.tmp", std::process::id()))
 }
 
 /// Read the roster, first-run-seeding it from an existing `engine.json` so a
@@ -478,10 +498,11 @@ pub struct UpdateOutcome {
 
 /// Overwrite the editable fields of a connection.
 ///
-/// Returns `Err` only when nothing was written: the connection doesn't exist,
-/// the roster couldn't be written, or the edit was refused. Once the roster is
-/// written the edit stands, and a failure to update `engine.json` is reported
-/// in [`UpdateOutcome::engine_error`].
+/// Returns `Err` when the edit wasn't saved: the connection doesn't exist, the
+/// roster couldn't be written (the previous roster is left intact), or the
+/// edit was refused. (Reading the roster can still repair it on disk; see
+/// [`load_or_seed`].) Once the roster is written the edit stands, and a failure
+/// to update `engine.json` is reported in [`UpdateOutcome::engine_error`].
 ///
 /// Refuses (writing nothing) to move a connection whose provider needs a key
 /// to a different server without a new key: the stored key isn't carried
@@ -588,9 +609,15 @@ pub fn discard_draft(id: &str) -> anyhow::Result<bool> {
     if !untouched {
         return Ok(false);
     }
+    let was_active = roster.active_id.as_deref() == Some(id);
     roster.remove_and_repoint(id);
     write(&roster)?;
-    project(&roster)?;
+    // Rows added for a save are never made active, so `engine.json` normally
+    // doesn't mention this one and needs no update. Only rewrite it when the
+    // active connection actually changed.
+    if was_active {
+        project(&roster)?;
+    }
     Ok(true)
 }
 

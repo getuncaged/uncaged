@@ -941,3 +941,72 @@ fn a_saved_edit_whose_engine_config_fails_is_still_saved() {
     );
     assert!(err.is_err());
 }
+
+#[test]
+fn a_failed_roster_write_leaves_the_previous_roster_intact() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let dir = isolate();
+
+    let (custom, _) = connections::claim_for_preset("custom").unwrap();
+    let roster_path = dir.join("connections.json");
+    let before = std::fs::read(&roster_path).unwrap();
+
+    // The staging file can't be written (its path is a directory), so the
+    // write fails before anything replaces the roster.
+    let tmp = connections::roster_temp_path(&roster_path);
+    std::fs::create_dir_all(&tmp).unwrap();
+    let err = connections::update(
+        &custom,
+        "Custom".to_string(),
+        "http://localhost:8000/v1".to_string(),
+        "qwen".to_string(),
+        None,
+        Vec::new(),
+    );
+    assert!(err.is_err());
+    assert_eq!(std::fs::read(&roster_path).unwrap(), before);
+
+    // Once it can be written, the save lands and leaves no staging file behind.
+    std::fs::remove_dir(&tmp).unwrap();
+    connections::update(
+        &custom,
+        "Custom".to_string(),
+        "http://localhost:8000/v1".to_string(),
+        "qwen".to_string(),
+        None,
+        Vec::new(),
+    )
+    .unwrap();
+    assert!(!tmp.exists());
+    let saved = connections::load()
+        .connections
+        .into_iter()
+        .find(|c| c.id == custom)
+        .unwrap();
+    assert_eq!(saved.model, "qwen");
+}
+
+#[test]
+fn discarding_an_inactive_draft_does_not_touch_the_engine_config() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let dir = isolate();
+
+    // An active connection, then a blank row added for a save (never active).
+    let active = connections::add("openai").unwrap();
+    let (draft, created) = connections::claim_for_preset("custom").unwrap();
+    assert!(created);
+    assert_eq!(connections::load().active_id.as_deref(), Some(active.as_str()));
+
+    // engine.json can't be written now; discarding the inactive draft doesn't
+    // need it, so the cleanup succeeds.
+    let engine_dir = dir.join("engine-dir");
+    std::fs::create_dir_all(&engine_dir).unwrap();
+    // SAFETY: the env lock is held (see `isolate`).
+    unsafe {
+        std::env::set_var("UNCAGED_CONFIG", &engine_dir);
+    }
+    assert!(connections::discard_draft(&draft).unwrap());
+    let roster = connections::load();
+    assert!(roster.connections.iter().all(|c| c.id != draft));
+    assert_eq!(roster.active_id.as_deref(), Some(active.as_str()));
+}

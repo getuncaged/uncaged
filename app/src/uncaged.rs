@@ -288,8 +288,9 @@ mod imp {
     /// `Some(non-empty)` replaces the stored key and `Some("")` keeps it —
     /// unless the URL moved to a different server, in which case the stored key
     /// is cleared (`SaveOutcome::key_cleared`; for a provider that needs a key
-    /// the edit is refused instead). `Err` means nothing was written; a saved
-    /// edit whose `engine.json` update failed is `Ok` with `engine_error`.
+    /// the edit is refused instead). `Err` means the edit wasn't saved (the
+    /// previous roster is left intact); a saved edit whose `engine.json` update
+    /// failed is `Ok` with `engine_error`.
     pub fn update(
         id: &str,
         label: String,

@@ -733,8 +733,9 @@ pub struct AISettingsPageView {
     // Set when the editor was opened on an untouched draft. Saving then claims
     // the draft again, so two editors handed the same draft (two windows) save
     // to separate rows, and Remove never deletes a row another window saved.
-    // Also set (already claimed) once a new connection's save has picked its
-    // row, so a retry after an error updates that row.
+    // Also set (claimed) while a new connection's save writes the row it
+    // picked, so that save doesn't claim a second row. If nothing was written,
+    // the editor goes back to new-connection mode (`pending_uncaged_new`).
     pending_uncaged_draft: Option<PendingUncagedDraft>,
     // Set while the editor is open for a new connection that Connect started:
     // nothing is in the roster until Save, so Cancel, Esc, closing the window
@@ -2664,7 +2665,12 @@ impl AISettingsPageView {
         // to it (activating writes engine.json too).
         if let Some(err) = outcome.engine_error {
             let label = saved.map_or_else(|| name.to_string(), |c| c.label);
-            self.uncaged_error_toast(format!("Saved {label}, but: {err}.{key_note}"), ctx);
+            self.uncaged_error_toast(
+                format!(
+                    "Saved {label}, but the engine config couldn't be updated: {err}.{key_note}"
+                ),
+                ctx,
+            );
             ctx.notify();
             return true;
         }
@@ -2716,9 +2722,9 @@ impl AISettingsPageView {
         };
         // The roster may have grown: make sure the new row gets Use/Edit buttons.
         self.ensure_uncaged_row_buttons(ctx);
-        // From here the editor edits that row, so a retry after an error updates
-        // it rather than adding another. It's claimed: this save chose it, and
-        // the prefilled-name rule keeps the row's own (unique) label.
+        // While this save writes it, the editor edits that row. It's claimed:
+        // this save chose it, so the save doesn't claim another, and the
+        // prefilled-name rule keeps the row's own (unique) label.
         self.pending_uncaged_new = None;
         self.pending_uncaged_connection_id = Some(id.clone());
         self.pending_uncaged_draft = Some(PendingUncagedDraft {
@@ -2734,8 +2740,8 @@ impl AISettingsPageView {
         // roster: the row picked this time may have been taken (and configured)
         // by another window by then. Take back a row this save added, so Cancel
         // still leaves the roster as it was; a reused row was there before.
-        // (Single UI thread: nothing else can have touched a row this save
-        // added since.)
+        // `discard_draft` only removes the row while it's still blank, so a row
+        // another app instance has configured since is kept.
         self.pending_uncaged_connection_id = None;
         self.pending_uncaged_draft = None;
         self.pending_uncaged_new = Some(new);
@@ -8786,9 +8792,10 @@ struct PendingUncagedDraft {
     preset: String,
     /// The label the editor's name field was prefilled with.
     opened_label: String,
-    /// Set when a new connection's save picked this row: the row is this
-    /// editor's own, so a retry after an error updates it instead of claiming
-    /// another, and Remove may delete it. The prefilled-name rule still applies.
+    /// Set while a new connection's save writes the row it picked: the save
+    /// chose it, so it doesn't claim another. If nothing was written, the
+    /// editor goes back to new-connection mode. The prefilled-name rule still
+    /// applies.
     claimed: bool,
 }
 
