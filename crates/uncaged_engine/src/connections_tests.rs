@@ -644,7 +644,8 @@ fn a_draft_claimed_twice_saves_to_separate_rows() {
     let _guard = ENV_LOCK.lock().unwrap();
     isolate();
 
-    // Connect clicked in two windows: both editors get the same blank draft.
+    // Two editors on the same blank draft (e.g. Edit on a row onboarding left,
+    // in two windows).
     let draft = connections::connect_or_focus("custom").unwrap();
     assert_eq!(connections::connect_or_focus("custom").unwrap(), draft);
     assert!(connections::is_draft(&draft));
@@ -877,20 +878,66 @@ fn saving_the_first_connection_does_not_activate_its_blank_row() {
     assert!(in_roster(&openai));
     assert!(!config::config_path().exists());
 
-    // So is a fresh row from re-claiming a draft another editor configured.
-    let custom = connections::connect_or_focus("custom").unwrap();
-    configure_custom(&custom, "http://localhost:8000/v1", "qwen");
-    let fresh = connections::claim_draft(&custom, "custom").unwrap();
-    assert_ne!(fresh, custom);
+    // So is the fresh row `claim_draft` adds on an empty roster (the draft the
+    // editor was opened on has been removed meanwhile).
+    connections::remove(&openai).unwrap();
+    assert!(connections::load().connections.is_empty());
+    let fresh = connections::claim_draft("custom", "custom").unwrap();
+    assert!(in_roster(&fresh));
     assert_eq!(connections::load().active_id, None);
+    assert!(!config::config_path().exists());
 
     // `add` itself still makes the first row of an empty roster active.
-    connections::remove(&openai).unwrap();
-    connections::remove(&custom).unwrap();
     connections::remove(&fresh).unwrap();
     let first = connections::add("lmstudio").unwrap();
     assert_eq!(
         connections::load().active_id.as_deref(),
         Some(first.as_str())
     );
+}
+
+#[test]
+fn a_saved_edit_whose_engine_config_fails_is_still_saved() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let dir = isolate();
+
+    // engine.json can't be written (its path is a directory).
+    let engine_dir = dir.join("engine-dir");
+    std::fs::create_dir_all(&engine_dir).unwrap();
+    // SAFETY: the env lock is held (see `isolate`).
+    unsafe {
+        std::env::set_var("UNCAGED_CONFIG", &engine_dir);
+    }
+
+    // The roster write lands, so `update` succeeds and reports the engine.json
+    // failure separately: the caller knows the edit was saved.
+    let (custom, _) = connections::claim_for_preset("custom").unwrap();
+    let outcome = connections::update(
+        &custom,
+        "Custom".to_string(),
+        "http://localhost:8000/v1".to_string(),
+        "qwen".to_string(),
+        None,
+        Vec::new(),
+    )
+    .unwrap();
+    assert!(outcome.engine_error.is_some());
+    let saved = connections::load()
+        .connections
+        .into_iter()
+        .find(|c| c.id == custom)
+        .unwrap();
+    assert_eq!(saved.base_url, "http://localhost:8000/v1");
+    assert_eq!(saved.model, "qwen");
+
+    // A refused edit is still an error, with nothing written.
+    let err = connections::update(
+        "missing",
+        "x".to_string(),
+        String::new(),
+        String::new(),
+        None,
+        Vec::new(),
+    );
+    assert!(err.is_err());
 }

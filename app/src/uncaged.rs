@@ -28,6 +28,15 @@ pub struct PresetView {
     pub allows_multiple: bool,
 }
 
+/// What saving a connection's edits did besides writing them (see `update`).
+#[derive(Clone, Debug, Default)]
+pub struct SaveOutcome {
+    /// The stored API key was cleared because the URL moved to another server.
+    pub key_cleared: bool,
+    /// The edit was saved, but updating the engine's config then failed.
+    pub engine_error: Option<String>,
+}
+
 /// A gallery section grouping presets that connect the same way.
 #[derive(Clone, Debug, Default)]
 pub struct CatalogSection {
@@ -143,6 +152,7 @@ mod imp {
     use super::CatalogSection;
     use super::ConnectionView;
     use super::PresetView;
+    use super::SaveOutcome;
 
     /// Whether the local Uncaged engine is configured and active.
     pub fn engine_active() -> bool {
@@ -277,8 +287,9 @@ mod imp {
     /// Overwrite a connection's editable fields. For `api_key`, a
     /// `Some(non-empty)` replaces the stored key and `Some("")` keeps it —
     /// unless the URL moved to a different server, in which case the stored key
-    /// is cleared and this returns `Ok(true)` (or, for a provider that needs a
-    /// key, the edit is refused with an error and nothing is written).
+    /// is cleared (`SaveOutcome::key_cleared`; for a provider that needs a key
+    /// the edit is refused instead). `Err` means nothing was written; a saved
+    /// edit whose `engine.json` update failed is `Ok` with `engine_error`.
     pub fn update(
         id: &str,
         label: String,
@@ -286,10 +297,13 @@ mod imp {
         model: String,
         api_key: Option<String>,
         cli_command: Vec<String>,
-    ) -> Result<bool, String> {
+    ) -> Result<SaveOutcome, String> {
         let result =
             uncaged_engine::update_connection(id, label, base_url, model, api_key, cli_command)
-                .map(|outcome| outcome.key_cleared)
+                .map(|outcome| SaveOutcome {
+                    key_cleared: outcome.key_cleared,
+                    engine_error: outcome.engine_error,
+                })
                 .map_err(|e| e.to_string());
         super::invalidate_active_provider_icon();
         result
@@ -341,6 +355,7 @@ mod imp {
 mod imp {
     use super::CatalogSection;
     use super::ConnectionView;
+    use super::SaveOutcome;
 
     pub fn engine_active() -> bool {
         false
@@ -367,7 +382,7 @@ mod imp {
         _model: String,
         _api_key: Option<String>,
         _cli_command: Vec<String>,
-    ) -> Result<bool, String> {
+    ) -> Result<SaveOutcome, String> {
         Err("The local engine is not available on this build.".to_string())
     }
     pub fn is_draft(_id: &str) -> bool {

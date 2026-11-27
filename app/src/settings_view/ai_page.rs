@@ -106,8 +106,8 @@ use crate::view_components::action_button::{
     ActionButton, ButtonSize, DangerSecondaryTheme, SecondaryTheme,
 };
 use crate::view_components::{
-    render_warning_box, FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent,
-    WarningBoxConfig,
+    render_warning_box, DismissibleToast, FilterableDropdown, SubmittableTextInput,
+    SubmittableTextInputEvent, ToastFlavor, WarningBoxConfig,
 };
 use crate::workspaces::user_workspaces::UserWorkspacesEvent;
 
@@ -2429,8 +2429,13 @@ impl AISettingsPageView {
                 .find(|c| c.id == id)
             {
                 Some(conn) if conn.usable && !conn.needs_key => {
-                    let _ = crate::uncaged::activate(&conn.id);
-                    self.uncaged_toast(format!("Connected {} — ready to use.", conn.label), ctx);
+                    match crate::uncaged::activate(&conn.id) {
+                        Ok(()) => self.uncaged_toast(
+                            format!("Connected {} — ready to use.", conn.label),
+                            ctx,
+                        ),
+                        Err(err) => self.uncaged_error_toast(err, ctx),
+                    }
                     ctx.notify();
                 }
                 // An existing connection for this preset that was edited into
@@ -2631,24 +2636,10 @@ impl AISettingsPageView {
         };
         // `Some("")` is the roster's "keep the stored key" sentinel (unused for CLI).
         let key = Some(api_key.to_string());
-        let before = Self::uncaged_row_snapshot(id);
-        let result = crate::uncaged::update(id, name, base_url, model, key, cli_command);
-        let key_cleared = match result {
-            Ok(key_cleared) => key_cleared,
+        let result = crate::uncaged::update(id, name.clone(), base_url, model, key, cli_command);
+        let outcome = match result {
+            Ok(outcome) => outcome,
             Err(err) => {
-                // If the roster write landed and only a later step failed (e.g.
-                // engine.json couldn't be written), the edit is saved: close the
-                // editor and say what failed. Keeping it open for a retry would
-                // hold this row's id while another window could remove the row
-                // and re-create one with the same id. (Single UI thread: nothing
-                // else can have changed the row since `before`.)
-                let after = Self::uncaged_row_snapshot(id);
-                if let Some(saved) = after.filter(|after| Some(after) != before.as_ref()) {
-                    self.hide_custom_endpoint_modal(ctx);
-                    self.uncaged_error_toast(format!("Saved {}, but: {err}", saved.0), ctx);
-                    ctx.notify();
-                    return true;
-                }
                 // Nothing was written (e.g. a new server needs its key, the
                 // roster couldn't be read or written, or the row was removed in
                 // another window): keep the editor open with the user's input.
@@ -2657,19 +2648,30 @@ impl AISettingsPageView {
                 return false;
             }
         };
+        // The edit is saved from here on, so the editor closes. (Keeping it open
+        // for a retry would hold this row's id while another window could remove
+        // the row and re-create one with the same id.)
         self.hide_custom_endpoint_modal(ctx);
-        let key_note = if key_cleared {
+        let key_note = if outcome.key_cleared {
             " Its saved API key was cleared because the server changed."
         } else {
             ""
         };
+        let saved = crate::uncaged::connections()
+            .into_iter()
+            .find(|c| c.id == id);
+        // Saved, but engine.json couldn't be updated: say so, and don't switch
+        // to it (activating writes engine.json too).
+        if let Some(err) = outcome.engine_error {
+            let label = saved.map_or_else(|| name.to_string(), |c| c.label);
+            self.uncaged_error_toast(format!("Saved {label}, but: {err}.{key_note}"), ctx);
+            ctx.notify();
+            return true;
+        }
         // Only switch to the connection once it can actually run: activating an
         // unusable one would put the engine to sleep and stop whatever model is
         // running now. (A saved key is dropped if the URL moved to another
         // server, so this can still be "Needs key" after a Save.)
-        let saved = crate::uncaged::connections()
-            .into_iter()
-            .find(|c| c.id == id);
         match saved {
             Some(conn) if conn.usable => match crate::uncaged::activate(id) {
                 Ok(()) => self.uncaged_toast(format!("Model connected.{key_note}"), ctx),
@@ -2690,15 +2692,6 @@ impl AISettingsPageView {
         }
         ctx.notify();
         true
-    }
-
-    /// The saved fields of a roster connection, for telling whether a failed
-    /// save still wrote to it.
-    fn uncaged_row_snapshot(id: &str) -> Option<(String, String, String, Vec<String>, bool)> {
-        crate::uncaged::connections()
-            .into_iter()
-            .find(|c| c.id == id)
-            .map(|c| (c.label, c.base_url, c.model, c.cli_command, c.has_key))
     }
 
     /// Save a new connection's editor (see `open_new_uncaged_connection_editor`):
@@ -2736,23 +2729,20 @@ impl AISettingsPageView {
         if self.commit_uncaged_connection(&id, name, url, api_key, models, ctx) {
             return;
         }
-        // Nothing was written and the editor is still open. Take back a row this
-        // save added, and return to a new-connection editor, so Cancel still
-        // leaves the roster as it was. (Single UI thread: nothing else can have
-        // touched the row since it was added.) If the row was reused instead,
-        // the editor stays on it: a retry updates it, although the modal still
-        // reads "Add connection".
-        if !created {
-            return;
-        }
-        match crate::uncaged::discard_draft(&id) {
-            Ok(true) => {
-                self.pending_uncaged_connection_id = None;
-                self.pending_uncaged_draft = None;
-                self.pending_uncaged_new = Some(new);
+        // Nothing was written and the editor is still open. Return it to a
+        // new connection, so the next Save picks its row again from the current
+        // roster: the row picked this time may have been taken (and configured)
+        // by another window by then. Take back a row this save added, so Cancel
+        // still leaves the roster as it was; a reused row was there before.
+        // (Single UI thread: nothing else can have touched a row this save
+        // added since.)
+        self.pending_uncaged_connection_id = None;
+        self.pending_uncaged_draft = None;
+        self.pending_uncaged_new = Some(new);
+        if created {
+            if let Err(err) = crate::uncaged::discard_draft(&id) {
+                self.uncaged_error_toast(err, ctx);
             }
-            Ok(false) => {}
-            Err(err) => self.uncaged_error_toast(err, ctx),
         }
         ctx.notify();
     }
@@ -2786,23 +2776,19 @@ impl AISettingsPageView {
     }
 
     fn uncaged_toast(&mut self, message: String, ctx: &mut ViewContext<Self>) {
-        let toast = crate::view_components::DismissibleToast::success(message);
-        Self::show_uncaged_toast(toast, ctx);
+        Self::show_uncaged_toast(message, ToastFlavor::Success, ctx);
     }
 
     /// Like `uncaged_toast`, styled as an error: for a failed or refused action,
     /// or a save that only partly went through.
     fn uncaged_error_toast(&mut self, message: String, ctx: &mut ViewContext<Self>) {
-        let toast = crate::view_components::DismissibleToast::error(message);
-        Self::show_uncaged_toast(toast, ctx);
+        Self::show_uncaged_toast(message, ToastFlavor::Error, ctx);
     }
 
-    fn show_uncaged_toast(
-        toast: crate::view_components::DismissibleToast<crate::workspace::WorkspaceAction>,
-        ctx: &mut ViewContext<Self>,
-    ) {
+    fn show_uncaged_toast(message: String, flavor: ToastFlavor, ctx: &mut ViewContext<Self>) {
         let window_id = ctx.window_id();
         crate::ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
+            let toast = DismissibleToast::new(message, flavor);
             toast_stack.add_ephemeral_toast(toast, window_id, ctx);
         });
     }

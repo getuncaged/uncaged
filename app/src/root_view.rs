@@ -2322,7 +2322,8 @@ impl RootView {
                 // create (or focus) a connection for this preset; when it's
                 // immediately usable and needs no key (local runtimes, CLI
                 // agents), activate it in one click. (Settings' editor-based
-                // Connect adds nothing until Save; onboarding has no editor.) Presets that need an API key create an incomplete
+                // Connect adds nothing until Save; onboarding has no editor.)
+                // Presets that need an API key create an incomplete
                 // connection here and surface in the "Connected" roster with a
                 // "Needs key" status — the user finishes them in Settings after
                 // onboarding. (TODO: host the CustomEndpointModal as an overlay

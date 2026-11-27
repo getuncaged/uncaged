@@ -466,14 +466,22 @@ pub fn claim_for_preset(preset_id: &str) -> anyhow::Result<(String, bool)> {
 }
 
 /// What [`update`] did besides writing the given fields.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UpdateOutcome {
     /// The stored API key was cleared because the URL moved to a different
     /// server and no new key was entered.
     pub key_cleared: bool,
+    /// The edit was saved to the roster, but mirroring the active connection
+    /// into `engine.json` then failed with this error.
+    pub engine_error: Option<String>,
 }
 
 /// Overwrite the editable fields of a connection.
+///
+/// Returns `Err` only when nothing was written: the connection doesn't exist,
+/// the roster couldn't be written, or the edit was refused. Once the roster is
+/// written the edit stands, and a failure to update `engine.json` is reported
+/// in [`UpdateOutcome::engine_error`].
 ///
 /// Refuses (writing nothing) to move a connection whose provider needs a key
 /// to a different server without a new key: the stored key isn't carried
@@ -547,7 +555,12 @@ pub fn update(
         );
     }
     write(&roster)?;
-    project(&roster)?;
+    // The edit is saved from here on, so a failure to mirror it into
+    // engine.json is reported in the outcome, not as an error: callers can tell
+    // "nothing was written" (`Err`) from "saved, but the engine wasn't updated".
+    if let Err(err) = project(&roster) {
+        outcome.engine_error = Some(err.to_string());
+    }
     Ok(outcome)
 }
 
