@@ -2458,6 +2458,7 @@ impl AISettingsPageView {
             crate::uncaged::is_draft(&conn.id).then(|| PendingUncagedDraft {
                 preset: conn.preset.clone(),
                 opened_label: conn.label.clone(),
+                claimed: false,
             });
         // A CLI agent has no URL/key — its lever is the command line, so put the
         // command into the field the modal shows (relabeled "Command" below) and
@@ -2498,6 +2499,17 @@ impl AISettingsPageView {
         ctx.notify();
     }
 
+    /// The row a save from a draft editor should go to: the editor's own row
+    /// once it has written to it, otherwise the draft if it's still untouched,
+    /// or a fresh row from the same preset (see `crate::uncaged::claim_draft`).
+    fn claim_uncaged_draft(id: &str, draft: &PendingUncagedDraft) -> Result<String, String> {
+        if draft.claimed {
+            Ok(id.to_string())
+        } else {
+            crate::uncaged::claim_draft(id, &draft.preset)
+        }
+    }
+
     /// Persist edits from the modal back onto a roster connection and activate
     /// it. A blank key means "keep whatever is stored".
     fn commit_uncaged_connection(
@@ -2516,8 +2528,9 @@ impl AISettingsPageView {
         // If the editor was opened on a draft, something else (another window's
         // editor) may have configured that row since. Claim it again: that
         // returns a fresh row in that case, so this save doesn't overwrite it.
+        // A row this editor already wrote to is its own and isn't re-claimed.
         let (id, name) = match self.pending_uncaged_draft.clone() {
-            Some(draft) => match crate::uncaged::claim_draft(id, &draft.preset) {
+            Some(draft) => match Self::claim_uncaged_draft(id, &draft) {
                 Ok(claimed) => {
                     // A name left at the prefilled default means "keep the row's
                     // label": a fresh row already has its own unique default
@@ -2573,8 +2586,10 @@ impl AISettingsPageView {
                 // draft and is this editor's own: a retry must update it rather
                 // than claim yet another row. (Single UI thread: nothing else can
                 // have touched it since the update above.)
-                if self.pending_uncaged_draft.is_some() && !crate::uncaged::is_draft(id) {
-                    self.pending_uncaged_draft = None;
+                if let Some(draft) = self.pending_uncaged_draft.as_mut() {
+                    if !draft.claimed && !crate::uncaged::is_draft(id) {
+                        draft.claimed = true;
+                    }
                 }
                 self.uncaged_toast(err, ctx);
                 ctx.notify();
@@ -2620,7 +2635,11 @@ impl AISettingsPageView {
         // An editor opened on a draft can be stale: another window may have saved
         // this row since. Only ever remove the blank draft this editor was given,
         // never a connection someone else set up.
-        if self.pending_uncaged_draft.is_some() && !crate::uncaged::is_draft(id) {
+        let stale = self
+            .pending_uncaged_draft
+            .as_ref()
+            .is_some_and(|draft| !draft.claimed);
+        if stale && !crate::uncaged::is_draft(id) {
             self.hide_custom_endpoint_modal(ctx);
             self.uncaged_toast(
                 "Nothing was removed: this connection was set up in another window.".to_string(),
@@ -8615,10 +8634,6 @@ impl SettingsWidget for CloudHandoffWidget {
     }
 }
 
-/// The Uncaged "Connect a model" section: the roster of saved connections
-/// (one active, powering Agent Mode) plus a grouped gallery of every platform
-/// you can connect — a local agent CLI, an on-device model, or an API key.
-/// This is the always-visible face of the local bring-your-own-model engine.
 /// An Uncaged connection editor that was opened on an untouched draft (see
 /// `AISettingsPageView::pending_uncaged_draft`).
 #[derive(Clone, Debug)]
@@ -8627,8 +8642,17 @@ struct PendingUncagedDraft {
     preset: String,
     /// The label the editor's name field was prefilled with.
     opened_label: String,
+    /// Set once a save from this editor has reached the roster (a later step
+    /// failed, so the editor is still open): the row is now this editor's own,
+    /// so retries update it instead of claiming another, and Remove may delete
+    /// it. The prefilled-name rule still applies.
+    claimed: bool,
 }
 
+/// The Uncaged "Connect a model" section: the roster of saved connections
+/// (one active, powering Agent Mode) plus a grouped gallery of every platform
+/// you can connect — a local agent CLI, an on-device model, or an API key.
+/// This is the always-visible face of the local bring-your-own-model engine.
 struct ConnectModelWidget;
 
 impl ConnectModelWidget {
