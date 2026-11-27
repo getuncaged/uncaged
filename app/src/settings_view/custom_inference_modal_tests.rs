@@ -129,26 +129,51 @@ fn direct_url_allows_empty_string() {
 }
 
 #[test]
-fn direct_endpoint_form_does_not_require_an_api_key() {
+fn direct_endpoint_form_key_is_optional_unless_required() {
+    let url = "http://localhost:8000/v1";
+    // Keyless server, or a key already stored: a blank key field is fine.
     assert!(is_direct_endpoint_form_valid(
         "Local vLLM",
-        "http://localhost:8000/v1",
+        url,
+        "",
+        false,
         true
+    ));
+    // The provider needs a key and none is stored: the field must be filled.
+    assert!(!is_direct_endpoint_form_valid(
+        "OpenAI", url, "", true, true
     ));
     assert!(!is_direct_endpoint_form_valid(
-        "",
-        "http://localhost:8000/v1",
-        true
+        "OpenAI", url, "   ", true, true
     ));
-    assert!(!is_direct_endpoint_form_valid("Local vLLM", "", true));
+    assert!(is_direct_endpoint_form_valid(
+        "OpenAI", url, "sk-test", true, true
+    ));
+}
+
+#[test]
+fn direct_endpoint_form_requires_name_url_and_model() {
+    let url = "http://localhost:8000/v1";
+    assert!(!is_direct_endpoint_form_valid("", url, "", false, true));
     assert!(!is_direct_endpoint_form_valid(
         "Local vLLM",
-        "http://localhost:8000/v1",
+        "",
+        "",
+        false,
+        true
+    ));
+    assert!(!is_direct_endpoint_form_valid(
+        "Local vLLM",
+        url,
+        "",
+        false,
         false
     ));
     assert!(!is_direct_endpoint_form_valid(
         "Local vLLM",
         "ftp://localhost",
+        "",
+        false,
         true
     ));
 }
@@ -159,9 +184,11 @@ fn endpoint_kind_routes_url_validation() {
     assert!(EndpointKind::Api
         .validate_url("http://localhost:8000/v1")
         .is_err());
-    assert!(EndpointKind::DirectApi
-        .validate_url("http://localhost:8000/v1")
-        .is_ok());
+    assert!(EndpointKind::DirectApi {
+        key_required: false
+    }
+    .validate_url("http://localhost:8000/v1")
+    .is_ok());
     assert!(EndpointKind::Cli
         .validate_url("claude-code-acp --model opus")
         .is_ok());

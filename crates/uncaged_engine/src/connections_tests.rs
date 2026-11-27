@@ -506,6 +506,30 @@ fn changing_the_server_drops_the_stored_key_unless_a_new_one_is_given() {
     // A different server with a new key: the new key is stored.
     update("https://other.example.com/v1", Some("other-secret"));
     assert_eq!(stored_key().as_deref(), Some("other-secret"));
+
+    // Spelling out the default port, or surrounding whitespace, is the same
+    // server: the key is kept (and the stored URL is trimmed).
+    update(" https://other.example.com:443/v1 ", Some(""));
+    assert_eq!(stored_key().as_deref(), Some("other-secret"));
+    let stored_url = connections::load()
+        .connections
+        .into_iter()
+        .find(|c| c.id == id)
+        .unwrap()
+        .base_url;
+    assert_eq!(stored_url, "https://other.example.com:443/v1");
+
+    // Extra slashes after the scheme still name a host (the HTTP client's URL
+    // parser ignores them), so moving between such URLs is a server change.
+    update("https:///trusted.example.com/v1", Some("trusted-secret"));
+    assert_eq!(stored_key().as_deref(), Some("trusted-secret"));
+    update("https:///attacker.example.com/v1", Some(""));
+    assert_eq!(stored_key(), None);
+
+    // A URL that doesn't parse never keeps a key.
+    update("https://other.example.com/v1", Some("other-secret"));
+    update("not a url", Some(""));
+    assert_eq!(stored_key(), None);
 }
 
 #[test]

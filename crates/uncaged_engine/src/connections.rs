@@ -261,13 +261,16 @@ fn is_unedited_draft(conn: &Connection, preset: &Preset) -> bool {
         && conn.cli_command == seed.cli_command
 }
 
-/// The `scheme://host[:port]` part of a URL, lowercased, for comparing which
-/// server a connection talks to.
-fn url_origin(url: &str) -> String {
-    let url = url.trim();
-    let (scheme, rest) = url.split_once("://").unwrap_or(("", url));
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
-    format!("{scheme}://{authority}").to_ascii_lowercase()
+/// Whether two base URLs point at the same server: equal parsed origins
+/// (scheme, host and port, with default ports normalized), using the same URL
+/// parser as the HTTP client. A URL that doesn't parse, or has no host-based
+/// origin, never matches — so a stored key is dropped rather than risked.
+fn same_server(a: &str, b: &str) -> bool {
+    let origin = |url: &str| reqwest::Url::parse(url.trim()).ok().map(|u| u.origin());
+    match (origin(a), origin(b)) {
+        (Some(a), Some(b)) => a.is_tuple() && a == b,
+        _ => false,
+    }
 }
 
 /// The on-disk roster path (`$UNCAGED_CONNECTIONS` or
@@ -407,7 +410,8 @@ pub fn update(
                     url.to_string()
                 }
             };
-            if url_origin(&effective(&conn.base_url)) != url_origin(&effective(&base_url)) {
+            let base_url = base_url.trim().to_string();
+            if !same_server(&effective(&conn.base_url), &effective(&base_url)) {
                 conn.api_key = None;
             }
             conn.base_url = base_url;

@@ -169,9 +169,12 @@ const CONTENT_FONT_SIZE: f32 = 12.;
 const PRIMARY_HEADER_FONT_SIZE: f32 = 24.;
 
 /// How many per-row action buttons (Use / Edit) are pre-allocated for saved
-/// Uncaged connections. The pools grow past this whenever the roster does (see
-/// `ensure_uncaged_row_buttons`), so every row keeps its actions.
-const UNCAGED_INITIAL_CONN_ROWS: usize = 16;
+/// Uncaged connections, and how many spare ones `ensure_uncaged_row_buttons`
+/// keeps beyond the current roster. Render can't create views, so the spare
+/// buttons cover connections added elsewhere (another window, onboarding)
+/// while this page stays selected; the pools grow again on the next Connect
+/// or page selection.
+const UNCAGED_SPARE_CONN_ROWS: usize = 16;
 
 /// Leading brand-icon size for connection rows and gallery tiles (kept
 /// identical so the same provider mark never renders at two sizes on one page).
@@ -2348,7 +2351,7 @@ impl AISettingsPageView {
         is_use: bool,
         ctx: &mut ViewContext<Self>,
     ) -> Vec<ViewHandle<ActionButton>> {
-        (0..UNCAGED_INITIAL_CONN_ROWS)
+        (0..UNCAGED_SPARE_CONN_ROWS)
             .map(|index| Self::create_uncaged_row_button(is_use, index, ctx))
             .collect()
     }
@@ -2375,11 +2378,12 @@ impl AISettingsPageView {
     }
 
     /// Grow the per-row Use / Edit button pools to cover every saved
-    /// connection. Render can't create views, so call this whenever the roster
-    /// may have grown: after a Connect and when the page is shown (the roster
-    /// can also change from onboarding or by hand).
+    /// connection, plus `UNCAGED_SPARE_CONN_ROWS` spares. Render can't create
+    /// views, so call this whenever the roster may have grown: after a Connect
+    /// and when the page is shown (the roster can also change from onboarding,
+    /// another window, or by hand).
     fn ensure_uncaged_row_buttons(&mut self, ctx: &mut ViewContext<Self>) {
-        let needed = crate::uncaged::connections().len();
+        let needed = crate::uncaged::connections().len() + UNCAGED_SPARE_CONN_ROWS;
         for index in self.uncaged_use_buttons.len()..needed {
             let button = Self::create_uncaged_row_button(true, index, ctx);
             self.uncaged_use_buttons.push(button);
@@ -2450,11 +2454,14 @@ impl AISettingsPageView {
         // tell the modal it's a CLI so it hides the key and skips URL validation.
         let is_cli = conn.wire == "cli";
         // An HTTP connection is called by the local engine, not Warp's servers,
-        // so it gets the relaxed rules (http://, localhost, optional key).
+        // so it gets the relaxed rules (http://, localhost, private hosts). Its
+        // key is required only when the provider needs one and none is stored.
         let kind = if is_cli {
             EndpointKind::Cli
         } else {
-            EndpointKind::DirectApi
+            EndpointKind::DirectApi {
+                key_required: conn.needs_key && !conn.has_key,
+            }
         };
         let synthetic = ::ai::api_keys::CustomEndpoint {
             name: conn.label.clone(),
@@ -2515,12 +2522,37 @@ impl AISettingsPageView {
         // `Some("")` is the roster's "keep the stored key" sentinel (unused for CLI).
         let key = Some(api_key.to_string());
         let result =
-            crate::uncaged::update(id, name.to_string(), base_url, model, key, cli_command)
-                .and_then(|()| crate::uncaged::activate(id));
+            crate::uncaged::update(id, name.to_string(), base_url, model, key, cli_command);
         self.hide_custom_endpoint_modal(ctx);
-        match result {
-            Ok(()) => self.uncaged_toast("Model connected.".to_string(), ctx),
-            Err(err) => self.uncaged_toast(err, ctx),
+        if let Err(err) = result {
+            self.uncaged_toast(err, ctx);
+            ctx.notify();
+            return;
+        }
+        // Only switch to the connection once it can actually run: activating an
+        // unusable one would put the engine to sleep and stop whatever model is
+        // running now. (A saved key is dropped if the URL moved to another
+        // server, so this can still be "Needs key" after a Save.)
+        let saved = crate::uncaged::connections()
+            .into_iter()
+            .find(|c| c.id == id);
+        match saved {
+            Some(conn) if conn.usable => match crate::uncaged::activate(id) {
+                Ok(()) => self.uncaged_toast("Model connected.".to_string(), ctx),
+                Err(err) => self.uncaged_toast(err, ctx),
+            },
+            Some(conn) if conn.needs_key && !conn.has_key => self.uncaged_toast(
+                format!("Saved {}. Add an API key to use it.", conn.label),
+                ctx,
+            ),
+            Some(conn) => self.uncaged_toast(
+                format!(
+                    "Saved {}. Add its endpoint and model to use it.",
+                    conn.label
+                ),
+                ctx,
+            ),
+            None => {}
         }
         ctx.notify();
     }

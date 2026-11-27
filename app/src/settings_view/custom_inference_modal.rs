@@ -73,9 +73,12 @@ pub enum EndpointKind {
     Api,
     /// An Uncaged connection's HTTP endpoint. The local engine calls it from
     /// this machine, so plain `http://`, `localhost` and private hosts are
-    /// allowed (Ollama, LM Studio, vLLM, ...), and the API key is optional: a
-    /// blank key keeps the stored one, and keyless servers need none.
-    DirectApi,
+    /// allowed (Ollama, LM Studio, vLLM, ...). The API key is required only
+    /// when `key_required` — the provider needs one and none is stored;
+    /// otherwise a blank key keeps the stored one, and keyless servers need none.
+    DirectApi {
+        key_required: bool,
+    },
     Cli,
 }
 
@@ -84,7 +87,7 @@ impl EndpointKind {
     /// CLI command.
     fn is_http(self) -> bool {
         match self {
-            EndpointKind::Api | EndpointKind::DirectApi => true,
+            EndpointKind::Api | EndpointKind::DirectApi { .. } => true,
             EndpointKind::Cli => false,
         }
     }
@@ -93,7 +96,7 @@ impl EndpointKind {
     fn validate_url(self, url: &str) -> Result<(), &'static str> {
         match self {
             EndpointKind::Api => validate_url(url),
-            EndpointKind::DirectApi => validate_direct_url(url),
+            EndpointKind::DirectApi { .. } => validate_direct_url(url),
             EndpointKind::Cli => Ok(()),
         }
     }
@@ -388,7 +391,7 @@ impl CustomEndpointModal {
         self.kind = kind;
         let placeholder = match kind {
             EndpointKind::Api => "Please include 'https://'",
-            EndpointKind::DirectApi => {
+            EndpointKind::DirectApi { .. } => {
                 "e.g. http://localhost:11434/v1 or https://api.example.com/v1"
             }
             EndpointKind::Cli => "e.g. claude-code-acp --model opus",
@@ -462,6 +465,13 @@ impl CustomEndpointModal {
         }
         let name = self.endpoint_name_editor.as_ref(ctx).buffer_text(ctx);
         let url = self.endpoint_url_editor.as_ref(ctx).buffer_text(ctx);
+        // Save the URL that was validated: validation ignores surrounding
+        // whitespace, but a stored space would end up inside request paths.
+        let url = if self.kind.is_http() {
+            url.trim().to_string()
+        } else {
+            url
+        };
         let api_key = self.api_key_editor.as_ref(ctx).buffer_text(ctx);
         let models: Vec<(String, Option<String>, Option<String>)> = self
             .model_rows
@@ -537,7 +547,9 @@ impl CustomEndpointModal {
         });
         match self.kind {
             EndpointKind::Api => is_endpoint_form_valid(&name, &url, &api_key, has_models),
-            EndpointKind::DirectApi => is_direct_endpoint_form_valid(&name, &url, has_models),
+            EndpointKind::DirectApi { key_required } => {
+                is_direct_endpoint_form_valid(&name, &url, &api_key, key_required, has_models)
+            }
             // A CLI just needs a name + a command; the model is optional and it
             // has no key or URL to validate.
             EndpointKind::Cli => !name.trim().is_empty() && !url.trim().is_empty(),
@@ -601,7 +613,7 @@ impl CustomEndpointModal {
         // For a CLI the key field is hidden, so Tab/Enter jumps straight to the
         // first model row; validation is API-only (a command is not a URL).
         let after_url = |me: &Self, ctx: &mut ViewContext<Self>| match me.kind {
-            EndpointKind::Api | EndpointKind::DirectApi => ctx.focus(&me.api_key_editor),
+            EndpointKind::Api | EndpointKind::DirectApi { .. } => ctx.focus(&me.api_key_editor),
             EndpointKind::Cli => {
                 if let Some(first_row) = me.model_rows.first() {
                     ctx.focus(&first_row.name_editor);
@@ -746,7 +758,7 @@ impl View for CustomEndpointModal {
             EndpointKind::Api => {
                 "Provide the endpoint and model details. Paste your API key to finish connecting."
             }
-            EndpointKind::DirectApi => {
+            EndpointKind::DirectApi { .. } => {
                 "Provide the endpoint and model details. Local servers can use http://. Add an API key if your provider needs one."
             }
             EndpointKind::Cli => {
@@ -785,7 +797,7 @@ impl View for CustomEndpointModal {
 
         // Endpoint URL — relabeled "Command" for a CLI agent.
         let url_label = match self.kind {
-            EndpointKind::Api | EndpointKind::DirectApi => "API endpoint",
+            EndpointKind::Api | EndpointKind::DirectApi { .. } => "API endpoint",
             EndpointKind::Cli => "Command",
         };
         column.add_child(
@@ -816,8 +828,12 @@ impl View for CustomEndpointModal {
         // API key — a CLI agent uses its own login, so it has no key field.
         if self.kind.is_http() {
             let key_label = match self.kind {
-                EndpointKind::DirectApi => "API key (optional)",
-                EndpointKind::Api | EndpointKind::Cli => "API key",
+                EndpointKind::DirectApi {
+                    key_required: false,
+                } => "API key (optional)",
+                EndpointKind::DirectApi { key_required: true }
+                | EndpointKind::Api
+                | EndpointKind::Cli => "API key",
             };
             column.add_child(
                 Container::new(label(key_label))
@@ -1041,10 +1057,18 @@ fn validate_direct_url(url: &str) -> Result<(), &'static str> {
 }
 
 /// Form rules for an Uncaged HTTP connection: like [`is_endpoint_form_valid`]
-/// but with [`validate_direct_url`] and no required API key.
-fn is_direct_endpoint_form_valid(name: &str, url: &str, has_models: bool) -> bool {
+/// but with [`validate_direct_url`], and the API key required only when
+/// `key_required`.
+fn is_direct_endpoint_form_valid(
+    name: &str,
+    url: &str,
+    api_key: &str,
+    key_required: bool,
+    has_models: bool,
+) -> bool {
     !name.trim().is_empty()
         && !url.trim().is_empty()
+        && (!key_required || !api_key.trim().is_empty())
         && has_models
         && validate_direct_url(url).is_ok()
 }
