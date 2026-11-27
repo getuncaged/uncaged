@@ -730,10 +730,10 @@ pub struct AISettingsPageView {
     uncaged_use_buttons: Vec<ViewHandle<ActionButton>>,
     uncaged_edit_buttons: Vec<ViewHandle<ActionButton>>,
     pending_uncaged_connection_id: Option<String>,
-    // The preset of the connection being edited, when the editor was opened on
-    // an untouched draft. Saving then claims the draft again, so two editors
-    // handed the same draft (two windows) save to separate rows.
-    pending_uncaged_draft_preset: Option<String>,
+    // Set when the editor was opened on an untouched draft. Saving then claims
+    // the draft again, so two editors handed the same draft (two windows) save
+    // to separate rows, and Remove never deletes a row another window saved.
+    pending_uncaged_draft: Option<PendingUncagedDraft>,
 
     // Prompt offering to switch the default Agent Mode model after a BYO key or
     // custom endpoint is saved while the default isn't backed by a credential.
@@ -2019,7 +2019,7 @@ impl AISettingsPageView {
             uncaged_use_buttons,
             uncaged_edit_buttons,
             pending_uncaged_connection_id: None,
-            pending_uncaged_draft_preset: None,
+            pending_uncaged_draft: None,
             set_default_model_modal,
             last_seen_provider_keys,
             #[cfg(not(target_family = "wasm"))]
@@ -2454,8 +2454,11 @@ impl AISettingsPageView {
         ctx: &mut ViewContext<Self>,
     ) {
         self.pending_uncaged_connection_id = Some(conn.id.clone());
-        self.pending_uncaged_draft_preset =
-            crate::uncaged::is_draft(&conn.id).then(|| conn.preset.clone());
+        self.pending_uncaged_draft =
+            crate::uncaged::is_draft(&conn.id).then(|| PendingUncagedDraft {
+                preset: conn.preset.clone(),
+                opened_label: conn.label.clone(),
+            });
         // A CLI agent has no URL/key — its lever is the command line, so put the
         // command into the field the modal shows (relabeled "Command" below) and
         // tell the modal it's a CLI so it hides the key and skips URL validation.
@@ -2513,16 +2516,30 @@ impl AISettingsPageView {
         // If the editor was opened on a draft, something else (another window's
         // editor) may have configured that row since. Claim it again: that
         // returns a fresh row in that case, so this save doesn't overwrite it.
-        let id = match self.pending_uncaged_draft_preset.clone() {
-            Some(preset) => match crate::uncaged::claim_draft(id, &preset) {
-                Ok(claimed) => claimed,
+        let (id, name) = match self.pending_uncaged_draft.clone() {
+            Some(draft) => match crate::uncaged::claim_draft(id, &draft.preset) {
+                Ok(claimed) => {
+                    // A name left at the prefilled default means "keep the row's
+                    // label": a fresh row already has its own unique default
+                    // ("… 2"), which the stale prefill must not overwrite.
+                    let name = if name.trim() == draft.opened_label.trim() {
+                        crate::uncaged::connections()
+                            .into_iter()
+                            .find(|c| c.id == claimed)
+                            .map(|c| c.label)
+                            .unwrap_or_else(|| name.to_string())
+                    } else {
+                        name.to_string()
+                    };
+                    (claimed, name)
+                }
                 Err(err) => {
                     self.uncaged_toast(err, ctx);
                     ctx.notify();
                     return;
                 }
             },
-            None => id.to_string(),
+            None => (id.to_string(), name.to_string()),
         };
         let id = id.as_str();
         // Keep later saves from this editor (after an error below) on that row.
@@ -2545,13 +2562,20 @@ impl AISettingsPageView {
         };
         // `Some("")` is the roster's "keep the stored key" sentinel (unused for CLI).
         let key = Some(api_key.to_string());
-        let result =
-            crate::uncaged::update(id, name.to_string(), base_url, model, key, cli_command);
-        // On an error nothing was saved: keep the editor open so the user can fix
-        // it (e.g. enter the key for a new server) instead of losing their input.
+        let result = crate::uncaged::update(id, name, base_url, model, key, cli_command);
+        // On an error keep the editor open so the user can fix it (e.g. enter the
+        // key for a new server) instead of losing their input.
         let key_cleared = match result {
             Ok(key_cleared) => key_cleared,
             Err(err) => {
+                // The roster write may have landed before a later step failed
+                // (e.g. engine.json is read-only). Then the row is no longer a
+                // draft and is this editor's own: a retry must update it rather
+                // than claim yet another row. (Single UI thread: nothing else can
+                // have touched it since the update above.)
+                if self.pending_uncaged_draft.is_some() && !crate::uncaged::is_draft(id) {
+                    self.pending_uncaged_draft = None;
+                }
                 self.uncaged_toast(err, ctx);
                 ctx.notify();
                 return;
@@ -2593,6 +2617,18 @@ impl AISettingsPageView {
 
     /// Remove the pending roster connection (from the editor's Remove button).
     fn remove_uncaged_connection(&mut self, id: &str, ctx: &mut ViewContext<Self>) {
+        // An editor opened on a draft can be stale: another window may have saved
+        // this row since. Only ever remove the blank draft this editor was given,
+        // never a connection someone else set up.
+        if self.pending_uncaged_draft.is_some() && !crate::uncaged::is_draft(id) {
+            self.hide_custom_endpoint_modal(ctx);
+            self.uncaged_toast(
+                "Nothing was removed: this connection was set up in another window.".to_string(),
+                ctx,
+            );
+            ctx.notify();
+            return;
+        }
         let result = crate::uncaged::remove(id);
         self.hide_custom_endpoint_modal(ctx);
         match result {
@@ -2665,7 +2701,7 @@ impl AISettingsPageView {
     fn hide_custom_endpoint_modal(&mut self, ctx: &mut ViewContext<Self>) {
         // Closing the modal ends any in-progress Uncaged connection edit.
         self.pending_uncaged_connection_id = None;
-        self.pending_uncaged_draft_preset = None;
+        self.pending_uncaged_draft = None;
         self.custom_endpoint_modal_state.close(ctx);
         ctx.emit(AISettingsPageEvent::HideModal);
         ctx.notify();
@@ -8583,6 +8619,16 @@ impl SettingsWidget for CloudHandoffWidget {
 /// (one active, powering Agent Mode) plus a grouped gallery of every platform
 /// you can connect — a local agent CLI, an on-device model, or an API key.
 /// This is the always-visible face of the local bring-your-own-model engine.
+/// An Uncaged connection editor that was opened on an untouched draft (see
+/// `AISettingsPageView::pending_uncaged_draft`).
+#[derive(Clone, Debug)]
+struct PendingUncagedDraft {
+    /// The draft's preset, for claiming a fresh row if the draft was taken.
+    preset: String,
+    /// The label the editor's name field was prefilled with.
+    opened_label: String,
+}
+
 struct ConnectModelWidget;
 
 impl ConnectModelWidget {
