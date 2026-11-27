@@ -48,6 +48,7 @@ pub use catalog::Group;
 pub use catalog::PRESETS;
 pub use catalog::Preset;
 pub use catalog::Wire;
+pub use catalog::allows_multiple as preset_allows_multiple;
 pub use catalog::preset_by_id;
 pub use catalog::presets_in;
 pub use config::ANTHROPIC_DEFAULT_BASE_URL;

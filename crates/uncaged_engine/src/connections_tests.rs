@@ -301,7 +301,8 @@ fn connect_or_focus_never_duplicates() {
     assert_eq!(r.active_id.as_deref(), Some(id1.as_str()));
 
     // `custom` is exempt — each custom endpoint is a distinct connection.
-    connections::connect_or_focus("custom").unwrap();
+    let custom1 = connections::connect_or_focus("custom").unwrap();
+    configure_custom(&custom1, "http://localhost:8000/v1", "model-a");
     connections::connect_or_focus("custom").unwrap();
     let r = connections::load();
     assert_eq!(
@@ -312,6 +313,104 @@ fn connect_or_focus_never_duplicates() {
         2,
         "custom presets are allowed to repeat"
     );
+}
+
+/// Give a custom connection the URL + model it needs to be usable, keeping the
+/// label it was created with.
+fn configure_custom(id: &str, base_url: &str, model: &str) {
+    let label = connections::load()
+        .connections
+        .into_iter()
+        .find(|c| c.id == id)
+        .unwrap()
+        .label;
+    connections::update(
+        id,
+        label,
+        base_url.to_string(),
+        model.to_string(),
+        None,
+        Vec::new(),
+    )
+    .unwrap();
+}
+
+#[test]
+fn only_custom_preset_allows_multiple_connections() {
+    assert!(crate::catalog::allows_multiple("custom"));
+    for preset in crate::catalog::PRESETS.iter().filter(|p| p.id != "custom") {
+        assert!(
+            !crate::catalog::allows_multiple(preset.id),
+            "{} should stay one-connection-per-preset",
+            preset.id
+        );
+    }
+}
+
+#[test]
+fn multiple_custom_connections_are_distinct_and_keep_the_active_one() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    let first = connections::connect_or_focus("custom").unwrap();
+    configure_custom(&first, "http://localhost:8000/v1", "model-a");
+    connections::set_active(&first).unwrap();
+
+    let second = connections::connect_or_focus("custom").unwrap();
+    assert_ne!(first, second, "a second custom connection was added");
+    configure_custom(&second, "https://proxy.example.com/v1", "model-b");
+
+    let third = connections::connect_or_focus("custom").unwrap();
+    assert_ne!(third, first);
+    assert_ne!(third, second);
+
+    let r = connections::load_or_seed();
+    let customs: Vec<_> = r
+        .connections
+        .iter()
+        .filter(|c| c.preset == "custom")
+        .collect();
+    assert_eq!(
+        customs.len(),
+        3,
+        "custom connections survive the dedupe pass"
+    );
+
+    let labels: std::collections::HashSet<&str> =
+        customs.iter().map(|c| c.label.as_str()).collect();
+    assert_eq!(
+        labels.len(),
+        3,
+        "each custom connection gets a distinct label"
+    );
+    assert_eq!(customs[0].label, "Custom (OpenAI-compatible)");
+    assert_eq!(customs[1].label, "Custom (OpenAI-compatible) 2");
+
+    // Adding more custom endpoints never steals the active connection, and the
+    // engine keeps running against it.
+    assert_eq!(r.active_id.as_deref(), Some(first.as_str()));
+    match config::read_persisted().unwrap().provider {
+        ProviderConfig::OpenAiCompatible {
+            base_url, model, ..
+        } => {
+            assert_eq!(base_url, "http://localhost:8000/v1");
+            assert_eq!(model, "model-a");
+        }
+        other => panic!("expected the first custom endpoint, got {other:?}"),
+    }
+}
+
+#[test]
+fn connecting_custom_reuses_an_unfinished_custom_connection() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    // Clicking Connect and dismissing the editor leaves a blank custom row;
+    // clicking Connect again should resume it rather than add another.
+    let blank = connections::connect_or_focus("custom").unwrap();
+    let again = connections::connect_or_focus("custom").unwrap();
+    assert_eq!(blank, again, "the unfinished custom connection was reused");
+    assert_eq!(connections::load().connections.len(), 1);
 }
 
 #[test]

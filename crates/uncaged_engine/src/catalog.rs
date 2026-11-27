@@ -348,12 +348,23 @@ pub const PRESETS: &[Preset] = &[
     },
 ];
 
+/// The id of the "any OpenAI-compatible server" escape-hatch preset.
+pub const CUSTOM_PRESET_ID: &str = "custom";
+
 /// Look a preset up by id, falling back to the `custom` escape hatch.
 pub fn preset_by_id(id: &str) -> &'static Preset {
     PRESETS
         .iter()
         .find(|p| p.id == id)
-        .unwrap_or_else(|| PRESETS.iter().find(|p| p.id == "custom").unwrap())
+        .unwrap_or_else(|| PRESETS.iter().find(|p| p.id == CUSTOM_PRESET_ID).unwrap())
+}
+
+/// Whether a preset may back more than one saved connection. Named platforms
+/// are one-connection-per-preset (connecting one again focuses the existing
+/// connection), but `custom` is a template: each custom endpoint is a distinct
+/// server, so the gallery keeps offering to add another.
+pub fn allows_multiple(preset_id: &str) -> bool {
+    preset_id == CUSTOM_PRESET_ID
 }
 
 /// All presets belonging to a gallery section, in catalog order.

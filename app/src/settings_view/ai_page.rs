@@ -8693,8 +8693,13 @@ impl ConnectModelWidget {
                     .map(|b| b.as_ref(app).render(app));
                 preset_idx += 1;
 
-                let is_active = active_preset == Some(preset.id.as_str());
-                let is_connected = connected.contains(preset.id.as_str());
+                // A preset that allows multiple connections (custom endpoints)
+                // keeps offering Connect so another one can be added; the
+                // roster above shows which of them is in use.
+                let is_active =
+                    !preset.allows_multiple && active_preset == Some(preset.id.as_str());
+                let is_connected =
+                    !preset.allows_multiple && connected.contains(preset.id.as_str());
 
                 // Title only — the section header already states the pill copy
                 // ("Your login"/"On-device"/"API key"); the right slot carries state.

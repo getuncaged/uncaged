@@ -191,10 +191,25 @@ impl Roster {
         self.connections.iter().find(|c| c.preset == preset_id)
     }
 
+    /// A unique default label for a new connection seeded from `base`, so
+    /// repeated presets (e.g. several custom endpoints) stay distinguishable:
+    /// "Custom", "Custom 2", "Custom 3", ...
+    fn unique_label(&self, base: &str) -> String {
+        let taken = |label: &str| self.connections.iter().any(|c| c.label == label);
+        if !taken(base) {
+            return base.to_string();
+        }
+        (2..)
+            .map(|n| format!("{base} {n}"))
+            .find(|candidate| !taken(candidate))
+            .unwrap_or_else(|| base.to_string())
+    }
+
     /// Collapse duplicate connections that share a preset — the active one wins,
-    /// else the first seen — preserving order and `active_id`. `custom` is exempt
-    /// (multiple distinct custom endpoints are legitimate). Returns whether any
-    /// duplicate was removed. This repairs rosters dirtied before the
+    /// else the first seen — preserving order and `active_id`. Presets that
+    /// [allow multiple](catalog::allows_multiple) connections (`custom`) are
+    /// exempt: multiple distinct custom endpoints are legitimate. Returns
+    /// whether any duplicate was removed. This repairs rosters dirtied before the
     /// one-connection-per-preset rule existed.
     fn dedupe_by_preset(&mut self) -> bool {
         use std::collections::HashMap;
@@ -202,7 +217,7 @@ impl Roster {
         // Decide which id to keep for each non-custom preset (active wins).
         let mut keep: HashMap<String, String> = HashMap::new();
         for c in &self.connections {
-            if c.preset == "custom" {
+            if catalog::allows_multiple(&c.preset) {
                 continue;
             }
             let is_active = active.as_deref() == Some(c.id.as_str());
@@ -212,7 +227,8 @@ impl Roster {
         }
         let before = self.connections.len();
         self.connections.retain(|c| {
-            c.preset == "custom" || keep.get(&c.preset).map(String::as_str) == Some(c.id.as_str())
+            catalog::allows_multiple(&c.preset)
+                || keep.get(&c.preset).map(String::as_str) == Some(c.id.as_str())
         });
         // Defensive: if the active id was somehow dropped, repoint to a survivor.
         if let Some(a) = &active {
@@ -295,7 +311,8 @@ pub fn add(preset_id: &str) -> anyhow::Result<String> {
     let preset = catalog::preset_by_id(preset_id);
     let mut roster = load_or_seed();
     let id = roster.unique_id(preset.id);
-    let conn = Connection::from_preset(preset, id.clone());
+    let mut conn = Connection::from_preset(preset, id.clone());
+    conn.label = roster.unique_label(&conn.label);
     let first = roster.connections.is_empty();
     roster.connections.push(conn);
     if first {
@@ -308,16 +325,27 @@ pub fn add(preset_id: &str) -> anyhow::Result<String> {
 
 /// Connect a preset, but never create a duplicate: if a connection for that
 /// preset already exists, make it active and return its id instead of adding a
-/// second row. `custom` is exempt (each custom endpoint is distinct), so it
-/// always adds. This is what the "Connect" buttons call, so re-clicking an
+/// second row. This is what the "Connect" buttons call, so re-clicking an
 /// already-connected preset simply switches to it.
+///
+/// Presets that [allow multiple](catalog::allows_multiple) connections
+/// (`custom`) add a new connection each time — except that an existing one
+/// that isn't configured yet is returned (without activating it) so the caller
+/// can finish setting it up, rather than piling up blank rows when the editor
+/// is dismissed and Connect is clicked again.
 pub fn connect_or_focus(preset_id: &str) -> anyhow::Result<String> {
-    if preset_id != "custom" {
-        let roster = load_or_seed();
-        if let Some(existing) = roster.find_by_preset(preset_id).map(|c| c.id.clone()) {
-            set_active(&existing)?;
-            return Ok(existing);
+    let roster = load_or_seed();
+    if catalog::allows_multiple(preset_id) {
+        if let Some(unfinished) = roster
+            .connections
+            .iter()
+            .find(|c| c.preset == preset_id && !c.usable())
+        {
+            return Ok(unfinished.id.clone());
         }
+    } else if let Some(existing) = roster.find_by_preset(preset_id).map(|c| c.id.clone()) {
+        set_active(&existing)?;
+        return Ok(existing);
     }
     add(preset_id)
 }

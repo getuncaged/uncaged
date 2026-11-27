@@ -23,6 +23,9 @@ pub struct PresetView {
     pub local: bool,
     pub key_url: String,
     pub note: Option<String>,
+    /// Whether this preset can back several saved connections (custom
+    /// endpoints), so the gallery keeps offering "Connect" once one exists.
+    pub allows_multiple: bool,
 }
 
 /// A gallery section grouping presets that connect the same way.
@@ -164,6 +167,7 @@ mod imp {
             local: p.local,
             key_url: p.key_url.to_string(),
             note: p.note.map(str::to_string),
+            allows_multiple: uncaged_engine::preset_allows_multiple(p.id),
         }
     }
 
