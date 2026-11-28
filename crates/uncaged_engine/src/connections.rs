@@ -329,11 +329,21 @@ pub fn load() -> Roster {
 /// anyone who couldn't read the roster, and a first roster is owner-only. A
 /// symlinked roster is written through to its target (the link is kept). A
 /// hard-linked roster is split: the other name keeps the previous contents.
+///
+/// Like an in-place write, it refuses to replace a roster it couldn't write to
+/// (read-only, or no permission). That roster may also be unreadable, in which
+/// case the caller has an empty or reseeded copy that would erase it.
 fn write(roster: &Roster) -> anyhow::Result<()> {
     let json = serde_json::to_string_pretty(roster)?;
     let path = write_target(roster_path(), 0)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
+    }
+    // Opening for writing (no create, no truncate) changes nothing on disk.
+    match std::fs::OpenOptions::new().write(true).open(&path) {
+        Ok(_) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(err.into()),
     }
     let (tmp, file) = create_staging_file(&path)?;
     // From here the staging file is this call's own, so it's removed on failure.

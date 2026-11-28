@@ -1237,3 +1237,37 @@ fn saving_keeps_the_roster_group_with_its_mode() {
     assert_eq!(meta.gid(), other_gid);
     assert_eq!(meta.permissions().mode() & 0o777, 0o640);
 }
+
+#[cfg(unix)]
+#[test]
+fn an_unreadable_roster_is_never_replaced() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    // Two connections, one of them active (and runnable, so it's projected
+    // into engine.json).
+    let active = connections::add("lmstudio").unwrap();
+    connections::claim_for_preset("custom").unwrap();
+    let roster_path = connections::roster_path();
+    let before = std::fs::read(&roster_path).unwrap();
+
+    // The roster can't be read or written. Skip where that isn't enforced
+    // (running as root).
+    std::fs::set_permissions(&roster_path, std::fs::Permissions::from_mode(0o000)).unwrap();
+    if std::fs::read(&roster_path).is_ok() {
+        std::fs::set_permissions(&roster_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        return;
+    }
+
+    // Reading falls back to a copy seeded from engine.json, and a save onto
+    // it fails instead of replacing the roster with that copy.
+    let seeded = connections::load_or_seed();
+    assert_eq!(seeded.connections.len(), 1);
+    assert!(connections::claim_for_preset("custom").is_err());
+    assert!(connections::set_active(&active).is_err());
+
+    std::fs::set_permissions(&roster_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(std::fs::read(&roster_path).unwrap(), before);
+}
