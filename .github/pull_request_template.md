@@ -5,7 +5,6 @@
 <!--
 Link the GitHub issue this PR addresses. Before opening this PR, please confirm:
 -->
-- [ ] The linked issue is labeled `ready-to-spec` or `ready-to-implement`.
 - [ ] Where appropriate, screenshots or a short video of the implementation are included below (especially for user-visible or UI changes).
 
 ## Testing
