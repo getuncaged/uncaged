@@ -464,3 +464,761 @@ fn message_with(message: api::message::Message) -> api::Message {
         ..Default::default()
     }
 }
+
+// ---- tool calls and their results (#43) ----
+
+/// A history `ToolCall` message running `command`.
+fn shell_call(id: &str, command: &str) -> api::Message {
+    message_with(api::message::Message::ToolCall(api::message::ToolCall {
+        tool_call_id: id.into(),
+        tool: Some(api::message::tool_call::Tool::RunShellCommand(
+            api::message::tool_call::RunShellCommand {
+                command: command.into(),
+                ..Default::default()
+            },
+        )),
+    }))
+}
+
+fn user_query(text: &str) -> api::Message {
+    message_with(api::message::Message::UserQuery(api::message::UserQuery {
+        query: text.into(),
+        ..Default::default()
+    }))
+}
+
+fn agent_text(text: &str) -> api::Message {
+    message_with(api::message::Message::AgentOutput(
+        api::message::AgentOutput { text: text.into() },
+    ))
+}
+
+/// A request continuing `history` with a new typed `query`.
+fn follow_up_request(history: Vec<api::Message>, query: &str) -> api::Request {
+    api::Request {
+        task_context: Some(api::request::TaskContext {
+            tasks: vec![api::Task {
+                id: "task-1".into(),
+                messages: history,
+                ..Default::default()
+            }],
+        }),
+        input: Some(api::request::Input {
+            r#type: Some(api::request::input::Type::UserInputs(
+                api::request::input::UserInputs {
+                    inputs: vec![api::request::input::user_inputs::UserInput {
+                        input: Some(
+                            api::request::input::user_inputs::user_input::Input::UserQuery(
+                                api::request::input::UserQuery {
+                                    query: query.into(),
+                                    ..Default::default()
+                                },
+                            ),
+                        ),
+                    }],
+                },
+            )),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+/// The rule OpenAI-compatible and Anthropic backends enforce: every tool call
+/// is immediately followed by a result for it, and every result answers a tool
+/// call in the assistant turn right before it.
+fn assert_tool_calls_answered(messages: &[NeutralMsg]) {
+    for (i, message) in messages.iter().enumerate() {
+        match message {
+            NeutralMsg::Assistant { tool_uses, .. } if !tool_uses.is_empty() => {
+                let Some(NeutralMsg::ToolResults(results)) = messages.get(i + 1) else {
+                    panic!("tool calls at {i} aren't followed by results: {messages:#?}");
+                };
+                for call in tool_uses {
+                    assert!(
+                        results.iter().any(|r| r.id == call.id),
+                        "tool call {} has no result: {messages:#?}",
+                        call.id
+                    );
+                }
+            }
+            NeutralMsg::ToolResults(results) => {
+                let Some(NeutralMsg::Assistant { tool_uses, .. }) =
+                    i.checked_sub(1).and_then(|p| messages.get(p))
+                else {
+                    panic!("tool results at {i} don't follow tool calls: {messages:#?}");
+                };
+                for result in results {
+                    assert!(
+                        tool_uses.iter().any(|c| c.id == result.id),
+                        "result {} answers no tool call: {messages:#?}",
+                        result.id
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+#[test]
+fn a_tool_call_whose_result_was_never_recorded_still_gets_one() {
+    // The conversation from #43: an earlier round ran a shell command, but its
+    // result never made it into the task, then the model replied and the user
+    // asked something else.
+    let request = follow_up_request(
+        vec![
+            user_query("list files"),
+            shell_call("run_shell_command:1", "ls"),
+            agent_text("There are two files."),
+            user_query("now count the lines"),
+        ],
+        "now count the lines",
+    );
+
+    let parsed = request_parse::parse(&request);
+    assert_tool_calls_answered(&parsed.messages);
+}
+
+/// The result of running `ls`, as the client sends it in `input`.
+fn shell_result(id: &str, output: &str) -> api::request::input::ToolCallResult {
+    api::request::input::ToolCallResult {
+        tool_call_id: id.into(),
+        result: Some(
+            api::request::input::tool_call_result::Result::RunShellCommand(
+                api::RunShellCommandResult {
+                    command: "ls".into(),
+                    result: Some(api::run_shell_command_result::Result::CommandFinished(
+                        api::ShellCommandFinished {
+                            output: output.into(),
+                            exit_code: 0,
+                            ..Default::default()
+                        },
+                    )),
+                    ..Default::default()
+                },
+            ),
+        ),
+    }
+}
+
+/// A request sending `results` for tool calls in `history`.
+fn tool_results_request(
+    history: Vec<api::Message>,
+    results: Vec<api::request::input::ToolCallResult>,
+) -> api::Request {
+    let inputs = results
+        .into_iter()
+        .map(|result| api::request::input::user_inputs::UserInput {
+            input: Some(
+                api::request::input::user_inputs::user_input::Input::ToolCallResult(result),
+            ),
+        })
+        .collect();
+    let mut request = follow_up_request(history, "");
+    request.input = Some(api::request::Input {
+        r#type: Some(api::request::input::Type::UserInputs(
+            api::request::input::UserInputs { inputs },
+        )),
+        ..Default::default()
+    });
+    request
+}
+
+#[test]
+fn a_missing_result_gets_a_placeholder_and_stray_results_are_dropped() {
+    use crate::model::MISSING_TOOL_RESULT;
+    use crate::model::ToolResult;
+    use crate::model::ToolUse;
+    use crate::model::answer_tool_calls;
+
+    let call = |id: &str| ToolUse {
+        id: id.into(),
+        name: "run_shell_command".into(),
+        input: json!({}),
+    };
+    let result = |id: &str| ToolResult {
+        id: id.into(),
+        content: format!("output of {id}"),
+        is_error: false,
+    };
+    let messages = answer_tool_calls(vec![
+        NeutralMsg::User("go".into()),
+        // Two calls; only the second has a result, plus one that answers
+        // nothing.
+        NeutralMsg::Assistant {
+            text: None,
+            tool_uses: vec![call("a"), call("b")],
+        },
+        NeutralMsg::ToolResults(vec![result("stray"), result("b")]),
+        // A result with no tool call before it at all.
+        NeutralMsg::ToolResults(vec![result("orphan")]),
+        NeutralMsg::User("next".into()),
+    ]);
+    assert_tool_calls_answered(&messages);
+    assert_eq!(messages.len(), 4);
+    let NeutralMsg::ToolResults(results) = &messages[2] else {
+        panic!("expected tool results: {messages:#?}");
+    };
+    // In call order: a placeholder for `a`, then `b`'s real result.
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].id, "a");
+    assert_eq!(results[0].content, MISSING_TOOL_RESULT);
+    assert!(results[0].is_error);
+    assert_eq!(results[1].id, "b");
+    assert_eq!(results[1].content, "output of b");
+}
+
+#[test]
+fn a_new_tool_result_is_reported_for_recording_once() {
+    let history = vec![user_query("list files"), shell_call("tc-1", "ls")];
+
+    // Fresh from the client: not in the history yet, so it's reported.
+    let parsed = request_parse::parse(&tool_results_request(
+        history.clone(),
+        vec![shell_result("tc-1", "a.txt")],
+    ));
+    assert_eq!(parsed.new_tool_results.len(), 1);
+    assert_eq!(parsed.new_tool_results[0].tool_call_id, "tc-1");
+
+    // Already in the history (recorded by an earlier turn): not reported again.
+    let mut recorded = history;
+    recorded.push(wire::tool_call_result_message(
+        "m-1",
+        &shell_result("tc-1", "a.txt"),
+    ));
+    let parsed = request_parse::parse(&tool_results_request(
+        recorded,
+        vec![shell_result("tc-1", "a.txt")],
+    ));
+    assert!(parsed.new_tool_results.is_empty());
+    assert_tool_calls_answered(&parsed.messages);
+}
+
+#[test]
+fn a_recorded_tool_result_reads_back_the_same() {
+    let input = shell_result("tc-1", "a.txt");
+    let message = wire::tool_call_result_message("m-1", &input);
+    let Some(api::message::Message::ToolCallResult(recorded)) = &message.message else {
+        panic!("expected a tool call result message: {message:?}");
+    };
+    let read_back = decode_history_result(recorded);
+    let original = crate::tools::decode_input_result(&input);
+    assert_eq!(message.id, "m-1");
+    assert_eq!(read_back.id, original.id);
+    assert_eq!(read_back.content, original.content);
+    assert_eq!(read_back.is_error, original.is_error);
+}
+
+/// A provider that streams `reply` and keeps what it was sent.
+struct FakeProvider {
+    sent: std::sync::Arc<std::sync::Mutex<Option<crate::model::Conversation>>>,
+    reply: Vec<crate::providers::ProviderEvent>,
+}
+
+impl crate::providers::Provider for FakeProvider {
+    fn stream(
+        &self,
+        conversation: crate::model::Conversation,
+    ) -> futures::stream::BoxStream<'static, crate::providers::ProviderEvent> {
+        use futures::StreamExt as _;
+        *self.sent.lock().unwrap() = Some(conversation);
+        futures::stream::iter(self.reply.clone()).boxed()
+    }
+}
+
+/// A model reply of just "Done.".
+fn says_done() -> Vec<crate::providers::ProviderEvent> {
+    vec![
+        crate::providers::ProviderEvent::TextDelta("Done.".into()),
+        crate::providers::ProviderEvent::Done,
+    ]
+}
+
+/// Run one turn of `request` against a [`FakeProvider`] that streams `reply`:
+/// the client actions the engine sent, in order, and the conversation the
+/// provider got.
+async fn run_fake_turn(
+    request: &api::Request,
+    reply: Vec<crate::providers::ProviderEvent>,
+) -> (Vec<api::client_action::Action>, crate::model::Conversation) {
+    use futures::StreamExt as _;
+    let sent = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let provider = FakeProvider {
+        sent: sent.clone(),
+        reply,
+    };
+    let events: Vec<_> = crate::engine::run_turn_with(request, |_| Box::new(provider))
+        .collect()
+        .await;
+    let actions = events
+        .into_iter()
+        .filter_map(|event| match event.unwrap().r#type {
+            Some(api::response_event::Type::ClientActions(actions)) => Some(actions.actions),
+            _ => None,
+        })
+        .flatten()
+        .filter_map(|action| action.action)
+        .collect();
+    let conversation = sent
+        .lock()
+        .unwrap()
+        .take()
+        .expect("the provider was called");
+    (actions, conversation)
+}
+
+#[tokio::test]
+async fn a_turn_records_its_tool_results_before_the_reply() {
+    let history = vec![user_query("list files"), shell_call("tc-1", "ls")];
+    let request = tool_results_request(history.clone(), vec![shell_result("tc-1", "a.txt")]);
+
+    let (actions, conversation) = run_fake_turn(&request, says_done()).await;
+    assert_tool_calls_answered(&conversation.messages);
+
+    // The result is added to the task first, then the reply.
+    let added: Vec<_> = actions
+        .iter()
+        .filter_map(|action| match action {
+            api::client_action::Action::AddMessagesToTask(add) => Some(add),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(added.len(), 2, "{actions:#?}");
+    assert_eq!(added[0].task_id, "task-1");
+    let recorded = &added[0].messages[0];
+    let Some(api::message::Message::ToolCallResult(result)) = &recorded.message else {
+        panic!("expected the tool result first: {actions:#?}");
+    };
+    assert_eq!(result.tool_call_id, "tc-1");
+    assert!(matches!(
+        added[1].messages[0].message,
+        Some(api::message::Message::AgentOutput(_))
+    ));
+
+    // The client applies those actions to the task; the next request then
+    // replays the call with its real result, not a placeholder.
+    let mut next = history;
+    next.push(recorded.clone());
+    next.push(added[1].messages[0].clone());
+    next.push(user_query("now count them"));
+    let (_, conversation) =
+        run_fake_turn(&follow_up_request(next, "now count them"), says_done()).await;
+    assert_tool_calls_answered(&conversation.messages);
+    let results: Vec<_> = conversation
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            NeutralMsg::ToolResults(results) => Some(results),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert_eq!(results.len(), 1);
+    assert!(results[0].content.contains("a.txt"), "{results:#?}");
+}
+
+/// The output of every tool result the provider was sent.
+fn result_contents(conversation: &crate::model::Conversation) -> Vec<&str> {
+    conversation
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            NeutralMsg::ToolResults(results) => Some(results),
+            NeutralMsg::User(_) | NeutralMsg::Assistant { .. } => None,
+        })
+        .flatten()
+        .map(|r| r.content.as_str())
+        .collect()
+}
+
+#[tokio::test]
+async fn a_reused_tool_call_id_is_replaced_so_both_results_survive() {
+    use crate::providers::ProviderEvent;
+
+    // Round 1 ran `run_shell_command:1` and recorded its result.
+    let mut history = vec![
+        user_query("list files"),
+        shell_call("run_shell_command:1", "ls"),
+        wire::tool_call_result_message("m-1", &shell_result("run_shell_command:1", "a.txt")),
+        agent_text("There is one file."),
+    ];
+
+    // Round 2: a backend that numbers calls per response reuses that id, next
+    // to a call with a fresh one.
+    let reply = vec![
+        ProviderEvent::ToolCall {
+            id: "run_shell_command:1".into(),
+            name: "run_shell_command".into(),
+            input: json!({ "command": "ls -a" }),
+        },
+        ProviderEvent::ToolCall {
+            id: "call-fresh".into(),
+            name: "run_shell_command".into(),
+            input: json!({ "command": "pwd" }),
+        },
+        ProviderEvent::Done,
+    ];
+    let (actions, _) = run_fake_turn(
+        &follow_up_request(history.clone(), "and hidden ones?"),
+        reply,
+    )
+    .await;
+    let calls: Vec<_> = actions
+        .iter()
+        .filter_map(|action| match action {
+            api::client_action::Action::AddMessagesToTask(add) => Some(add.messages.clone()),
+            _ => None,
+        })
+        .flatten()
+        .filter(|m| matches!(m.message, Some(api::message::Message::ToolCall(_))))
+        .collect();
+    let ids: Vec<_> = calls
+        .iter()
+        .map(|m| match &m.message {
+            Some(api::message::Message::ToolCall(tc)) => tc.tool_call_id.clone(),
+            other => panic!("expected a tool call: {other:?}"),
+        })
+        .collect();
+    assert_eq!(ids.len(), 2, "{actions:#?}");
+    assert!(!ids[0].is_empty());
+    assert_ne!(
+        ids[0], "run_shell_command:1",
+        "a reused id must be replaced"
+    );
+    assert_eq!(ids[1], "call-fresh", "an unused id is kept");
+
+    // The client runs the calls and sends their results under the new ids.
+    history.push(user_query("and hidden ones?"));
+    history.extend(calls);
+    let request = tool_results_request(
+        history,
+        vec![
+            shell_result(&ids[0], ".hidden"),
+            shell_result(&ids[1], "/home"),
+        ],
+    );
+    let parsed = request_parse::parse(&request);
+    assert_eq!(
+        parsed.new_tool_results.len(),
+        2,
+        "both results are recorded"
+    );
+
+    let (_, conversation) = run_fake_turn(&request, says_done()).await;
+    assert_tool_calls_answered(&conversation.messages);
+    let contents = result_contents(&conversation);
+    assert_eq!(contents.len(), 3, "{contents:#?}");
+    assert!(contents[0].contains("a.txt"), "{contents:#?}");
+    assert!(contents[1].contains(".hidden"), "{contents:#?}");
+    assert!(contents[2].contains("/home"), "{contents:#?}");
+}
+
+#[tokio::test]
+async fn a_result_sent_with_an_attachment_stays_with_its_call() {
+    // The user types a query with a selection attached while a tool result is
+    // pending; the client sends the result and the query together.
+    let history = vec![user_query("list files"), shell_call("tc-1", "ls")];
+    let mut request = tool_results_request(history, vec![shell_result("tc-1", "a.txt")]);
+    let input = request.input.as_mut().unwrap();
+    input.context = Some(api::InputContext {
+        selected_text: vec![api::input_context::SelectedText {
+            text: "notes.md".into(),
+        }],
+        ..Default::default()
+    });
+    let Some(api::request::input::Type::UserInputs(inputs)) = &mut input.r#type else {
+        panic!("expected user inputs");
+    };
+    inputs
+        .inputs
+        .push(api::request::input::user_inputs::UserInput {
+            input: Some(
+                api::request::input::user_inputs::user_input::Input::UserQuery(
+                    api::request::input::UserQuery {
+                        query: "which of these is newer?".into(),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        });
+
+    let (_, conversation) = run_fake_turn(&request, says_done()).await;
+    assert_tool_calls_answered(&conversation.messages);
+    let contents = result_contents(&conversation);
+    assert_eq!(contents.len(), 1, "{contents:#?}");
+    assert!(
+        contents[0].contains("a.txt"),
+        "the real result is kept: {contents:#?}"
+    );
+    let Some(NeutralMsg::User(last)) = conversation.messages.last() else {
+        panic!("expected the user turn last: {:#?}", conversation.messages);
+    };
+    assert!(last.contains("notes.md"), "{last}");
+    assert!(last.contains("which of these is newer?"), "{last}");
+}
+
+// ---- long-running commands (#50) ----
+
+/// What the client reports when it stops waiting for `du` while it still runs.
+fn still_running(id: &str) -> api::request::input::ToolCallResult {
+    api::request::input::ToolCallResult {
+        tool_call_id: id.into(),
+        result: Some(
+            api::request::input::tool_call_result::Result::RunShellCommand(
+                api::RunShellCommandResult {
+                    command: "du -sh .".into(),
+                    result: Some(
+                        api::run_shell_command_result::Result::LongRunningCommandSnapshot(
+                            api::LongRunningShellCommandSnapshot {
+                                output: "12G\t./Library<|cursor|>".into(),
+                                cursor: "<|cursor|>".into(),
+                                command_id: "block-7".into(),
+                                ..Default::default()
+                            },
+                        ),
+                    ),
+                    ..Default::default()
+                },
+            ),
+        ),
+    }
+}
+
+#[test]
+fn a_still_running_command_shows_its_output_and_how_to_follow_up() {
+    let result = crate::tools::decode_input_result(&still_running("tc-1"));
+    assert!(!result.is_error);
+    // The output as the client sent it, with its cursor marker explained.
+    assert!(
+        result.content.contains("12G\t./Library<|cursor|>"),
+        "{}",
+        result.content
+    );
+    assert!(
+        result.content.contains("<|cursor|> marks the cursor"),
+        "{}",
+        result.content
+    );
+    assert!(result.content.contains("block-7"), "{}", result.content);
+    assert!(
+        result.content.contains("read_shell_command_output"),
+        "{}",
+        result.content
+    );
+}
+
+#[test]
+fn read_shell_command_output_waits_for_completion_unless_told_otherwise() {
+    use api::message::tool_call::Tool;
+    use api::message::tool_call::read_shell_command_output::Delay;
+
+    let registry = ToolRegistry::build(&api::Request::default());
+    let names: Vec<_> = registry.specs.iter().map(|s| s.name.as_str()).collect();
+    assert!(names.contains(&"read_shell_command_output"));
+    assert!(names.contains(&"write_to_long_running_shell_command"));
+
+    let encode = |input| match registry.encode("read_shell_command_output", &input) {
+        Some(Tool::ReadShellCommandOutput(read)) => read,
+        other => panic!("wrong tool: {other:?}"),
+    };
+    let wait = encode(json!({ "command_id": "block-7" }));
+    assert_eq!(wait.command_id, "block-7");
+    assert_eq!(wait.delay, Some(Delay::OnCompletion(())));
+    let seconds =
+        |wait| match encode(json!({ "command_id": "block-7", "wait_seconds": wait })).delay {
+            Some(Delay::Duration(duration)) => duration.seconds,
+            other => panic!("expected a duration: {other:?}"),
+        };
+    assert_eq!(seconds(json!(5)), 5);
+    assert_eq!(seconds(json!(5.0)), 5);
+    assert_eq!(seconds(json!(-3)), 0);
+    assert_eq!(seconds(json!(500)), 120, "the client's cap");
+    let not_a_number = json!({ "command_id": "block-7", "wait_seconds": "soon" });
+    assert!(
+        registry
+            .encode("read_shell_command_output", &not_a_number)
+            .is_none()
+    );
+    let peek = encode(json!({ "command_id": "block-7", "wait_seconds": 5 }));
+
+    // Replayed from history as the same call.
+    let call = api::message::ToolCall {
+        tool_call_id: "tc-2".into(),
+        tool: Some(Tool::ReadShellCommandOutput(peek)),
+    };
+    let replayed = crate::tools::decode_tool_call(&call);
+    assert_eq!(replayed.name, "read_shell_command_output");
+    assert_eq!(
+        replayed.input,
+        json!({ "command_id": "block-7", "wait_seconds": 5 })
+    );
+
+    // A read with no delay waits the client's default two seconds.
+    let call = api::message::ToolCall {
+        tool_call_id: "tc-2".into(),
+        tool: Some(Tool::ReadShellCommandOutput(
+            api::message::tool_call::ReadShellCommandOutput {
+                command_id: "block-7".into(),
+                delay: None,
+            },
+        )),
+    };
+    assert_eq!(
+        crate::tools::decode_tool_call(&call).input,
+        json!({ "command_id": "block-7", "wait_seconds": 2 })
+    );
+}
+
+#[test]
+fn write_to_long_running_shell_command_sends_keys() {
+    use api::message::tool_call::Tool;
+    use api::message::tool_call::write_to_long_running_shell_command::mode::Mode as M;
+
+    let registry = ToolRegistry::build(&api::Request::default());
+    let encode = |input| match registry.encode("write_to_long_running_shell_command", &input) {
+        Some(Tool::WriteToLongRunningShellCommand(write)) => write,
+        other => panic!("wrong tool: {other:?}"),
+    };
+    // A line is the text plus Enter, with nothing in front of it.
+    let answer = encode(json!({ "command_id": "block-7", "input": "y" }));
+    assert_eq!(answer.input, b"y\r");
+    assert_eq!(answer.mode.and_then(|m| m.mode), Some(M::Raw(())));
+    let enter = encode(json!({ "command_id": "block-7", "input": "", "mode": "line" }));
+    assert_eq!(enter.input, b"\r");
+    let interrupt = encode(json!({ "command_id": "block-7", "input": "\u{3}", "mode": "raw" }));
+    assert_eq!(interrupt.input, [3]);
+    assert_eq!(interrupt.mode.and_then(|m| m.mode), Some(M::Raw(())));
+
+    // A malformed call writes nothing.
+    for input in [
+        json!({ "command_id": "block-7" }),
+        json!({ "command_id": "block-7", "input": 42 }),
+        json!({ "command_id": "block-7", "input": "y", "mode": "block" }),
+        json!({ "command_id": "block-7", "input": "y", "mode": "typo" }),
+    ] {
+        assert!(
+            registry
+                .encode("write_to_long_running_shell_command", &input)
+                .is_none(),
+            "{input}"
+        );
+    }
+
+    let call = api::message::ToolCall {
+        tool_call_id: "tc-3".into(),
+        tool: Some(Tool::WriteToLongRunningShellCommand(interrupt)),
+    };
+    let replayed = crate::tools::decode_tool_call(&call);
+    assert_eq!(replayed.name, "write_to_long_running_shell_command");
+    assert_eq!(
+        replayed.input,
+        json!({ "command_id": "block-7", "input": "\u{3}", "mode": "raw" })
+    );
+}
+
+#[test]
+fn following_up_on_a_command_reads_back_as_text() {
+    use api::request::input::tool_call_result::Result as R;
+
+    let finished = crate::tools::decode_input_result(&api::request::input::ToolCallResult {
+        tool_call_id: "tc-2".into(),
+        result: Some(R::ReadShellCommandOutput(
+            api::ReadShellCommandOutputResult {
+                command: "du -sh .".into(),
+                result: Some(
+                    api::read_shell_command_output_result::Result::CommandFinished(
+                        api::ShellCommandFinished {
+                            output: "45G\t.".into(),
+                            exit_code: 0,
+                            ..Default::default()
+                        },
+                    ),
+                ),
+            },
+        )),
+    });
+    assert!(!finished.is_error);
+    assert!(
+        finished.content.contains("$ du -sh ."),
+        "{}",
+        finished.content
+    );
+    assert!(finished.content.contains("45G"), "{}", finished.content);
+
+    let gone = crate::tools::decode_input_result(&api::request::input::ToolCallResult {
+        tool_call_id: "tc-3".into(),
+        result: Some(R::WriteToLongRunningShellCommand(
+            api::WriteToLongRunningShellCommandResult {
+                result: Some(
+                    api::write_to_long_running_shell_command_result::Result::Error(
+                        api::ShellCommandError {
+                            r#type: Some(api::shell_command_error::Type::CommandNotFound(())),
+                        },
+                    ),
+                ),
+            },
+        )),
+    });
+    assert!(gone.is_error);
+    assert!(gone.content.contains("command_id"), "{}", gone.content);
+}
+
+#[tokio::test]
+async fn the_agent_can_wait_for_a_slow_command_to_finish() {
+    use crate::providers::ProviderEvent;
+
+    // `du` is still running when the client stops waiting; the model waits for it.
+    let mut history = vec![user_query("disk usage?"), shell_call("tc-1", "du -sh .")];
+    let request = tool_results_request(history.clone(), vec![still_running("tc-1")]);
+    let reply = vec![
+        ProviderEvent::ToolCall {
+            id: "tc-2".into(),
+            name: "read_shell_command_output".into(),
+            input: json!({ "command_id": "block-7" }),
+        },
+        ProviderEvent::Done,
+    ];
+    let (actions, conversation) = run_fake_turn(&request, reply).await;
+    assert!(
+        result_contents(&conversation)[0].contains("block-7"),
+        "{conversation:#?}"
+    );
+    history.extend(
+        actions
+            .into_iter()
+            .filter_map(|action| match action {
+                api::client_action::Action::AddMessagesToTask(add) => Some(add.messages),
+                _ => None,
+            })
+            .flatten(),
+    );
+
+    // It finishes; the client sends the result of the wait.
+    let finished = api::request::input::ToolCallResult {
+        tool_call_id: "tc-2".into(),
+        result: Some(
+            api::request::input::tool_call_result::Result::ReadShellCommandOutput(
+                api::ReadShellCommandOutputResult {
+                    command: "du -sh .".into(),
+                    result: Some(
+                        api::read_shell_command_output_result::Result::CommandFinished(
+                            api::ShellCommandFinished {
+                                output: "45G\t.".into(),
+                                exit_code: 0,
+                                ..Default::default()
+                            },
+                        ),
+                    ),
+                },
+            ),
+        ),
+    };
+    let (_, conversation) =
+        run_fake_turn(&tool_results_request(history, vec![finished]), says_done()).await;
+    assert_tool_calls_answered(&conversation.messages);
+    let contents = result_contents(&conversation);
+    assert_eq!(contents.len(), 2, "{contents:#?}");
+    assert!(contents[0].contains("still running"), "{contents:#?}");
+    assert!(contents[1].contains("45G"), "{contents:#?}");
+}

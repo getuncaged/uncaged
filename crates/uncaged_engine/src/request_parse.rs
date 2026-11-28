@@ -9,6 +9,7 @@ use std::collections::HashSet;
 
 use crate::model::Conversation;
 use crate::model::NeutralMsg;
+use crate::model::answer_tool_calls;
 use crate::proto::api;
 use crate::tools::decode_history_result;
 use crate::tools::decode_input_result;
@@ -20,6 +21,10 @@ pub struct ParsedHistory {
     pub target_task_id: Option<String>,
     /// Round-tripped to the client in `StreamInit`.
     pub conversation_id: String,
+    /// Tool results that arrived in `input` and aren't in the task history
+    /// yet. The engine adds them to the task, so later requests replay each
+    /// tool call with its result.
+    pub new_tool_results: Vec<api::request::input::ToolCallResult>,
 }
 
 pub fn parse(request: &api::Request) -> ParsedHistory {
@@ -32,6 +37,7 @@ pub fn parse(request: &api::Request) -> ParsedHistory {
 
     let mut seen_result_ids: HashSet<String> = HashSet::new();
     let mut target_task_id: Option<String> = None;
+    let mut new_tool_results = Vec::new();
 
     // --- history ---
     if let Some(task_context) = &request.task_context {
@@ -47,7 +53,12 @@ pub fn parse(request: &api::Request) -> ParsedHistory {
 
     // --- the new input turn ---
     if let Some(input) = &request.input {
-        lower_input(input, &mut builder, &mut seen_result_ids);
+        lower_input(
+            input,
+            &mut builder,
+            &mut seen_result_ids,
+            &mut new_tool_results,
+        );
     }
 
     let conversation_id = request
@@ -58,9 +69,10 @@ pub fn parse(request: &api::Request) -> ParsedHistory {
         .unwrap_or_else(new_id);
 
     ParsedHistory {
-        messages: builder.messages,
+        messages: answer_tool_calls(builder.messages),
         target_task_id,
         conversation_id,
+        new_tool_results,
     }
 }
 
@@ -96,6 +108,7 @@ fn lower_input(
     input: &api::request::Input,
     builder: &mut Conversation,
     seen_result_ids: &mut HashSet<String>,
+    new_tool_results: &mut Vec<api::request::input::ToolCallResult>,
 ) {
     // Attached context — terminal blocks the user pinned via "Attach as agent
     // context", plus any selected text or files — rides on `input.context`
@@ -103,20 +116,43 @@ fn lower_input(
     // already folds in). Surface the *attachments* here so the model can actually
     // see them. `push_user` coalesces, so these merge with the query below into a
     // single user turn (keeps the backends' strict user/assistant alternation intact).
+    //
+    // Tool results go first, though: they answer the tool calls that end the
+    // history, and backends need each result right after its call. A query
+    // that brings in finished results can also carry attachments.
+    use api::request::input::Type;
+    use api::request::input::user_inputs::user_input::Input as I;
+    match &input.r#type {
+        Some(Type::UserInputs(user_inputs)) => {
+            for item in &user_inputs.inputs {
+                if let Some(I::ToolCallResult(tr)) = &item.input {
+                    push_input_result(builder, tr, seen_result_ids, new_tool_results);
+                }
+            }
+        }
+        // Deprecated direct form, still handled defensively.
+        Some(Type::ToolCallResult(tr)) => {
+            push_input_result(builder, tr, seen_result_ids, new_tool_results)
+        }
+        _ => {}
+    }
+
     if let Some(ctx) = &input.context {
         lower_attached_context(ctx, builder);
     }
 
-    use api::request::input::Type;
     match &input.r#type {
         Some(Type::UserInputs(user_inputs)) => {
             for item in &user_inputs.inputs {
-                lower_user_input(item, builder, seen_result_ids);
+                if let Some(I::UserQuery(uq)) = &item.input {
+                    push_user_deduped(builder, &uq.query);
+                }
             }
         }
-        // Deprecated direct forms, still handled defensively.
+        // Deprecated direct forms, still handled defensively. Results were
+        // lowered above.
         Some(Type::UserQuery(uq)) => push_user_deduped(builder, &uq.query),
-        Some(Type::ToolCallResult(tr)) => push_input_result(builder, tr, seen_result_ids),
+        Some(Type::ToolCallResult(_)) => {}
         // Hardcoded-prompt inputs: surface their user-visible text if present.
         Some(Type::CreateNewProject(p)) => push_user_deduped(builder, &p.query),
         Some(Type::CloneRepository(c)) => push_user_deduped(builder, &c.url),
@@ -216,23 +252,11 @@ fn lower_attached_context(ctx: &api::InputContext, builder: &mut Conversation) {
     }
 }
 
-fn lower_user_input(
-    item: &api::request::input::user_inputs::UserInput,
-    builder: &mut Conversation,
-    seen_result_ids: &mut HashSet<String>,
-) {
-    use api::request::input::user_inputs::user_input::Input as I;
-    match &item.input {
-        Some(I::UserQuery(uq)) => push_user_deduped(builder, &uq.query),
-        Some(I::ToolCallResult(tr)) => push_input_result(builder, tr, seen_result_ids),
-        _ => {}
-    }
-}
-
 fn push_input_result(
     builder: &mut Conversation,
     tr: &api::request::input::ToolCallResult,
     seen_result_ids: &mut HashSet<String>,
+    new_tool_results: &mut Vec<api::request::input::ToolCallResult>,
 ) {
     let result = decode_input_result(tr);
     if seen_result_ids.contains(&result.id) {
@@ -240,6 +264,7 @@ fn push_input_result(
     }
     seen_result_ids.insert(result.id.clone());
     builder.push_tool_result(result);
+    new_tool_results.push(tr.clone());
 }
 
 /// Push a user message unless it exactly duplicates the last user message
