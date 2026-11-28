@@ -2318,10 +2318,12 @@ impl RootView {
             | AgentOnboardingEvent::UpgradeCopyUrlRequested
             | AgentOnboardingEvent::UpgradePasteTokenFromClipboardRequested => {}
             AgentOnboardingEvent::ConnectPresetRequested(preset_id) => {
-                // Mirror ai_page.rs::uncaged_connect_preset: create (or focus) a
-                // connection for this preset; when it's immediately usable and
-                // needs no key (local runtimes, CLI agents), activate it in one
-                // click. Presets that need an API key create an incomplete
+                // Like ai_page.rs::uncaged_connect_preset's one-click path:
+                // create (or focus) a connection for this preset; when it's
+                // immediately usable and needs no key (local runtimes, CLI
+                // agents), activate it in one click. (Settings' editor-based
+                // Connect adds nothing until Save; onboarding has no editor.)
+                // Presets that need an API key create an incomplete
                 // connection here and surface in the "Connected" roster with a
                 // "Needs key" status — the user finishes them in Settings after
                 // onboarding. (TODO: host the CustomEndpointModal as an overlay

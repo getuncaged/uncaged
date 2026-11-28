@@ -2332,12 +2332,24 @@ impl TypedActionView for ProfileModelSelector {
                         Some(String::new()),
                         c.cli_command.clone(),
                     )
-                    .and_then(|()| crate::uncaged::activate(&c.id))
+                    // The URL is unchanged, so the stored key is always kept.
+                    // Once saved, a later failure is reported as such: the
+                    // model change stuck. If the engine config wasn't updated,
+                    // don't switch to it.
+                    .map(|saved| match saved.engine_error {
+                        Some(err) => Some(format!("the engine config couldn't be updated: {err}")),
+                        None => crate::uncaged::activate(&c.id)
+                            .err()
+                            .map(|err| format!("couldn't switch to it: {err}")),
+                    })
                 } else {
                     Err("connection no longer exists".to_string())
                 };
                 match result {
-                    Ok(()) => self.show_toast(format!("Model set to {model}"), ctx),
+                    Ok(None) => self.show_toast(format!("Model set to {model}"), ctx),
+                    Ok(Some(problem)) => {
+                        self.show_toast(format!("Model saved, but {problem}"), ctx)
+                    }
                     Err(e) => self.show_toast(format!("Couldn't set model: {e}"), ctx),
                 }
                 ctx.notify();

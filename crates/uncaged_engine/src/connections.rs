@@ -11,6 +11,8 @@
 //! has to know the roster exists — it just reads the single active provider as
 //! before. Nothing here talks to the network; keys stay on the user's machine.
 
+use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 
 use serde::Deserialize;
@@ -170,20 +172,29 @@ impl Roster {
         self.connections.iter().find(|c| c.id == id)
     }
 
-    /// A readable, unique id for a new connection seeded from `base`.
+    /// Drop `id`. If it was active, the first remaining usable connection (or
+    /// the first remaining, or none) becomes active.
+    fn remove_and_repoint(&mut self, id: &str) {
+        self.connections.retain(|c| c.id != id);
+        if self.active_id.as_deref() == Some(id) {
+            self.active_id = self
+                .connections
+                .iter()
+                .find(|c| c.usable())
+                .or_else(|| self.connections.first())
+                .map(|c| c.id.clone());
+        }
+    }
+
+    /// A readable, unique id for a new connection seeded from `base`:
+    /// "custom", "custom-2", "custom-3", ...
     fn unique_id(&self, base: &str) -> String {
         let base = if base.trim().is_empty() {
             "model"
         } else {
             base
         };
-        if self.get(base).is_none() {
-            return base.to_string();
-        }
-        (2..)
-            .map(|n| format!("{base}-{n}"))
-            .find(|candidate| self.get(candidate).is_none())
-            .unwrap_or_else(|| base.to_string())
+        first_free(base, "-", |candidate| self.get(candidate).is_some())
     }
 
     /// The first connection created from a given preset, if any.
@@ -191,10 +202,20 @@ impl Roster {
         self.connections.iter().find(|c| c.preset == preset_id)
     }
 
+    /// A unique default label for a new connection seeded from `base`, so
+    /// repeated presets (e.g. several custom endpoints) stay distinguishable:
+    /// "Custom", "Custom 2", "Custom 3", ...
+    fn unique_label(&self, base: &str) -> String {
+        first_free(base, " ", |candidate| {
+            self.connections.iter().any(|c| c.label == candidate)
+        })
+    }
+
     /// Collapse duplicate connections that share a preset — the active one wins,
-    /// else the first seen — preserving order and `active_id`. `custom` is exempt
-    /// (multiple distinct custom endpoints are legitimate). Returns whether any
-    /// duplicate was removed. This repairs rosters dirtied before the
+    /// else the first seen — preserving order and `active_id`. Presets that
+    /// [allow multiple](catalog::allows_multiple) connections (`custom`) are
+    /// exempt: multiple distinct custom endpoints are legitimate. Returns
+    /// whether any duplicate was removed. This repairs rosters dirtied before the
     /// one-connection-per-preset rule existed.
     fn dedupe_by_preset(&mut self) -> bool {
         use std::collections::HashMap;
@@ -202,7 +223,7 @@ impl Roster {
         // Decide which id to keep for each non-custom preset (active wins).
         let mut keep: HashMap<String, String> = HashMap::new();
         for c in &self.connections {
-            if c.preset == "custom" {
+            if catalog::allows_multiple(&c.preset) {
                 continue;
             }
             let is_active = active.as_deref() == Some(c.id.as_str());
@@ -212,7 +233,8 @@ impl Roster {
         }
         let before = self.connections.len();
         self.connections.retain(|c| {
-            c.preset == "custom" || keep.get(&c.preset).map(String::as_str) == Some(c.id.as_str())
+            catalog::allows_multiple(&c.preset)
+                || keep.get(&c.preset).map(String::as_str) == Some(c.id.as_str())
         });
         // Defensive: if the active id was somehow dropped, repoint to a survivor.
         if let Some(a) = &active {
@@ -226,6 +248,44 @@ impl Roster {
             }
         }
         self.connections.len() != before
+    }
+}
+
+/// `base` if it isn't `taken`, else the first free `{base}{sep}{n}` for n >= 2.
+fn first_free(base: &str, sep: &str, taken: impl Fn(&str) -> bool) -> String {
+    if !taken(base) {
+        return base.to_string();
+    }
+    (2..)
+        .map(|n| format!("{base}{sep}{n}"))
+        .find(|candidate| !taken(candidate))
+        .expect("an unbounded range always has a free candidate")
+}
+
+/// Whether `conn` is still exactly what [`add`] seeds from `preset` — e.g. the
+/// row onboarding's Connect leaves to be finished in Settings. Any edit (a URL,
+/// model, key, command or different wire) makes it a real connection that must
+/// never be handed out as a blank draft. The label and id are ignored: `add`
+/// already makes those unique.
+fn is_unedited_draft(conn: &Connection, preset: &Preset) -> bool {
+    let seed = Connection::from_preset(preset, String::new());
+    conn.preset == seed.preset
+        && conn.wire == seed.wire
+        && conn.base_url == seed.base_url
+        && conn.model == seed.model
+        && conn.api_key.is_none()
+        && conn.cli_command == seed.cli_command
+}
+
+/// Whether two base URLs point at the same server: equal parsed origins
+/// (scheme, host and port, with default ports normalized), using the same URL
+/// parser as the HTTP client. A URL that doesn't parse, or has no host-based
+/// origin, never matches — so a stored key is dropped rather than risked.
+fn same_server(a: &str, b: &str) -> bool {
+    let origin = |url: &str| reqwest::Url::parse(url.trim()).ok().map(|u| u.origin());
+    match (origin(a), origin(b)) {
+        (Some(a), Some(b)) => a.is_tuple() && a == b,
+        _ => false,
     }
 }
 
@@ -258,13 +318,135 @@ pub fn load() -> Roster {
     }
 }
 
+/// Write the roster atomically: the new contents go to a temporary file next
+/// to it, which is then renamed over it. A write that fails part-way leaves the
+/// previous roster intact instead of a truncated one.
+///
+/// The roster holds API keys. On Unix the temporary file is created private to
+/// its owner (`0600`), and only after the contents are on disk does it take the
+/// current roster's permissions, and only when it also has the roster's owner
+/// and group; otherwise it stays owner-only. So the keys are never readable by
+/// anyone who couldn't read the roster, and a first roster is owner-only. A
+/// symlinked roster is written through to its target (the link is kept). A
+/// hard-linked roster is split: the other name keeps the previous contents.
+///
+/// Like an in-place write, it refuses to replace a roster it couldn't write to
+/// (read-only, or no permission). That roster may also be unreadable, in which
+/// case the caller has an empty or reseeded copy that would erase it.
 fn write(roster: &Roster) -> anyhow::Result<()> {
-    let path = roster_path();
+    let json = serde_json::to_string_pretty(roster)?;
+    let path = write_target(roster_path(), 0)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::write(&path, serde_json::to_string_pretty(roster)?)?;
+    // Opening for writing (no create, no truncate) changes nothing on disk.
+    match std::fs::OpenOptions::new().write(true).open(&path) {
+        Ok(_) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => return Err(err.into()),
+    }
+    let (tmp, file) = create_staging_file(&path)?;
+    // From here the staging file is this call's own, so it's removed on failure.
+    let replaced = stage(file, &json).and_then(|file| {
+        #[cfg(unix)]
+        keep_roster_access(&file, &path);
+        drop(file);
+        std::fs::rename(&tmp, &path)
+    });
+    if let Err(err) = replaced {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(err.into());
+    }
     Ok(())
+}
+
+/// How many staging names [`write`] tries before giving up.
+pub(crate) const STAGING_ATTEMPTS: u32 = 8;
+
+/// Create the staging file for [`write`] exclusively, so the write never goes
+/// through something already at that name (a symlink, say), and never removes
+/// it either: a taken name (e.g. a crashed run's leftover) is skipped for the
+/// next one. On Unix it starts private to its owner.
+fn create_staging_file(path: &Path) -> std::io::Result<(PathBuf, std::fs::File)> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut last_err = None;
+    for attempt in 0..STAGING_ATTEMPTS {
+        let tmp = roster_temp_path(path, attempt);
+        match options.open(&tmp) {
+            Ok(file) => return Ok((tmp, file)),
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => last_err = Some(err),
+            Err(err) => return Err(err),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| std::io::Error::other("no staging file name to try")))
+}
+
+/// Fill and sync the staging file for [`write`].
+fn stage(mut file: std::fs::File, json: &str) -> std::io::Result<std::fs::File> {
+    file.write_all(json.as_bytes())?;
+    file.sync_all()?;
+    Ok(file)
+}
+
+/// Give the synced staging file the current roster's permissions, but only if
+/// it has (or can be given) the roster's owner and group: the same mode bits
+/// under another group would let that group read the keys. Best-effort: when
+/// anything doesn't match or fails, the file stays owner-only, never wider.
+#[cfg(unix)]
+fn keep_roster_access(file: &std::fs::File, current: &Path) {
+    use std::os::unix::fs::MetadataExt;
+
+    let (Ok(roster), Ok(staged)) = (std::fs::metadata(current), file.metadata()) else {
+        return;
+    };
+    let same_group = staged.gid() == roster.gid()
+        || std::os::unix::fs::fchown(file, None, Some(roster.gid())).is_ok();
+    if staged.uid() == roster.uid() && same_group {
+        let _ = file.set_permissions(roster.permissions());
+    }
+}
+
+/// The file [`write`] replaces: the roster path, or the file it links to when
+/// it's a symlink (so the rename updates the target instead of replacing the
+/// link). A link whose target doesn't exist yet is followed to where the
+/// target would be, so the first save creates it there. `depth` bounds a chain
+/// of such links. A link loop or any other resolution error fails the save and
+/// leaves the link as it is.
+fn write_target(path: PathBuf, depth: u32) -> std::io::Result<PathBuf> {
+    if !path.is_symlink() {
+        return Ok(path);
+    }
+    match std::fs::canonicalize(&path) {
+        Ok(target) => Ok(target),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound && depth < 40 => {
+            let link = std::fs::read_link(&path)?;
+            let next = match path.parent() {
+                Some(parent) => parent.join(link),
+                None => link,
+            };
+            write_target(next, depth + 1)
+        }
+        Err(err) => Err(err),
+    }
+}
+
+/// The `attempt`th temporary name [`write`] may stage the roster in: same
+/// directory (so the rename stays on one filesystem), named per process so two
+/// app instances saving at once don't collide. Roster writes in one process all
+/// run on the UI thread, so they never collide either.
+pub(crate) fn roster_temp_path(path: &Path, attempt: u32) -> PathBuf {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "connections.json".to_string());
+    let pid = std::process::id();
+    path.with_file_name(format!(".{name}.{pid}-{attempt}.tmp"))
 }
 
 /// Read the roster, first-run-seeding it from an existing `engine.json` so a
@@ -290,39 +472,146 @@ pub fn load_or_seed() -> Roster {
 }
 
 /// Add a new connection from a catalog preset. Becomes active if it's the first
-/// one. Returns the new connection's id.
+/// one. Returns the new connection's id once the roster is written.
 pub fn add(preset_id: &str) -> anyhow::Result<String> {
+    add_row(preset_id, true)
+}
+
+/// Append a fresh row seeded from `preset_id` and return its id. With
+/// `activate_first`, a row added to an empty roster becomes active (and is
+/// projected); without it the active connection is never touched and
+/// `engine.json` isn't rewritten — for rows a save is about to fill in, which
+/// the caller activates only once they can run.
+fn add_row(preset_id: &str, activate_first: bool) -> anyhow::Result<String> {
     let preset = catalog::preset_by_id(preset_id);
     let mut roster = load_or_seed();
     let id = roster.unique_id(preset.id);
-    let conn = Connection::from_preset(preset, id.clone());
-    let first = roster.connections.is_empty();
+    let mut conn = Connection::from_preset(preset, id.clone());
+    conn.label = roster.unique_label(&conn.label);
+    let activate = activate_first && roster.connections.is_empty();
     roster.connections.push(conn);
-    if first {
+    if activate {
         roster.active_id = Some(id.clone());
     }
     write(&roster)?;
-    project(&roster)?;
+    // `engine.json` only mirrors the active connection, so it only needs
+    // rewriting when this row became active. (Otherwise a projection failure
+    // would report an error for a row that was in fact added.)
+    if activate {
+        project(&roster)?;
+    }
     Ok(id)
 }
 
 /// Connect a preset, but never create a duplicate: if a connection for that
 /// preset already exists, make it active and return its id instead of adding a
-/// second row. `custom` is exempt (each custom endpoint is distinct), so it
-/// always adds. This is what the "Connect" buttons call, so re-clicking an
-/// already-connected preset simply switches to it.
+/// second row. Onboarding's Connect buttons call this, as does Settings'
+/// one-click Connect for presets that are ready as seeded (local runtimes, CLI
+/// agents); Settings' editor-based Connect adds nothing until Save (see
+/// [`claim_for_preset`]).
+///
+/// Presets that [allow multiple](catalog::allows_multiple) connections
+/// (`custom`) add a new connection each time — except that an untouched draft
+/// (see [`is_unedited_draft`]) is returned, without activating it, so repeated
+/// Connect clicks in onboarding don't pile up blank rows.
 pub fn connect_or_focus(preset_id: &str) -> anyhow::Result<String> {
-    if preset_id != "custom" {
-        let roster = load_or_seed();
-        if let Some(existing) = roster.find_by_preset(preset_id).map(|c| c.id.clone()) {
-            set_active(&existing)?;
-            return Ok(existing);
+    let roster = load_or_seed();
+    if catalog::allows_multiple(preset_id) {
+        let preset = catalog::preset_by_id(preset_id);
+        if let Some(draft) = roster
+            .connections
+            .iter()
+            .find(|c| is_unedited_draft(c, preset))
+        {
+            return Ok(draft.id.clone());
         }
+    } else if let Some(existing) = roster.find_by_preset(preset_id).map(|c| c.id.clone()) {
+        set_active(&existing)?;
+        return Ok(existing);
     }
     add(preset_id)
 }
 
+/// Whether `id` is an untouched draft (see [`is_unedited_draft`]) of a preset
+/// that [allows multiple](catalog::allows_multiple) connections — i.e. a row
+/// another editor (or a new connection's save) could also pick up.
+pub fn is_draft(id: &str) -> bool {
+    load_or_seed().get(id).is_some_and(|c| {
+        catalog::allows_multiple(&c.preset)
+            && is_unedited_draft(c, catalog::preset_by_id(&c.preset))
+    })
+}
+
+/// For an editor that was opened on a draft of `preset_id`: return `id` if it
+/// is still an untouched draft, otherwise add a fresh connection from the same
+/// preset and return that. Two editors on the same draft (e.g. Edit on a blank
+/// row onboarding left, in two windows) therefore save to separate rows instead
+/// of the second overwriting the first. A fresh row isn't made active; the
+/// caller activates it once the save has made it usable.
+pub fn claim_draft(id: &str, preset_id: &str) -> anyhow::Result<String> {
+    let roster = load_or_seed();
+    let still_draft = roster
+        .get(id)
+        .is_some_and(|c| is_unedited_draft(c, catalog::preset_by_id(preset_id)));
+    if still_draft {
+        Ok(id.to_string())
+    } else {
+        add_row(preset_id, false)
+    }
+}
+
+/// The row a save from a new-connection editor (opened by Connect, with nothing
+/// added to the roster yet) should write to, and whether it was just added:
+///
+/// - a preset that [allows multiple](catalog::allows_multiple) connections
+///   reuses an untouched draft (e.g. one onboarding left), else adds a row;
+/// - any other preset reuses its existing connection (another window may have
+///   connected it since), else adds one. The save then overwrites that row
+///   with what its form holds: last save wins, as with two Edit editors.
+///
+/// Unlike [`connect_or_focus`] this never changes the active connection and
+/// never rewrites `engine.json`, even on an empty roster: the caller activates
+/// the row once the save has made it usable.
+pub fn claim_for_preset(preset_id: &str) -> anyhow::Result<(String, bool)> {
+    let roster = load_or_seed();
+    let existing = if catalog::allows_multiple(preset_id) {
+        let preset = catalog::preset_by_id(preset_id);
+        roster
+            .connections
+            .iter()
+            .find(|c| is_unedited_draft(c, preset))
+    } else {
+        roster.find_by_preset(preset_id)
+    };
+    match existing {
+        Some(conn) => Ok((conn.id.clone(), false)),
+        None => Ok((add_row(preset_id, false)?, true)),
+    }
+}
+
+/// What [`update`] did besides writing the given fields.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct UpdateOutcome {
+    /// The stored API key was cleared because the URL moved to a different
+    /// server and no new key was entered.
+    pub key_cleared: bool,
+    /// The edit was saved to the roster, but mirroring the active connection
+    /// into `engine.json` then failed with this error.
+    pub engine_error: Option<String>,
+}
+
 /// Overwrite the editable fields of a connection.
+///
+/// Returns `Err` when the edit wasn't saved: the connection doesn't exist, the
+/// roster couldn't be written (the previous roster is left intact), or the
+/// edit was refused. (Reading the roster can still repair it on disk; see
+/// [`load_or_seed`].) Once the roster is written the edit stands, and a failure
+/// to update `engine.json` is reported in [`UpdateOutcome::engine_error`].
+///
+/// Refuses (writing nothing) to move a connection whose provider needs a key
+/// to a different server without a new key: the stored key isn't carried
+/// over, so the result couldn't run — and if it is the active connection,
+/// writing it would stop the running model.
 pub fn update(
     id: &str,
     label: String,
@@ -330,8 +619,9 @@ pub fn update(
     model: String,
     api_key: Option<String>,
     cli_command: Vec<String>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<UpdateOutcome> {
     let mut roster = load_or_seed();
+    let mut outcome = UpdateOutcome::default();
     if let Some(conn) = roster.connections.iter_mut().find(|c| c.id == id) {
         conn.label = label;
         conn.model = model;
@@ -343,6 +633,35 @@ pub fn update(
         if conn.wire == "cli" {
             conn.cli_command = cli_command;
         } else {
+            // A stored key belongs to the server it was entered for. If the URL
+            // now points at a different server, drop it rather than send it
+            // there; a key typed alongside the new URL is still kept below.
+            let effective = |url: &str| {
+                if url.trim().is_empty() && conn.wire == "anthropic" {
+                    config::ANTHROPIC_DEFAULT_BASE_URL.to_string()
+                } else {
+                    url.to_string()
+                }
+            };
+            let base_url = base_url.trim().to_string();
+            let keep_stored_key = matches!(&api_key, Some(k) if k.trim().is_empty());
+            // An unchanged URL is always the same server, even one that doesn't
+            // parse; only an edited URL is compared by origin.
+            let key_cleared = keep_stored_key
+                && conn.api_key.is_some()
+                && base_url != conn.base_url.trim()
+                && !same_server(&effective(&conn.base_url), &effective(&base_url));
+            if key_cleared && conn.needs_key {
+                // Nothing has been written yet; bail before the roster is saved.
+                anyhow::bail!(
+                    "Enter the API key for the new server. A saved key is only sent to the \
+                     server it was entered for."
+                );
+            }
+            if key_cleared {
+                conn.api_key = None;
+                outcome.key_cleared = true;
+            }
             conn.base_url = base_url;
             // A `Some("")` from a cleared field means "leave the stored key"; only
             // a non-empty value replaces it, and `None` is an explicit clear.
@@ -352,28 +671,59 @@ pub fn update(
                 None => conn.api_key = None,
             }
         }
+    } else {
+        // A row removed since its editor opened (e.g. in another window) can't
+        // be saved onto: say so, writing nothing, rather than report success
+        // for an edit that went nowhere.
+        anyhow::bail!(
+            "This connection no longer exists. It may have been removed in another window."
+        );
     }
     write(&roster)?;
-    project(&roster)?;
-    Ok(())
+    // The edit is saved from here on, so a failure to mirror it into
+    // engine.json is reported in the outcome, not as an error: callers can tell
+    // "nothing was written" (`Err`) from "saved, but the engine wasn't updated".
+    if let Err(err) = project(&roster) {
+        outcome.engine_error = Some(err.to_string());
+    }
+    Ok(outcome)
 }
 
 /// Remove a connection. If it was active, the first remaining usable connection
 /// (or the first remaining, or none) becomes active.
 pub fn remove(id: &str) -> anyhow::Result<()> {
     let mut roster = load_or_seed();
-    roster.connections.retain(|c| c.id != id);
-    if roster.active_id.as_deref() == Some(id) {
-        roster.active_id = roster
-            .connections
-            .iter()
-            .find(|c| c.usable())
-            .or_else(|| roster.connections.first())
-            .map(|c| c.id.clone());
-    }
+    roster.remove_and_repoint(id);
     write(&roster)?;
     project(&roster)?;
     Ok(())
+}
+
+/// Remove `id` only if it is still an untouched draft of its preset (see
+/// [`is_unedited_draft`]): used to take back a row that a save added (see
+/// [`claim_for_preset`]) when the save then failed before writing to it, so a
+/// cancelled editor leaves nothing behind. A row that has been configured
+/// (e.g. the save's write landed) is kept. Returns whether a row was removed;
+/// nothing is written when none was. `engine.json` is rewritten only if the
+/// removed row was the active one (a row added for a save never is).
+pub fn discard_draft(id: &str) -> anyhow::Result<bool> {
+    let mut roster = load_or_seed();
+    let untouched = roster
+        .get(id)
+        .is_some_and(|c| is_unedited_draft(c, catalog::preset_by_id(&c.preset)));
+    if !untouched {
+        return Ok(false);
+    }
+    let was_active = roster.active_id.as_deref() == Some(id);
+    roster.remove_and_repoint(id);
+    write(&roster)?;
+    // Rows added for a save are never made active, so `engine.json` normally
+    // doesn't mention this one and needs no update. Only rewrite it when the
+    // active connection actually changed.
+    if was_active {
+        project(&roster)?;
+    }
+    Ok(true)
 }
 
 /// Make a connection the active one and project it into `engine.json`.
