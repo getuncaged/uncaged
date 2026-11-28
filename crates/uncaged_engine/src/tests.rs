@@ -710,9 +710,10 @@ fn a_recorded_tool_result_reads_back_the_same() {
     assert_eq!(read_back.is_error, original.is_error);
 }
 
-/// A provider that replies "Done." and keeps what it was sent.
+/// A provider that streams `reply` and keeps what it was sent.
 struct FakeProvider {
     sent: std::sync::Arc<std::sync::Mutex<Option<crate::model::Conversation>>>,
+    reply: Vec<crate::providers::ProviderEvent>,
 }
 
 impl crate::providers::Provider for FakeProvider {
@@ -722,22 +723,31 @@ impl crate::providers::Provider for FakeProvider {
     ) -> futures::stream::BoxStream<'static, crate::providers::ProviderEvent> {
         use futures::StreamExt as _;
         *self.sent.lock().unwrap() = Some(conversation);
-        futures::stream::iter(vec![
-            crate::providers::ProviderEvent::TextDelta("Done.".into()),
-            crate::providers::ProviderEvent::Done,
-        ])
-        .boxed()
+        futures::stream::iter(self.reply.clone()).boxed()
     }
 }
 
-/// Run one turn of `request` against [`FakeProvider`]: the client actions the
-/// engine sent, in order, and the conversation the provider got.
+/// A model reply of just "Done.".
+fn says_done() -> Vec<crate::providers::ProviderEvent> {
+    vec![
+        crate::providers::ProviderEvent::TextDelta("Done.".into()),
+        crate::providers::ProviderEvent::Done,
+    ]
+}
+
+/// Run one turn of `request` against a [`FakeProvider`] that streams `reply`:
+/// the client actions the engine sent, in order, and the conversation the
+/// provider got.
 async fn run_fake_turn(
     request: &api::Request,
+    reply: Vec<crate::providers::ProviderEvent>,
 ) -> (Vec<api::client_action::Action>, crate::model::Conversation) {
     use futures::StreamExt as _;
     let sent = std::sync::Arc::new(std::sync::Mutex::new(None));
-    let provider = FakeProvider { sent: sent.clone() };
+    let provider = FakeProvider {
+        sent: sent.clone(),
+        reply,
+    };
     let events: Vec<_> = crate::engine::run_turn_with(request, |_| Box::new(provider))
         .collect()
         .await;
@@ -763,7 +773,7 @@ async fn a_turn_records_its_tool_results_before_the_reply() {
     let history = vec![user_query("list files"), shell_call("tc-1", "ls")];
     let request = tool_results_request(history.clone(), vec![shell_result("tc-1", "a.txt")]);
 
-    let (actions, conversation) = run_fake_turn(&request).await;
+    let (actions, conversation) = run_fake_turn(&request, says_done()).await;
     assert_tool_calls_answered(&conversation.messages);
 
     // The result is added to the task first, then the reply.
@@ -792,7 +802,8 @@ async fn a_turn_records_its_tool_results_before_the_reply() {
     next.push(recorded.clone());
     next.push(added[1].messages[0].clone());
     next.push(user_query("now count them"));
-    let (_, conversation) = run_fake_turn(&follow_up_request(next, "now count them")).await;
+    let (_, conversation) =
+        run_fake_turn(&follow_up_request(next, "now count them"), says_done()).await;
     assert_tool_calls_answered(&conversation.messages);
     let results: Vec<_> = conversation
         .messages
@@ -805,4 +816,144 @@ async fn a_turn_records_its_tool_results_before_the_reply() {
         .collect();
     assert_eq!(results.len(), 1);
     assert!(results[0].content.contains("a.txt"), "{results:#?}");
+}
+
+/// The output of every tool result the provider was sent.
+fn result_contents(conversation: &crate::model::Conversation) -> Vec<&str> {
+    conversation
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            NeutralMsg::ToolResults(results) => Some(results),
+            NeutralMsg::User(_) | NeutralMsg::Assistant { .. } => None,
+        })
+        .flatten()
+        .map(|r| r.content.as_str())
+        .collect()
+}
+
+#[tokio::test]
+async fn a_reused_tool_call_id_is_replaced_so_both_results_survive() {
+    use crate::providers::ProviderEvent;
+
+    // Round 1 ran `run_shell_command:1` and recorded its result.
+    let mut history = vec![
+        user_query("list files"),
+        shell_call("run_shell_command:1", "ls"),
+        wire::tool_call_result_message("m-1", &shell_result("run_shell_command:1", "a.txt")),
+        agent_text("There is one file."),
+    ];
+
+    // Round 2: a backend that numbers calls per response reuses that id, next
+    // to a call with a fresh one.
+    let reply = vec![
+        ProviderEvent::ToolCall {
+            id: "run_shell_command:1".into(),
+            name: "run_shell_command".into(),
+            input: json!({ "command": "ls -a" }),
+        },
+        ProviderEvent::ToolCall {
+            id: "call-fresh".into(),
+            name: "run_shell_command".into(),
+            input: json!({ "command": "pwd" }),
+        },
+        ProviderEvent::Done,
+    ];
+    let (actions, _) = run_fake_turn(
+        &follow_up_request(history.clone(), "and hidden ones?"),
+        reply,
+    )
+    .await;
+    let calls: Vec<_> = actions
+        .iter()
+        .filter_map(|action| match action {
+            api::client_action::Action::AddMessagesToTask(add) => Some(add.messages.clone()),
+            _ => None,
+        })
+        .flatten()
+        .filter(|m| matches!(m.message, Some(api::message::Message::ToolCall(_))))
+        .collect();
+    let ids: Vec<_> = calls
+        .iter()
+        .map(|m| match &m.message {
+            Some(api::message::Message::ToolCall(tc)) => tc.tool_call_id.clone(),
+            other => panic!("expected a tool call: {other:?}"),
+        })
+        .collect();
+    assert_eq!(ids.len(), 2, "{actions:#?}");
+    assert!(!ids[0].is_empty());
+    assert_ne!(
+        ids[0], "run_shell_command:1",
+        "a reused id must be replaced"
+    );
+    assert_eq!(ids[1], "call-fresh", "an unused id is kept");
+
+    // The client runs the calls and sends their results under the new ids.
+    history.push(user_query("and hidden ones?"));
+    history.extend(calls);
+    let request = tool_results_request(
+        history,
+        vec![
+            shell_result(&ids[0], ".hidden"),
+            shell_result(&ids[1], "/home"),
+        ],
+    );
+    let parsed = request_parse::parse(&request);
+    assert_eq!(
+        parsed.new_tool_results.len(),
+        2,
+        "both results are recorded"
+    );
+
+    let (_, conversation) = run_fake_turn(&request, says_done()).await;
+    assert_tool_calls_answered(&conversation.messages);
+    let contents = result_contents(&conversation);
+    assert_eq!(contents.len(), 3, "{contents:#?}");
+    assert!(contents[0].contains("a.txt"), "{contents:#?}");
+    assert!(contents[1].contains(".hidden"), "{contents:#?}");
+    assert!(contents[2].contains("/home"), "{contents:#?}");
+}
+
+#[tokio::test]
+async fn a_result_sent_with_an_attachment_stays_with_its_call() {
+    // The user types a query with a selection attached while a tool result is
+    // pending; the client sends the result and the query together.
+    let history = vec![user_query("list files"), shell_call("tc-1", "ls")];
+    let mut request = tool_results_request(history, vec![shell_result("tc-1", "a.txt")]);
+    let input = request.input.as_mut().unwrap();
+    input.context = Some(api::InputContext {
+        selected_text: vec![api::input_context::SelectedText {
+            text: "notes.md".into(),
+        }],
+        ..Default::default()
+    });
+    let Some(api::request::input::Type::UserInputs(inputs)) = &mut input.r#type else {
+        panic!("expected user inputs");
+    };
+    inputs
+        .inputs
+        .push(api::request::input::user_inputs::UserInput {
+            input: Some(
+                api::request::input::user_inputs::user_input::Input::UserQuery(
+                    api::request::input::UserQuery {
+                        query: "which of these is newer?".into(),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        });
+
+    let (_, conversation) = run_fake_turn(&request, says_done()).await;
+    assert_tool_calls_answered(&conversation.messages);
+    let contents = result_contents(&conversation);
+    assert_eq!(contents.len(), 1, "{contents:#?}");
+    assert!(
+        contents[0].contains("a.txt"),
+        "the real result is kept: {contents:#?}"
+    );
+    let Some(NeutralMsg::User(last)) = conversation.messages.last() else {
+        panic!("expected the user turn last: {:#?}", conversation.messages);
+    };
+    assert!(last.contains("notes.md"), "{last}");
+    assert!(last.contains("which of these is newer?"), "{last}");
 }

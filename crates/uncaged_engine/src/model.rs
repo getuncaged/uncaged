@@ -122,11 +122,12 @@ pub fn answer_tool_calls(messages: Vec<NeutralMsg>) -> Vec<NeutralMsg> {
     while let Some(message) = messages.next() {
         match message {
             NeutralMsg::Assistant { text, tool_uses } if !tool_uses.is_empty() => {
-                let mut recorded =
-                    match messages.next_if(|m| matches!(m, NeutralMsg::ToolResults(_))) {
-                        Some(NeutralMsg::ToolResults(results)) => results,
-                        _ => Vec::new(),
-                    };
+                let mut recorded = match messages
+                    .next_if(|m| matches!(m, NeutralMsg::ToolResults(_)))
+                {
+                    Some(NeutralMsg::ToolResults(results)) => results,
+                    Some(NeutralMsg::User(_) | NeutralMsg::Assistant { .. }) | None => Vec::new(),
+                };
                 let results = tool_uses
                     .iter()
                     .map(|call| match recorded.iter().position(|r| r.id == call.id) {
@@ -161,7 +162,7 @@ pub fn answer_tool_calls(messages: Vec<NeutralMsg>) -> Vec<NeutralMsg> {
                     );
                 }
             }
-            other => out.push(other),
+            message @ (NeutralMsg::User(_) | NeutralMsg::Assistant { .. }) => out.push(message),
         }
     }
     out

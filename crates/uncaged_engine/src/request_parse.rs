@@ -116,22 +116,43 @@ fn lower_input(
     // already folds in). Surface the *attachments* here so the model can actually
     // see them. `push_user` coalesces, so these merge with the query below into a
     // single user turn (keeps the backends' strict user/assistant alternation intact).
+    //
+    // Tool results go first, though: they answer the tool calls that end the
+    // history, and backends need each result right after its call. A query
+    // that brings in finished results can also carry attachments.
+    use api::request::input::Type;
+    use api::request::input::user_inputs::user_input::Input as I;
+    match &input.r#type {
+        Some(Type::UserInputs(user_inputs)) => {
+            for item in &user_inputs.inputs {
+                if let Some(I::ToolCallResult(tr)) = &item.input {
+                    push_input_result(builder, tr, seen_result_ids, new_tool_results);
+                }
+            }
+        }
+        // Deprecated direct form, still handled defensively.
+        Some(Type::ToolCallResult(tr)) => {
+            push_input_result(builder, tr, seen_result_ids, new_tool_results)
+        }
+        _ => {}
+    }
+
     if let Some(ctx) = &input.context {
         lower_attached_context(ctx, builder);
     }
 
-    use api::request::input::Type;
     match &input.r#type {
         Some(Type::UserInputs(user_inputs)) => {
             for item in &user_inputs.inputs {
-                lower_user_input(item, builder, seen_result_ids, new_tool_results);
+                if let Some(I::UserQuery(uq)) = &item.input {
+                    push_user_deduped(builder, &uq.query);
+                }
             }
         }
-        // Deprecated direct forms, still handled defensively.
+        // Deprecated direct forms, still handled defensively. Results were
+        // lowered above.
         Some(Type::UserQuery(uq)) => push_user_deduped(builder, &uq.query),
-        Some(Type::ToolCallResult(tr)) => {
-            push_input_result(builder, tr, seen_result_ids, new_tool_results)
-        }
+        Some(Type::ToolCallResult(_)) => {}
         // Hardcoded-prompt inputs: surface their user-visible text if present.
         Some(Type::CreateNewProject(p)) => push_user_deduped(builder, &p.query),
         Some(Type::CloneRepository(c)) => push_user_deduped(builder, &c.url),
@@ -228,22 +249,6 @@ fn lower_attached_context(ctx: &api::InputContext, builder: &mut Conversation) {
                 ),
             );
         }
-    }
-}
-
-fn lower_user_input(
-    item: &api::request::input::user_inputs::UserInput,
-    builder: &mut Conversation,
-    seen_result_ids: &mut HashSet<String>,
-    new_tool_results: &mut Vec<api::request::input::ToolCallResult>,
-) {
-    use api::request::input::user_inputs::user_input::Input as I;
-    match &item.input {
-        Some(I::UserQuery(uq)) => push_user_deduped(builder, &uq.query),
-        Some(I::ToolCallResult(tr)) => {
-            push_input_result(builder, tr, seen_result_ids, new_tool_results)
-        }
-        _ => {}
     }
 }
 

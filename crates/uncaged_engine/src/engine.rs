@@ -6,12 +6,15 @@
 //! plus tool calls), finish". When the client executes the tool calls it issues
 //! a fresh request, which is just another call into here.
 
+use std::collections::HashSet;
+
 use futures::StreamExt as _;
 use futures::channel::mpsc;
 use futures::stream::BoxStream;
 
 use crate::config::UncagedConfig;
 use crate::model::Conversation;
+use crate::model::NeutralMsg;
 use crate::proto::api;
 use crate::providers;
 use crate::providers::ProviderEvent;
@@ -114,6 +117,10 @@ async fn drive(
     // 4. Stream the assistant turn.
     let assistant_message_id = request_parse::new_id();
     let mut started_text = false;
+    // Tool-call ids must be unique across the conversation: results are paired
+    // with their calls by id, and some backends number calls per response, so
+    // they reuse ids ("run_shell_command:1") from turn to turn.
+    let mut tool_call_ids = used_tool_call_ids(&conversation);
 
     let mut events = provider.stream(conversation);
     while let Some(event) = events.next().await {
@@ -135,6 +142,12 @@ async fn drive(
             }
             ProviderEvent::ToolCall { id, name, input } => match registry.encode(&name, &input) {
                 Some(tool) => {
+                    let id = if id.is_empty() || tool_call_ids.contains(&id) {
+                        request_parse::new_id()
+                    } else {
+                        id
+                    };
+                    tool_call_ids.insert(id.clone());
                     let message_id = request_parse::new_id();
                     let message = wire::tool_call_message(&message_id, &id, tool);
                     let _ = tx.unbounded_send(Ok(wire::client_actions(vec![wire::add_message(
@@ -155,4 +168,17 @@ async fn drive(
 
     // 5. Finish.
     let _ = tx.unbounded_send(Ok(wire::finished_done()));
+}
+
+/// The ids of the tool calls already in `conversation`.
+fn used_tool_call_ids(conversation: &Conversation) -> HashSet<String> {
+    conversation
+        .messages
+        .iter()
+        .flat_map(|message| match message {
+            NeutralMsg::Assistant { tool_uses, .. } => tool_uses.as_slice(),
+            NeutralMsg::User(_) | NeutralMsg::ToolResults(_) => &[],
+        })
+        .map(|call| call.id.clone())
+        .collect()
 }
