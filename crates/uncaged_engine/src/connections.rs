@@ -322,18 +322,21 @@ pub fn load() -> Roster {
 /// to it, which is then renamed over it. A write that fails part-way leaves the
 /// previous roster intact instead of a truncated one.
 ///
-/// A symlinked roster is written through to its target (the link is kept), and
-/// on Unix the new file keeps the current roster's permissions: it holds API
-/// keys, so a roster restricted to its owner stays that way.
+/// The roster holds API keys. On Unix the temporary file is created private to
+/// its owner (`0600`) and only takes the current roster's permissions after the
+/// contents are on disk, so keys are never readable more widely than the roster
+/// already was, and a first roster is created owner-only. A symlinked roster is
+/// written through to its target (the link is kept). A hard-linked roster is
+/// split: the other name keeps the previous contents.
 fn write(roster: &Roster) -> anyhow::Result<()> {
     let json = serde_json::to_string_pretty(roster)?;
-    let path = write_target(roster_path());
+    let path = write_target(roster_path(), 0)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let tmp = roster_temp_path(&path);
-    // Only a staging file this call opened is cleaned up on failure.
-    let file = std::fs::File::create(&tmp)?;
+    let file = create_staging_file(&tmp)?;
+    // From here the staging file is this call's own, so it's removed on failure.
     if let Err(err) = stage(file, &path, &json).and_then(|()| std::fs::rename(&tmp, &path)) {
         let _ = std::fs::remove_file(&tmp);
         return Err(err.into());
@@ -341,28 +344,62 @@ fn write(roster: &Roster) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Fill (and close) the staging file for [`write`]. On Unix it first gets the
-/// current roster's permissions, so keys are never readable more widely than
-/// they were.
+/// Create the staging file for [`write`] exclusively, so the write never goes
+/// through something already at that name (a symlink, say). On Unix it starts
+/// private to its owner. A leftover at the name (from a crashed run that had
+/// the same pid) is removed first; if it can't be, the save fails.
+fn create_staging_file(tmp: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    match options.open(tmp) {
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+            std::fs::remove_file(tmp)?;
+            options.open(tmp)
+        }
+        result => result,
+    }
+}
+
+/// Fill, sync and close the staging file for [`write`]. On Unix it then takes
+/// the current roster's permissions, best-effort: if they can't be applied the
+/// roster ends up owner-only, never wider.
 fn stage(mut file: std::fs::File, current: &Path, json: &str) -> std::io::Result<()> {
+    file.write_all(json.as_bytes())?;
+    file.sync_all()?;
     if cfg!(unix)
         && let Ok(meta) = std::fs::metadata(current)
     {
-        file.set_permissions(meta.permissions())?;
+        let _ = file.set_permissions(meta.permissions());
     }
-    file.write_all(json.as_bytes())?;
-    file.sync_all()
+    Ok(())
 }
 
 /// The file [`write`] replaces: the roster path, or the file it links to when
 /// it's a symlink (so the rename updates the target instead of replacing the
-/// link). A broken link falls back to the path itself.
-fn write_target(path: PathBuf) -> PathBuf {
+/// link). A link whose target doesn't exist yet is followed to where the
+/// target would be, so the first save creates it there. `depth` bounds a chain
+/// of such links.
+fn write_target(path: PathBuf, depth: u32) -> std::io::Result<PathBuf> {
     let is_link = std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink());
-    if is_link {
-        std::fs::canonicalize(&path).unwrap_or(path)
-    } else {
-        path
+    if !is_link {
+        return Ok(path);
+    }
+    match std::fs::canonicalize(&path) {
+        Ok(target) => Ok(target),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound && depth < 40 => {
+            let link = std::fs::read_link(&path)?;
+            let next = match path.parent() {
+                Some(parent) => parent.join(link),
+                None => link,
+            };
+            write_target(next, depth + 1)
+        }
+        Err(err) => Err(err),
     }
 }
 

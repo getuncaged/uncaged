@@ -1046,23 +1046,36 @@ fn saving_keeps_the_roster_permissions() {
     let _guard = ENV_LOCK.lock().unwrap();
     isolate();
 
-    let (custom, _) = connections::claim_for_preset("custom").unwrap();
     let roster_path = connections::roster_path();
-    std::fs::set_permissions(&roster_path, std::fs::Permissions::from_mode(0o600)).unwrap();
-    connections::update(
-        &custom,
-        "Custom".to_string(),
-        "http://localhost:8000/v1".to_string(),
-        "qwen".to_string(),
-        Some("sk-test".to_string()),
-        Vec::new(),
-    )
-    .unwrap();
-    let mode = std::fs::metadata(&roster_path)
-        .unwrap()
-        .permissions()
-        .mode();
-    assert_eq!(mode & 0o777, 0o600);
+    let mode = || {
+        std::fs::metadata(&roster_path)
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777
+    };
+    let save_key = |id: &str| {
+        connections::update(
+            id,
+            "Custom".to_string(),
+            "http://localhost:8000/v1".to_string(),
+            "qwen".to_string(),
+            Some("sk-test".to_string()),
+            Vec::new(),
+        )
+        .unwrap();
+    };
+
+    // A first roster is created owner-only.
+    let (custom, _) = connections::claim_for_preset("custom").unwrap();
+    assert_eq!(mode(), 0o600);
+
+    // After that, a save keeps whatever the roster has.
+    for wanted in [0o640, 0o600] {
+        std::fs::set_permissions(&roster_path, std::fs::Permissions::from_mode(wanted)).unwrap();
+        save_key(&custom);
+        assert_eq!(mode(), wanted);
+    }
 }
 
 #[cfg(unix)]
@@ -1097,6 +1110,65 @@ fn saving_writes_through_a_symlinked_roster() {
     );
     assert!(
         std::fs::read_to_string(&target)
+            .unwrap()
+            .contains("\"qwen\"")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn saving_creates_the_target_of_a_dangling_roster_symlink() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let dir = isolate();
+
+    // The roster is a relative link to a file that doesn't exist yet.
+    let link = connections::roster_path();
+    std::fs::create_dir_all(dir.join("dotfiles")).unwrap();
+    std::os::unix::fs::symlink("dotfiles/connections.json", &link).unwrap();
+
+    connections::claim_for_preset("custom").unwrap();
+    assert!(
+        std::fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    let target = dir.join("dotfiles").join("connections.json");
+    assert!(
+        std::fs::read_to_string(&target)
+            .unwrap()
+            .contains("\"custom\"")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn saving_never_writes_through_a_planted_staging_file() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let dir = isolate();
+
+    let (custom, _) = connections::claim_for_preset("custom").unwrap();
+    let roster_path = connections::roster_path();
+
+    // Something is already at the staging name: a link to an unrelated file.
+    let decoy = dir.join("decoy.txt");
+    std::fs::write(&decoy, "decoy").unwrap();
+    let tmp = connections::roster_temp_path(&roster_path);
+    std::os::unix::fs::symlink(&decoy, &tmp).unwrap();
+
+    connections::update(
+        &custom,
+        "Custom".to_string(),
+        "http://localhost:8000/v1".to_string(),
+        "qwen".to_string(),
+        None,
+        Vec::new(),
+    )
+    .unwrap();
+    assert_eq!(std::fs::read_to_string(&decoy).unwrap(), "decoy");
+    assert!(std::fs::symlink_metadata(&tmp).is_err());
+    assert!(
+        std::fs::read_to_string(&roster_path)
             .unwrap()
             .contains("\"qwen\"")
     );
