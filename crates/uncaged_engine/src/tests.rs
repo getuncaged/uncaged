@@ -957,3 +957,219 @@ async fn a_result_sent_with_an_attachment_stays_with_its_call() {
     assert!(last.contains("notes.md"), "{last}");
     assert!(last.contains("which of these is newer?"), "{last}");
 }
+
+// ---- long-running commands (#50) ----
+
+/// What the client reports when it stops waiting for `du` while it still runs.
+fn still_running(id: &str) -> api::request::input::ToolCallResult {
+    api::request::input::ToolCallResult {
+        tool_call_id: id.into(),
+        result: Some(
+            api::request::input::tool_call_result::Result::RunShellCommand(
+                api::RunShellCommandResult {
+                    command: "du -sh .".into(),
+                    result: Some(
+                        api::run_shell_command_result::Result::LongRunningCommandSnapshot(
+                            api::LongRunningShellCommandSnapshot {
+                                output: "12G\t./Library<|cursor|>".into(),
+                                cursor: "<|cursor|>".into(),
+                                command_id: "block-7".into(),
+                                ..Default::default()
+                            },
+                        ),
+                    ),
+                    ..Default::default()
+                },
+            ),
+        ),
+    }
+}
+
+#[test]
+fn a_still_running_command_shows_its_output_and_how_to_follow_up() {
+    let result = crate::tools::decode_input_result(&still_running("tc-1"));
+    assert!(!result.is_error);
+    assert!(
+        result.content.contains("12G\t./Library"),
+        "{}",
+        result.content
+    );
+    assert!(!result.content.contains("<|cursor|>"), "{}", result.content);
+    assert!(result.content.contains("block-7"), "{}", result.content);
+    assert!(
+        result.content.contains("read_shell_command_output"),
+        "{}",
+        result.content
+    );
+}
+
+#[test]
+fn read_shell_command_output_waits_for_completion_unless_told_otherwise() {
+    use api::message::tool_call::Tool;
+    use api::message::tool_call::read_shell_command_output::Delay;
+
+    let registry = ToolRegistry::build(&api::Request::default());
+    let names: Vec<_> = registry.specs.iter().map(|s| s.name.as_str()).collect();
+    assert!(names.contains(&"read_shell_command_output"));
+    assert!(names.contains(&"write_to_long_running_shell_command"));
+
+    let encode = |input| match registry.encode("read_shell_command_output", &input) {
+        Some(Tool::ReadShellCommandOutput(read)) => read,
+        other => panic!("wrong tool: {other:?}"),
+    };
+    let wait = encode(json!({ "command_id": "block-7" }));
+    assert_eq!(wait.command_id, "block-7");
+    assert_eq!(wait.delay, Some(Delay::OnCompletion(())));
+    let peek = encode(json!({ "command_id": "block-7", "wait_seconds": 5 }));
+    let Some(Delay::Duration(duration)) = peek.delay else {
+        panic!("expected a duration: {peek:?}");
+    };
+    assert_eq!(duration.seconds, 5);
+
+    // Replayed from history as the same call.
+    let call = api::message::ToolCall {
+        tool_call_id: "tc-2".into(),
+        tool: Some(Tool::ReadShellCommandOutput(peek)),
+    };
+    let replayed = crate::tools::decode_tool_call(&call);
+    assert_eq!(replayed.name, "read_shell_command_output");
+    assert_eq!(
+        replayed.input,
+        json!({ "command_id": "block-7", "wait_seconds": 5 })
+    );
+}
+
+#[test]
+fn write_to_long_running_shell_command_sends_keys() {
+    use api::message::tool_call::Tool;
+    use api::message::tool_call::write_to_long_running_shell_command::mode::Mode as M;
+
+    let registry = ToolRegistry::build(&api::Request::default());
+    let encode = |input| match registry.encode("write_to_long_running_shell_command", &input) {
+        Some(Tool::WriteToLongRunningShellCommand(write)) => write,
+        other => panic!("wrong tool: {other:?}"),
+    };
+    let answer = encode(json!({ "command_id": "block-7", "input": "y" }));
+    assert_eq!(answer.input, b"y");
+    assert_eq!(answer.mode.and_then(|m| m.mode), Some(M::Line(())));
+    let interrupt = encode(json!({ "command_id": "block-7", "input": "\u{3}", "mode": "raw" }));
+    assert_eq!(interrupt.input, [3]);
+    assert_eq!(interrupt.mode.and_then(|m| m.mode), Some(M::Raw(())));
+
+    let call = api::message::ToolCall {
+        tool_call_id: "tc-3".into(),
+        tool: Some(Tool::WriteToLongRunningShellCommand(interrupt)),
+    };
+    let replayed = crate::tools::decode_tool_call(&call);
+    assert_eq!(replayed.name, "write_to_long_running_shell_command");
+    assert_eq!(
+        replayed.input,
+        json!({ "command_id": "block-7", "input": "\u{3}", "mode": "raw" })
+    );
+}
+
+#[test]
+fn following_up_on_a_command_reads_back_as_text() {
+    use api::request::input::tool_call_result::Result as R;
+
+    let finished = crate::tools::decode_input_result(&api::request::input::ToolCallResult {
+        tool_call_id: "tc-2".into(),
+        result: Some(R::ReadShellCommandOutput(
+            api::ReadShellCommandOutputResult {
+                command: "du -sh .".into(),
+                result: Some(
+                    api::read_shell_command_output_result::Result::CommandFinished(
+                        api::ShellCommandFinished {
+                            output: "45G\t.".into(),
+                            exit_code: 0,
+                            ..Default::default()
+                        },
+                    ),
+                ),
+            },
+        )),
+    });
+    assert!(!finished.is_error);
+    assert!(
+        finished.content.contains("$ du -sh ."),
+        "{}",
+        finished.content
+    );
+    assert!(finished.content.contains("45G"), "{}", finished.content);
+
+    let gone = crate::tools::decode_input_result(&api::request::input::ToolCallResult {
+        tool_call_id: "tc-3".into(),
+        result: Some(R::WriteToLongRunningShellCommand(
+            api::WriteToLongRunningShellCommandResult {
+                result: Some(
+                    api::write_to_long_running_shell_command_result::Result::Error(
+                        api::ShellCommandError {
+                            r#type: Some(api::shell_command_error::Type::CommandNotFound(())),
+                        },
+                    ),
+                ),
+            },
+        )),
+    });
+    assert!(gone.is_error);
+    assert!(gone.content.contains("command_id"), "{}", gone.content);
+}
+
+#[tokio::test]
+async fn the_agent_can_wait_for_a_slow_command_to_finish() {
+    use crate::providers::ProviderEvent;
+
+    // `du` is still running when the client stops waiting; the model waits for it.
+    let mut history = vec![user_query("disk usage?"), shell_call("tc-1", "du -sh .")];
+    let request = tool_results_request(history.clone(), vec![still_running("tc-1")]);
+    let reply = vec![
+        ProviderEvent::ToolCall {
+            id: "tc-2".into(),
+            name: "read_shell_command_output".into(),
+            input: json!({ "command_id": "block-7" }),
+        },
+        ProviderEvent::Done,
+    ];
+    let (actions, conversation) = run_fake_turn(&request, reply).await;
+    assert!(
+        result_contents(&conversation)[0].contains("block-7"),
+        "{conversation:#?}"
+    );
+    history.extend(
+        actions
+            .into_iter()
+            .filter_map(|action| match action {
+                api::client_action::Action::AddMessagesToTask(add) => Some(add.messages),
+                _ => None,
+            })
+            .flatten(),
+    );
+
+    // It finishes; the client sends the result of the wait.
+    let finished = api::request::input::ToolCallResult {
+        tool_call_id: "tc-2".into(),
+        result: Some(
+            api::request::input::tool_call_result::Result::ReadShellCommandOutput(
+                api::ReadShellCommandOutputResult {
+                    command: "du -sh .".into(),
+                    result: Some(
+                        api::read_shell_command_output_result::Result::CommandFinished(
+                            api::ShellCommandFinished {
+                                output: "45G\t.".into(),
+                                exit_code: 0,
+                                ..Default::default()
+                            },
+                        ),
+                    ),
+                },
+            ),
+        ),
+    };
+    let (_, conversation) =
+        run_fake_turn(&tool_results_request(history, vec![finished]), says_done()).await;
+    assert_tool_calls_answered(&conversation.messages);
+    let contents = result_contents(&conversation);
+    assert_eq!(contents.len(), 2, "{contents:#?}");
+    assert!(contents[0].contains("still running"), "{contents:#?}");
+    assert!(contents[1].contains("45G"), "{contents:#?}");
+}

@@ -32,6 +32,10 @@ const BUILTIN_SEARCH_CODEBASE: &str = "search_codebase";
 const BUILTIN_APPLY_DIFFS: &str = "apply_file_diffs";
 const BUILTIN_GREP: &str = "grep";
 const BUILTIN_FILE_GLOB: &str = "file_glob";
+// Follow up on a command still running after the client stopped waiting for it
+// (it reports a `LongRunningShellCommandSnapshot` with a `command_id`).
+const BUILTIN_READ_SHELL_OUTPUT: &str = "read_shell_command_output";
+const BUILTIN_WRITE_TO_SHELL: &str = "write_to_long_running_shell_command";
 // Not a PTY/filesystem tool: calling this emits a `SuggestPrompt` the client
 // renders as a one-click chip (passive follow-up suggestions). See
 // `request_parse::lower_passive_suggestion`.
@@ -85,6 +89,12 @@ impl ToolRegistry {
         }
         if supports(api::ToolType::SuggestPrompt) {
             specs.push(spec_suggest_prompt());
+        }
+        if supports(api::ToolType::ReadShellCommandOutput) {
+            specs.push(spec_read_shell_output());
+        }
+        if supports(api::ToolType::WriteToLongRunningShellCommand) {
+            specs.push(spec_write_to_shell());
         }
 
         // MCP tools: forward name/description/schema verbatim, remember which
@@ -151,6 +161,40 @@ impl ToolRegistry {
                 min_depth: int_field(input, "min_depth"),
             })),
             BUILTIN_APPLY_DIFFS => Some(tc::Tool::ApplyFileDiffs(encode_apply_diffs(input))),
+            BUILTIN_READ_SHELL_OUTPUT => {
+                use tc::read_shell_command_output::Delay;
+                // No `wait_seconds`: wait for the command to finish (the
+                // client caps that at two minutes).
+                let delay = match input.get("wait_seconds").and_then(Value::as_i64) {
+                    Some(seconds) => Delay::Duration(prost_types::Duration {
+                        seconds: seconds.max(0),
+                        nanos: 0,
+                    }),
+                    None => Delay::OnCompletion(()),
+                };
+                Some(tc::Tool::ReadShellCommandOutput(
+                    tc::ReadShellCommandOutput {
+                        command_id: str_field(input, "command_id"),
+                        delay: Some(delay),
+                    },
+                ))
+            }
+            BUILTIN_WRITE_TO_SHELL => {
+                use tc::write_to_long_running_shell_command::Mode;
+                use tc::write_to_long_running_shell_command::mode::Mode as M;
+                let mode = match str_field(input, "mode").as_str() {
+                    "raw" => M::Raw(()),
+                    "block" => M::Block(()),
+                    _ => M::Line(()),
+                };
+                Some(tc::Tool::WriteToLongRunningShellCommand(
+                    tc::WriteToLongRunningShellCommand {
+                        input: str_field(input, "input").into_bytes(),
+                        mode: Some(Mode { mode: Some(mode) }),
+                        command_id: str_field(input, "command_id"),
+                    },
+                ))
+            }
             // `label` is optional in the schema; an empty string maps to the
             // proto's "no label" (the client falls back to showing `prompt`).
             BUILTIN_SUGGEST_PROMPT => Some(tc::Tool::SuggestPrompt(tc::SuggestPrompt {
@@ -239,6 +283,32 @@ pub fn decode_tool_call(call: &api::message::ToolCall) -> ToolUse {
             json!({ "patterns": g.patterns, "search_dir": g.search_dir }),
         ),
         Some(Tool::ApplyFileDiffs(a)) => (BUILTIN_APPLY_DIFFS, json!({ "summary": a.summary })),
+        Some(Tool::ReadShellCommandOutput(r)) => {
+            use api::message::tool_call::read_shell_command_output::Delay;
+            let input = match r.delay {
+                Some(Delay::Duration(d)) => {
+                    json!({ "command_id": r.command_id, "wait_seconds": d.seconds })
+                }
+                Some(Delay::OnCompletion(())) | None => json!({ "command_id": r.command_id }),
+            };
+            (BUILTIN_READ_SHELL_OUTPUT, input)
+        }
+        Some(Tool::WriteToLongRunningShellCommand(w)) => {
+            use api::message::tool_call::write_to_long_running_shell_command::mode::Mode as M;
+            let mode = match w.mode.and_then(|m| m.mode) {
+                Some(M::Raw(())) | None => "raw",
+                Some(M::Line(())) => "line",
+                Some(M::Block(())) => "block",
+            };
+            (
+                BUILTIN_WRITE_TO_SHELL,
+                json!({
+                    "command_id": w.command_id,
+                    "input": String::from_utf8_lossy(&w.input),
+                    "mode": mode,
+                }),
+            )
+        }
         Some(Tool::CallMcpTool(m)) => (
             m.name.as_str(),
             m.args.as_ref().map(struct_to_json).unwrap_or(json!({})),
@@ -263,6 +333,8 @@ pub fn decode_history_result(result: &api::message::ToolCallResult) -> ToolResul
         Some(R::Grep(r)) => format_grep(r),
         Some(R::FileGlobV2(r)) => format_file_glob(r),
         Some(R::CallMcpTool(r)) => format_mcp(r),
+        Some(R::ReadShellCommandOutput(r)) => format_read_shell_output(r),
+        Some(R::WriteToLongRunningShellCommand(r)) => format_write_to_shell(r),
         Some(other) => (format!("{other:?}"), false),
         None => ("(no result)".to_string(), false),
     };
@@ -286,6 +358,8 @@ pub fn decode_input_result(result: &api::request::input::ToolCallResult) -> Tool
         Some(R::Grep(r)) => format_grep(r),
         Some(R::FileGlobV2(r)) => format_file_glob(r),
         Some(R::CallMcpTool(r)) => format_mcp(r),
+        Some(R::ReadShellCommandOutput(r)) => format_read_shell_output(r),
+        Some(R::WriteToLongRunningShellCommand(r)) => format_write_to_shell(r),
         Some(other) => (format!("{other:?}"), false),
         None => ("(no result)".to_string(), false),
     };
@@ -301,20 +375,95 @@ pub fn decode_input_result(result: &api::request::input::ToolCallResult) -> Tool
 fn format_shell_result(r: &api::RunShellCommandResult) -> (String, bool) {
     use api::run_shell_command_result::Result as R;
     match &r.result {
-        Some(R::CommandFinished(f)) => {
-            let header = format!("$ {}\n(exit code {})", r.command, f.exit_code);
-            (format!("{header}\n{}", f.output), f.exit_code != 0)
-        }
+        Some(R::CommandFinished(f)) => format_finished(&r.command, f),
         Some(R::PermissionDenied(_)) => (
             format!("$ {}\n(permission denied by user)", r.command),
             true,
         ),
-        Some(R::LongRunningCommandSnapshot(_)) => (
-            format!("$ {}\n(command is still running)", r.command),
-            false,
-        ),
+        Some(R::LongRunningCommandSnapshot(s)) => format_snapshot(&r.command, s),
         None => (format!("$ {}\n(no output)", r.command), false),
     }
+}
+
+fn format_read_shell_output(r: &api::ReadShellCommandOutputResult) -> (String, bool) {
+    use api::read_shell_command_output_result::Result as R;
+    match &r.result {
+        Some(R::CommandFinished(f)) => format_finished(&r.command, f),
+        Some(R::LongRunningCommandSnapshot(s)) => format_snapshot(&r.command, s),
+        Some(R::Error(e)) => format_shell_error(e),
+        None => ("(no result)".to_string(), false),
+    }
+}
+
+fn format_write_to_shell(r: &api::WriteToLongRunningShellCommandResult) -> (String, bool) {
+    use api::write_to_long_running_shell_command_result::Result as R;
+    match &r.result {
+        Some(R::CommandFinished(f)) => format_finished("", f),
+        Some(R::LongRunningCommandSnapshot(s)) => format_snapshot("", s),
+        Some(R::Error(e)) => format_shell_error(e),
+        None => ("(no result)".to_string(), false),
+    }
+}
+
+/// `$ command`, when the result names it.
+fn command_line(command: &str) -> String {
+    if command.is_empty() {
+        String::new()
+    } else {
+        format!("$ {command}\n")
+    }
+}
+
+fn format_finished(command: &str, f: &api::ShellCommandFinished) -> (String, bool) {
+    (
+        format!(
+            "{}(exit code {})\n{}",
+            command_line(command),
+            f.exit_code,
+            f.output
+        ),
+        f.exit_code != 0,
+    )
+}
+
+/// A command the client stopped waiting for while it was still running. The
+/// terminal can't run another command until it finishes, so tell the model how
+/// to follow up on it.
+fn format_snapshot(command: &str, s: &api::LongRunningShellCommandSnapshot) -> (String, bool) {
+    let screen = if s.is_alt_screen_active {
+        "It is showing a full-screen program. Its screen"
+    } else {
+        "Its output so far"
+    };
+    // The client marks the cursor position; that's noise to the model.
+    let output = if s.cursor.is_empty() {
+        s.output.clone()
+    } else {
+        s.output.replace(&s.cursor, "")
+    };
+    (
+        format!(
+            "{}(still running, command_id: {id})\n\
+             {screen}:\n{output}\n\n\
+             The terminal can't run another command until this one finishes. Use \
+             `{BUILTIN_READ_SHELL_OUTPUT}` with command_id \"{id}\" to wait for it or check on \
+             it, or `{BUILTIN_WRITE_TO_SHELL}` to answer a prompt or stop it.",
+            command_line(command),
+            id = s.command_id,
+        ),
+        false,
+    )
+}
+
+fn format_shell_error(e: &api::ShellCommandError) -> (String, bool) {
+    use api::shell_command_error::Type;
+    let message = match e.r#type {
+        Some(Type::CommandNotFound(())) => {
+            "No command with that command_id is running in this terminal."
+        }
+        None => "The command could not be reached.",
+    };
+    (message.to_string(), true)
 }
 
 fn format_read_files(r: &api::ReadFilesResult) -> (String, bool) {
@@ -458,6 +607,60 @@ fn spec_run_shell() -> ToolSpec {
                 "command": { "type": "string", "description": "The shell command to run." }
             },
             "required": ["command"]
+        }),
+    }
+}
+
+fn spec_read_shell_output() -> ToolSpec {
+    ToolSpec {
+        name: BUILTIN_READ_SHELL_OUTPUT.into(),
+        description: "Wait for a command that is still running (one whose result said \
+            \"still running\" and gave a command_id) and read its output. By default this \
+            waits until the command finishes, for up to two minutes; if it is still running \
+            then, you get its output so far and can wait again."
+            .into(),
+        schema: json!({
+            "type": "object",
+            "properties": {
+                "command_id": {
+                    "type": "string",
+                    "description": "The command_id from the command's \"still running\" result."
+                },
+                "wait_seconds": {
+                    "type": "integer",
+                    "description": "Read the output after this many seconds instead of waiting \
+                        for the command to finish. Use 0 to read it now."
+                }
+            },
+            "required": ["command_id"]
+        }),
+    }
+}
+
+fn spec_write_to_shell() -> ToolSpec {
+    ToolSpec {
+        name: BUILTIN_WRITE_TO_SHELL.into(),
+        description: "Send input to a command that is still running, for example to answer \
+            its prompt, or to stop it with Ctrl-C (mode \"raw\", input \"\\u0003\"). The \
+            user may be asked to approve it. Returns the command's output afterwards."
+            .into(),
+        schema: json!({
+            "type": "object",
+            "properties": {
+                "command_id": {
+                    "type": "string",
+                    "description": "The command_id from the command's \"still running\" result."
+                },
+                "input": { "type": "string", "description": "The text to send." },
+                "mode": {
+                    "type": "string",
+                    "enum": ["line", "raw", "block"],
+                    "description": "\"line\" (default) types the text and presses Enter; \
+                        \"raw\" sends the bytes as-is (for control keys); \"block\" pastes \
+                        multi-line text."
+                }
+            },
+            "required": ["command_id", "input"]
         }),
     }
 }
