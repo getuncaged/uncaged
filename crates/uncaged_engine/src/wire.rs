@@ -129,3 +129,72 @@ pub fn tool_call_message(
         ..Default::default()
     }
 }
+
+/// A tool-call result, as a task message. The client keeps a tool call's
+/// result in its history only when the server adds it to the task (as Warp's
+/// own server does); without it, later requests replay the call with no
+/// result, which OpenAI-compatible and Anthropic backends reject.
+pub fn tool_call_result_message(
+    message_id: &str,
+    result: &api::request::input::ToolCallResult,
+) -> api::Message {
+    api::Message {
+        id: message_id.to_string(),
+        message: Some(api::message::Message::ToolCallResult(
+            api::message::ToolCallResult {
+                tool_call_id: result.tool_call_id.clone(),
+                result: result.result.as_ref().map(history_result),
+                ..Default::default()
+            },
+        )),
+        ..Default::default()
+    }
+}
+
+/// The same result in the history message's type: both oneofs wrap the same
+/// result messages, under (almost) the same variant names.
+// `FileGlob` is deprecated in favour of `FileGlobV2`, but is still carried over.
+#[allow(deprecated)]
+fn history_result(
+    result: &api::request::input::tool_call_result::Result,
+) -> api::message::tool_call_result::Result {
+    use api::message::tool_call_result::Result as Out;
+    use api::request::input::tool_call_result::Result as In;
+    match result {
+        In::RunShellCommand(r) => Out::RunShellCommand(r.clone()),
+        In::ReadFiles(r) => Out::ReadFiles(r.clone()),
+        In::SearchCodebase(r) => Out::SearchCodebase(r.clone()),
+        In::ApplyFileDiffs(r) => Out::ApplyFileDiffs(r.clone()),
+        In::SuggestPlan(r) => Out::SuggestPlan(r.clone()),
+        In::SuggestCreatePlan(r) => Out::SuggestCreatePlan(*r),
+        In::Grep(r) => Out::Grep(r.clone()),
+        In::FileGlob(r) => Out::FileGlob(r.clone()),
+        In::ReadMcpResource(r) => Out::ReadMcpResource(r.clone()),
+        In::CallMcpTool(r) => Out::CallMcpTool(r.clone()),
+        In::WriteToLongRunningShellCommand(r) => Out::WriteToLongRunningShellCommand(r.clone()),
+        In::SuggestNewConversation(r) => Out::SuggestNewConversation(r.clone()),
+        In::FileGlobV2(r) => Out::FileGlobV2(r.clone()),
+        In::SuggestPrompt(r) => Out::SuggestPrompt(*r),
+        In::OpenCodeReview(r) => Out::OpenCodeReview(*r),
+        In::InitProject(r) => Out::InitProject(*r),
+        In::ReadDocuments(r) => Out::ReadDocuments(r.clone()),
+        In::EditDocuments(r) => Out::EditDocuments(r.clone()),
+        In::CreateDocuments(r) => Out::CreateDocuments(r.clone()),
+        In::ReadShellCommandOutput(r) => Out::ReadShellCommandOutput(r.clone()),
+        In::UseComputer(r) => Out::UseComputer(r.clone()),
+        In::InsertReviewComments(r) => Out::InsertReviewComments(r.clone()),
+        In::RequestComputerUse(r) => Out::RequestComputerUseResult(r.clone()),
+        In::ReadSkill(r) => Out::ReadSkill(r.clone()),
+        In::FetchConversation(r) => Out::FetchConversation(r.clone()),
+        In::StartAgent(r) => Out::StartAgent(r.clone()),
+        In::SendMessageToAgent(r) => Out::SendMessageToAgent(r.clone()),
+        In::TransferShellCommandControlToUser(r) => {
+            Out::TransferShellCommandControlToUser(r.clone())
+        }
+        In::AskUserQuestion(r) => Out::AskUserQuestion(r.clone()),
+        In::StartAgentV2(r) => Out::StartAgentV2(r.clone()),
+        In::UploadFileArtifact(r) => Out::UploadFileArtifact(r.clone()),
+        In::RunAgentsResult(r) => Out::RunAgentsResult(r.clone()),
+        In::WaitForEvents(r) => Out::WaitForEvents(*r),
+    }
+}
