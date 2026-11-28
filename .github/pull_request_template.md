@@ -21,9 +21,6 @@ You can run the app locally using `./script/run` - see AGENTS.md for more detail
 ### Screenshots / Videos
 <!-- Attach screenshots or a short video demonstrating the change, where appropriate. Remove this section if it is not relevant to your PR. -->
 
-## Agent Mode
-- [ ] Warp Agent Mode - This PR was created via Warp's AI Agent Mode
-
 <!--
 ## Changelog Entries for Stable
 
