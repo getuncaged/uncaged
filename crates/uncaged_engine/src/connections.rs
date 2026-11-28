@@ -323,32 +323,41 @@ pub fn load() -> Roster {
 /// previous roster intact instead of a truncated one.
 ///
 /// The roster holds API keys. On Unix the temporary file is created private to
-/// its owner (`0600`) and only takes the current roster's permissions after the
-/// contents are on disk, so keys are never readable more widely than the roster
-/// already was, and a first roster is created owner-only. A symlinked roster is
-/// written through to its target (the link is kept). A hard-linked roster is
-/// split: the other name keeps the previous contents.
+/// its owner (`0600`), and only after the contents are on disk does it take the
+/// current roster's permissions, and only when it also has the roster's owner
+/// and group; otherwise it stays owner-only. So the keys are never readable by
+/// anyone who couldn't read the roster, and a first roster is owner-only. A
+/// symlinked roster is written through to its target (the link is kept). A
+/// hard-linked roster is split: the other name keeps the previous contents.
 fn write(roster: &Roster) -> anyhow::Result<()> {
     let json = serde_json::to_string_pretty(roster)?;
     let path = write_target(roster_path(), 0)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let tmp = roster_temp_path(&path);
-    let file = create_staging_file(&tmp)?;
+    let (tmp, file) = create_staging_file(&path)?;
     // From here the staging file is this call's own, so it's removed on failure.
-    if let Err(err) = stage(file, &path, &json).and_then(|()| std::fs::rename(&tmp, &path)) {
+    let replaced = stage(file, &json).and_then(|file| {
+        #[cfg(unix)]
+        keep_roster_access(&file, &path);
+        drop(file);
+        std::fs::rename(&tmp, &path)
+    });
+    if let Err(err) = replaced {
         let _ = std::fs::remove_file(&tmp);
         return Err(err.into());
     }
     Ok(())
 }
 
+/// How many staging names [`write`] tries before giving up.
+pub(crate) const STAGING_ATTEMPTS: u32 = 8;
+
 /// Create the staging file for [`write`] exclusively, so the write never goes
-/// through something already at that name (a symlink, say). On Unix it starts
-/// private to its owner. A leftover at the name (from a crashed run that had
-/// the same pid) is removed first; if it can't be, the save fails.
-fn create_staging_file(tmp: &Path) -> std::io::Result<std::fs::File> {
+/// through something already at that name (a symlink, say), and never removes
+/// it either: a taken name (e.g. a crashed run's leftover) is skipped for the
+/// next one. On Unix it starts private to its owner.
+fn create_staging_file(path: &Path) -> std::io::Result<(PathBuf, std::fs::File)> {
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -356,37 +365,51 @@ fn create_staging_file(tmp: &Path) -> std::io::Result<std::fs::File> {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    match options.open(tmp) {
-        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
-            std::fs::remove_file(tmp)?;
-            options.open(tmp)
+    let mut last_err = None;
+    for attempt in 0..STAGING_ATTEMPTS {
+        let tmp = roster_temp_path(path, attempt);
+        match options.open(&tmp) {
+            Ok(file) => return Ok((tmp, file)),
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => last_err = Some(err),
+            Err(err) => return Err(err),
         }
-        result => result,
     }
+    Err(last_err.unwrap_or_else(|| std::io::Error::other("no staging file name to try")))
 }
 
-/// Fill, sync and close the staging file for [`write`]. On Unix it then takes
-/// the current roster's permissions, best-effort: if they can't be applied the
-/// roster ends up owner-only, never wider.
-fn stage(mut file: std::fs::File, current: &Path, json: &str) -> std::io::Result<()> {
+/// Fill and sync the staging file for [`write`].
+fn stage(mut file: std::fs::File, json: &str) -> std::io::Result<std::fs::File> {
     file.write_all(json.as_bytes())?;
     file.sync_all()?;
-    if cfg!(unix)
-        && let Ok(meta) = std::fs::metadata(current)
-    {
-        let _ = file.set_permissions(meta.permissions());
+    Ok(file)
+}
+
+/// Give the synced staging file the current roster's permissions, but only if
+/// it has (or can be given) the roster's owner and group: the same mode bits
+/// under another group would let that group read the keys. Best-effort: when
+/// anything doesn't match or fails, the file stays owner-only, never wider.
+#[cfg(unix)]
+fn keep_roster_access(file: &std::fs::File, current: &Path) {
+    use std::os::unix::fs::MetadataExt;
+
+    let (Ok(roster), Ok(staged)) = (std::fs::metadata(current), file.metadata()) else {
+        return;
+    };
+    let same_group = staged.gid() == roster.gid()
+        || std::os::unix::fs::fchown(file, None, Some(roster.gid())).is_ok();
+    if staged.uid() == roster.uid() && same_group {
+        let _ = file.set_permissions(roster.permissions());
     }
-    Ok(())
 }
 
 /// The file [`write`] replaces: the roster path, or the file it links to when
 /// it's a symlink (so the rename updates the target instead of replacing the
 /// link). A link whose target doesn't exist yet is followed to where the
 /// target would be, so the first save creates it there. `depth` bounds a chain
-/// of such links.
+/// of such links. A link loop or any other resolution error fails the save and
+/// leaves the link as it is.
 fn write_target(path: PathBuf, depth: u32) -> std::io::Result<PathBuf> {
-    let is_link = std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink());
-    if !is_link {
+    if !path.is_symlink() {
         return Ok(path);
     }
     match std::fs::canonicalize(&path) {
@@ -403,16 +426,17 @@ fn write_target(path: PathBuf, depth: u32) -> std::io::Result<PathBuf> {
     }
 }
 
-/// The temporary file [`write`] stages the roster in: same directory (so the
-/// rename stays on one filesystem), named per process so two app instances
-/// saving at once don't share it. Roster writes in one process all run on the
-/// UI thread, so they never share it either.
-pub(crate) fn roster_temp_path(path: &Path) -> PathBuf {
+/// The `attempt`th temporary name [`write`] may stage the roster in: same
+/// directory (so the rename stays on one filesystem), named per process so two
+/// app instances saving at once don't collide. Roster writes in one process all
+/// run on the UI thread, so they never collide either.
+pub(crate) fn roster_temp_path(path: &Path, attempt: u32) -> PathBuf {
     let name = path
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "connections.json".to_string());
-    path.with_file_name(format!(".{name}.{}.tmp", std::process::id()))
+    let pid = std::process::id();
+    path.with_file_name(format!(".{name}.{pid}-{attempt}.tmp"))
 }
 
 /// Read the roster, first-run-seeding it from an existing `engine.json` so a

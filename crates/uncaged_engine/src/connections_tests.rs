@@ -951,10 +951,14 @@ fn a_failed_roster_write_leaves_the_previous_roster_intact() {
     let roster_path = connections::roster_path();
     let before = std::fs::read(&roster_path).unwrap();
 
-    // The staging file can't be written (its path is a directory), so the
-    // write fails before anything replaces the roster.
-    let tmp = connections::roster_temp_path(&roster_path);
-    std::fs::create_dir_all(&tmp).unwrap();
+    // Every staging name is taken (by directories), so the write fails before
+    // anything replaces the roster.
+    let taken: Vec<_> = (0..connections::STAGING_ATTEMPTS)
+        .map(|attempt| connections::roster_temp_path(&roster_path, attempt))
+        .collect();
+    for tmp in &taken {
+        std::fs::create_dir_all(tmp).unwrap();
+    }
     let err = connections::update(
         &custom,
         "Custom".to_string(),
@@ -965,9 +969,14 @@ fn a_failed_roster_write_leaves_the_previous_roster_intact() {
     );
     assert!(err.is_err());
     assert_eq!(std::fs::read(&roster_path).unwrap(), before);
+    for tmp in &taken {
+        assert!(tmp.is_dir(), "a taken staging name was removed");
+    }
 
-    // Once it can be written, the save lands and leaves no staging file behind.
-    std::fs::remove_dir(&tmp).unwrap();
+    // Once a name is free, the save lands and leaves no staging file behind.
+    for tmp in &taken {
+        std::fs::remove_dir(tmp).unwrap();
+    }
     connections::update(
         &custom,
         "Custom".to_string(),
@@ -977,7 +986,7 @@ fn a_failed_roster_write_leaves_the_previous_roster_intact() {
         Vec::new(),
     )
     .unwrap();
-    assert!(!tmp.exists());
+    assert!(taken.iter().all(|tmp| !tmp.exists()));
     let saved = connections::load()
         .connections
         .into_iter()
@@ -1143,18 +1152,21 @@ fn saving_creates_the_target_of_a_dangling_roster_symlink() {
 
 #[cfg(unix)]
 #[test]
-fn saving_never_writes_through_a_planted_staging_file() {
+fn saving_leaves_whatever_is_at_a_staging_name_alone() {
     let _guard = ENV_LOCK.lock().unwrap();
     let dir = isolate();
 
     let (custom, _) = connections::claim_for_preset("custom").unwrap();
     let roster_path = connections::roster_path();
 
-    // Something is already at the staging name: a link to an unrelated file.
+    // The first staging names are taken: by an unrelated file, and by a link
+    // to another unrelated file.
+    let leftover = connections::roster_temp_path(&roster_path, 0);
+    std::fs::write(&leftover, "leftover").unwrap();
     let decoy = dir.join("decoy.txt");
     std::fs::write(&decoy, "decoy").unwrap();
-    let tmp = connections::roster_temp_path(&roster_path);
-    std::os::unix::fs::symlink(&decoy, &tmp).unwrap();
+    let link = connections::roster_temp_path(&roster_path, 1);
+    std::os::unix::fs::symlink(&decoy, &link).unwrap();
 
     connections::update(
         &custom,
@@ -1165,11 +1177,63 @@ fn saving_never_writes_through_a_planted_staging_file() {
         Vec::new(),
     )
     .unwrap();
+    // Neither is written through, truncated or removed; the save still lands.
+    assert_eq!(std::fs::read_to_string(&leftover).unwrap(), "leftover");
     assert_eq!(std::fs::read_to_string(&decoy).unwrap(), "decoy");
-    assert!(std::fs::symlink_metadata(&tmp).is_err());
+    assert!(
+        std::fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert!(!connections::roster_temp_path(&roster_path, 2).exists());
     assert!(
         std::fs::read_to_string(&roster_path)
             .unwrap()
             .contains("\"qwen\"")
     );
+}
+
+#[cfg(unix)]
+#[test]
+// `id -G` lists the user's groups; Unix only, so no Windows console to flash.
+#[allow(clippy::disallowed_types)]
+fn saving_keeps_the_roster_group_with_its_mode() {
+    use std::os::unix::fs::MetadataExt;
+    use std::os::unix::fs::PermissionsExt;
+
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    let (custom, _) = connections::claim_for_preset("custom").unwrap();
+    let roster_path = connections::roster_path();
+
+    // Move the roster to another of this user's groups, readable by it. Skip
+    // where the user has no other group.
+    let own_gid = std::fs::metadata(&roster_path).unwrap().gid();
+    let groups = std::process::Command::new("id").arg("-G").output().unwrap();
+    let other_gid = String::from_utf8_lossy(&groups.stdout)
+        .split_whitespace()
+        .filter_map(|g| g.parse::<u32>().ok())
+        .find(|&g| g != own_gid);
+    let Some(other_gid) = other_gid else {
+        return;
+    };
+    if std::os::unix::fs::chown(&roster_path, None, Some(other_gid)).is_err() {
+        return;
+    }
+    std::fs::set_permissions(&roster_path, std::fs::Permissions::from_mode(0o640)).unwrap();
+
+    connections::update(
+        &custom,
+        "Custom".to_string(),
+        "http://localhost:8000/v1".to_string(),
+        "qwen".to_string(),
+        Some("sk-test".to_string()),
+        Vec::new(),
+    )
+    .unwrap();
+    let meta = std::fs::metadata(&roster_path).unwrap();
+    assert_eq!(meta.gid(), other_gid);
+    assert_eq!(meta.permissions().mode() & 0o777, 0o640);
 }

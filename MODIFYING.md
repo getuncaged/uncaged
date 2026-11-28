@@ -249,7 +249,10 @@ Env overrides beat the files for quick experiments:
 > Security note: API keys currently live in `connections.json` in plaintext.
 > Moving them to the OS keychain is a tracked follow-up (DIRECTION.md → backlog);
 > the infra (`warpui_extras` `secure_storage` / `security-framework`) is already
-> in the tree.
+> in the tree. On Unix a new `connections.json` is created owner-only (`0600`);
+> later saves keep its mode, owner and group (or fall back to owner-only), so a
+> roster at a `$UNCAGED_CONNECTIONS` path shared with another account needs its
+> permissions set by hand.
 
 ---
 
