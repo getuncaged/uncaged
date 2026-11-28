@@ -155,7 +155,9 @@ async fn drive(
                     )])));
                 }
                 None => {
-                    tracing::warn!("uncaged: model called unknown tool `{name}`, ignoring");
+                    tracing::warn!(
+                        "uncaged: model called unknown tool `{name}` or gave it invalid arguments, ignoring"
+                    );
                 }
             },
             ProviderEvent::Done => break,

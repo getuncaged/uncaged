@@ -989,12 +989,17 @@ fn still_running(id: &str) -> api::request::input::ToolCallResult {
 fn a_still_running_command_shows_its_output_and_how_to_follow_up() {
     let result = crate::tools::decode_input_result(&still_running("tc-1"));
     assert!(!result.is_error);
+    // The output as the client sent it, with its cursor marker explained.
     assert!(
-        result.content.contains("12G\t./Library"),
+        result.content.contains("12G\t./Library<|cursor|>"),
         "{}",
         result.content
     );
-    assert!(!result.content.contains("<|cursor|>"), "{}", result.content);
+    assert!(
+        result.content.contains("<|cursor|> marks the cursor"),
+        "{}",
+        result.content
+    );
     assert!(result.content.contains("block-7"), "{}", result.content);
     assert!(
         result.content.contains("read_shell_command_output"),
@@ -1020,11 +1025,22 @@ fn read_shell_command_output_waits_for_completion_unless_told_otherwise() {
     let wait = encode(json!({ "command_id": "block-7" }));
     assert_eq!(wait.command_id, "block-7");
     assert_eq!(wait.delay, Some(Delay::OnCompletion(())));
+    let seconds =
+        |wait| match encode(json!({ "command_id": "block-7", "wait_seconds": wait })).delay {
+            Some(Delay::Duration(duration)) => duration.seconds,
+            other => panic!("expected a duration: {other:?}"),
+        };
+    assert_eq!(seconds(json!(5)), 5);
+    assert_eq!(seconds(json!(5.0)), 5);
+    assert_eq!(seconds(json!(-3)), 0);
+    assert_eq!(seconds(json!(500)), 120, "the client's cap");
+    let not_a_number = json!({ "command_id": "block-7", "wait_seconds": "soon" });
+    assert!(
+        registry
+            .encode("read_shell_command_output", &not_a_number)
+            .is_none()
+    );
     let peek = encode(json!({ "command_id": "block-7", "wait_seconds": 5 }));
-    let Some(Delay::Duration(duration)) = peek.delay else {
-        panic!("expected a duration: {peek:?}");
-    };
-    assert_eq!(duration.seconds, 5);
 
     // Replayed from history as the same call.
     let call = api::message::ToolCall {
@@ -1036,6 +1052,21 @@ fn read_shell_command_output_waits_for_completion_unless_told_otherwise() {
     assert_eq!(
         replayed.input,
         json!({ "command_id": "block-7", "wait_seconds": 5 })
+    );
+
+    // A read with no delay waits the client's default two seconds.
+    let call = api::message::ToolCall {
+        tool_call_id: "tc-2".into(),
+        tool: Some(Tool::ReadShellCommandOutput(
+            api::message::tool_call::ReadShellCommandOutput {
+                command_id: "block-7".into(),
+                delay: None,
+            },
+        )),
+    };
+    assert_eq!(
+        crate::tools::decode_tool_call(&call).input,
+        json!({ "command_id": "block-7", "wait_seconds": 2 })
     );
 }
 
@@ -1049,12 +1080,30 @@ fn write_to_long_running_shell_command_sends_keys() {
         Some(Tool::WriteToLongRunningShellCommand(write)) => write,
         other => panic!("wrong tool: {other:?}"),
     };
+    // A line is the text plus Enter, with nothing in front of it.
     let answer = encode(json!({ "command_id": "block-7", "input": "y" }));
-    assert_eq!(answer.input, b"y");
-    assert_eq!(answer.mode.and_then(|m| m.mode), Some(M::Line(())));
+    assert_eq!(answer.input, b"y\r");
+    assert_eq!(answer.mode.and_then(|m| m.mode), Some(M::Raw(())));
+    let enter = encode(json!({ "command_id": "block-7", "input": "", "mode": "line" }));
+    assert_eq!(enter.input, b"\r");
     let interrupt = encode(json!({ "command_id": "block-7", "input": "\u{3}", "mode": "raw" }));
     assert_eq!(interrupt.input, [3]);
     assert_eq!(interrupt.mode.and_then(|m| m.mode), Some(M::Raw(())));
+
+    // A malformed call writes nothing.
+    for input in [
+        json!({ "command_id": "block-7" }),
+        json!({ "command_id": "block-7", "input": 42 }),
+        json!({ "command_id": "block-7", "input": "y", "mode": "block" }),
+        json!({ "command_id": "block-7", "input": "y", "mode": "typo" }),
+    ] {
+        assert!(
+            registry
+                .encode("write_to_long_running_shell_command", &input)
+                .is_none(),
+            "{input}"
+        );
+    }
 
     let call = api::message::ToolCall {
         tool_call_id: "tc-3".into(),

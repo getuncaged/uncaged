@@ -36,6 +36,8 @@ const BUILTIN_FILE_GLOB: &str = "file_glob";
 // (it reports a `LongRunningShellCommandSnapshot` with a `command_id`).
 const BUILTIN_READ_SHELL_OUTPUT: &str = "read_shell_command_output";
 const BUILTIN_WRITE_TO_SHELL: &str = "write_to_long_running_shell_command";
+/// The longest wait the client honours for one read.
+const MAX_WAIT_SECONDS: f64 = 120.0;
 // Not a PTY/filesystem tool: calling this emits a `SuggestPrompt` the client
 // renders as a one-click chip (passive follow-up suggestions). See
 // `request_parse::lower_passive_suggestion`.
@@ -164,13 +166,16 @@ impl ToolRegistry {
             BUILTIN_READ_SHELL_OUTPUT => {
                 use tc::read_shell_command_output::Delay;
                 // No `wait_seconds`: wait for the command to finish (the
-                // client caps that at two minutes).
-                let delay = match input.get("wait_seconds").and_then(Value::as_i64) {
-                    Some(seconds) => Delay::Duration(prost_types::Duration {
-                        seconds: seconds.max(0),
-                        nanos: 0,
-                    }),
-                    None => Delay::OnCompletion(()),
+                // client caps any wait at two minutes).
+                let delay = match input.get("wait_seconds") {
+                    None | Some(Value::Null) => Delay::OnCompletion(()),
+                    Some(seconds) => {
+                        let seconds = seconds.as_f64().filter(|s| s.is_finite())?;
+                        Delay::Duration(prost_types::Duration {
+                            seconds: seconds.round().clamp(0.0, MAX_WAIT_SECONDS) as i64,
+                            nanos: 0,
+                        })
+                    }
                 };
                 Some(tc::Tool::ReadShellCommandOutput(
                     tc::ReadShellCommandOutput {
@@ -182,15 +187,22 @@ impl ToolRegistry {
             BUILTIN_WRITE_TO_SHELL => {
                 use tc::write_to_long_running_shell_command::Mode;
                 use tc::write_to_long_running_shell_command::mode::Mode as M;
-                let mode = match str_field(input, "mode").as_str() {
-                    "raw" => M::Raw(()),
-                    "block" => M::Block(()),
-                    _ => M::Line(()),
+                // Never guess at what to type: a malformed call writes nothing.
+                let text = input.get("input")?.as_str()?;
+                // A "line" is the text plus Enter, sent as-is. (The client's own
+                // line mode also sends Ctrl-A first, which a plain `read` or
+                // `input()` takes as part of the answer.)
+                let bytes = match input.get("mode").map(Value::as_str) {
+                    None | Some(Some("line")) => format!("{text}\r"),
+                    Some(Some("raw")) => text.to_string(),
+                    Some(_) => return None,
                 };
                 Some(tc::Tool::WriteToLongRunningShellCommand(
                     tc::WriteToLongRunningShellCommand {
-                        input: str_field(input, "input").into_bytes(),
-                        mode: Some(Mode { mode: Some(mode) }),
+                        input: bytes.into_bytes(),
+                        mode: Some(Mode {
+                            mode: Some(M::Raw(())),
+                        }),
                         command_id: str_field(input, "command_id"),
                     },
                 ))
@@ -289,7 +301,9 @@ pub fn decode_tool_call(call: &api::message::ToolCall) -> ToolUse {
                 Some(Delay::Duration(d)) => {
                     json!({ "command_id": r.command_id, "wait_seconds": d.seconds })
                 }
-                Some(Delay::OnCompletion(())) | None => json!({ "command_id": r.command_id }),
+                Some(Delay::OnCompletion(())) => json!({ "command_id": r.command_id }),
+                // The client's default: read after two seconds.
+                None => json!({ "command_id": r.command_id, "wait_seconds": 2 }),
             };
             (BUILTIN_READ_SHELL_OUTPUT, input)
         }
@@ -435,21 +449,22 @@ fn format_snapshot(command: &str, s: &api::LongRunningShellCommandSnapshot) -> (
     } else {
         "Its output so far"
     };
-    // The client marks the cursor position; that's noise to the model.
-    let output = if s.cursor.is_empty() {
-        s.output.clone()
+    // The client marks where the cursor is, which shows what's being typed into.
+    let cursor = if !s.cursor.is_empty() && s.output.contains(&s.cursor) {
+        format!(" ({} marks the cursor)", s.cursor)
     } else {
-        s.output.replace(&s.cursor, "")
+        String::new()
     };
     (
         format!(
             "{}(still running, command_id: {id})\n\
-             {screen}:\n{output}\n\n\
+             {screen}{cursor}:\n{output}\n\n\
              The terminal can't run another command until this one finishes. Use \
              `{BUILTIN_READ_SHELL_OUTPUT}` with command_id \"{id}\" to wait for it or check on \
              it, or `{BUILTIN_WRITE_TO_SHELL}` to answer a prompt or stop it.",
             command_line(command),
             id = s.command_id,
+            output = s.output,
         ),
         false,
     )
@@ -628,8 +643,10 @@ fn spec_read_shell_output() -> ToolSpec {
                 },
                 "wait_seconds": {
                     "type": "integer",
-                    "description": "Read the output after this many seconds instead of waiting \
-                        for the command to finish. Use 0 to read it now."
+                    "minimum": 0,
+                    "maximum": MAX_WAIT_SECONDS,
+                    "description": "Read the output after this many seconds (at most 120) \
+                        instead of waiting for the command to finish. Use 0 to read it now."
                 }
             },
             "required": ["command_id"]
@@ -654,10 +671,9 @@ fn spec_write_to_shell() -> ToolSpec {
                 "input": { "type": "string", "description": "The text to send." },
                 "mode": {
                     "type": "string",
-                    "enum": ["line", "raw", "block"],
+                    "enum": ["line", "raw"],
                     "description": "\"line\" (default) types the text and presses Enter; \
-                        \"raw\" sends the bytes as-is (for control keys); \"block\" pastes \
-                        multi-line text."
+                        \"raw\" sends it exactly as given (for control keys)."
                 }
             },
             "required": ["command_id", "input"]
