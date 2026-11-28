@@ -105,3 +105,64 @@ impl Conversation {
         }
     }
 }
+
+/// Text sent as the result of a tool call whose real result was never recorded.
+pub const MISSING_TOOL_RESULT: &str =
+    "(No result was recorded for this tool call. It may have been cancelled or interrupted.)";
+
+/// Make every tool call answered, as OpenAI-compatible and Anthropic backends
+/// require: each assistant turn with tool calls is followed by exactly one
+/// result per call, in call order. A call with no recorded result gets
+/// [`MISSING_TOOL_RESULT`]; a result that answers no call in the turn before
+/// it is dropped. Without this, one lost result makes every later request in
+/// the conversation fail.
+pub fn answer_tool_calls(messages: Vec<NeutralMsg>) -> Vec<NeutralMsg> {
+    let mut out = Vec::with_capacity(messages.len());
+    let mut messages = messages.into_iter().peekable();
+    while let Some(message) = messages.next() {
+        match message {
+            NeutralMsg::Assistant { text, tool_uses } if !tool_uses.is_empty() => {
+                let mut recorded =
+                    match messages.next_if(|m| matches!(m, NeutralMsg::ToolResults(_))) {
+                        Some(NeutralMsg::ToolResults(results)) => results,
+                        _ => Vec::new(),
+                    };
+                let results = tool_uses
+                    .iter()
+                    .map(|call| match recorded.iter().position(|r| r.id == call.id) {
+                        Some(found) => recorded.swap_remove(found),
+                        None => {
+                            tracing::warn!(
+                                "uncaged: tool call {} has no recorded result; sending a placeholder",
+                                call.id
+                            );
+                            ToolResult {
+                                id: call.id.clone(),
+                                content: MISSING_TOOL_RESULT.to_string(),
+                                is_error: true,
+                            }
+                        }
+                    })
+                    .collect();
+                for orphan in &recorded {
+                    tracing::warn!(
+                        "uncaged: dropping result {} that answers no tool call",
+                        orphan.id
+                    );
+                }
+                out.push(NeutralMsg::Assistant { text, tool_uses });
+                out.push(NeutralMsg::ToolResults(results));
+            }
+            NeutralMsg::ToolResults(results) => {
+                for orphan in &results {
+                    tracing::warn!(
+                        "uncaged: dropping result {} that answers no tool call",
+                        orphan.id
+                    );
+                }
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}

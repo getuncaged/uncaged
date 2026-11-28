@@ -26,6 +26,17 @@ pub type EngineStream = BoxStream<'static, Result<api::ResponseEvent, anyhow::Er
 
 /// Run a single Agent Mode turn against the configured local backend.
 pub fn run_turn(config: &UncagedConfig, request: &api::Request) -> EngineStream {
+    run_turn_with(request, |conversation_id| {
+        providers::build(config, conversation_id)
+    })
+}
+
+/// [`run_turn`] against the provider `build_provider` returns for the
+/// conversation's id (so tests can supply their own).
+pub(crate) fn run_turn_with(
+    request: &api::Request,
+    build_provider: impl FnOnce(&str) -> Box<dyn providers::Provider>,
+) -> EngineStream {
     let registry = ToolRegistry::build(request);
     let system = system_prompt::build(request, &registry.specs);
     let parsed = request_parse::parse(request);
@@ -36,11 +47,12 @@ pub fn run_turn(config: &UncagedConfig, request: &api::Request) -> EngineStream 
         tools: registry.specs.clone(),
     };
 
-    let provider = providers::build(config, &parsed.conversation_id);
+    let provider = build_provider(&parsed.conversation_id);
     let (tx, rx) = mpsc::unbounded();
 
     let target_task_id = parsed.target_task_id.clone();
     let conversation_id = parsed.conversation_id.clone();
+    let new_tool_results = parsed.new_tool_results;
 
     tokio::spawn(async move {
         drive(
@@ -49,6 +61,7 @@ pub fn run_turn(config: &UncagedConfig, request: &api::Request) -> EngineStream 
             conversation,
             conversation_id,
             target_task_id,
+            new_tool_results,
             tx,
         )
         .await;
@@ -63,6 +76,7 @@ async fn drive(
     conversation: Conversation,
     conversation_id: String,
     target_task_id: Option<String>,
+    new_tool_results: Vec<api::request::input::ToolCallResult>,
     tx: mpsc::UnboundedSender<Result<api::ResponseEvent, anyhow::Error>>,
 ) {
     let request_id = request_parse::new_id();
@@ -81,7 +95,23 @@ async fn drive(
         }
     };
 
-    // 3. Stream the assistant turn.
+    // 3. Record the tool results this request brought in the task, right after
+    //    their tool calls, so later requests replay each call with its result.
+    if !new_tool_results.is_empty() {
+        let actions = new_tool_results
+            .iter()
+            .map(|result| {
+                let message_id = request_parse::new_id();
+                wire::add_message(
+                    &task_id,
+                    wire::tool_call_result_message(&message_id, result),
+                )
+            })
+            .collect();
+        let _ = tx.unbounded_send(Ok(wire::client_actions(actions)));
+    }
+
+    // 4. Stream the assistant turn.
     let assistant_message_id = request_parse::new_id();
     let mut started_text = false;
 
@@ -123,6 +153,6 @@ async fn drive(
         }
     }
 
-    // 4. Finish.
+    // 5. Finish.
     let _ = tx.unbounded_send(Ok(wire::finished_done()));
 }
