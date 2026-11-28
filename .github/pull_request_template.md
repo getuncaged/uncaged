@@ -5,7 +5,6 @@
 <!--
 Link the GitHub issue this PR addresses. Before opening this PR, please confirm:
 -->
-- [ ] The linked issue is labeled `ready-to-spec` or `ready-to-implement`.
 - [ ] Where appropriate, screenshots or a short video of the implementation are included below (especially for user-visible or UI changes).
 
 ## Testing
@@ -21,9 +20,6 @@ You can run the app locally using `./script/run` - see AGENTS.md for more detail
 
 ### Screenshots / Videos
 <!-- Attach screenshots or a short video demonstrating the change, where appropriate. Remove this section if it is not relevant to your PR. -->
-
-## Agent Mode
-- [ ] Warp Agent Mode - This PR was created via Warp's AI Agent Mode
 
 <!--
 ## Changelog Entries for Stable
