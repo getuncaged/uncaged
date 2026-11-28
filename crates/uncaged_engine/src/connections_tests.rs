@@ -945,10 +945,10 @@ fn a_saved_edit_whose_engine_config_fails_is_still_saved() {
 #[test]
 fn a_failed_roster_write_leaves_the_previous_roster_intact() {
     let _guard = ENV_LOCK.lock().unwrap();
-    let dir = isolate();
+    isolate();
 
     let (custom, _) = connections::claim_for_preset("custom").unwrap();
-    let roster_path = dir.join("connections.json");
+    let roster_path = connections::roster_path();
     let before = std::fs::read(&roster_path).unwrap();
 
     // The staging file can't be written (its path is a directory), so the
@@ -995,7 +995,10 @@ fn discarding_an_inactive_draft_does_not_touch_the_engine_config() {
     let active = connections::add("openai").unwrap();
     let (draft, created) = connections::claim_for_preset("custom").unwrap();
     assert!(created);
-    assert_eq!(connections::load().active_id.as_deref(), Some(active.as_str()));
+    assert_eq!(
+        connections::load().active_id.as_deref(),
+        Some(active.as_str())
+    );
 
     // engine.json can't be written now; discarding the inactive draft doesn't
     // need it, so the cleanup succeeds.
@@ -1009,4 +1012,92 @@ fn discarding_an_inactive_draft_does_not_touch_the_engine_config() {
     let roster = connections::load();
     assert!(roster.connections.iter().all(|c| c.id != draft));
     assert_eq!(roster.active_id.as_deref(), Some(active.as_str()));
+}
+
+#[test]
+fn a_failed_rename_leaves_no_staging_file() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let dir = isolate();
+
+    // The roster path is a directory: reading it yields an empty roster and
+    // the staging file is written, but renaming it over the directory fails.
+    let roster_dir = dir.join("roster-dir");
+    std::fs::create_dir_all(roster_dir.join("keep")).unwrap();
+    // SAFETY: the env lock is held (see `isolate`).
+    unsafe {
+        std::env::set_var("UNCAGED_CONNECTIONS", &roster_dir);
+    }
+    assert!(connections::claim_for_preset("custom").is_err());
+    assert!(roster_dir.join("keep").is_dir());
+    let leftovers: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n.ends_with(".tmp"))
+        .collect();
+    assert!(leftovers.is_empty(), "staging files left: {leftovers:?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn saving_keeps_the_roster_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let _guard = ENV_LOCK.lock().unwrap();
+    isolate();
+
+    let (custom, _) = connections::claim_for_preset("custom").unwrap();
+    let roster_path = connections::roster_path();
+    std::fs::set_permissions(&roster_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    connections::update(
+        &custom,
+        "Custom".to_string(),
+        "http://localhost:8000/v1".to_string(),
+        "qwen".to_string(),
+        Some("sk-test".to_string()),
+        Vec::new(),
+    )
+    .unwrap();
+    let mode = std::fs::metadata(&roster_path)
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o600);
+}
+
+#[cfg(unix)]
+#[test]
+fn saving_writes_through_a_symlinked_roster() {
+    let _guard = ENV_LOCK.lock().unwrap();
+    let dir = isolate();
+
+    // Move the roster elsewhere and leave a symlink in its place.
+    let (custom, _) = connections::claim_for_preset("custom").unwrap();
+    let link = connections::roster_path();
+    let target_dir = dir.join("dotfiles");
+    std::fs::create_dir_all(&target_dir).unwrap();
+    let target = target_dir.join("connections.json");
+    std::fs::rename(&link, &target).unwrap();
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+
+    connections::update(
+        &custom,
+        "Custom".to_string(),
+        "http://localhost:8000/v1".to_string(),
+        "qwen".to_string(),
+        None,
+        Vec::new(),
+    )
+    .unwrap();
+    assert!(
+        std::fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert!(
+        std::fs::read_to_string(&target)
+            .unwrap()
+            .contains("\"qwen\"")
+    );
 }

@@ -11,6 +11,7 @@
 //! has to know the roster exists — it just reads the single active provider as
 //! before. Nothing here talks to the network; keys stay on the user's machine.
 
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -320,23 +321,55 @@ pub fn load() -> Roster {
 /// Write the roster atomically: the new contents go to a temporary file next
 /// to it, which is then renamed over it. A write that fails part-way leaves the
 /// previous roster intact instead of a truncated one.
+///
+/// A symlinked roster is written through to its target (the link is kept), and
+/// on Unix the new file keeps the current roster's permissions: it holds API
+/// keys, so a roster restricted to its owner stays that way.
 fn write(roster: &Roster) -> anyhow::Result<()> {
-    let path = roster_path();
+    let json = serde_json::to_string_pretty(roster)?;
+    let path = write_target(roster_path());
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let json = serde_json::to_string_pretty(roster)?;
     let tmp = roster_temp_path(&path);
-    if let Err(err) = std::fs::write(&tmp, json).and_then(|()| std::fs::rename(&tmp, &path)) {
+    // Only a staging file this call opened is cleaned up on failure.
+    let file = std::fs::File::create(&tmp)?;
+    if let Err(err) = stage(file, &path, &json).and_then(|()| std::fs::rename(&tmp, &path)) {
         let _ = std::fs::remove_file(&tmp);
         return Err(err.into());
     }
     Ok(())
 }
 
+/// Fill (and close) the staging file for [`write`]. On Unix it first gets the
+/// current roster's permissions, so keys are never readable more widely than
+/// they were.
+fn stage(mut file: std::fs::File, current: &Path, json: &str) -> std::io::Result<()> {
+    if cfg!(unix)
+        && let Ok(meta) = std::fs::metadata(current)
+    {
+        file.set_permissions(meta.permissions())?;
+    }
+    file.write_all(json.as_bytes())?;
+    file.sync_all()
+}
+
+/// The file [`write`] replaces: the roster path, or the file it links to when
+/// it's a symlink (so the rename updates the target instead of replacing the
+/// link). A broken link falls back to the path itself.
+fn write_target(path: PathBuf) -> PathBuf {
+    let is_link = std::fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink());
+    if is_link {
+        std::fs::canonicalize(&path).unwrap_or(path)
+    } else {
+        path
+    }
+}
+
 /// The temporary file [`write`] stages the roster in: same directory (so the
 /// rename stays on one filesystem), named per process so two app instances
-/// saving at once don't share it.
+/// saving at once don't share it. Roster writes in one process all run on the
+/// UI thread, so they never share it either.
 pub(crate) fn roster_temp_path(path: &Path) -> PathBuf {
     let name = path
         .file_name()
@@ -600,7 +633,8 @@ pub fn remove(id: &str) -> anyhow::Result<()> {
 /// [`claim_for_preset`]) when the save then failed before writing to it, so a
 /// cancelled editor leaves nothing behind. A row that has been configured
 /// (e.g. the save's write landed) is kept. Returns whether a row was removed;
-/// nothing is written when none was.
+/// nothing is written when none was. `engine.json` is rewritten only if the
+/// removed row was the active one (a row added for a save never is).
 pub fn discard_draft(id: &str) -> anyhow::Result<bool> {
     let mut roster = load_or_seed();
     let untouched = roster

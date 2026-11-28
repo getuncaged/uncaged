@@ -2558,9 +2558,10 @@ impl AISettingsPageView {
         ctx.notify();
     }
 
-    /// The row a save from a draft editor should go to: the editor's own row
-    /// once it has written to it, otherwise the draft if it's still untouched,
-    /// or a fresh row from the same preset (see `crate::uncaged::claim_draft`).
+    /// The row a save from a draft editor should go to: the row a new
+    /// connection's save just picked (`claimed`), otherwise the draft if it's
+    /// still untouched, or a fresh row from the same preset (see
+    /// `crate::uncaged::claim_draft`).
     fn claim_uncaged_draft(id: &str, draft: &PendingUncagedDraft) -> Result<String, String> {
         if draft.claimed {
             Ok(id.to_string())
@@ -2617,7 +2618,10 @@ impl AISettingsPageView {
             None => (id.to_string(), name.to_string()),
         };
         let id = id.as_str();
-        // Keep later saves from this editor (after an error below) on that row.
+        // Point the editor at that row. After an error below, a draft editor's
+        // next save claims it again (still the same row while it's untouched);
+        // a new connection's editor is put back into new-connection mode by
+        // `commit_new_uncaged_connection` and picks its row afresh.
         self.pending_uncaged_connection_id = Some(id.to_string());
         // For a CLI connection the modal's URL field actually holds the command
         // line, so split it into argv and store it as the command (leaving the
